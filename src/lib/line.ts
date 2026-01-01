@@ -188,152 +188,21 @@ export async function sendReceiptNotification(
 
 // Send welcome message when bot joins group
 export async function sendWelcomeMessage(groupId: string) {
-  const message: FlexMessage = {
-    type: 'flex',
-    altText: 'ยินดีต้อนรับสู่ SlipSync!',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          {
-            type: 'text',
-            text: '🧾 SlipSync',
-            size: 'xl',
-            weight: 'bold',
-            color: '#10B981',
-          },
-          {
-            type: 'text',
-            text: 'ระบบจัดการสลิปอัจฉริยะ',
-            size: 'sm',
-            color: '#94A3B8',
-            margin: 'sm',
-          },
-        ],
-        backgroundColor: '#0F172A',
-        paddingAll: '20px',
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          {
-            type: 'text',
-            text: 'Group ID ของคุณคือ:',
-            size: 'sm',
-            color: '#94A3B8',
-          },
-          {
-            type: 'text',
-            text: groupId,
-            size: 'md',
-            weight: 'bold',
-            color: '#10B981',
-            margin: 'sm',
-            wrap: true,
-          },
-          {
-            type: 'separator',
-            margin: 'xl',
-          },
-          {
-            type: 'text',
-            text: '📋 วิธีใช้งาน',
-            size: 'md',
-            weight: 'bold',
-            color: '#FFFFFF',
-            margin: 'xl',
-          },
-          {
-            type: 'text',
-            text: '1. คัดลอก Group ID ด้านบน',
-            size: 'sm',
-            color: '#CBD5E1',
-            margin: 'md',
-            wrap: true,
-          },
-          {
-            type: 'text',
-            text: '2. ไปที่ SlipSync > ตั้งค่า > Line',
-            size: 'sm',
-            color: '#CBD5E1',
-            margin: 'sm',
-            wrap: true,
-          },
-          {
-            type: 'text',
-            text: '3. วาง Group ID แล้วบันทึก',
-            size: 'sm',
-            color: '#CBD5E1',
-            margin: 'sm',
-            wrap: true,
-          },
-          {
-            type: 'separator',
-            margin: 'xl',
-          },
-          {
-            type: 'text',
-            text: '💡 พิมพ์ !groupid เพื่อดู Group ID อีกครั้ง',
-            size: 'xs',
-            color: '#64748B',
-            margin: 'xl',
-            wrap: true,
-          },
-        ],
-        backgroundColor: '#1E293B',
-        paddingAll: '20px',
-      },
-    },
+  // Send plain text first (easy to copy)
+  const textMessage: TextMessage = {
+    type: 'text',
+    text: `🎉 ยินดีต้อนรับสู่ SlipSync!\n\n🔑 Group ID ของคุณคือ:\n${groupId}\n\n📋 คัดลอก Group ID ด้านบนไปวางในหน้าตั้งค่า SlipSync\n\n💡 พิมพ์ !groupid เพื่อดู Group ID อีกครั้ง`,
   };
 
-  return lineClient.pushMessage(groupId, message);
+  return lineClient.pushMessage(groupId, textMessage);
 }
 
 // Send group ID message
 export async function sendGroupIdMessage(groupId: string, replyToken: string) {
-  const message: FlexMessage = {
-    type: 'flex',
-    altText: `Group ID: ${groupId}`,
-    contents: {
-      type: 'bubble',
-      size: 'kilo',
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          {
-            type: 'text',
-            text: '🔑 Group ID',
-            size: 'md',
-            weight: 'bold',
-            color: '#10B981',
-          },
-          {
-            type: 'text',
-            text: groupId,
-            size: 'sm',
-            color: '#FFFFFF',
-            margin: 'md',
-            wrap: true,
-          },
-          {
-            type: 'text',
-            text: 'คัดลอก ID นี้ไปวางในหน้าตั้งค่า SlipSync',
-            size: 'xs',
-            color: '#64748B',
-            margin: 'lg',
-            wrap: true,
-          },
-        ],
-        backgroundColor: '#1E293B',
-        paddingAll: '20px',
-      },
-    },
+  const textMessage: TextMessage = {
+    type: 'text',
+    text: `🔑 Group ID\n\n${groupId}\n\nคัดลอก ID นี้ไปวางในหน้าตั้งค่า SlipSync`,
   };
 
-  return lineClient.replyMessage(replyToken, message);
+  return lineClient.replyMessage(replyToken, textMessage);
 }
