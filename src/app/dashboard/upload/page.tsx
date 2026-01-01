@@ -193,12 +193,13 @@ export default function UploadPage() {
           .from('receipts')
           .getPublicUrl(fileName);
 
-        // Insert receipt record
-        const { error: insertError } = await supabase
-          .from('receipts')
-          .insert({
+        // Insert receipt record via Prisma API
+        const insertResponse = await fetch('/api/receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
             company_id: companyId,
-            uploaded_by: user.id,
             image_url: publicUrl,
             file_type: receipt.file.type.includes('pdf') ? 'pdf' : 'image',
             vendor_name: receipt.aiData.vendor_name,
@@ -208,13 +209,14 @@ export default function UploadPage() {
             has_vat: receipt.aiData.has_vat,
             receipt_date: receipt.aiData.receipt_date,
             ai_confidence: receipt.aiData.confidence,
-            status: 'pending',
-            period_month: new Date().getMonth() + 1,
-            period_year: new Date().getFullYear(),
-          });
+            suggested_category: receipt.aiData.suggested_category,
+          }),
+        });
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
+        const insertResult = await insertResponse.json();
+
+        if (!insertResult.success) {
+          console.error('Insert error:', insertResult.error, insertResult.details);
         } else {
           // Send LINE notification if enabled
           if (lineGroupId && lineNotificationsEnabled) {
