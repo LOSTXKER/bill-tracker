@@ -138,39 +138,40 @@ export default function UploadPage() {
         throw new Error('Not authenticated');
       }
 
-      // Get user profile with company and LINE settings
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id, full_name, companies(line_group_id, line_notifications)')
-        .eq('id', user.id)
-        .single();
+      // Get user profile with company and LINE settings via Prisma API
+      const profileResponse = await fetch('/api/profile');
+      const profileData = await profileResponse.json();
 
-      let companyId = profile?.company_id;
-      const lineGroupId = (profile?.companies as any)?.line_group_id;
-      const lineNotificationsEnabled = (profile?.companies as any)?.line_notifications;
-      const uploaderName = profile?.full_name || 'User';
+      if (!profileData.success) {
+        throw new Error('Failed to get profile');
+      }
 
-      // Create company if not exists
+      let companyId = profileData.profile?.companyId;
+      const lineGroupId = profileData.profile?.company?.lineGroupId;
+      const lineNotificationsEnabled = profileData.profile?.company?.lineNotifications;
+      const uploaderName = profileData.profile?.fullName || 'User';
+
+      // Create company if not exists via Prisma API
       if (!companyId) {
-        const { data: newCompany, error: companyError } = await supabase
-          .from('companies')
-          .insert({
-            name: 'บริษัทของฉัน',
-          })
-          .select()
-          .single();
+        const createCompanyResponse = await fetch('/api/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: uploaderName,
+            company: { name: 'บริษัทของฉัน' },
+            lineSettings: {},
+          }),
+        });
 
-        if (companyError || !newCompany) {
+        const createResult = await createCompanyResponse.json();
+        if (!createResult.success) {
           throw new Error('Failed to create company');
         }
 
-        companyId = newCompany.id;
-
-        // Update profile with company_id
-        await supabase
-          .from('profiles')
-          .update({ company_id: companyId })
-          .eq('id', user.id);
+        // Re-fetch profile to get the new company ID
+        const refetchResponse = await fetch('/api/profile');
+        const refetchData = await refetchResponse.json();
+        companyId = refetchData.profile?.companyId;
       }
 
       // Upload each receipt
@@ -219,9 +220,12 @@ export default function UploadPage() {
           console.error('Insert error:', insertResult.error, insertResult.details);
         } else {
           // Send LINE notification if enabled
+          console.log('LINE Settings:', { lineGroupId, lineNotificationsEnabled });
+          
           if (lineGroupId && lineNotificationsEnabled) {
             try {
-              await fetch('/api/line/notify', {
+              console.log('Sending LINE notification to:', lineGroupId);
+              const lineResponse = await fetch('/api/line/notify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -233,9 +237,13 @@ export default function UploadPage() {
                   receipt_date: receipt.aiData.receipt_date,
                 }),
               });
+              const lineResult = await lineResponse.json();
+              console.log('LINE notification result:', lineResult);
             } catch (lineError) {
               console.error('LINE notification error:', lineError);
             }
+          } else {
+            console.log('LINE notification skipped - not configured');
           }
         }
       }
