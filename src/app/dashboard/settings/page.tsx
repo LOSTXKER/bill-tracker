@@ -141,8 +141,8 @@ export default function SettingsPage() {
     { id: 'security', label: 'ความปลอดภัย', icon: Shield },
   ];
 
-  // LINE Bot ID - replace with your actual bot ID
-  const LINE_BOT_ID = '@slipsync';
+  // LINE Bot ID
+  const LINE_BOT_ID = '@175ebpyn';
   const LINE_BOT_ADD_URL = `https://line.me/R/ti/p/${LINE_BOT_ID}`;
 
   return (
