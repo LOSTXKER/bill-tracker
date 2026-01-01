@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  ceo
+  accounting
+  admin
+}
+
+enum ReceiptStatus {
+  pending
+  approved
+  rejected
+}
+
+enum FileType {
+  image
+  pdf
+}
+
+enum EntryStatus {
+  pending
+  processed
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model Company {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  taxId     String?  @map("tax_id") @db.VarChar(20)
+  address   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // LINE Integration
+  lineGroupId        String?  @map("line_group_id") @db.VarChar(50)
+  lineNotifications  Boolean  @default(false) @map("line_notifications")
+
+  // Relations
+  profiles              Profile[]
+  receipts              Receipt[]
+  expenseCategories     ExpenseCategory[]
+  preAccountingEntries  PreAccountingEntry[]
+
+  @@map("companies")
+}
+
+model Profile {
+  id        String   @id @db.Uuid
+  email     String   @db.VarChar(255)
+  fullName  String   @map("full_name") @db.VarChar(255)
+  role      UserRole @default(ceo)
+  companyId String?  @map("company_id") @db.Uuid
+  avatarUrl String?  @map("avatar_url") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  company            Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  uploadedReceipts   Receipt[]  @relation("UploadedBy")
+  approvedReceipts   Receipt[]  @relation("ApprovedBy")
+  processedEntries   PreAccountingEntry[]
+
+  @@map("profiles")
+}
+
+model ExpenseCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(100)
+  nameTh      String   @map("name_th") @db.VarChar(100)
+  description String?  @db.Text
+  companyId   String?  @map("company_id") @db.Uuid
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  company      Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  receipts     Receipt[] @relation("CategoryReceipts")
+  userReceipts Receipt[] @relation("UserCategoryReceipts")
+
+  @@map("expense_categories")
+}
+
+model Receipt {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  imageUrl   String   @map("image_url") @db.Text
+  fileType   FileType @default(image) @map("file_type")
+
+  // AI Extracted Data
+  vendorName     String?  @map("vendor_name") @db.VarChar(255)
+  amount         Decimal? @db.Decimal(15, 2)
+  vatAmount      Decimal? @map("vat_amount") @db.Decimal(15, 2)
+  totalAmount    Decimal? @map("total_amount") @db.Decimal(15, 2)
+  hasVat         Boolean  @default(false) @map("has_vat")
+  receiptDate    DateTime? @map("receipt_date") @db.Date
+  categoryId     String?  @map("category_id") @db.Uuid
+  aiConfidence   Decimal? @map("ai_confidence") @db.Decimal(5, 2)
+  aiRawResponse  Json?    @map("ai_raw_response")
+
+  // User Edited Data
+  userVendorName  String?  @map("user_vendor_name") @db.VarChar(255)
+  userAmount      Decimal? @map("user_amount") @db.Decimal(15, 2)
+  userReceiptDate DateTime? @map("user_receipt_date") @db.Date
+  userCategoryId  String?  @map("user_category_id") @db.Uuid
+  userNotes       String?  @map("user_notes") @db.Text
+
+  // Status
+  status      ReceiptStatus @default(pending)
+  approvedBy  String?       @map("approved_by") @db.Uuid
+  approvedAt  DateTime?     @map("approved_at") @db.Timestamptz
+
+  // Period
+  periodMonth Int? @map("period_month")
+  periodYear  Int? @map("period_year")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploader     Profile          @relation("UploadedBy", fields: [uploadedBy], references: [id], onDelete: Cascade)
+  approver     Profile?         @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  category     ExpenseCategory? @relation("CategoryReceipts", fields: [categoryId], references: [id])
+  userCategory ExpenseCategory? @relation("UserCategoryReceipts", fields: [userCategoryId], references: [id])
+  entries      PreAccountingEntry[]
+
+  @@index([companyId])
+  @@index([uploadedBy])
+  @@index([status])
+  @@index([periodYear, periodMonth])
+  @@index([createdAt(sort: Desc)])
+  @@map("receipts")
+}
+
+model PreAccountingEntry {
+  id          String      @id @default(uuid()) @db.Uuid
+  receiptId   String      @map("receipt_id") @db.Uuid
+  companyId   String      @map("company_id") @db.Uuid
+
+  // Entry Details
+  description   String    @db.Text
+  debitAccount  String?   @map("debit_account") @db.VarChar(50)
+  creditAccount String?   @map("credit_account") @db.VarChar(50)
+  amount        Decimal   @db.Decimal(15, 2)
+  vatAmount     Decimal?  @map("vat_amount") @db.Decimal(15, 2)
+
+  // Status
+  status       EntryStatus @default(pending)
+  processedBy  String?     @map("processed_by") @db.Uuid
+  processedAt  DateTime?   @map("processed_at") @db.Timestamptz
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  receipt   Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  processor Profile? @relation(fields: [processedBy], references: [id])
+
+  @@index([companyId])
+  @@map("pre_accounting_entries")
+}
