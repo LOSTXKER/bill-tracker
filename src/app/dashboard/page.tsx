@@ -60,7 +60,7 @@ export default async function DashboardPage() {
     .eq('period_year', currentYear);
 
   const categoryBreakdown = categoryData?.reduce((acc, r) => {
-    const categoryName = r.expense_categories?.name_th || 'อื่นๆ';
+    const categoryName = (r.expense_categories as any)?.name_th || 'อื่นๆ';
     const amount = Number(r.user_amount || r.total_amount || r.amount || 0);
     
     if (!acc[categoryName]) {

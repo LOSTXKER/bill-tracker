@@ -257,28 +257,23 @@ export default function UploadPage() {
       </div>
 
       {/* Steps Indicator */}
-      <div className="flex items-center justify-center gap-4">
-        <div className={`flex items-center gap-2 ${currentStep === 'upload' ? 'text-emerald-400' : 'text-slate-400'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'upload' ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
-            1
+      {(currentStep as string) !== 'complete' && (
+        <div className="flex items-center justify-center gap-4">
+          <div className={`flex items-center gap-2 ${currentStep === 'upload' ? 'text-emerald-400' : 'text-slate-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'upload' ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
+              1
+            </div>
+            <span className="hidden sm:inline">อัปโหลด</span>
           </div>
-          <span className="hidden sm:inline">อัปโหลด</span>
-        </div>
-        <div className="w-8 h-0.5 bg-slate-700" />
-        <div className={`flex items-center gap-2 ${currentStep === 'review' ? 'text-emerald-400' : 'text-slate-400'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'review' ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
-            2
+          <div className="w-8 h-0.5 bg-slate-700" />
+          <div className={`flex items-center gap-2 ${currentStep === 'review' ? 'text-emerald-400' : 'text-slate-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'review' ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
+              2
+            </div>
+            <span className="hidden sm:inline">ตรวจสอบ</span>
           </div>
-          <span className="hidden sm:inline">ตรวจสอบ</span>
         </div>
-        <div className="w-8 h-0.5 bg-slate-700" />
-        <div className={`flex items-center gap-2 ${currentStep === 'complete' ? 'text-emerald-400' : 'text-slate-400'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'complete' ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
-            3
-          </div>
-          <span className="hidden sm:inline">เสร็จสิ้น</span>
-        </div>
-      </div>
+      )}
 
       {/* Upload Area */}
       {currentStep === 'upload' && (
