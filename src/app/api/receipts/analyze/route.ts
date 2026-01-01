@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeReceipt } from '@/lib/gemini';
-import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     // Get form data
     const formData = await request.formData();
     const file = formData.get('file') as File;
