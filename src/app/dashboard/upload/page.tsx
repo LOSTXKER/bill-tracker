@@ -138,14 +138,17 @@ export default function UploadPage() {
         throw new Error('Not authenticated');
       }
 
-      // Get user profile with company
+      // Get user profile with company and LINE settings
       const { data: profile } = await supabase
         .from('profiles')
-        .select('company_id')
+        .select('company_id, full_name, companies(line_group_id, line_notifications)')
         .eq('id', user.id)
         .single();
 
       let companyId = profile?.company_id;
+      const lineGroupId = (profile?.companies as any)?.line_group_id;
+      const lineNotificationsEnabled = (profile?.companies as any)?.line_notifications;
+      const uploaderName = profile?.full_name || 'User';
 
       // Create company if not exists
       if (!companyId) {
@@ -212,6 +215,26 @@ export default function UploadPage() {
 
         if (insertError) {
           console.error('Insert error:', insertError);
+        } else {
+          // Send LINE notification if enabled
+          if (lineGroupId && lineNotificationsEnabled) {
+            try {
+              await fetch('/api/line/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  groupId: lineGroupId,
+                  vendor_name: receipt.aiData.vendor_name,
+                  total_amount: receipt.aiData.total_amount,
+                  category: receipt.aiData.suggested_category,
+                  uploaded_by: uploaderName,
+                  receipt_date: receipt.aiData.receipt_date,
+                }),
+              });
+            } catch (lineError) {
+              console.error('LINE notification error:', lineError);
+            }
+          }
         }
       }
 
