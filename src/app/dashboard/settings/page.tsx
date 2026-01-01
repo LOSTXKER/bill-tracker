@@ -17,7 +17,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/client';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -44,37 +43,32 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*, companies(*)')
-          .eq('id', user.id)
-          .single();
+      try {
+        const response = await fetch('/api/profile');
+        const data = await response.json();
 
-        if (profileData) {
+        if (data.success && data.profile) {
           setProfile({
-            full_name: profileData.full_name || '',
-            email: profileData.email || user.email || '',
+            full_name: data.profile.fullName || '',
+            email: data.profile.email || data.email || '',
             phone: '',
           });
 
-          if (profileData.companies) {
+          if (data.profile.company) {
             setCompany({
-              name: profileData.companies.name || '',
-              tax_id: profileData.companies.tax_id || '',
-              address: profileData.companies.address || '',
+              name: data.profile.company.name || '',
+              tax_id: data.profile.company.taxId || '',
+              address: data.profile.company.address || '',
             });
             
-            // Load LINE settings from company (you may need to add this column)
             setLineSettings({
-              group_id: profileData.companies.line_group_id || '',
-              notifications_enabled: profileData.companies.line_notifications || false,
+              group_id: data.profile.company.lineGroupId || '',
+              notifications_enabled: data.profile.company.lineNotifications || false,
             });
           }
         }
+      } catch (error) {
+        console.error('Load profile error:', error);
       }
     };
 
@@ -85,41 +79,31 @@ export default function SettingsPage() {
     setIsLoading(true);
     
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      // Update profile
-      await supabase
-        .from('profiles')
-        .update({
-          full_name: profile.full_name,
-        })
-        .eq('id', user.id);
-
-      // Get company_id and update company
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single();
-
-      if (profileData?.company_id) {
-        await supabase
-          .from('companies')
-          .update({
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: profile.full_name,
+          company: {
             name: company.name,
-            tax_id: company.tax_id,
+            taxId: company.tax_id,
             address: company.address,
-            line_group_id: lineSettings.group_id,
-            line_notifications: lineSettings.notifications_enabled,
-          })
-          .eq('id', profileData.company_id);
-      }
+          },
+          lineSettings: {
+            groupId: lineSettings.group_id,
+            notificationsEnabled: lineSettings.notifications_enabled,
+          },
+        }),
+      });
 
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      const data = await response.json();
+      
+      if (data.success) {
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      } else {
+        console.error('Save error:', data.error);
+      }
     } catch (error) {
       console.error('Save error:', error);
     } finally {

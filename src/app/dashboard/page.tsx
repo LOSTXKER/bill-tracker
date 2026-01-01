@@ -1,3 +1,4 @@
+import prisma from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,47 +22,57 @@ export default async function DashboardPage() {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // Get user profile
+  // Get user from Supabase auth
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, companies(*)')
-    .eq('id', user?.id)
-    .single();
 
-  // Get receipts stats for current month
-  const { data: receipts } = await supabase
-    .from('receipts')
-    .select('*')
-    .eq('period_month', currentMonth)
-    .eq('period_year', currentYear);
+  // Get profile using Prisma
+  const profile = user ? await prisma.profile.findUnique({
+    where: { id: user.id },
+    include: { company: true },
+  }) : null;
 
-  const totalReceipts = receipts?.length || 0;
-  const pendingReceipts = receipts?.filter(r => r.status === 'pending').length || 0;
-  const approvedReceipts = receipts?.filter(r => r.status === 'approved').length || 0;
+  // Get receipts stats for current month using Prisma
+  const receipts = await prisma.receipt.findMany({
+    where: {
+      periodMonth: currentMonth,
+      periodYear: currentYear,
+    },
+  });
+
+  const totalReceipts = receipts.length;
+  const pendingReceipts = receipts.filter(r => r.status === 'pending').length;
+  const approvedReceipts = receipts.filter(r => r.status === 'approved').length;
   
-  const totalAmount = receipts?.reduce((sum, r) => {
-    const amount = r.user_amount || r.total_amount || r.amount || 0;
+  const totalAmount = receipts.reduce((sum, r) => {
+    const amount = r.userAmount || r.totalAmount || r.amount || 0;
     return sum + Number(amount);
-  }, 0) || 0;
+  }, 0);
 
-  // Get recent receipts
-  const { data: recentReceipts } = await supabase
-    .from('receipts')
-    .select('*, expense_categories(*)')
-    .order('created_at', { ascending: false })
-    .limit(5);
+  // Get recent receipts using Prisma
+  const recentReceipts = await prisma.receipt.findMany({
+    include: {
+      category: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 5,
+  });
 
   // Get category breakdown
-  const { data: categoryData } = await supabase
-    .from('receipts')
-    .select('category_id, expense_categories(name_th), amount, total_amount, user_amount')
-    .eq('period_month', currentMonth)
-    .eq('period_year', currentYear);
+  const receiptsWithCategory = await prisma.receipt.findMany({
+    where: {
+      periodMonth: currentMonth,
+      periodYear: currentYear,
+    },
+    include: {
+      category: true,
+    },
+  });
 
-  const categoryBreakdown = categoryData?.reduce((acc, r) => {
-    const categoryName = (r.expense_categories as any)?.name_th || 'อื่นๆ';
-    const amount = Number(r.user_amount || r.total_amount || r.amount || 0);
+  const categoryBreakdown = receiptsWithCategory.reduce((acc, r) => {
+    const categoryName = r.category?.nameTh || 'อื่นๆ';
+    const amount = Number(r.userAmount || r.totalAmount || r.amount || 0);
     
     if (!acc[categoryName]) {
       acc[categoryName] = { count: 0, amount: 0 };
@@ -69,7 +80,7 @@ export default async function DashboardPage() {
     acc[categoryName].count++;
     acc[categoryName].amount += amount;
     return acc;
-  }, {} as Record<string, { count: number; amount: number }>) || {};
+  }, {} as Record<string, { count: number; amount: number }>);
 
   return (
     <div className="space-y-8">
@@ -77,7 +88,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-white">
-            สวัสดี, {profile?.full_name || 'คุณ'}! 👋
+            สวัสดี, {profile?.fullName || 'คุณ'}! 👋
           </h1>
           <p className="text-slate-400 mt-1">
             สรุปค่าใช้จ่าย {getMonthName(currentMonth)} {currentYear + 543}
@@ -174,7 +185,7 @@ export default async function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {recentReceipts && recentReceipts.length > 0 ? (
+            {recentReceipts.length > 0 ? (
               <div className="space-y-4">
                 {recentReceipts.map((receipt) => (
                   <div 
@@ -187,16 +198,16 @@ export default async function DashboardPage() {
                       </div>
                       <div>
                         <p className="font-medium text-white">
-                          {receipt.user_vendor_name || receipt.vendor_name || 'ไม่ระบุชื่อร้าน'}
+                          {receipt.userVendorName || receipt.vendorName || 'ไม่ระบุชื่อร้าน'}
                         </p>
                         <p className="text-sm text-slate-500">
-                          {receipt.expense_categories?.name_th || 'ไม่ระบุหมวด'}
+                          {receipt.category?.nameTh || 'ไม่ระบุหมวด'}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-white">
-                        {formatCurrency(receipt.user_amount || receipt.total_amount || receipt.amount || 0)}
+                        {formatCurrency(Number(receipt.userAmount || receipt.totalAmount || receipt.amount || 0))}
                       </p>
                       <Badge 
                         variant={

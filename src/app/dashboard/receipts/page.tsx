@@ -1,13 +1,10 @@
-import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import prisma from '@/lib/prisma';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   Receipt, 
-  Search, 
-  Filter, 
   Calendar,
-  ArrowUpRight,
   Eye,
   CheckCircle2,
   XCircle,
@@ -22,35 +19,36 @@ export default async function ReceiptsPage({
   searchParams: Promise<{ status?: string; month?: string; year?: string }>;
 }) {
   const params = await searchParams;
-  const supabase = await createClient();
   
   const currentMonth = params.month ? parseInt(params.month) : new Date().getMonth() + 1;
   const currentYear = params.year ? parseInt(params.year) : new Date().getFullYear();
-  const statusFilter = params.status;
+  const statusFilter = params.status as 'pending' | 'approved' | 'rejected' | undefined;
 
-  // Build query
-  let query = supabase
-    .from('receipts')
-    .select('*, expense_categories(*), profiles!receipts_uploaded_by_fkey(full_name)')
-    .eq('period_month', currentMonth)
-    .eq('period_year', currentYear)
-    .order('created_at', { ascending: false });
-
-  if (statusFilter) {
-    query = query.eq('status', statusFilter);
-  }
-
-  const { data: receipts, error } = await query;
+  // Fetch receipts using Prisma
+  const receipts = await prisma.receipt.findMany({
+    where: {
+      periodMonth: currentMonth,
+      periodYear: currentYear,
+      status: statusFilter || undefined,
+    },
+    include: {
+      category: true,
+      uploader: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
 
   // Get stats
-  const totalCount = receipts?.length || 0;
-  const pendingCount = receipts?.filter(r => r.status === 'pending').length || 0;
-  const approvedCount = receipts?.filter(r => r.status === 'approved').length || 0;
-  const rejectedCount = receipts?.filter(r => r.status === 'rejected').length || 0;
+  const totalCount = receipts.length;
+  const pendingCount = receipts.filter(r => r.status === 'pending').length;
+  const approvedCount = receipts.filter(r => r.status === 'approved').length;
+  const rejectedCount = receipts.filter(r => r.status === 'rejected').length;
 
-  const totalAmount = receipts?.reduce((sum, r) => {
-    return sum + Number(r.user_amount || r.total_amount || r.amount || 0);
-  }, 0) || 0;
+  const totalAmount = receipts.reduce((sum, r) => {
+    return sum + Number(r.userAmount || r.totalAmount || r.amount || 0);
+  }, 0);
 
   const months = [
     'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
@@ -144,7 +142,7 @@ export default async function ReceiptsPage({
       </Card>
 
       {/* Receipts List */}
-      {receipts && receipts.length > 0 ? (
+      {receipts.length > 0 ? (
         <div className="grid gap-4">
           {receipts.map((receipt) => (
             <Card key={receipt.id} className="hover:border-slate-700 transition-colors">
@@ -152,9 +150,9 @@ export default async function ReceiptsPage({
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   {/* Receipt Image Preview */}
                   <div className="w-full md:w-24 h-32 md:h-24 rounded-xl bg-slate-800 overflow-hidden flex-shrink-0">
-                    {receipt.image_url ? (
+                    {receipt.imageUrl ? (
                       <img 
-                        src={receipt.image_url} 
+                        src={receipt.imageUrl} 
                         alt="Receipt" 
                         className="w-full h-full object-cover"
                       />
@@ -170,11 +168,11 @@ export default async function ReceiptsPage({
                     <div className="flex items-start justify-between gap-4 mb-2">
                       <div>
                         <h3 className="font-semibold text-white truncate">
-                          {receipt.user_vendor_name || receipt.vendor_name || 'ไม่ระบุชื่อร้าน'}
+                          {receipt.userVendorName || receipt.vendorName || 'ไม่ระบุชื่อร้าน'}
                         </h3>
                         <p className="text-sm text-slate-400">
-                          {receipt.expense_categories?.name_th || 'ไม่ระบุหมวด'} • 
-                          {receipt.receipt_date && formatShortDate(receipt.receipt_date)}
+                          {receipt.category?.nameTh || 'ไม่ระบุหมวด'} • 
+                          {receipt.receiptDate && formatShortDate(receipt.receiptDate)}
                         </p>
                       </div>
                       <Badge 
@@ -192,26 +190,26 @@ export default async function ReceiptsPage({
                       <div>
                         <span className="text-slate-500">ยอดรวม: </span>
                         <span className="font-semibold text-white">
-                          {formatCurrency(receipt.user_amount || receipt.total_amount || receipt.amount || 0)}
+                          {formatCurrency(Number(receipt.userAmount || receipt.totalAmount || receipt.amount || 0))}
                         </span>
                       </div>
-                      {receipt.has_vat && receipt.vat_amount && (
+                      {receipt.hasVat && receipt.vatAmount && (
                         <div>
                           <span className="text-slate-500">VAT: </span>
-                          <span className="text-slate-300">{formatCurrency(receipt.vat_amount)}</span>
+                          <span className="text-slate-300">{formatCurrency(Number(receipt.vatAmount))}</span>
                         </div>
                       )}
-                      {receipt.ai_confidence && (
+                      {receipt.aiConfidence && (
                         <div>
                           <span className="text-slate-500">AI: </span>
-                          <span className="text-emerald-400">{receipt.ai_confidence}%</span>
+                          <span className="text-emerald-400">{Number(receipt.aiConfidence)}%</span>
                         </div>
                       )}
                     </div>
 
-                    {receipt.user_notes && (
+                    {receipt.userNotes && (
                       <p className="mt-2 text-sm text-slate-400 truncate">
-                        หมายเหตุ: {receipt.user_notes}
+                        หมายเหตุ: {receipt.userNotes}
                       </p>
                     )}
                   </div>
