@@ -145,8 +145,29 @@ export default function UploadPage() {
         .eq('id', user.id)
         .single();
 
-      if (!profile?.company_id) {
-        throw new Error('No company associated with user');
+      let companyId = profile?.company_id;
+
+      // Create company if not exists
+      if (!companyId) {
+        const { data: newCompany, error: companyError } = await supabase
+          .from('companies')
+          .insert({
+            name: 'บริษัทของฉัน',
+          })
+          .select()
+          .single();
+
+        if (companyError || !newCompany) {
+          throw new Error('Failed to create company');
+        }
+
+        companyId = newCompany.id;
+
+        // Update profile with company_id
+        await supabase
+          .from('profiles')
+          .update({ company_id: companyId })
+          .eq('id', user.id);
       }
 
       // Upload each receipt
@@ -173,7 +194,7 @@ export default function UploadPage() {
         const { error: insertError } = await supabase
           .from('receipts')
           .insert({
-            company_id: profile.company_id,
+            company_id: companyId,
             uploaded_by: user.id,
             image_url: publicUrl,
             file_type: receipt.file.type.includes('pdf') ? 'pdf' : 'image',
