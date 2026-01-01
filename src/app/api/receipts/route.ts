@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('company_id');
     const month = searchParams.get('month');
     const year = searchParams.get('year');
-    const status = searchParams.get('status');
+    const status = searchParams.get('status') as 'pending' | 'approved' | 'rejected' | null;
 
     const receipts = await prisma.receipt.findMany({
       where: {
