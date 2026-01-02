@@ -2,7 +2,7 @@
 
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
-import { isRedirectError } from "next/dist/client/components/redirect";
+import { redirect } from "next/navigation";
 
 export async function authenticate(
   email: string,
@@ -13,14 +13,9 @@ export async function authenticate(
     await signIn("credentials", {
       email,
       password,
-      redirectTo: callbackUrl,
+      redirect: false,
     });
-    return { success: true };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
@@ -29,6 +24,8 @@ export async function authenticate(
           return { success: false, error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
       }
     }
-    return { success: false, error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" };
+    throw error;
   }
+  
+  redirect(callbackUrl);
 }

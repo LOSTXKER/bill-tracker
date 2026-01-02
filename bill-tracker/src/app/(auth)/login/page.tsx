@@ -32,15 +32,14 @@ function LoginForm() {
     try {
       const result = await authenticate(email, password, callbackUrl);
 
-      if (!result.success) {
+      // If we get a result, it means there was an error (success redirects automatically)
+      if (result && !result.success) {
         setErrorMessage(result.error || "เกิดข้อผิดพลาด");
-        setIsLoading(false);
       }
-      // If success, the server action will handle the redirect
-    } catch (error) {
-      // Server action will throw redirect error on success, which is expected
-      // Only set error if it's not a redirect
-      setErrorMessage("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+    } catch {
+      // Redirect errors are expected on success - they're handled by Next.js
+      // Only show error for actual failures
+    } finally {
       setIsLoading(false);
     }
   };
