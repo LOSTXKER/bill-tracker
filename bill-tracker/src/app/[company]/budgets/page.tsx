@@ -173,7 +173,7 @@ async function BudgetOverview({ companyCode }: { companyCode: string }) {
 
       {/* Budget by Category */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {budgets.map((budget) => {
+        {budgets.map((budget: typeof budgets[number]) => {
           const spent = spendingMap.get(budget.category) || 0;
           const percentage = Number(budget.amount) > 0
             ? (spent / Number(budget.amount)) * 100
