@@ -73,11 +73,11 @@ async function BudgetOverview({ companyCode }: { companyCode: string }) {
   });
 
   const spendingMap = new Map<string, number>();
-  spending.forEach((s) => {
-    if (s.category) {
-      spendingMap.set(s.category, Number(s._sum.netPaid) || 0);
+  for (const item of spending) {
+    if (item.category) {
+      spendingMap.set(item.category, Number(item._sum.netPaid) || 0);
     }
-  });
+  }
 
   // Calculate total budget and spending
   const totalBudget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
