@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { hash } from "bcryptjs";
+const { PrismaClient } = require("@prisma/client");
+const { hash } = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
@@ -162,7 +162,7 @@ async function main() {
       create: {
         id: `seed-budget-${anajak.id}-${budget.category}`,
         companyId: anajak.id,
-        category: budget.category as any,
+        category: budget.category,
         amount: budget.amount,
         period: "MONTHLY",
         startDate: startOfMonth,
@@ -222,9 +222,9 @@ async function main() {
         whtAmount: whtAmount > 0 ? whtAmount : null,
         whtType: exp.isWht ? "SERVICE_3" : null,
         netPaid,
-        category: exp.category as any,
+        category: exp.category,
         description: exp.description,
-        status: exp.status as any,
+        status: exp.status,
         billDate: new Date(now.getFullYear(), now.getMonth(), 5 + i * 5),
         createdBy: demoUser.id,
       },
@@ -280,7 +280,7 @@ async function main() {
         whtType: inc.isWhtDeducted ? "SERVICE_3" : null,
         netReceived,
         source: inc.source,
-        status: inc.status as any,
+        status: inc.status,
         receiveDate: new Date(now.getFullYear(), now.getMonth(), 3 + i * 7),
         createdBy: demoUser.id,
       },
