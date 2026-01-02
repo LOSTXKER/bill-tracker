@@ -175,8 +175,8 @@ async function VATReport({
   ]);
 
   const summary = calculateVATSummary(
-    expenses.map((e) => ({ vatAmount: e.vatAmount ? Number(e.vatAmount) : null })),
-    incomes.map((i) => ({ vatAmount: i.vatAmount ? Number(i.vatAmount) : null }))
+    expenses.map((e: typeof expenses[number]) => ({ vatAmount: e.vatAmount ? Number(e.vatAmount) : null })),
+    incomes.map((i: typeof incomes[number]) => ({ vatAmount: i.vatAmount ? Number(i.vatAmount) : null }))
   );
 
   return (
@@ -383,8 +383,8 @@ async function WHTReport({
   ]);
 
   const summary = calculateWHTSummary(
-    expenses.map((e) => ({ whtAmount: e.whtAmount ? Number(e.whtAmount) : null })),
-    incomes.map((i) => ({ whtAmount: i.whtAmount ? Number(i.whtAmount) : null }))
+    expenses.map((e: typeof expenses[number]) => ({ whtAmount: e.whtAmount ? Number(e.whtAmount) : null })),
+    incomes.map((i: typeof incomes[number]) => ({ whtAmount: i.whtAmount ? Number(i.whtAmount) : null }))
   );
 
   return (
@@ -707,8 +707,8 @@ async function MonthlySummary({
           ) : (
             <div className="space-y-4">
               {expenseByCategory
-                .sort((a, b) => (Number(b._sum.netPaid) || 0) - (Number(a._sum.netPaid) || 0))
-                .map((item) => {
+                .sort((a: typeof expenseByCategory[number], b: typeof expenseByCategory[number]) => (Number(b._sum.netPaid) || 0) - (Number(a._sum.netPaid) || 0))
+                .map((item: typeof expenseByCategory[number]) => {
                   const amount = Number(item._sum.netPaid) || 0;
                   const percentage = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
                   return (

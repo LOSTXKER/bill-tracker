@@ -631,10 +631,10 @@ async function ExpenseCategoryChartData({
     _sum: { netPaid: true },
   });
 
-  const total = expenseByCategory.reduce(
-    (sum, item) => sum + Number(item._sum.netPaid || 0),
-    0
-  );
+  let total = 0;
+  for (const item of expenseByCategory) {
+    total += Number(item._sum.netPaid || 0);
+  }
 
   const categoryLabels: Record<string, string> = {
     MATERIAL: "วัตถุดิบ",
@@ -649,8 +649,8 @@ async function ExpenseCategoryChartData({
   };
 
   const chartData = expenseByCategory
-    .filter((item) => item.category)
-    .map((item) => {
+    .filter((item: typeof expenseByCategory[number]) => item.category)
+    .map((item: typeof expenseByCategory[number]) => {
       const value = Number(item._sum.netPaid) || 0;
       return {
         name: categoryLabels[item.category!] || item.category!,

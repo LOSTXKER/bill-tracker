@@ -104,7 +104,7 @@ async function CustomersList({
   });
 
   const statsMap = new Map(
-    customerStats.map((s) => [
+    customerStats.map((s: typeof customerStats[number]) => [
       s.customerId,
       { total: Number(s._sum.netReceived) || 0, count: s._count },
     ])

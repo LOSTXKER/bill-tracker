@@ -104,7 +104,7 @@ async function VendorsList({
   });
 
   const statsMap = new Map(
-    vendorStats.map((s) => [s.vendorId, { total: Number(s._sum.netPaid) || 0, count: s._count }])
+    vendorStats.map((s: typeof vendorStats[number]) => [s.vendorId, { total: Number(s._sum.netPaid) || 0, count: s._count }])
   );
 
   if (vendors.length === 0) {

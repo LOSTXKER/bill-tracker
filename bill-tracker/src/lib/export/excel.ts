@@ -365,14 +365,14 @@ export async function exportVATReport(
   // VAT Summary
   const summarySheet = workbook.addWorksheet("สรุป VAT");
 
-  const inputVAT = expenses.reduce(
-    (sum, e) => sum + (Number(e.vatAmount) || 0),
-    0
-  );
-  const outputVAT = incomes.reduce(
-    (sum, i) => sum + (Number(i.vatAmount) || 0),
-    0
-  );
+  let inputVAT = 0;
+  for (const e of expenses) {
+    inputVAT += Number(e.vatAmount) || 0;
+  }
+  let outputVAT = 0;
+  for (const i of incomes) {
+    outputVAT += Number(i.vatAmount) || 0;
+  }
   const netVAT = outputVAT - inputVAT;
 
   summarySheet.columns = [
@@ -474,14 +474,18 @@ export async function exportWHTReport(
   // WHT Summary
   const summarySheet = workbook.addWorksheet("สรุปหัก ณ ที่จ่าย");
 
-  const whtPaid = expenses.reduce(
-    (sum, e) => sum + (e.isWht ? Number(e.whtAmount) || 0 : 0),
-    0
-  );
-  const whtReceived = incomes.reduce(
-    (sum, i) => sum + (i.isWhtDeducted ? Number(i.whtAmount) || 0 : 0),
-    0
-  );
+  let whtPaid = 0;
+  for (const e of expenses) {
+    if (e.isWht) {
+      whtPaid += Number(e.whtAmount) || 0;
+    }
+  }
+  let whtReceived = 0;
+  for (const i of incomes) {
+    if (i.isWhtDeducted) {
+      whtReceived += Number(i.whtAmount) || 0;
+    }
+  }
 
   summarySheet.columns = [
     { header: "รายการ", key: "item", width: 30 },
