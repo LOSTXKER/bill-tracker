@@ -261,7 +261,7 @@ async function handleTextMessage(
     for (const budget of budgets) {
       const spent = expenses
         .filter((exp) => exp.category === budget.category)
-        .reduce((sum, exp) => sum + Number(exp.netPaid), 0);
+        .reduce((sum: number, exp) => sum + Number(exp.netPaid), 0);
 
       const budgetAmount = Number(budget.amount);
       const percentage = (spent / budgetAmount) * 100;

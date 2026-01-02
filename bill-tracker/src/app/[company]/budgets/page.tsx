@@ -80,8 +80,8 @@ async function BudgetOverview({ companyCode }: { companyCode: string }) {
   }
 
   // Calculate total budget and spending
-  const totalBudget = budgets.reduce((sum, b) => sum + Number(b.amount), 0);
-  const totalSpending = Array.from(spendingMap.values()).reduce((sum, v) => sum + v, 0);
+  const totalBudget = budgets.reduce((sum: number, b) => sum + Number(b.amount), 0);
+  const totalSpending = Array.from(spendingMap.values()).reduce((sum: number, v: number) => sum + v, 0);
   const totalPercentage = totalBudget > 0 ? (totalSpending / totalBudget) * 100 : 0;
 
   if (budgets.length === 0) {
