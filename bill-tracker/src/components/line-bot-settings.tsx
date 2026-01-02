@@ -75,7 +75,8 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
       if (response.ok) {
         const data = await response.json();
         setConfig({
-          ...config,
+          channelSecret: config?.channelSecret ?? null,
+          channelAccessToken: config?.channelAccessToken ?? null,
           isConfigured: true,
           groupId: formData.groupId || null,
         });
