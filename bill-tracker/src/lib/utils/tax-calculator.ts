@@ -139,8 +139,14 @@ export function calculateVATSummary(
   expenses: { vatAmount: number | null }[],
   incomes: { vatAmount: number | null }[]
 ): VATSummary {
-  const inputVAT = expenses.reduce((sum: number, e) => sum + (Number(e.vatAmount) || 0), 0);
-  const outputVAT = incomes.reduce((sum: number, i) => sum + (Number(i.vatAmount) || 0), 0);
+  let inputVAT = 0;
+  for (const e of expenses) {
+    inputVAT += Number(e.vatAmount) || 0;
+  }
+  let outputVAT = 0;
+  for (const i of incomes) {
+    outputVAT += Number(i.vatAmount) || 0;
+  }
   const netVAT = outputVAT - inputVAT;
 
   return { inputVAT, outputVAT, netVAT };
@@ -159,8 +165,14 @@ export function calculateWHTSummary(
   expenses: { whtAmount: number | null }[],
   incomes: { whtAmount: number | null }[]
 ): WHTSummary {
-  const whtPaid = expenses.reduce((sum: number, e) => sum + (Number(e.whtAmount) || 0), 0);
-  const whtReceived = incomes.reduce((sum: number, i) => sum + (Number(i.whtAmount) || 0), 0);
+  let whtPaid = 0;
+  for (const e of expenses) {
+    whtPaid += Number(e.whtAmount) || 0;
+  }
+  let whtReceived = 0;
+  for (const i of incomes) {
+    whtReceived += Number(i.whtAmount) || 0;
+  }
   const netWHT = whtPaid - whtReceived;
 
   return { whtPaid, whtReceived, netWHT };

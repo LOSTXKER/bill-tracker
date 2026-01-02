@@ -259,9 +259,11 @@ async function handleTextMessage(
     let budgetText = `💰 งบประมาณเดือน${now.toLocaleDateString("th-TH", { month: "long" })}\n\n`;
 
     for (const budget of budgets) {
-      const spent = expenses
-        .filter((exp) => exp.category === budget.category)
-        .reduce((sum: number, exp) => sum + Number(exp.netPaid), 0);
+      const filtered = expenses.filter((exp) => exp.category === budget.category);
+      let spent = 0;
+      for (const exp of filtered) {
+        spent += Number(exp.netPaid);
+      }
 
       const budgetAmount = Number(budget.amount);
       const percentage = (spent / budgetAmount) * 100;

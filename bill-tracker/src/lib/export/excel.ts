@@ -246,8 +246,14 @@ export async function exportMonthlyReport(
     { header: "จำนวนเงิน", key: "amount", width: 20 },
   ];
 
-  const totalIncome = incomes.reduce((sum: number, i) => sum + Number(i.netReceived), 0);
-  const totalExpense = expenses.reduce((sum: number, e) => sum + Number(e.netPaid), 0);
+  let totalIncome = 0;
+  for (const i of incomes) {
+    totalIncome += Number(i.netReceived);
+  }
+  let totalExpense = 0;
+  for (const e of expenses) {
+    totalExpense += Number(e.netPaid);
+  }
   const netCashFlow = totalIncome - totalExpense;
 
   summarySheet.addRow({
