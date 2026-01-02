@@ -237,7 +237,7 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
                   รอใบเสร็จจากร้านค้า ({waitingDocs.length})
                 </p>
                 <div className="space-y-2">
-                  {waitingDocs.map((expense) => (
+                  {waitingDocs.map((expense: typeof waitingDocs[number]) => (
                     <div
                       key={expense.id}
                       className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 p-3"
@@ -265,7 +265,7 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
                   รอใบ 50 ทวิ จากลูกค้า ({waitingWht.length})
                 </p>
                 <div className="space-y-2">
-                  {waitingWht.map((income) => (
+                  {waitingWht.map((income: typeof waitingWht[number]) => (
                     <div
                       key={income.id}
                       className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 p-3"
@@ -293,7 +293,7 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
                   รอออกบิลให้ลูกค้า ({waitingIssue.length})
                 </p>
                 <div className="space-y-2">
-                  {waitingIssue.map((income) => (
+                  {waitingIssue.map((income: typeof waitingIssue[number]) => (
                     <div
                       key={income.id}
                       className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 p-3"
@@ -403,8 +403,8 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
   ]);
 
   const combined = [
-    ...recentExpenses.map((e) => ({ ...e, type: "expense" as const })),
-    ...recentIncomes.map((i) => ({ ...i, type: "income" as const })),
+    ...recentExpenses.map((e: typeof recentExpenses[number]) => ({ ...e, type: "expense" as const })),
+    ...recentIncomes.map((i: typeof recentIncomes[number]) => ({ ...i, type: "income" as const })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 10);
@@ -421,7 +421,7 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
           </p>
         ) : (
           <div className="space-y-3">
-            {combined.map((item) => (
+            {combined.map((item: typeof combined[number]) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 p-3"

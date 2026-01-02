@@ -275,7 +275,7 @@ async function VATReport({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((expense) => (
+                {expenses.map((expense: typeof expenses[number]) => (
                   <TableRow key={expense.id}>
                     <TableCell>
                       {expense.billDate.toLocaleDateString("th-TH")}
@@ -321,7 +321,7 @@ async function VATReport({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {incomes.map((income) => (
+                {incomes.map((income: typeof incomes[number]) => (
                   <TableRow key={income.id}>
                     <TableCell>
                       {income.receiveDate.toLocaleDateString("th-TH")}
@@ -474,7 +474,7 @@ async function WHTReport({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((expense) => (
+                {expenses.map((expense: typeof expenses[number]) => (
                   <TableRow key={expense.id}>
                     <TableCell>
                       {expense.billDate.toLocaleDateString("th-TH")}
@@ -527,7 +527,7 @@ async function WHTReport({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {incomes.map((income) => (
+                {incomes.map((income: typeof incomes[number]) => (
                   <TableRow key={income.id}>
                     <TableCell>
                       {income.receiveDate.toLocaleDateString("th-TH")}

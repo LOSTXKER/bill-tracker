@@ -24,7 +24,7 @@ export async function GET() {
       include: { company: true },
     });
 
-    const companies = companyAccess.map((ca) => ({
+    const companies = companyAccess.map((ca: typeof companyAccess[number]) => ({
       ...ca.company,
       role: ca.role,
     }));

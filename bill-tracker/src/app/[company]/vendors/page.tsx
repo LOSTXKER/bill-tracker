@@ -142,7 +142,7 @@ async function VendorsList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {vendors.map((vendor) => {
+            {vendors.map((vendor: typeof vendors[number]) => {
               const stats = statsMap.get(vendor.id) || { total: 0, count: 0 };
               return (
                 <TableRow key={vendor.id}>

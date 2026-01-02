@@ -86,7 +86,7 @@ export async function getUserCompanies(userId: string) {
     });
   }
 
-  return user.companies.map((c) => ({
+  return user.companies.map((c: typeof user.companies[number]) => ({
     ...c.company,
     access: c,
     role: c.role,

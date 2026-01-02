@@ -179,7 +179,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expenses.map((expense) => (
+                  {expenses.map((expense: typeof expenses[number]) => (
                     <TableRow key={expense.id}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(expense.billDate).toLocaleDateString("th-TH", {
@@ -239,7 +239,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {incomes.map((income) => (
+                  {incomes.map((income: typeof incomes[number]) => (
                     <TableRow key={income.id}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(income.receiveDate).toLocaleDateString(

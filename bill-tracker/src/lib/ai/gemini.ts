@@ -303,7 +303,7 @@ export async function chat(
     };
 
     // Convert messages to Gemini format
-    const contents = messages.map((msg) => ({
+    const contents = messages.map((msg: typeof messages[number]) => ({
       role: msg.role,
       parts: [{ text: msg.content }],
     }));

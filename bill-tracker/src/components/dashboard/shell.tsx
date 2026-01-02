@@ -97,7 +97,7 @@ export function DashboardShell({ children, company, user }: DashboardShellProps)
 
   const NavLinks = () => (
     <>
-      {navigation.map((item) => (
+      {navigation.map((item: typeof navigation[number]) => (
         <Link
           key={item.name}
           href={item.href}

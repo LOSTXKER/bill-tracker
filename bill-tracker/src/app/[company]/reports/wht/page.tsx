@@ -238,7 +238,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expensesWithWHT.map((expense) => (
+                  {expensesWithWHT.map((expense: typeof expensesWithWHT[number]) => (
                     <TableRow key={expense.id}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(expense.billDate).toLocaleDateString("th-TH", {
@@ -295,7 +295,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {incomesWithWHT.map((income) => (
+                  {incomesWithWHT.map((income: typeof incomesWithWHT[number]) => (
                     <TableRow key={income.id}>
                       <TableCell className="whitespace-nowrap">
                         {new Date(income.receiveDate).toLocaleDateString(

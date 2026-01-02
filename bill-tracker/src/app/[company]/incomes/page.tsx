@@ -236,7 +236,7 @@ async function IncomesTable({ companyCode }: { companyCode: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {incomes.map((income) => (
+                {incomes.map((income: typeof incomes[number]) => (
                   <TableRow key={income.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
                     <TableCell className="whitespace-nowrap">
                       {new Date(income.receiveDate).toLocaleDateString("th-TH", {

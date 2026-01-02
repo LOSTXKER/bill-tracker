@@ -28,7 +28,7 @@ export default async function HomePage() {
   const companies =
     session.user.role === "ADMIN"
       ? await prisma.company.findMany({ orderBy: { name: "asc" } })
-      : user?.companies.map((c) => ({ ...c.company, role: c.role })) ?? [];
+      : user?.companies.map((c: NonNullable<typeof user>["companies"][number]) => ({ ...c.company, role: c.role })) ?? [];
 
   // If no companies, show setup page with create company option
   if (companies.length === 0) {
@@ -123,7 +123,7 @@ export default async function HomePage() {
 
         {/* Company Cards */}
         <div className="w-full max-w-2xl space-y-4 sm:space-y-6">
-          {companies.map((company) => (
+          {companies.map((company: typeof companies[number]) => (
             <CompanyCard key={company.id} company={company} />
           ))}
         </div>

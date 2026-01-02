@@ -70,7 +70,7 @@ export function CompanySelector({ onSelect }: CompanySelectorProps) {
 
   return (
     <div className="grid gap-4 sm:gap-6">
-      {companies.map((company) => {
+      {companies.map((company: typeof companies[number]) => {
         const style = getCompanyStyle(company.code);
         const Icon = style.icon;
         const isSelected = selectedCompany?.id === company.id;
