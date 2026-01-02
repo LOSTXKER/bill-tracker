@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Receipt, AlertCircle } from "lucide-react";
+import { authenticate } from "./actions";
 
 function LoginForm() {
   const router = useRouter();
@@ -30,14 +30,10 @@ function LoginForm() {
     setErrorMessage(null);
 
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+      const result = await authenticate(email, password);
 
-      if (result?.error) {
-        setErrorMessage("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+      if (!result.success) {
+        setErrorMessage(result.error || "เกิดข้อผิดพลาด");
       } else {
         router.push(callbackUrl);
         router.refresh();

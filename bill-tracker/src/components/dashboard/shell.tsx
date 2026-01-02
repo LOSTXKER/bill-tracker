@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -227,7 +227,7 @@ export function DashboardShell({ children, company, user }: DashboardShellProps)
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => logout()}
             >
               <LogOut className="mr-2 h-4 w-4" />
               ออกจากระบบ
