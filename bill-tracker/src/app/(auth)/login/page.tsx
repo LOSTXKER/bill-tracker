@@ -30,17 +30,17 @@ function LoginForm() {
     setErrorMessage(null);
 
     try {
-      const result = await authenticate(email, password);
+      const result = await authenticate(email, password, callbackUrl);
 
       if (!result.success) {
         setErrorMessage(result.error || "เกิดข้อผิดพลาด");
-      } else {
-        router.push(callbackUrl);
-        router.refresh();
+        setIsLoading(false);
       }
-    } catch {
+      // If success, the server action will handle the redirect
+    } catch (error) {
+      // Server action will throw redirect error on success, which is expected
+      // Only set error if it's not a redirect
       setErrorMessage("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-    } finally {
       setIsLoading(false);
     }
   };
