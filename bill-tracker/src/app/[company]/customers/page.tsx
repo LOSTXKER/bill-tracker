@@ -147,7 +147,7 @@ async function CustomersList({
           </TableHeader>
           <TableBody>
             {customers.map((customer: typeof customers[number]) => {
-              const stats = statsMap.get(customer.id) || { total: 0, count: 0 };
+              const stats: { total: number; count: number } = statsMap.get(customer.id) || { total: 0, count: 0 };
               return (
                 <TableRow key={customer.id}>
                   <TableCell>
