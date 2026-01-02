@@ -1,0 +1,449 @@
+// Bill Tracker & Mini-ERP System
+// Database schema for Anajak T-Shirt & Meelike-th
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// Core Business Entities
+// =============================================================================
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String   // "Anajak T-Shirt", "Meelike-th"
+  code      String   @unique // "ANJ", "MLK"
+  taxId     String?  // เลขประจำตัวผู้เสียภาษี
+  address   String?
+  phone     String?
+  logoUrl   String?
+
+  // LINE Bot Configuration
+  lineChannelSecret      String? // LINE Bot Channel Secret
+  lineChannelAccessToken String? // LINE Bot Channel Access Token
+  lineGroupId            String? // LINE Group ID (auto-filled by bot)
+
+  // AI Configuration
+  aiConfig Json? // AI preferences and settings
+
+  // Relations
+  expenses          Expense[]
+  incomes           Income[]
+  users             CompanyAccess[]
+  vendors           Vendor[]
+  customers         Customer[]
+  budgets           Budget[]
+  integrations      Integration[]
+  recurringExpenses RecurringExpense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
+}
+
+// =============================================================================
+// User Management with RBAC
+// =============================================================================
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String
+  password    String    // hashed with bcrypt
+  role        UserRole  @default(STAFF)
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  avatarUrl   String?
+
+  // Relations
+  companies CompanyAccess[]
+  expenses  Expense[]       @relation("ExpenseCreator")
+  incomes   Income[]        @relation("IncomeCreator")
+  auditLogs AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN      // ระดับสูงสุด - จัดการทุกอย่างได้
+  ACCOUNTANT // บัญชี - จัดการ expense/income ได้
+  STAFF      // พนักงานทั่วไป - บันทึกรายการได้
+  VIEWER     // ดูอย่างเดียว
+}
+
+model CompanyAccess {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role      CompanyRole @default(VIEWER)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+enum CompanyRole {
+  OWNER      // เจ้าของ - จัดการทุกอย่างของบริษัท
+  MANAGER    // ผู้จัดการ - จัดการได้ทุกอย่างยกเว้นลบบริษัท
+  ACCOUNTANT // บัญชี - จัดการรายการเงินได้
+  VIEWER     // ดูอย่างเดียว
+}
+
+// =============================================================================
+// Vendors (ผู้ขาย/ร้านค้า)
+// =============================================================================
+
+model Vendor {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  taxId     String? // เลขประจำตัวผู้เสียภาษีของผู้ขาย
+  address   String?
+  phone     String?
+  email     String?
+  notes     String?
+
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([taxId])
+  @@index([name])
+}
+
+// =============================================================================
+// Customers (ลูกค้า)
+// =============================================================================
+
+model Customer {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  taxId           String?  // เลขประจำตัวผู้เสียภาษีของลูกค้า
+  address         String?
+  phone           String?
+  email           String?
+  creditLimit     Decimal? @db.Decimal(12, 2)
+  paymentTermDays Int      @default(0) // จำนวนวันเครดิต
+  notes           String?
+
+  incomes Income[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([taxId])
+  @@index([name])
+}
+
+// =============================================================================
+// Expense (รายจ่าย) - Enhanced
+// =============================================================================
+
+model Expense {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Vendor Information
+  vendorId   String?
+  vendor     Vendor? @relation(fields: [vendorId], references: [id])
+  vendorName String? // สำหรับกรณีไม่ได้เลือก vendor จาก master
+  vendorTaxId String?
+
+  // Financial Data
+  amount    Decimal  @db.Decimal(12, 2) // ยอดเต็มก่อน VAT
+  vatRate   Int      @default(7)        // 7% หรือ 0%
+  vatAmount Decimal? @db.Decimal(12, 2)
+
+  // WHT (เราหักเขา)
+  isWht     Boolean  @default(false)
+  whtRate   Decimal? @db.Decimal(5, 2) // 1, 2, 3, 5, 10
+  whtAmount Decimal? @db.Decimal(12, 2)
+  whtType   WhtType?                   // ประเภทเงินได้
+  netPaid   Decimal  @db.Decimal(12, 2) // Amount + VAT - WHT
+
+  // Document Details
+  description   String?
+  category      ExpenseCategory?
+  invoiceNumber String?              // เลขที่ใบกำกับภาษี
+  referenceNo   String?              // เลขอ้างอิง transaction
+  paymentMethod PaymentMethod        @default(BANK_TRANSFER)
+
+  // Evidence Files (Supabase Storage URLs)
+  slipUrl       String? // รูปสลิปโอนเงิน
+  taxInvoiceUrl String? // รูปใบกำกับภาษี
+  whtCertUrl    String? // รูปใบ 50 ทวิ
+
+  // Dates
+  billDate DateTime  @default(now()) // วันที่จ่ายเงิน
+  dueDate  DateTime?                 // วันครบกำหนด (กรณีเครดิต)
+
+  // Status & Workflow
+  status ExpenseDocStatus @default(PENDING_PHYSICAL)
+  notes  String?          @db.Text
+
+  // Approval (สำหรับรายจ่ายสูง)
+  approvedBy String?
+  approvedAt DateTime?
+
+  // Tracking
+  createdBy String
+  creator   User     @relation("ExpenseCreator", fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, billDate])
+  @@index([status])
+  @@index([category])
+  @@index([vendorId])
+  @@index([createdAt])
+}
+
+enum ExpenseCategory {
+  MATERIAL   // วัตถุดิบ
+  UTILITY    // สาธารณูปโภค
+  MARKETING  // การตลาด
+  SALARY     // เงินเดือน
+  FREELANCE  // ค่าจ้างฟรีแลนซ์
+  TRANSPORT  // ค่าขนส่ง
+  RENT       // ค่าเช่า
+  OFFICE     // สำนักงาน
+  OTHER      // อื่นๆ
+}
+
+enum ExpenseDocStatus {
+  WAITING_FOR_DOC  // 🟠 จ่ายเงินแล้ว แต่ร้านยังไม่ส่งใบเสร็จมา
+  PENDING_PHYSICAL // 🔴 ได้ใบเสร็จแล้ว แต่ตัวจริงยังอยู่ที่ตัว
+  READY_TO_SEND    // 🟡 รวบรวมใส่ซองแล้ว รอส่งบัญชี
+  SENT_TO_ACCOUNT  // 🟢 ส่งให้บัญชีเรียบร้อยแล้ว
+}
+
+// =============================================================================
+// Income (รายรับ) - Enhanced
+// =============================================================================
+
+model Income {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Customer Information
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  customerName String?
+  customerTaxId String?
+
+  // Financial Data
+  amount    Decimal  @db.Decimal(12, 2) // ยอดเต็มก่อน VAT
+  vatRate   Int      @default(0)
+  vatAmount Decimal? @db.Decimal(12, 2)
+
+  // WHT (เขาหักเรา)
+  isWhtDeducted Boolean  @default(false)
+  whtRate       Decimal? @db.Decimal(5, 2)
+  whtAmount     Decimal? @db.Decimal(12, 2)
+  whtType       WhtType?
+  netReceived   Decimal  @db.Decimal(12, 2)
+
+  // Document Details
+  source        String? // แหล่งที่มา
+  invoiceNumber String? // เลขที่ใบกำกับภาษีที่เราออกให้
+  referenceNo   String?
+  paymentMethod PaymentMethod @default(BANK_TRANSFER)
+
+  // Evidence Files (Supabase Storage URLs)
+  customerSlipUrl String? // สลิปที่ลูกค้าโอนมา
+  myBillCopyUrl   String? // สำเนาบิลที่เราเขียนให้
+  whtCertUrl      String? // ใบ 50 ทวิ ที่ลูกค้าให้มา
+
+  // Dates
+  receiveDate DateTime @default(now())
+
+  // Status & Workflow
+  status IncomeDocStatus @default(PENDING_COPY_SEND)
+  notes  String?         @db.Text
+
+  // Job Order (สำหรับ Phase 5 - Anajak)
+  jobOrderId String?
+
+  // Tracking
+  createdBy String
+  creator   User     @relation("IncomeCreator", fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, receiveDate])
+  @@index([status])
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+enum IncomeDocStatus {
+  NO_DOC_REQUIRED   // ⚪ รับเงินแล้ว ไม่ต้องทำเอกสาร
+  WAITING_ISSUE     // 🟠 รับเงินแล้ว แต่ยังไม่ได้เขียนบิล
+  WAITING_WHT_CERT  // 🟠 ออกบิลแล้ว แต่รอใบ 50 ทวิ
+  PENDING_COPY_SEND // 🔴 เอกสารครบ รอส่งบัญชี
+  SENT_COPY         // 🟢 ส่งปึกสำเนาให้บัญชีแล้ว
+}
+
+// =============================================================================
+// Shared Enums
+// =============================================================================
+
+enum PaymentMethod {
+  CASH          // เงินสด
+  BANK_TRANSFER // โอนเงิน
+  CREDIT_CARD   // บัตรเครดิต
+  PROMPTPAY     // พร้อมเพย์
+  CHEQUE        // เช็ค
+}
+
+enum WhtType {
+  SERVICE_3      // ค่าบริการ 3%
+  PROFESSIONAL_5 // ค่าบริการวิชาชีพ 5%
+  TRANSPORT_1    // ค่าขนส่ง 1%
+  RENT_5         // ค่าเช่า 5%
+  ADVERTISING_2  // ค่าโฆษณา 2%
+  OTHER          // อื่นๆ
+}
+
+// =============================================================================
+// Recurring Expenses (รายจ่ายประจำ)
+// =============================================================================
+
+model RecurringExpense {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name         String         // เช่น "ค่าเช่าโกดัง", "ค่าไฟรายเดือน"
+  templateData Json           // ข้อมูลที่จะใช้สร้าง Expense
+  frequency    RecurrenceFreq
+  amount       Decimal        @db.Decimal(12, 2)
+
+  nextDueDate   DateTime
+  lastCreatedAt DateTime?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, nextDueDate])
+  @@index([isActive])
+}
+
+enum RecurrenceFreq {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+// =============================================================================
+// Budget Management
+// =============================================================================
+
+model Budget {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  category ExpenseCategory
+  amount   Decimal         @db.Decimal(12, 2) // งบประมาณที่ตั้งไว้
+  period   BudgetPeriod
+
+  startDate DateTime
+  endDate   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, startDate])
+  @@index([category])
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+// =============================================================================
+// Integration Configuration
+// =============================================================================
+
+model Integration {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type           IntegrationType
+  name           String          // ชื่อการเชื่อมต่อ
+  config         Json            // API keys, endpoints, etc.
+  isActive       Boolean         @default(true)
+  lastSyncAt     DateTime?
+  lastSyncStatus String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, type])
+}
+
+enum IntegrationType {
+  ACCOUNTING_SOFTWARE // PEAK, Express
+  BANK_STATEMENT      // ดึงข้อมูลจากธนาคาร
+  PAYMENT_GATEWAY     // PromptPay
+  LINE_NOTIFY
+  GOOGLE_DRIVE        // Backup
+}
+
+// =============================================================================
+// Audit Log (บันทึกการเปลี่ยนแปลง)
+// =============================================================================
+
+model AuditLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  action     AuditAction
+  entityType String      // "Expense", "Income", etc.
+  entityId   String
+  changes    Json?       // บันทึกการเปลี่ยนแปลง (before/after)
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  APPROVE
+  EXPORT
+}
