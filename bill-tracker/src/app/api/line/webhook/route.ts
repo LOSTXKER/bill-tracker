@@ -176,11 +176,11 @@ async function handleTextMessage(
     ]);
 
     const totalExpense = expenses.reduce(
-      (sum, exp) => sum + Number(exp.netPaid),
+      (sum: number, exp: typeof expenses[number]) => sum + Number(exp.netPaid),
       0
     );
     const totalIncome = incomes.reduce(
-      (sum, inc) => sum + Number(inc.netReceived),
+      (sum: number, inc: typeof incomes[number]) => sum + Number(inc.netReceived),
       0
     );
     const netCashFlow = totalIncome - totalExpense;

@@ -95,17 +95,17 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
 
   // Calculate totals
   const totalWHTpaid = expensesWithWHT.reduce(
-    (sum, e) => sum + Number(e.whtAmount || 0),
+    (sum: number, e: typeof expensesWithWHT[number]) => sum + Number(e.whtAmount || 0),
     0
   );
   const totalWHTreceived = incomesWithWHT.reduce(
-    (sum, i) => sum + Number(i.whtAmount || 0),
+    (sum: number, i: typeof incomesWithWHT[number]) => sum + Number(i.whtAmount || 0),
     0
   );
 
   // Group by type
   const whtByType = expensesWithWHT.reduce(
-    (acc, expense) => {
+    (acc: Record<string, { count: number; amount: number }>, expense: typeof expensesWithWHT[number]) => {
       const type = expense.whtType || "OTHER";
       if (!acc[type]) {
         acc[type] = { count: 0, amount: 0 };

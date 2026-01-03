@@ -86,11 +86,11 @@ async function VATReport({ companyCode }: { companyCode: string }) {
 
   // Calculate totals
   const inputVAT = expenses.reduce(
-    (sum: number, e) => sum + Number(e.vatAmount || 0),
+    (sum: number, e: typeof expenses[number]) => sum + Number(e.vatAmount || 0),
     0
   );
   const outputVAT = incomes.reduce(
-    (sum: number, i) => sum + Number(i.vatAmount || 0),
+    (sum: number, i: typeof incomes[number]) => sum + Number(i.vatAmount || 0),
     0
   );
   const netVAT = outputVAT - inputVAT;
