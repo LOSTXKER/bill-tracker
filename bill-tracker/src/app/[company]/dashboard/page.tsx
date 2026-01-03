@@ -406,7 +406,7 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
     ...recentExpenses.map((e: typeof recentExpenses[number]) => ({ ...e, type: "expense" as const })),
     ...recentIncomes.map((i: typeof recentIncomes[number]) => ({ ...i, type: "income" as const })),
   ]
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 10);
 
   return (
@@ -658,7 +658,7 @@ async function ExpenseCategoryChartData({
         percentage: total > 0 ? (value / total) * 100 : 0,
       };
     })
-    .sort((a, b) => b.value - a.value);
+    .sort((a: any, b: any) => b.value - a.value);
 
   return <ExpenseCategoryChart data={chartData} />;
 }
