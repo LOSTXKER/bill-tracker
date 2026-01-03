@@ -188,7 +188,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.entries(whtByType).map(([type, data]: [string, { count: number; amount: number }]) => (
+                {(Object.entries(whtByType) as [string, { count: number; amount: number }][]).map(([type, data]) => (
                   <TableRow key={type}>
                     <TableCell className="font-medium">
                       {WHT_TYPE_LABELS[type] || type}
