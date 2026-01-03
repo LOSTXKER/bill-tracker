@@ -259,7 +259,7 @@ async function handleTextMessage(
     let budgetText = `💰 งบประมาณเดือน${now.toLocaleDateString("th-TH", { month: "long" })}\n\n`;
 
     for (const budget of budgets) {
-      const filtered = expenses.filter((exp) => exp.category === budget.category);
+      const filtered = expenses.filter((exp: typeof expenses[number]) => exp.category === budget.category);
       let spent = 0;
       for (const exp of filtered) {
         spent += Number(exp.netPaid);
