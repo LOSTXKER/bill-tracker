@@ -134,7 +134,7 @@ export function CreateCompanyDialog({ children }: CreateCompanyDialogProps) {
                 pattern="[A-Za-z0-9]{2,10}"
                 required
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 รหัสจะใช้ใน URL เช่น /mycompany/dashboard
               </p>
             </div>

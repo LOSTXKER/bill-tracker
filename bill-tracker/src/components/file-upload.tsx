@@ -95,8 +95,8 @@ export function FileUpload({
           className={cn(
             "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
             isDragActive
-              ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
-              : "border-slate-300 dark:border-slate-700 hover:border-emerald-400",
+              ? "border-primary bg-primary/10"
+              : "border-border hover:border-primary/50",
             disabled && "opacity-50 cursor-not-allowed",
             uploading && "pointer-events-none"
           )}
@@ -106,24 +106,24 @@ export function FileUpload({
           <div className="flex flex-col items-center gap-2">
             {uploading ? (
               <>
-                <Loader2 className="h-8 w-8 text-emerald-500 animate-spin" />
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">
                   กำลังอัพโหลด...
                 </p>
               </>
             ) : (
               <>
-                <Upload className="h-8 w-8 text-slate-400" />
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-medium text-emerald-600">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-primary">
                     คลิกเพื่อเลือก
                   </span>{" "}
                   หรือลากไฟล์มาวาง
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   รองรับ JPEG, PNG, WebP (สูงสุด 5MB)
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   {files.length}/{maxFiles} ไฟล์
                 </p>
               </>
@@ -134,7 +134,7 @@ export function FileUpload({
 
       {/* Error Message */}
       {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg">
+        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
           {error}
         </div>
       )}
@@ -145,7 +145,7 @@ export function FileUpload({
           {files.map((url, index) => (
             <div
               key={url}
-              className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700"
+              className="relative group aspect-square rounded-lg overflow-hidden border border-border"
             >
               <img
                 src={url}

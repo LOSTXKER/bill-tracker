@@ -4,10 +4,8 @@ import { z } from "zod";
 const expenseBaseSchema = z.object({
   companyId: z.string().min(1, "กรุณาเลือกบริษัท"),
   
-  // Vendor
-  vendorId: z.string().optional(),
-  vendorName: z.string().optional(),
-  vendorTaxId: z.string().optional(),
+  // Contact (ผู้ติดต่อ - ผู้ขาย/ร้านค้า)
+  contactId: z.string().optional().nullable(),
   
   // Financial
   amount: z
@@ -40,7 +38,8 @@ const expenseBaseSchema = z.object({
     "RENT",
     "OFFICE",
     "OTHER",
-  ]).optional(),
+  ]).optional(), // DEPRECATED: kept for backward compatibility
+  categoryId: z.string().optional().nullable(),
   invoiceNumber: z.string().max(50).optional(),
   referenceNo: z.string().max(50).optional(),
   paymentMethod: z.enum([

@@ -26,10 +26,10 @@ export default async function VATReportPage({ params }: VATReportPageProps) {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">
             รายงานภาษีมูลค่าเพิ่ม (VAT)
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-muted-foreground">
             สรุปภาษีซื้อ-ภาษีขายสำหรับยื่น ภ.พ.30
           </p>
         </div>
@@ -67,7 +67,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { billDate: "asc" },
     include: {
-      vendor: true,
+      contact: true,
     },
   });
 
@@ -80,7 +80,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { receiveDate: "asc" },
     include: {
-      customer: true,
+      contact: true,
     },
   });
 
@@ -99,9 +99,9 @@ async function VATReport({ companyCode }: { companyCode: string }) {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="border-blue-200/50 dark:border-blue-800/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               ภาษีซื้อ (Input VAT)
             </CardTitle>
             <FileText className="h-5 w-5 text-blue-500" />
@@ -110,48 +110,48 @@ async function VATReport({ companyCode }: { companyCode: string }) {
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {formatCurrency(inputVAT)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {expenses.length} รายการ
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-primary/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               ภาษีขาย (Output VAT)
             </CardTitle>
-            <FileText className="h-5 w-5 text-emerald-500" />
+            <FileText className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <div className="text-2xl font-bold text-primary">
               {formatCurrency(outputVAT)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">{incomes.length} รายการ</p>
+            <p className="text-xs text-muted-foreground mt-1">{incomes.length} รายการ</p>
           </CardContent>
         </Card>
 
         <Card
           className={
             netVAT > 0
-              ? "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20"
-              : "border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20"
+              ? "border-red-200/50 dark:border-red-800/50"
+              : "border-primary/50 bg-primary/10"
           }
         >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               ภาษีสุทธิ (Net VAT)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
               className={`text-2xl font-bold ${
-                netVAT > 0 ? "text-red-600" : "text-blue-600"
+                netVAT > 0 ? "text-red-600 dark:text-red-400" : "text-primary"
               }`}
             >
               {formatCurrency(Math.abs(netVAT))}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {netVAT > 0 ? "ต้องนำส่ง" : "ขอคืน"}
             </p>
           </CardContent>
@@ -165,7 +165,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
         </CardHeader>
         <CardContent>
           {expenses.length === 0 ? (
-            <p className="text-center py-8 text-slate-500">ไม่มีรายการ</p>
+            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -189,7 +189,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
                         })}
                       </TableCell>
                       <TableCell>
-                        {expense.vendor?.name || expense.vendorName || "-"}
+                        {expense.contact?.name || expense.description || "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(Number(expense.amount))}
@@ -204,9 +204,9 @@ async function VATReport({ companyCode }: { companyCode: string }) {
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold">
+                  <TableRow className="bg-muted/50 font-bold">
                     <TableCell colSpan={3}>รวมภาษีซื้อ</TableCell>
-                    <TableCell className="text-right text-blue-600">
+                    <TableCell className="text-right text-blue-600 dark:text-blue-400">
                       {formatCurrency(inputVAT)}
                     </TableCell>
                     <TableCell></TableCell>
@@ -225,7 +225,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
         </CardHeader>
         <CardContent>
           {incomes.length === 0 ? (
-            <p className="text-center py-8 text-slate-500">ไม่มีรายการ</p>
+            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -252,12 +252,12 @@ async function VATReport({ companyCode }: { companyCode: string }) {
                         )}
                       </TableCell>
                       <TableCell>
-                        {income.customer?.name || income.customerName || "-"}
+                        {income.contact?.name || income.source || "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(Number(income.amount))}
                       </TableCell>
-                      <TableCell className="text-right text-emerald-600">
+                      <TableCell className="text-right text-primary">
                         {formatCurrency(Number(income.vatAmount || 0))}
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -267,9 +267,9 @@ async function VATReport({ companyCode }: { companyCode: string }) {
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold">
+                  <TableRow className="bg-muted/50 font-bold">
                     <TableCell colSpan={3}>รวมภาษีขาย</TableCell>
-                    <TableCell className="text-right text-emerald-600">
+                    <TableCell className="text-right text-primary">
                       {formatCurrency(outputVAT)}
                     </TableCell>
                     <TableCell></TableCell>

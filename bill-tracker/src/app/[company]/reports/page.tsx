@@ -51,10 +51,10 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">
             รายงาน
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-muted-foreground">
             รายงานภาษีและสรุปรายรับ-รายจ่าย
           </p>
         </div>
@@ -183,59 +183,59 @@ async function VATReport({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-200/50">
+        <Card className="border-blue-200/50 dark:border-blue-800/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               ภาษีซื้อ (Input VAT)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {formatCurrency(summary.inputVAT)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               จากรายจ่าย {expenses.length} รายการ
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-200/50">
+        <Card className="border-primary/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               ภาษีขาย (Output VAT)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
+            <div className="text-2xl font-bold text-primary">
               {formatCurrency(summary.outputVAT)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               จากรายรับ {incomes.length} รายการ
             </p>
           </CardContent>
         </Card>
 
         <Card
-          className={`bg-gradient-to-br ${
+          className={`${
             summary.netVAT >= 0
-              ? "from-red-500/10 to-orange-500/10 border-red-200/50"
-              : "from-green-500/10 to-emerald-500/10 border-green-200/50"
+              ? "border-red-200/50 dark:border-red-800/50"
+              : "border-primary/50 bg-primary/10"
           }`}
         >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               {summary.netVAT >= 0 ? "ต้องชำระ" : "ขอคืน"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
               className={`text-2xl font-bold ${
-                summary.netVAT >= 0 ? "text-red-600" : "text-green-600"
+                summary.netVAT >= 0 ? "text-red-600 dark:text-red-400" : "text-primary"
               }`}
             >
               {formatCurrency(Math.abs(summary.netVAT))}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               สำหรับยื่น ภ.พ.30
             </p>
           </CardContent>
@@ -260,7 +260,7 @@ async function VATReport({
         </CardHeader>
         <CardContent>
           {expenses.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">
+            <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการภาษีซื้อในเดือนนี้
             </p>
           ) : (
@@ -281,7 +281,7 @@ async function VATReport({
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>{expense.invoiceNumber || "-"}</TableCell>
-                    <TableCell>{expense.vendorName || "-"}</TableCell>
+                    <TableCell>{expense.description || "-"}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(expense.amount))}
                     </TableCell>
@@ -300,13 +300,13 @@ async function VATReport({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-emerald-500" />
+            <TrendingUp className="h-5 w-5 text-primary" />
             รายการภาษีขาย
           </CardTitle>
         </CardHeader>
         <CardContent>
           {incomes.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">
+            <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการภาษีขายในเดือนนี้
             </p>
           ) : (
@@ -327,11 +327,11 @@ async function VATReport({
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>{income.invoiceNumber || "-"}</TableCell>
-                    <TableCell>{income.customerName || "-"}</TableCell>
+                    <TableCell>{income.source || "-"}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(income.amount))}
                     </TableCell>
-                    <TableCell className="text-right text-emerald-600">
+                    <TableCell className="text-right text-primary">
                       {formatCurrency(Number(income.vatAmount) || 0)}
                     </TableCell>
                   </TableRow>
@@ -391,46 +391,46 @@ async function WHTReport({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border-red-200/50">
+        <Card className="border-red-200/50 dark:border-red-800/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               หักจากผู้ขาย (ต้องนำส่ง)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
               {formatCurrency(summary.whtPaid)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {expenses.length} รายการ - ยื่น ภ.ง.ด.53
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-200/50">
+        <Card className="border-primary/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               โดนหักจากลูกค้า (เครดิตภาษี)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-primary">
               {formatCurrency(summary.whtReceived)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {incomes.length} รายการ
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-slate-500/10 to-slate-600/10 border-slate-200/50">
+        <Card className="border-muted">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               สุทธิ
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-700">
+            <div className="text-2xl font-bold text-foreground">
               {formatCurrency(summary.netWHT)}
             </div>
           </CardContent>
@@ -458,7 +458,7 @@ async function WHTReport({
         </CardHeader>
         <CardContent>
           {expenses.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">
+            <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการในเดือนนี้
             </p>
           ) : (
@@ -479,8 +479,8 @@ async function WHTReport({
                     <TableCell>
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
-                    <TableCell>{expense.vendorName || "-"}</TableCell>
-                    <TableCell>{expense.vendorTaxId || "-"}</TableCell>
+                    <TableCell>{expense.description || "-"}</TableCell>
+                    <TableCell>-</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(expense.amount))}
                     </TableCell>
@@ -511,7 +511,7 @@ async function WHTReport({
         </CardHeader>
         <CardContent>
           {incomes.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">
+            <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการในเดือนนี้
             </p>
           ) : (
@@ -532,7 +532,7 @@ async function WHTReport({
                     <TableCell>
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
-                    <TableCell>{income.customerName || "-"}</TableCell>
+                    <TableCell>{income.source || "-"}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(income.amount))}
                     </TableCell>
@@ -630,54 +630,54 @@ async function MonthlySummary({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-200/50">
+        <Card className="border-primary/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               รายรับรวม
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
+            <div className="text-2xl font-bold text-primary">
               {formatCurrency(totalIncome)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {incomeSum._count} รายการ
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border-red-200/50">
+        <Card className="border-red-200/50 dark:border-red-800/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               รายจ่ายรวม
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
               {formatCurrency(totalExpense)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {expenseSum._count} รายการ
             </p>
           </CardContent>
         </Card>
 
         <Card
-          className={`bg-gradient-to-br ${
+          className={`${
             netCashFlow >= 0
-              ? "from-blue-500/10 to-indigo-500/10 border-blue-200/50"
-              : "from-red-500/10 to-pink-500/10 border-red-200/50"
+              ? "border-blue-200/50 dark:border-blue-800/50"
+              : "border-red-200/50 dark:border-red-800/50"
           }`}
         >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               กระแสเงินสดสุทธิ
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
               className={`text-2xl font-bold ${
-                netCashFlow >= 0 ? "text-blue-600" : "text-red-600"
+                netCashFlow >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"
               }`}
             >
               {formatCurrency(netCashFlow)}
@@ -701,7 +701,7 @@ async function MonthlySummary({
         </CardHeader>
         <CardContent>
           {expenseByCategory.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">
+            <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการในเดือนนี้
             </p>
           ) : (
@@ -719,13 +719,13 @@ async function MonthlySummary({
                         </span>
                         <span>{formatCurrency(amount)}</span>
                       </div>
-                      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-xs text-slate-500">
+                      <div className="flex justify-between text-xs text-muted-foreground">
                         <span>{item._count} รายการ</span>
                         <span>{percentage.toFixed(1)}%</span>
                       </div>

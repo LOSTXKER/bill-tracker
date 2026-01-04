@@ -15,10 +15,10 @@ export function calculateWHT(baseAmount: number, whtRate: number): number {
 }
 
 /**
- * Calculate expense totals
- * Net Paid = Base Amount + VAT - WHT
+ * Calculate transaction totals (unified for both expense and income)
+ * Net Amount = Base Amount + VAT - WHT
  */
-export function calculateExpenseTotals(
+export function calculateTransactionTotals(
   baseAmount: number,
   vatRate: number,
   whtRate: number = 0
@@ -38,27 +38,16 @@ export function calculateExpenseTotals(
 }
 
 /**
- * Calculate income totals
- * Net Received = Base Amount + VAT - WHT deducted by customer
+ * Calculate expense totals (wrapper for backward compatibility)
+ * @deprecated Use calculateTransactionTotals instead
  */
-export function calculateIncomeTotals(
-  baseAmount: number,
-  vatRate: number,
-  whtDeductedRate: number = 0
-): TaxCalculation {
-  const vatAmount = calculateVAT(baseAmount, vatRate);
-  const whtAmount = calculateWHT(baseAmount, whtDeductedRate);
-  const totalWithVat = baseAmount + vatAmount;
-  const netAmount = totalWithVat - whtAmount;
+export const calculateExpenseTotals = calculateTransactionTotals;
 
-  return {
-    baseAmount,
-    vatAmount,
-    whtAmount,
-    totalWithVat,
-    netAmount,
-  };
-}
+/**
+ * Calculate income totals (wrapper for backward compatibility)
+ * @deprecated Use calculateTransactionTotals instead
+ */
+export const calculateIncomeTotals = calculateTransactionTotals;
 
 /**
  * Reverse calculate base amount from total with VAT
@@ -82,6 +71,28 @@ export function formatCurrency(
     maximumFractionDigits: 2,
     ...options,
   }).format(amount);
+}
+
+/**
+ * Format date in Thai short format (e.g., "5 ม.ค. 68")
+ */
+export function formatThaiDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+  });
+}
+
+/**
+ * Format date in Thai long format (e.g., "5 มกราคม 2568")
+ */
+export function formatThaiDateLong(date: Date | string): string {
+  return new Date(date).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /**

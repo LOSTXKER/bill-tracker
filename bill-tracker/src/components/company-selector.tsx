@@ -23,8 +23,8 @@ const COMPANY_STYLES: Record<
   },
   DEFAULT: {
     icon: Building2,
-    bgGradient: "from-slate-500 to-slate-600",
-    iconColor: "text-slate-100",
+    bgGradient: "from-primary to-primary/80",
+    iconColor: "text-primary-foreground",
   },
 };
 
@@ -52,11 +52,11 @@ export function CompanySelector({ onSelect }: CompanySelectorProps) {
   if (companies.length === 0) {
     return (
       <Card className="p-8 text-center border-dashed">
-        <Building2 className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-        <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <Building2 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium text-foreground mb-2">
           ยังไม่มีบริษัท
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-muted-foreground">
           กรุณาติดต่อผู้ดูแลระบบเพื่อเพิ่มบริษัท
         </p>
       </Card>
@@ -81,7 +81,7 @@ export function CompanySelector({ onSelect }: CompanySelectorProps) {
             onClick={() => handleSelect(company)}
             className={cn(
               "group relative w-full text-left transition-all duration-300",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
               "rounded-2xl"
             )}
           >
@@ -90,8 +90,8 @@ export function CompanySelector({ onSelect }: CompanySelectorProps) {
                 "relative overflow-hidden p-6 sm:p-8 transition-all duration-300",
                 "border-2 hover:shadow-xl hover:-translate-y-1",
                 isSelected
-                  ? "border-emerald-500 shadow-lg shadow-emerald-500/20"
-                  : "border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                  ? "border-primary shadow-lg shadow-primary/20"
+                  : "border-transparent hover:border-border"
               )}
             >
               {/* Background gradient */}
@@ -116,23 +116,20 @@ export function CompanySelector({ onSelect }: CompanySelectorProps) {
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 truncate">
+                  <h3 className="text-xl sm:text-2xl font-bold text-foreground truncate">
                     {company.name}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     รหัส: {company.code}
                   </p>
-                  {company.role && (
+                  {company.isOwner && (
                     <span
                       className={cn(
                         "inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full",
-                        "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        "bg-muted text-muted-foreground"
                       )}
                     >
-                      {company.role === "OWNER" && "เจ้าของ"}
-                      {company.role === "MANAGER" && "ผู้จัดการ"}
-                      {company.role === "ACCOUNTANT" && "บัญชี"}
-                      {company.role === "VIEWER" && "ผู้ดู"}
+                      เจ้าของ
                     </span>
                   )}
                 </div>
@@ -140,15 +137,15 @@ export function CompanySelector({ onSelect }: CompanySelectorProps) {
                 {/* Arrow */}
                 <ChevronRight
                   className={cn(
-                    "w-6 h-6 text-slate-400 transition-transform duration-300",
-                    "group-hover:translate-x-1 group-hover:text-slate-600 dark:group-hover:text-slate-300"
+                    "w-6 h-6 text-muted-foreground transition-transform duration-300",
+                    "group-hover:translate-x-1 group-hover:text-foreground"
                   )}
                 />
               </div>
 
               {/* Selected indicator */}
               {isSelected && (
-                <div className="absolute top-4 right-4 w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
+                <div className="absolute top-4 right-4 w-3 h-3 bg-primary rounded-full animate-pulse" />
               )}
             </Card>
           </button>

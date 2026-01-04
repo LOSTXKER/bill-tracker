@@ -16,6 +16,7 @@ const LINE_API_URL = "https://api.line.me/v2/bot/message";
 interface CompanyLineConfig {
   channelAccessToken: string;
   groupId: string;
+  notifyEnabled: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ export async function getCompanyLineConfig(
       select: {
         lineChannelAccessToken: true,
         lineGroupId: true,
+        lineNotifyEnabled: true,
       },
     });
 
@@ -40,9 +42,16 @@ export async function getCompanyLineConfig(
       return null;
     }
 
+    // Check if notifications are enabled
+    if (!company.lineNotifyEnabled) {
+      console.log(`LINE notifications disabled for company ${companyId}`);
+      return null;
+    }
+
     return {
       channelAccessToken: company.lineChannelAccessToken,
       groupId: company.lineGroupId,
+      notifyEnabled: company.lineNotifyEnabled,
     };
   } catch (error) {
     console.error("Failed to get LINE config:", error);
@@ -62,6 +71,7 @@ export async function getCompanyLineConfigByCode(
       select: {
         lineChannelAccessToken: true,
         lineGroupId: true,
+        lineNotifyEnabled: true,
       },
     });
 
@@ -72,9 +82,16 @@ export async function getCompanyLineConfigByCode(
       return null;
     }
 
+    // Check if notifications are enabled
+    if (!company.lineNotifyEnabled) {
+      console.log(`LINE notifications disabled for company code ${companyCode}`);
+      return null;
+    }
+
     return {
       channelAccessToken: company.lineChannelAccessToken,
       groupId: company.lineGroupId,
+      notifyEnabled: company.lineNotifyEnabled,
     };
   } catch (error) {
     console.error("Failed to get LINE config:", error);
@@ -162,9 +179,21 @@ function formatCurrencyThai(amount: number): string {
 }
 
 /**
+ * Format number with commas and 2 decimal places
+ */
+function formatNumber(amount: number): string {
+  return new Intl.NumberFormat("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
  * Create expense notification (Flex Message)
  */
 export function createExpenseFlexMessage(expense: {
+  id?: string;
+  companyCode?: string;
   companyName: string;
   vendorName?: string;
   description?: string;
@@ -175,120 +204,245 @@ export function createExpenseFlexMessage(expense: {
   whtAmount?: number;
   netPaid: number;
   status: string;
-}): LineMessage {
-  const statusEmoji = {
-    WAITING_FOR_DOC: "🟠",
-    PENDING_PHYSICAL: "🔴",
-    READY_TO_SEND: "🟡",
-    SENT_TO_ACCOUNT: "🟢",
-  }[expense.status] || "⚪";
+}, baseUrl?: string): LineMessage {
+  const statusConfig: Record<string, { emoji: string; text: string; color: string; bgColor: string }> = {
+    WAITING_FOR_DOC: { emoji: "📋", text: "รอใบเสร็จ", color: "#F59E0B", bgColor: "#FEF3C7" },
+    PENDING_PHYSICAL: { emoji: "📄", text: "รอส่งบัญชี", color: "#EF4444", bgColor: "#FEE2E2" },
+    READY_TO_SEND: { emoji: "📦", text: "พร้อมส่ง", color: "#8B5CF6", bgColor: "#EDE9FE" },
+    SENT_TO_ACCOUNT: { emoji: "✅", text: "ส่งแล้ว", color: "#10B981", bgColor: "#D1FAE5" },
+  };
 
-  const statusText = {
-    WAITING_FOR_DOC: "รอใบเสร็จจากร้าน",
-    PENDING_PHYSICAL: "รอส่งบัญชี",
-    READY_TO_SEND: "พร้อมส่ง",
-    SENT_TO_ACCOUNT: "ส่งแล้ว",
-  }[expense.status] || expense.status;
+  const status = statusConfig[expense.status] || { emoji: "⚪", text: expense.status, color: "#6B7280", bgColor: "#F3F4F6" };
 
-  return {
-    type: "flex",
-    altText: `💸 รายจ่าย ${formatCurrencyThai(expense.netPaid)}`,
-    contents: {
-      type: "bubble",
-      size: "kilo",
-      header: {
+  const bodyContents: object[] = [
+    // Vendor/Description with icon
+    {
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { type: "text", text: "🏪", size: "xl" },
+          ],
+          width: "40px",
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: expense.vendorName || "ไม่ระบุผู้ขาย",
+              weight: "bold",
+              size: "lg",
+              color: "#1F2937",
+              wrap: true,
+            },
+            ...(expense.description ? [{
+              type: "text",
+              text: expense.description,
+              size: "xs",
+              color: "#6B7280",
+              wrap: true,
+              margin: "xs",
+            }] : []),
+          ],
+          flex: 1,
+        },
+      ],
+      spacing: "md",
+    },
+    // Divider
+    {
+      type: "box",
+      layout: "vertical",
+      contents: [{ type: "filler" }],
+      height: "1px",
+      backgroundColor: "#E5E7EB",
+      margin: "lg",
+    },
+    // Amount breakdown
+    {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            { type: "text", text: "ยอดก่อน VAT", size: "sm", color: "#6B7280", flex: 2 },
+            { type: "text", text: `฿${formatNumber(expense.amount)}`, size: "sm", color: "#374151", align: "end", flex: 1, weight: "bold" },
+          ],
+        },
+      ],
+      margin: "lg",
+      spacing: "sm",
+    },
+  ];
+
+  // Add VAT row if applicable
+  if (expense.vatAmount && expense.vatAmount > 0) {
+    bodyContents.push({
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        { 
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            { type: "text", text: "VAT 7%", size: "sm", color: "#3B82F6", flex: 0 },
+            {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                { type: "text", text: "ภาษี", size: "xxs", color: "#93C5FD" },
+              ],
+              margin: "sm",
+            },
+          ],
+          flex: 2,
+        },
+        { type: "text", text: `+฿${formatNumber(expense.vatAmount)}`, size: "sm", color: "#3B82F6", align: "end", flex: 1, weight: "bold" },
+      ],
+    });
+  }
+
+  // Add WHT row if applicable
+  if (expense.isWht && expense.whtAmount) {
+    bodyContents.push({
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        { 
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            { type: "text", text: `หัก ณ ที่จ่าย ${expense.whtRate}%`, size: "sm", color: "#DC2626", flex: 0 },
+          ],
+          flex: 2,
+        },
+        { type: "text", text: `-฿${formatNumber(expense.whtAmount)}`, size: "sm", color: "#DC2626", align: "end", flex: 1, weight: "bold" },
+      ],
+    });
+  }
+
+  // Net amount box
+  bodyContents.push({
+    type: "box",
+    layout: "horizontal",
+    contents: [
+      {
         type: "box",
         layout: "vertical",
         contents: [
+          { type: "text", text: "💳 โอนจริง", size: "md", color: "#374151", weight: "bold" },
+        ],
+        flex: 1,
+      },
+      {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { type: "text", text: `฿${formatNumber(expense.netPaid)}`, size: "xl", color: "#059669", weight: "bold", align: "end" },
+        ],
+        flex: 1,
+      },
+    ],
+    backgroundColor: "#ECFDF5",
+    cornerRadius: "lg",
+    paddingAll: "lg",
+    margin: "lg",
+  });
+
+  // Build footer with view button if id and companyCode are provided
+  const viewUrl = expense.id && expense.companyCode && baseUrl 
+    ? `${baseUrl}/${expense.companyCode}/expenses/${expense.id}`
+    : null;
+
+  return {
+    type: "flex",
+    altText: `💸 รายจ่าย ฿${formatNumber(expense.netPaid)} - ${expense.vendorName || expense.description || "ไม่ระบุ"}`,
+    contents: {
+      type: "bubble",
+      size: "mega",
+      header: {
+        type: "box",
+        layout: "horizontal",
+        contents: [
           {
-            type: "text",
-            text: `💸 ${expense.companyName}`,
-            weight: "bold",
-            color: "#EF4444",
-            size: "md",
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "💸", size: "xxl" },
+            ],
+            width: "50px",
+            height: "50px",
+            backgroundColor: "#FEE2E2",
+            cornerRadius: "25px",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "รายจ่ายใหม่", size: "xs", color: "#9CA3AF" },
+              { type: "text", text: expense.companyName, weight: "bold", size: "lg", color: "#111827" },
+            ],
+            flex: 1,
+            margin: "lg",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: status.emoji, size: "sm", align: "center" },
+              { type: "text", text: status.text, size: "xxs", color: status.color, align: "center", weight: "bold" },
+            ],
+            backgroundColor: status.bgColor,
+            cornerRadius: "md",
+            paddingAll: "sm",
+            width: "65px",
           },
         ],
-        backgroundColor: "#FEF2F2",
-        paddingAll: "12px",
+        paddingAll: "lg",
+        backgroundColor: "#FFFFFF",
+        spacing: "md",
       },
       body: {
         type: "box",
         layout: "vertical",
-        contents: [
-          {
-            type: "text",
-            text: expense.vendorName || expense.description || "ไม่ระบุ",
-            weight: "bold",
-            size: "lg",
-            wrap: true,
-          },
-          {
-            type: "separator",
-            margin: "md",
-          },
-          {
-            type: "box",
-            layout: "horizontal",
-            margin: "md",
-            contents: [
-              { type: "text", text: "ยอดก่อน VAT", size: "sm", color: "#666666", flex: 1 },
-              { type: "text", text: formatCurrencyThai(expense.amount), size: "sm", align: "end", flex: 1 },
-            ],
-          },
-          ...(expense.vatAmount && expense.vatAmount > 0
-            ? [
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    { type: "text", text: "VAT 7%", size: "sm", color: "#3B82F6", flex: 1 },
-                    { type: "text", text: `+${formatCurrencyThai(expense.vatAmount)}`, size: "sm", color: "#3B82F6", align: "end", flex: 1 },
-                  ],
-                },
-              ]
-            : []),
-          ...(expense.isWht && expense.whtAmount
-            ? [
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    { type: "text", text: `หัก ณ ที่จ่าย ${expense.whtRate}%`, size: "sm", color: "#EF4444", flex: 2 },
-                    { type: "text", text: `-${formatCurrencyThai(expense.whtAmount)}`, size: "sm", color: "#EF4444", align: "end", flex: 1 },
-                  ],
-                },
-              ]
-            : []),
-          {
-            type: "separator",
-            margin: "md",
-          },
-          {
-            type: "box",
-            layout: "horizontal",
-            margin: "md",
-            contents: [
-              { type: "text", text: "โอนจริง", weight: "bold", size: "md", flex: 1 },
-              { type: "text", text: formatCurrencyThai(expense.netPaid), weight: "bold", size: "md", color: "#10B981", align: "end", flex: 1 },
-            ],
-          },
-        ],
-        paddingAll: "12px",
+        contents: bodyContents,
+        paddingAll: "lg",
+        backgroundColor: "#F9FAFB",
       },
-      footer: {
+      footer: viewUrl ? {
         type: "box",
         layout: "vertical",
         contents: [
           {
-            type: "text",
-            text: `${statusEmoji} ${statusText}`,
-            size: "sm",
-            color: "#666666",
-            align: "center",
+            type: "button",
+            action: {
+              type: "uri",
+              label: "📄 ดูรายละเอียด",
+              uri: viewUrl,
+            },
+            style: "primary",
+            color: "#EF4444",
+            height: "sm",
           },
         ],
-        paddingAll: "12px",
-        backgroundColor: "#F9FAFB",
+        paddingAll: "lg",
+        backgroundColor: "#FFFFFF",
+      } : undefined,
+      styles: {
+        header: {
+          separator: false,
+        },
       },
     },
   };
@@ -298,6 +452,8 @@ export function createExpenseFlexMessage(expense: {
  * Create income notification (Flex Message)
  */
 export function createIncomeFlexMessage(income: {
+  id?: string;
+  companyCode?: string;
   companyName: string;
   customerName?: string;
   source?: string;
@@ -308,134 +464,262 @@ export function createIncomeFlexMessage(income: {
   whtAmount?: number;
   netReceived: number;
   status: string;
-}): LineMessage {
-  const statusEmoji = {
-    NO_DOC_REQUIRED: "⚪",
-    WAITING_ISSUE: "🟠",
-    WAITING_WHT_CERT: "🟠",
-    PENDING_COPY_SEND: "🔴",
-    SENT_COPY: "🟢",
-  }[income.status] || "⚪";
+}, baseUrl?: string): LineMessage {
+  const statusConfig: Record<string, { emoji: string; text: string; color: string; bgColor: string }> = {
+    NO_DOC_REQUIRED: { emoji: "⚪", text: "ไม่ต้องทำเอกสาร", color: "#6B7280", bgColor: "#F3F4F6" },
+    WAITING_ISSUE: { emoji: "📝", text: "รอออกบิล", color: "#F59E0B", bgColor: "#FEF3C7" },
+    WAITING_WHT_CERT: { emoji: "📋", text: "รอใบ 50 ทวิ", color: "#F59E0B", bgColor: "#FEF3C7" },
+    PENDING_COPY_SEND: { emoji: "📄", text: "รอส่งสำเนา", color: "#EF4444", bgColor: "#FEE2E2" },
+    SENT_COPY: { emoji: "✅", text: "ส่งแล้ว", color: "#10B981", bgColor: "#D1FAE5" },
+  };
 
-  const statusText = {
-    NO_DOC_REQUIRED: "ไม่ต้องทำเอกสาร",
-    WAITING_ISSUE: "รอออกบิล",
-    WAITING_WHT_CERT: "รอใบ 50 ทวิ",
-    PENDING_COPY_SEND: "รอส่งสำเนา",
-    SENT_COPY: "ส่งแล้ว",
-  }[income.status] || income.status;
+  const status = statusConfig[income.status] || { emoji: "⚪", text: income.status, color: "#6B7280", bgColor: "#F3F4F6" };
 
-  return {
-    type: "flex",
-    altText: `💰 รายรับ ${formatCurrencyThai(income.netReceived)}`,
-    contents: {
-      type: "bubble",
-      size: "kilo",
-      header: {
+  const bodyContents: object[] = [
+    // Customer/Source with icon
+    {
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { type: "text", text: "👤", size: "xl" },
+          ],
+          width: "40px",
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: income.customerName || "ไม่ระบุลูกค้า",
+              weight: "bold",
+              size: "lg",
+              color: "#1F2937",
+              wrap: true,
+            },
+            ...(income.source ? [{
+              type: "text",
+              text: income.source,
+              size: "xs",
+              color: "#6B7280",
+              wrap: true,
+              margin: "xs",
+            }] : []),
+          ],
+          flex: 1,
+        },
+      ],
+      spacing: "md",
+    },
+    // Divider
+    {
+      type: "box",
+      layout: "vertical",
+      contents: [{ type: "filler" }],
+      height: "1px",
+      backgroundColor: "#E5E7EB",
+      margin: "lg",
+    },
+    // Amount breakdown
+    {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            { type: "text", text: "ยอดก่อน VAT", size: "sm", color: "#6B7280", flex: 2 },
+            { type: "text", text: `฿${formatNumber(income.amount)}`, size: "sm", color: "#374151", align: "end", flex: 1, weight: "bold" },
+          ],
+        },
+      ],
+      margin: "lg",
+      spacing: "sm",
+    },
+  ];
+
+  // Add VAT row if applicable
+  if (income.vatAmount && income.vatAmount > 0) {
+    bodyContents.push({
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        { 
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            { type: "text", text: "VAT 7%", size: "sm", color: "#3B82F6", flex: 0 },
+            {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                { type: "text", text: "ภาษี", size: "xxs", color: "#93C5FD" },
+              ],
+              margin: "sm",
+            },
+          ],
+          flex: 2,
+        },
+        { type: "text", text: `+฿${formatNumber(income.vatAmount)}`, size: "sm", color: "#3B82F6", align: "end", flex: 1, weight: "bold" },
+      ],
+    });
+  }
+
+  // Add WHT row if applicable
+  if (income.isWhtDeducted && income.whtAmount) {
+    bodyContents.push({
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        { 
+          type: "box",
+          layout: "horizontal",
+          contents: [
+            { type: "text", text: `ลูกค้าหัก ${income.whtRate}%`, size: "sm", color: "#F59E0B", flex: 0 },
+          ],
+          flex: 2,
+        },
+        { type: "text", text: `-฿${formatNumber(income.whtAmount)}`, size: "sm", color: "#F59E0B", align: "end", flex: 1, weight: "bold" },
+      ],
+    });
+  }
+
+  // Net amount box
+  bodyContents.push({
+    type: "box",
+    layout: "horizontal",
+    contents: [
+      {
         type: "box",
         layout: "vertical",
         contents: [
+          { type: "text", text: "💵 รับจริง", size: "md", color: "#374151", weight: "bold" },
+        ],
+        flex: 1,
+      },
+      {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { type: "text", text: `฿${formatNumber(income.netReceived)}`, size: "xl", color: "#059669", weight: "bold", align: "end" },
+        ],
+        flex: 1,
+      },
+    ],
+    backgroundColor: "#ECFDF5",
+    cornerRadius: "lg",
+    paddingAll: "lg",
+    margin: "lg",
+  });
+
+  // Add WHT reminder if applicable
+  if (income.status === "WAITING_WHT_CERT") {
+    bodyContents.push({
+      type: "box",
+      layout: "horizontal",
+      contents: [
+        { type: "text", text: "⚠️", size: "md" },
+        { type: "text", text: "อย่าลืมทวงใบ 50 ทวิ จากลูกค้า!", size: "sm", color: "#B45309", flex: 1, margin: "sm", weight: "bold" },
+      ],
+      backgroundColor: "#FEF3C7",
+      cornerRadius: "md",
+      paddingAll: "md",
+      margin: "md",
+    });
+  }
+
+  // Build footer with view button if id and companyCode are provided
+  const viewUrl = income.id && income.companyCode && baseUrl 
+    ? `${baseUrl}/${income.companyCode}/incomes/${income.id}`
+    : null;
+
+  return {
+    type: "flex",
+    altText: `💰 รายรับ ฿${formatNumber(income.netReceived)} - ${income.customerName || income.source || "ไม่ระบุ"}`,
+    contents: {
+      type: "bubble",
+      size: "mega",
+      header: {
+        type: "box",
+        layout: "horizontal",
+        contents: [
           {
-            type: "text",
-            text: `💰 ${income.companyName}`,
-            weight: "bold",
-            color: "#10B981",
-            size: "md",
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "💰", size: "xxl" },
+            ],
+            width: "50px",
+            height: "50px",
+            backgroundColor: "#D1FAE5",
+            cornerRadius: "25px",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "รายรับใหม่", size: "xs", color: "#9CA3AF" },
+              { type: "text", text: income.companyName, weight: "bold", size: "lg", color: "#111827" },
+            ],
+            flex: 1,
+            margin: "lg",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: status.emoji, size: "sm", align: "center" },
+              { type: "text", text: status.text, size: "xxs", color: status.color, align: "center", weight: "bold" },
+            ],
+            backgroundColor: status.bgColor,
+            cornerRadius: "md",
+            paddingAll: "sm",
+            width: "80px",
           },
         ],
-        backgroundColor: "#ECFDF5",
-        paddingAll: "12px",
+        paddingAll: "lg",
+        backgroundColor: "#FFFFFF",
+        spacing: "md",
       },
       body: {
         type: "box",
         layout: "vertical",
-        contents: [
-          {
-            type: "text",
-            text: income.customerName || income.source || "ไม่ระบุ",
-            weight: "bold",
-            size: "lg",
-            wrap: true,
-          },
-          {
-            type: "separator",
-            margin: "md",
-          },
-          {
-            type: "box",
-            layout: "horizontal",
-            margin: "md",
-            contents: [
-              { type: "text", text: "ยอดก่อน VAT", size: "sm", color: "#666666", flex: 1 },
-              { type: "text", text: formatCurrencyThai(income.amount), size: "sm", align: "end", flex: 1 },
-            ],
-          },
-          ...(income.vatAmount && income.vatAmount > 0
-            ? [
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    { type: "text", text: "VAT 7%", size: "sm", color: "#3B82F6", flex: 1 },
-                    { type: "text", text: `+${formatCurrencyThai(income.vatAmount)}`, size: "sm", color: "#3B82F6", align: "end", flex: 1 },
-                  ],
-                },
-              ]
-            : []),
-          ...(income.isWhtDeducted && income.whtAmount
-            ? [
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  contents: [
-                    { type: "text", text: `ลูกค้าหัก ${income.whtRate}%`, size: "sm", color: "#F59E0B", flex: 2 },
-                    { type: "text", text: `-${formatCurrencyThai(income.whtAmount)}`, size: "sm", color: "#F59E0B", align: "end", flex: 1 },
-                  ],
-                },
-              ]
-            : []),
-          {
-            type: "separator",
-            margin: "md",
-          },
-          {
-            type: "box",
-            layout: "horizontal",
-            margin: "md",
-            contents: [
-              { type: "text", text: "รับจริง", weight: "bold", size: "md", flex: 1 },
-              { type: "text", text: formatCurrencyThai(income.netReceived), weight: "bold", size: "md", color: "#10B981", align: "end", flex: 1 },
-            ],
-          },
-        ],
-        paddingAll: "12px",
+        contents: bodyContents,
+        paddingAll: "lg",
+        backgroundColor: "#F9FAFB",
       },
-      footer: {
+      footer: viewUrl ? {
         type: "box",
         layout: "vertical",
         contents: [
           {
-            type: "text",
-            text: `${statusEmoji} ${statusText}`,
-            size: "sm",
-            color: "#666666",
-            align: "center",
+            type: "button",
+            action: {
+              type: "uri",
+              label: "📄 ดูรายละเอียด",
+              uri: viewUrl,
+            },
+            style: "primary",
+            color: "#10B981",
+            height: "sm",
           },
-          ...(income.status === "WAITING_WHT_CERT"
-            ? [
-                {
-                  type: "text",
-                  text: "⚠️ อย่าลืมทวงใบ 50 ทวิ!",
-                  size: "xs",
-                  color: "#F59E0B",
-                  align: "center",
-                  margin: "sm",
-                },
-              ]
-            : []),
         ],
-        paddingAll: "12px",
-        backgroundColor: "#F9FAFB",
+        paddingAll: "lg",
+        backgroundColor: "#FFFFFF",
+      } : undefined,
+      styles: {
+        header: {
+          separator: false,
+        },
       },
     },
   };
@@ -692,6 +976,8 @@ export async function notifyCompanyText(
 export async function notifyExpense(
   companyId: string,
   expense: {
+    id?: string;
+    companyCode?: string;
     companyName: string;
     vendorName?: string;
     description?: string;
@@ -702,9 +988,10 @@ export async function notifyExpense(
     whtAmount?: number;
     netPaid: number;
     status: string;
-  }
+  },
+  baseUrl?: string
 ): Promise<boolean> {
-  const message = createExpenseFlexMessage(expense);
+  const message = createExpenseFlexMessage(expense, baseUrl);
   return notifyCompanyById(companyId, message);
 }
 
@@ -714,6 +1001,8 @@ export async function notifyExpense(
 export async function notifyIncome(
   companyId: string,
   income: {
+    id?: string;
+    companyCode?: string;
     companyName: string;
     customerName?: string;
     source?: string;
@@ -724,8 +1013,170 @@ export async function notifyIncome(
     whtAmount?: number;
     netReceived: number;
     status: string;
-  }
+  },
+  baseUrl?: string
 ): Promise<boolean> {
-  const message = createIncomeFlexMessage(income);
+  const message = createIncomeFlexMessage(income, baseUrl);
   return notifyCompanyById(companyId, message);
+}
+
+/**
+ * Create test notification (Flex Message)
+ */
+export function createTestFlexMessage(companyName: string): LineMessage {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+
+  return {
+    type: "flex",
+    altText: `🔔 ทดสอบการแจ้งเตือน - ${companyName}`,
+    contents: {
+      type: "bubble",
+      size: "mega",
+      header: {
+        type: "box",
+        layout: "horizontal",
+        contents: [
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "🔔", size: "xxl" },
+            ],
+            width: "50px",
+            height: "50px",
+            backgroundColor: "#DBEAFE",
+            cornerRadius: "25px",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "ทดสอบการแจ้งเตือน", size: "xs", color: "#9CA3AF" },
+              { type: "text", text: companyName, weight: "bold", size: "lg", color: "#111827" },
+            ],
+            flex: 1,
+            margin: "lg",
+          },
+        ],
+        paddingAll: "lg",
+        backgroundColor: "#FFFFFF",
+        spacing: "md",
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "✅ การเชื่อมต่อสำเร็จ!", weight: "bold", size: "lg", color: "#059669", align: "center" },
+              { type: "text", text: "LINE Bot พร้อมส่งการแจ้งเตือนแล้ว", size: "sm", color: "#6B7280", align: "center", margin: "md" },
+            ],
+            backgroundColor: "#ECFDF5",
+            cornerRadius: "lg",
+            paddingAll: "xl",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [{ type: "filler" }],
+            height: "1px",
+            backgroundColor: "#E5E7EB",
+            margin: "xl",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  { type: "text", text: "📅 วันที่ส่ง", size: "sm", color: "#6B7280", flex: 1 },
+                  { type: "text", text: dateStr, size: "sm", color: "#374151", align: "end", flex: 1, weight: "bold" },
+                ],
+              },
+              {
+                type: "box",
+                layout: "horizontal",
+                contents: [
+                  { type: "text", text: "🕐 เวลา", size: "sm", color: "#6B7280", flex: 1 },
+                  { type: "text", text: timeStr, size: "sm", color: "#374151", align: "end", flex: 1, weight: "bold" },
+                ],
+                margin: "md",
+              },
+            ],
+            margin: "xl",
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "💡 Tip: สร้างรายรับ/รายจ่ายใหม่เพื่อรับการแจ้งเตือนอัตโนมัติ", size: "xs", color: "#9CA3AF", wrap: true, align: "center" },
+            ],
+            margin: "xl",
+            paddingAll: "md",
+            backgroundColor: "#F3F4F6",
+            cornerRadius: "md",
+          },
+        ],
+        paddingAll: "lg",
+        backgroundColor: "#F9FAFB",
+      },
+      styles: {
+        header: {
+          separator: false,
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Send test notification to company (bypasses notifyEnabled check)
+ */
+export async function sendTestNotification(companyId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        name: true,
+        lineChannelAccessToken: true,
+        lineGroupId: true,
+      },
+    });
+
+    if (!company) {
+      return { success: false, error: "ไม่พบบริษัท" };
+    }
+
+    if (!company.lineChannelAccessToken) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า Channel Access Token" };
+    }
+
+    if (!company.lineGroupId) {
+      return { success: false, error: "ยังไม่ได้ตั้งค่า Group ID" };
+    }
+
+    const message = createTestFlexMessage(company.name);
+    const success = await sendLineMessage({
+      channelAccessToken: company.lineChannelAccessToken,
+      to: company.lineGroupId,
+      messages: [message],
+    });
+
+    if (!success) {
+      return { success: false, error: "ส่งข้อความไม่สำเร็จ กรุณาตรวจสอบ Channel Access Token และ Group ID" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Test notification error:", error);
+    return { success: false, error: "เกิดข้อผิดพลาดในการส่งข้อความ" };
+  }
 }

@@ -4,10 +4,8 @@ import { z } from "zod";
 const incomeBaseSchema = z.object({
   companyId: z.string().min(1, "กรุณาเลือกบริษัท"),
   
-  // Customer
-  customerId: z.string().optional(),
-  customerName: z.string().optional(),
-  customerTaxId: z.string().optional(),
+  // Contact (ผู้ติดต่อ - ลูกค้า)
+  contactId: z.string().optional().nullable(),
   
   // Financial
   amount: z
@@ -30,6 +28,7 @@ const incomeBaseSchema = z.object({
   
   // Details
   source: z.string().max(200).optional(),
+  categoryId: z.string().optional().nullable(),
   invoiceNumber: z.string().max(50).optional(),
   referenceNo: z.string().max(50).optional(),
   paymentMethod: z.enum([

@@ -3,7 +3,7 @@
 /**
  * Team Management Card Component
  * 
- * Card displaying team members with ability to invite new members
+ * Card displaying team members with ability to create new members
  */
 
 import { useState } from "react";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Users, UserPlus } from "lucide-react";
 import { TeamMembersList } from "./team-members-list";
-import { InviteMemberDialog } from "./invite-member-dialog";
+import { CreateMemberDialog } from "./create-member-dialog";
 import { useIsOwner } from "@/components/guards/permission-guard";
 
 interface TeamManagementCardProps {
@@ -19,7 +19,7 @@ interface TeamManagementCardProps {
 }
 
 export function TeamManagementCard({ companyId }: TeamManagementCardProps) {
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const isOwner = useIsOwner();
 
   return (
@@ -29,7 +29,7 @@ export function TeamManagementCard({ companyId }: TeamManagementCardProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-emerald-500" />
+                <Users className="h-5 w-5 text-primary" />
                 สมาชิกในทีม
               </CardTitle>
               <CardDescription>
@@ -37,9 +37,9 @@ export function TeamManagementCard({ companyId }: TeamManagementCardProps) {
               </CardDescription>
             </div>
             {isOwner && (
-              <Button onClick={() => setInviteDialogOpen(true)}>
+              <Button onClick={() => setCreateDialogOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" />
-                เชิญสมาชิกใหม่
+                สร้างสมาชิกใหม่
               </Button>
             )}
           </div>
@@ -49,13 +49,13 @@ export function TeamManagementCard({ companyId }: TeamManagementCardProps) {
         </CardContent>
       </Card>
 
-      {/* Invite Dialog */}
-      <InviteMemberDialog
+      {/* Create Member Dialog */}
+      <CreateMemberDialog
         companyId={companyId}
-        open={inviteDialogOpen}
-        onOpenChange={setInviteDialogOpen}
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
         onSuccess={() => {
-          setInviteDialogOpen(false);
+          setCreateDialogOpen(false);
           // The TeamMembersList component will reload automatically
         }}
       />

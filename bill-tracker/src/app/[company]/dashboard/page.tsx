@@ -237,7 +237,7 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
                     >
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          {expense.vendorName || expense.description || "ไม่ระบุ"}
+                          {expense.description || "ไม่ระบุ"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatCurrency(Number(expense.netPaid))}
@@ -265,7 +265,7 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
                     >
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          {income.customerName || income.source || "ไม่ระบุ"}
+                          {income.source || "ไม่ระบุ"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatCurrency(Number(income.netReceived))}
@@ -293,7 +293,7 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
                     >
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          {income.customerName || income.source || "ไม่ระบุ"}
+                          {income.source || "ไม่ระบุ"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatCurrency(Number(income.netReceived))}
@@ -442,11 +442,9 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
                   <div>
                     <p className="text-sm font-medium text-foreground">
                       {item.type === "expense"
-                        ? (item as (typeof recentExpenses)[0]).vendorName ||
-                          (item as (typeof recentExpenses)[0]).description ||
+                        ? (item as (typeof recentExpenses)[0]).description ||
                           "ไม่ระบุ"
-                        : (item as (typeof recentIncomes)[0]).customerName ||
-                          (item as (typeof recentIncomes)[0]).source ||
+                        : (item as (typeof recentIncomes)[0]).source ||
                           "ไม่ระบุ"}
                     </p>
                     <p className="text-xs text-muted-foreground">

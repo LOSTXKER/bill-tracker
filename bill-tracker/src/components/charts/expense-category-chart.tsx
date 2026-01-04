@@ -42,7 +42,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     return (
       <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
         <p className="font-medium text-foreground">{payload[0].name}</p>
-        <p className="text-sm text-emerald-500 font-medium">
+        <p className="text-sm text-primary font-medium">
           {formatCurrency(payload[0].value)}
         </p>
         <p className="text-xs text-muted-foreground">

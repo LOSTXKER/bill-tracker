@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { prisma } from "@/lib/db";
 import {
   exportExpensesToExcel,
@@ -9,49 +9,18 @@ import {
   exportWHTReport,
 } from "@/lib/export/excel";
 
-export async function GET(request: Request) {
-  try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export const GET = withCompanyAccess(
+  async (request, { company }) => {
     const { searchParams } = new URL(request.url);
-    const companyCode = searchParams.get("company");
     const type = searchParams.get("type"); // 'expenses', 'incomes', 'monthly', 'vat', 'wht'
     const month = searchParams.get("month");
     const year = searchParams.get("year");
 
-    if (!companyCode || !type || !month || !year) {
+    if (!type || !month || !year) {
       return NextResponse.json(
         { error: "Missing required parameters" },
         { status: 400 }
       );
-    }
-
-    const company = await prisma.company.findUnique({
-      where: { code: companyCode.toUpperCase() },
-    });
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
-
-    // Check user access
-    const hasAccess =
-      session.user.role === "ADMIN" ||
-      (await prisma.companyAccess.findUnique({
-        where: {
-          userId_companyId: {
-            userId: session.user.id,
-            companyId: company.id,
-          },
-        },
-      }));
-
-    if (!hasAccess) {
-      return NextResponse.json({ error: "No access" }, { status: 403 });
     }
 
     const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -64,103 +33,107 @@ export async function GET(request: Request) {
           companyId: company.id,
           billDate: { gte: startDate, lte: endDate },
         },
-        orderBy: { billDate: "asc" },
-        select: {
-          billDate: true,
-          vendorName: true,
-          vendorTaxId: true,
-          description: true,
-          category: true,
-          amount: true,
-          vatRate: true,
-          vatAmount: true,
-          isWht: true,
-          whtRate: true,
-          whtAmount: true,
-          netPaid: true,
-          status: true,
-          invoiceNumber: true,
+        include: {
+          contact: true,
         },
+        orderBy: { billDate: "asc" },
       }),
       prisma.income.findMany({
         where: {
           companyId: company.id,
           receiveDate: { gte: startDate, lte: endDate },
         },
-        orderBy: { receiveDate: "asc" },
-        select: {
-          receiveDate: true,
-          customerName: true,
-          customerTaxId: true,
-          source: true,
-          amount: true,
-          vatRate: true,
-          vatAmount: true,
-          isWhtDeducted: true,
-          whtRate: true,
-          whtAmount: true,
-          netReceived: true,
-          status: true,
-          invoiceNumber: true,
+        include: {
+          contact: true,
         },
+        orderBy: { receiveDate: "asc" },
       }),
     ]);
+
+    // Transform data to match export format
+    const expenseData = expenses.map((e) => ({
+      billDate: e.billDate,
+      vendorName: e.contact?.name || null,
+      vendorTaxId: e.contact?.taxId || null,
+      description: e.description,
+      category: e.category,
+      amount: e.amount,
+      vatRate: e.vatRate,
+      vatAmount: e.vatAmount,
+      isWht: e.isWht,
+      whtRate: e.whtRate,
+      whtAmount: e.whtAmount,
+      netPaid: e.netPaid,
+      status: e.status,
+      invoiceNumber: e.invoiceNumber,
+    }));
+
+    const incomeData = incomes.map((i) => ({
+      receiveDate: i.receiveDate,
+      customerName: i.contact?.name || null,
+      customerTaxId: i.contact?.taxId || null,
+      source: i.source,
+      amount: i.amount,
+      vatRate: i.vatRate,
+      vatAmount: i.vatAmount,
+      isWhtDeducted: i.isWhtDeducted,
+      whtRate: i.whtRate,
+      whtAmount: i.whtAmount,
+      netReceived: i.netReceived,
+      status: i.status,
+      invoiceNumber: i.invoiceNumber,
+    }));
 
     let buffer: Buffer;
     let filename: string;
 
     switch (type) {
       case "expenses":
-        buffer = await exportExpensesToExcel(expenses as any, company.name, period);
-        filename = `รายจ่าย_${companyCode}_${month}-${year}.xlsx`;
+        buffer = await exportExpensesToExcel(expenseData as any, company.name, period);
+        filename = `รายจ่าย_${company.code}_${month}-${year}.xlsx`;
         break;
       case "incomes":
-        buffer = await exportIncomesToExcel(incomes as any, company.name, period);
-        filename = `รายรับ_${companyCode}_${month}-${year}.xlsx`;
+        buffer = await exportIncomesToExcel(incomeData as any, company.name, period);
+        filename = `รายรับ_${company.code}_${month}-${year}.xlsx`;
         break;
       case "monthly":
         buffer = await exportMonthlyReport(
-          expenses as any,
-          incomes as any,
+          expenseData as any,
+          incomeData as any,
           company.name,
           period
         );
-        filename = `สรุปรายเดือน_${companyCode}_${month}-${year}.xlsx`;
+        filename = `สรุปรายเดือน_${company.code}_${month}-${year}.xlsx`;
         break;
       case "vat":
         buffer = await exportVATReport(
-          expenses as any,
-          incomes as any,
+          expenseData as any,
+          incomeData as any,
           company.name,
           period
         );
-        filename = `รายงาน_VAT_${companyCode}_${month}-${year}.xlsx`;
+        filename = `รายงาน_VAT_${company.code}_${month}-${year}.xlsx`;
         break;
       case "wht":
         buffer = await exportWHTReport(
-          expenses as any,
-          incomes as any,
+          expenseData as any,
+          incomeData as any,
           company.name,
           period
         );
-        filename = `รายงาน_WHT_${companyCode}_${month}-${year}.xlsx`;
+        filename = `รายงาน_WHT_${company.code}_${month}-${year}.xlsx`;
         break;
       default:
         return NextResponse.json({ error: "Invalid export type" }, { status: 400 });
     }
 
-    return new Response(new Uint8Array(buffer), {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
       },
     });
-  } catch (error) {
-    console.error("Export error:", error);
-    return NextResponse.json(
-      { error: "Export failed" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "reports:export" }
+);

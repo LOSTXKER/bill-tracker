@@ -26,10 +26,10 @@ export default async function WHTReportPage({ params }: WHTReportPageProps) {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">
             รายงานภาษีหัก ณ ที่จ่าย (WHT)
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-muted-foreground">
             สรุปภาษีหักสำหรับยื่น ภ.ง.ด.53/54
           </p>
         </div>
@@ -76,7 +76,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { billDate: "asc" },
     include: {
-      vendor: true,
+      contact: true,
     },
   });
 
@@ -89,7 +89,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { receiveDate: "asc" },
     include: {
-      customer: true,
+      contact: true,
     },
   });
 
@@ -121,9 +121,9 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20">
+        <Card className="border-red-200/50 dark:border-red-800/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               เราหักเขา (ต้องนำส่ง)
             </CardTitle>
             <AlertCircle className="h-5 w-5 text-red-500" />
@@ -132,15 +132,15 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">
               {formatCurrency(totalWHTpaid)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {expensesWithWHT.length} รายการ
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+        <Card className="border-blue-200/50 dark:border-blue-800/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               เขาหักเรา (เครดิตภาษี)
             </CardTitle>
             <FileText className="h-5 w-5 text-blue-500" />
@@ -149,23 +149,23 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {formatCurrency(totalWHTreceived)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {incomesWithWHT.length} รายการ
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-muted">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               ต้องนำส่งสุทธิ
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <div className="text-2xl font-bold text-foreground">
               {formatCurrency(totalWHTpaid - totalWHTreceived)}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               หัก - {formatCurrency(totalWHTreceived)} เครดิต
             </p>
           </CardContent>
@@ -199,7 +199,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
                     </TableCell>
                   </TableRow>
                 ))}
-                <TableRow className="bg-slate-50 dark:bg-slate-800 font-bold">
+                <TableRow className="bg-muted/50 font-bold">
                   <TableCell>รวมทั้งหมด</TableCell>
                   <TableCell className="text-center">
                     {expensesWithWHT.length}
@@ -223,7 +223,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
         </CardHeader>
         <CardContent>
           {expensesWithWHT.length === 0 ? (
-            <p className="text-center py-8 text-slate-500">ไม่มีรายการ</p>
+            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -248,7 +248,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
                         })}
                       </TableCell>
                       <TableCell>
-                        {expense.vendor?.name || expense.vendorName || "-"}
+                        {expense.contact?.name || expense.description || "-"}
                       </TableCell>
                       <TableCell className="text-sm">
                         {WHT_TYPE_LABELS[expense.whtType || "OTHER"]}
@@ -280,7 +280,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
         </CardHeader>
         <CardContent>
           {incomesWithWHT.length === 0 ? (
-            <p className="text-center py-8 text-slate-500">ไม่มีรายการ</p>
+            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -308,7 +308,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
                         )}
                       </TableCell>
                       <TableCell>
-                        {income.customer?.name || income.customerName || "-"}
+                        {income.contact?.name || income.source || "-"}
                       </TableCell>
                       <TableCell className="text-sm">
                         {WHT_TYPE_LABELS[income.whtType || "OTHER"]}

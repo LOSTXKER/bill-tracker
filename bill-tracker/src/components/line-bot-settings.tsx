@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, CheckCircle2, XCircle, Loader2, ExternalLink } from "lucide-react";
+import { MessageSquare, CheckCircle2, XCircle, Loader2, ExternalLink, Bell, BellOff, Send } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 interface LineBotSettingsProps {
@@ -18,10 +19,12 @@ interface LineBotSettingsProps {
 export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps) {
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [testing, setTesting] = React.useState(false);
   const [config, setConfig] = React.useState<{
     channelSecret: string | null;
     channelAccessToken: string | null;
     groupId: string | null;
+    notifyEnabled: boolean;
     isConfigured: boolean;
   } | null>(null);
 
@@ -79,12 +82,12 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
       });
 
       if (response.ok) {
-        const data = await response.json();
         setConfig({
           channelSecret: config?.channelSecret ?? null,
           channelAccessToken: config?.channelAccessToken ?? null,
           isConfigured: true,
           groupId: formData.groupId || null,
+          notifyEnabled: config?.notifyEnabled ?? true,
         });
         setIsEditing(false);
         toast.success("✅ บันทึกการตั้งค่า LINE Bot สำเร็จ!");
@@ -116,6 +119,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
           channelSecret: null,
           channelAccessToken: null,
           groupId: null,
+          notifyEnabled: true,
           isConfigured: false,
         });
         setFormData({
@@ -136,18 +140,63 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
     }
   };
 
+  const handleToggleNotify = async (enabled: boolean) => {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/companies/${companyId}/line-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifyEnabled: enabled }),
+      });
+
+      if (response.ok) {
+        setConfig((prev) => prev ? { ...prev, notifyEnabled: enabled } : null);
+        toast.success(enabled ? "✅ เปิดการแจ้งเตือน LINE แล้ว" : "🔕 ปิดการแจ้งเตือน LINE แล้ว");
+      } else {
+        toast.error("เกิดข้อผิดพลาด");
+      }
+    } catch (error) {
+      console.error("Failed to toggle notifications:", error);
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    setTesting(true);
+    try {
+      const response = await fetch(`/api/companies/${companyId}/line-config`, {
+        method: "PUT",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success("📤 ส่งข้อความทดสอบสำเร็จ! ตรวจสอบที่ LINE Group");
+      } else {
+        toast.error(data.error || "เกิดข้อผิดพลาด");
+      }
+    } catch (error) {
+      console.error("Failed to send test notification:", error);
+      toast.error("เกิดข้อผิดพลาดในการส่งข้อความ");
+    } finally {
+      setTesting(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-green-500" />
+            <MessageSquare className="h-5 w-5 text-primary" />
             LINE Bot
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         </CardContent>
       </Card>
@@ -158,16 +207,16 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-green-500" />
+          <MessageSquare className="h-5 w-5 text-primary" />
           LINE Bot
           {config?.isConfigured && (
-            <Badge variant="outline" className="ml-auto bg-green-100 text-green-700 border-green-200">
+            <Badge variant="outline" className="ml-auto bg-primary/10 text-primary border-primary/20">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               เชื่อมต่อแล้ว
             </Badge>
           )}
           {config && !config.isConfigured && (
-            <Badge variant="outline" className="ml-auto text-slate-500">
+            <Badge variant="outline" className="ml-auto text-muted-foreground">
               <XCircle className="h-3 w-3 mr-1" />
               ยังไม่เชื่อมต่อ
             </Badge>
@@ -181,6 +230,57 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
         {!isEditing && config?.isConfigured ? (
           // Display mode
           <>
+            {/* Notification Toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="flex items-center gap-3">
+                {config.notifyEnabled ? (
+                  <Bell className="h-5 w-5 text-primary" />
+                ) : (
+                  <BellOff className="h-5 w-5 text-muted-foreground" />
+                )}
+                <div>
+                  <Label className="text-base">แจ้งเตือนอัตโนมัติ</Label>
+                  <p className="text-sm text-muted-foreground">
+                    ส่งข้อความเมื่อสร้างรายรับ/รายจ่ายใหม่
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={config.notifyEnabled}
+                onCheckedChange={handleToggleNotify}
+                disabled={saving || !config.groupId}
+              />
+            </div>
+            {!config.groupId && (
+              <p className="text-xs text-amber-600">
+                ⚠️ ต้องตั้งค่า Group ID ก่อนจึงจะเปิดการแจ้งเตือนได้
+              </p>
+            )}
+
+            {/* Test Button */}
+            {config.groupId && (
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                onClick={handleSendTest}
+                disabled={testing}
+              >
+                {testing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4" />
+                    ส่งข้อความทดสอบ
+                  </>
+                )}
+              </Button>
+            )}
+
+            <Separator />
+
             <div className="space-y-2">
               <Label>Channel Secret</Label>
               <Input value={config.channelSecret || "••••••••"} disabled />
@@ -196,7 +296,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
                 disabled 
               />
               {config.groupId && (
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   ✅ บอทอยู่ในกลุ่มแล้ว
                 </p>
               )}
@@ -212,7 +312,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
               </Button>
               <Button 
                 variant="outline" 
-                className="flex-1 text-red-600 hover:text-red-700"
+                className="flex-1 text-destructive hover:text-destructive"
                 onClick={handleRemove}
                 disabled={saving}
               >
@@ -251,7 +351,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
 
             <div className="space-y-2">
               <Label htmlFor="channelSecret">
-                Channel Secret <span className="text-red-500">*</span>
+                Channel Secret <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="channelSecret"
@@ -264,7 +364,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
 
             <div className="space-y-2">
               <Label htmlFor="channelAccessToken">
-                Channel Access Token <span className="text-red-500">*</span>
+                Channel Access Token <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="channelAccessToken"
@@ -277,7 +377,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
 
             <div className="space-y-2">
               <Label htmlFor="groupId">
-                Group ID <span className="text-slate-500">(ไม่บังคับ)</span>
+                Group ID <span className="text-muted-foreground">(ไม่บังคับ)</span>
               </Label>
               <Input
                 id="groupId"
@@ -285,7 +385,7 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
                 value={formData.groupId}
                 onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 💡 ไม่จำเป็นต้องกรอก - บอทจะบันทึก Group ID อัตโนมัติเมื่อคุณพิมพ์ "group id" ในกลุ่ม
               </p>
             </div>
@@ -330,18 +430,18 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
         {config?.isConfigured && !isEditing && (
           <>
             <Separator />
-            <div className="rounded-lg bg-green-50 dark:bg-green-950 p-4 space-y-2 text-sm">
-              <p className="font-medium text-green-900 dark:text-green-100">
+            <div className="rounded-lg bg-primary/10 p-4 space-y-2 text-sm">
+              <p className="font-medium text-primary">
                 ✅ LINE Bot พร้อมใช้งาน!
               </p>
-              <p className="text-green-800 dark:text-green-200">
+              <p className="text-foreground">
                 คุณสามารถใช้คำสั่งต่อไปนี้ใน LINE Group:
               </p>
-              <ul className="list-disc list-inside space-y-1 text-green-800 dark:text-green-200">
-                <li><code className="bg-green-100 dark:bg-green-900 px-1 rounded">help</code> - ดูคำสั่งทั้งหมด</li>
-                <li><code className="bg-green-100 dark:bg-green-900 px-1 rounded">group id</code> - ดู Group ID</li>
-                <li><code className="bg-green-100 dark:bg-green-900 px-1 rounded">summary</code> - สรุปรายการวันนี้</li>
-                <li><code className="bg-green-100 dark:bg-green-900 px-1 rounded">budget</code> - สถานะงบประมาณ</li>
+              <ul className="list-disc list-inside space-y-1 text-foreground">
+                <li><code className="bg-primary/10 px-1 rounded">help</code> - ดูคำสั่งทั้งหมด</li>
+                <li><code className="bg-primary/10 px-1 rounded">group id</code> - ดู Group ID</li>
+                <li><code className="bg-primary/10 px-1 rounded">summary</code> - สรุปรายการวันนี้</li>
+                <li><code className="bg-primary/10 px-1 rounded">budget</code> - สถานะงบประมาณ</li>
                 <li>ส่งรูปใบเสร็จ - วิเคราะห์ด้วย AI (เร็วๆ นี้)</li>
               </ul>
             </div>

@@ -1,7 +1,24 @@
+require("dotenv").config();
+
 const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
 const { hash } = require("bcryptjs");
 
-const prisma = new PrismaClient();
+function createPrismaClient() {
+  const connectionString = process.env.DATABASE_URL;
+  
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not defined");
+  }
+
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+
+  return new PrismaClient({ adapter });
+}
+
+const prisma = createPrismaClient();
 
 async function main() {
   console.log("🌱 Seeding database...");
@@ -61,7 +78,7 @@ async function main() {
   });
   console.log("✅ Created company:", meelike.name);
 
-  // Give demo user access to both companies
+  // Give demo user access to both companies (using new schema with isOwner and permissions)
   await prisma.companyAccess.upsert({
     where: {
       userId_companyId: {
@@ -73,7 +90,8 @@ async function main() {
     create: {
       userId: demoUser.id,
       companyId: anajak.id,
-      role: "MANAGER",
+      isOwner: false,
+      permissions: ["expenses:read", "expenses:write", "incomes:read", "incomes:write", "contacts:read", "contacts:write", "reports:read"],
     },
   });
 
@@ -88,94 +106,45 @@ async function main() {
     create: {
       userId: demoUser.id,
       companyId: meelike.id,
-      role: "OWNER",
+      isOwner: true,
+      permissions: [],
     },
   });
   console.log("✅ Granted company access to demo user");
 
-  // Create sample vendors for Anajak
-  const vendors = [
-    { name: "ร้านหมึก DTF สยาม", taxId: "1111111111111" },
-    { name: "บริษัท เสื้อผ้าไทย จำกัด", taxId: "2222222222222" },
-    { name: "ขนส่งด่วน Express", taxId: "3333333333333" },
+  // Create sample contacts (replacing vendors and customers)
+  const contacts = [
+    { name: "ร้านหมึก DTF สยาม", taxId: "1111111111111", paymentTerms: 0 },
+    { name: "บริษัท เสื้อผ้าไทย จำกัด", taxId: "2222222222222", paymentTerms: 0 },
+    { name: "ขนส่งด่วน Express", taxId: "3333333333333", paymentTerms: 0 },
+    { name: "บริษัท ABC จำกัด", taxId: "4444444444444", paymentTerms: 30 },
+    { name: "ห้างหุ้นส่วนจำกัด XYZ", taxId: "5555555555555", paymentTerms: 15 },
+    { name: "คุณสมชาย ใจดี", taxId: null, paymentTerms: 0 },
   ];
 
-  for (const vendor of vendors) {
-    await prisma.vendor.upsert({
-      where: {
-        id: `seed-vendor-${vendor.taxId}`,
-      },
+  const createdContacts = {};
+  for (const contact of contacts) {
+    const id = `seed-contact-${contact.name}`;
+    const created = await prisma.contact.upsert({
+      where: { id },
       update: {},
       create: {
-        id: `seed-vendor-${vendor.taxId}`,
+        id,
         companyId: anajak.id,
-        name: vendor.name,
-        taxId: vendor.taxId,
+        name: contact.name,
+        taxId: contact.taxId,
+        paymentTerms: contact.paymentTerms,
       },
     });
+    createdContacts[contact.name] = created;
   }
-  console.log("✅ Created sample vendors");
-
-  // Create sample customers for Anajak
-  const customers = [
-    { name: "บริษัท ABC จำกัด", taxId: "4444444444444", creditDays: 30 },
-    { name: "ห้างหุ้นส่วนจำกัด XYZ", taxId: "5555555555555", creditDays: 15 },
-    { name: "คุณสมชาย ใจดี", taxId: null, creditDays: 0 },
-  ];
-
-  for (const customer of customers) {
-    await prisma.customer.upsert({
-      where: {
-        id: `seed-customer-${customer.name}`,
-      },
-      update: {},
-      create: {
-        id: `seed-customer-${customer.name}`,
-        companyId: anajak.id,
-        name: customer.name,
-        taxId: customer.taxId,
-        paymentTermDays: customer.creditDays,
-      },
-    });
-  }
-  console.log("✅ Created sample customers");
-
-  // Create sample budgets for current month
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const budgets = [
-    { category: "MATERIAL", amount: 50000 },
-    { category: "UTILITY", amount: 10000 },
-    { category: "MARKETING", amount: 20000 },
-    { category: "FREELANCE", amount: 15000 },
-    { category: "TRANSPORT", amount: 5000 },
-  ];
-
-  for (const budget of budgets) {
-    await prisma.budget.upsert({
-      where: {
-        id: `seed-budget-${anajak.id}-${budget.category}`,
-      },
-      update: {},
-      create: {
-        id: `seed-budget-${anajak.id}-${budget.category}`,
-        companyId: anajak.id,
-        category: budget.category,
-        amount: budget.amount,
-        period: "MONTHLY",
-        startDate: startOfMonth,
-        endDate: endOfMonth,
-      },
-    });
-  }
-  console.log("✅ Created sample budgets");
+  console.log("✅ Created sample contacts");
 
   // Create sample expenses
+  const now = new Date();
   const expenses = [
     {
-      vendorName: "ร้านหมึก DTF สยาม",
+      contactName: "ร้านหมึก DTF สยาม",
       amount: 5000,
       vatRate: 7,
       category: "MATERIAL",
@@ -183,7 +152,7 @@ async function main() {
       status: "SENT_TO_ACCOUNT",
     },
     {
-      vendorName: "กราฟิกฟรีแลนซ์ คุณต้น",
+      contactName: "บริษัท เสื้อผ้าไทย จำกัด",
       amount: 3000,
       vatRate: 0,
       isWht: true,
@@ -193,7 +162,7 @@ async function main() {
       status: "PENDING_PHYSICAL",
     },
     {
-      vendorName: "ขนส่งด่วน Express",
+      contactName: "ขนส่งด่วน Express",
       amount: 800,
       vatRate: 7,
       isWht: true,
@@ -209,11 +178,12 @@ async function main() {
     const vatAmount = (exp.amount * (exp.vatRate || 0)) / 100;
     const whtAmount = exp.isWht ? (exp.amount * (exp.whtRate || 0)) / 100 : 0;
     const netPaid = exp.amount + vatAmount - whtAmount;
+    const contact = createdContacts[exp.contactName];
 
     await prisma.expense.create({
       data: {
         companyId: anajak.id,
-        vendorName: exp.vendorName,
+        contactId: contact?.id || null,
         amount: exp.amount,
         vatRate: exp.vatRate,
         vatAmount: vatAmount > 0 ? vatAmount : null,
@@ -235,7 +205,7 @@ async function main() {
   // Create sample incomes
   const incomes = [
     {
-      customerName: "บริษัท ABC จำกัด",
+      contactName: "บริษัท ABC จำกัด",
       amount: 20000,
       vatRate: 7,
       isWhtDeducted: true,
@@ -244,14 +214,14 @@ async function main() {
       status: "SENT_COPY",
     },
     {
-      customerName: "คุณสมชาย ใจดี",
+      contactName: "คุณสมชาย ใจดี",
       amount: 5000,
       vatRate: 0,
       source: "สกรีนเสื้อ 50 ตัว",
       status: "PENDING_COPY_SEND",
     },
     {
-      customerName: "ห้างหุ้นส่วนจำกัด XYZ",
+      contactName: "ห้างหุ้นส่วนจำกัด XYZ",
       amount: 15000,
       vatRate: 7,
       isWhtDeducted: true,
@@ -266,11 +236,12 @@ async function main() {
     const vatAmount = (inc.amount * (inc.vatRate || 0)) / 100;
     const whtAmount = inc.isWhtDeducted ? (inc.amount * (inc.whtRate || 0)) / 100 : 0;
     const netReceived = inc.amount + vatAmount - whtAmount;
+    const contact = createdContacts[inc.contactName];
 
     await prisma.income.create({
       data: {
         companyId: anajak.id,
-        customerName: inc.customerName,
+        contactId: contact?.id || null,
         amount: inc.amount,
         vatRate: inc.vatRate,
         vatAmount: vatAmount > 0 ? vatAmount : null,

@@ -3,11 +3,9 @@ import type {
   Company, 
   Expense, 
   Income, 
-  Vendor, 
-  Customer,
+  Contact,
   CompanyAccess,
   UserRole,
-  CompanyRole,
   ExpenseCategory,
   ExpenseDocStatus,
   IncomeDocStatus,
@@ -21,11 +19,9 @@ export type {
   Company,
   Expense,
   Income,
-  Vendor,
-  Customer,
+  Contact,
   CompanyAccess,
   UserRole,
-  CompanyRole,
   ExpenseCategory,
   ExpenseDocStatus,
   IncomeDocStatus,
@@ -42,23 +38,24 @@ export interface SessionUser {
   avatarUrl?: string | null;
 }
 
-// Company with access role
+// Company with access
 export interface CompanyWithAccess extends Company {
   access?: CompanyAccess;
-  role?: CompanyRole;
+  isOwner?: boolean;
+  permissions?: string[];
 }
 
 // Expense with relations
 export interface ExpenseWithRelations extends Expense {
   company?: Company;
-  vendor?: Vendor | null;
+  contact?: Contact | null;
   creator?: User;
 }
 
 // Income with relations
 export interface IncomeWithRelations extends Income {
   company?: Company;
-  customer?: Customer | null;
+  contact?: Contact | null;
   creator?: User;
 }
 
@@ -112,7 +109,7 @@ export interface ExpenseFilters {
   category?: ExpenseCategory;
   startDate?: Date;
   endDate?: Date;
-  vendorId?: string;
+  contactId?: string;
   search?: string;
 }
 
@@ -121,7 +118,7 @@ export interface IncomeFilters {
   status?: IncomeDocStatus;
   startDate?: Date;
   endDate?: Date;
-  customerId?: string;
+  contactId?: string;
   search?: string;
 }
 
@@ -129,8 +126,7 @@ export interface IncomeFilters {
 export interface VatReportItem {
   date: Date;
   invoiceNumber: string | null;
-  vendorName: string | null;
-  customerName: string | null;
+  contactName: string | null;
   amount: number;
   vatAmount: number;
   type: "input" | "output";
@@ -161,12 +157,24 @@ export interface CashFlowData {
   net: number;
 }
 
+// Contact and Category types for forms
+export interface ContactSummary {
+  id: string;
+  name: string;
+  taxId?: string | null;
+}
+
+export interface CategorySummary {
+  id: string;
+  name: string;
+  color?: string | null;
+  isActive: boolean;
+}
+
 // Form data types
 export interface ExpenseFormData {
   companyId: string;
-  vendorId?: string;
-  vendorName?: string;
-  vendorTaxId?: string;
+  contactId?: string;
   amount: number;
   vatRate: number;
   isWht: boolean;
@@ -185,9 +193,7 @@ export interface ExpenseFormData {
 
 export interface IncomeFormData {
   companyId: string;
-  customerId?: string;
-  customerName?: string;
-  customerTaxId?: string;
+  contactId?: string;
   amount: number;
   vatRate: number;
   isWhtDeducted: boolean;

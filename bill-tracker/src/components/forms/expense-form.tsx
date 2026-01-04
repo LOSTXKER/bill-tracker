@@ -3,14 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -19,11 +16,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Calculator, Upload, Receipt } from "lucide-react";
-import { FileUpload } from "@/components/file-upload";
-import { expenseSchema, type ExpenseInput, EXPENSE_CATEGORY_LABELS } from "@/lib/validations/expense";
-import { calculateExpenseTotals, formatCurrency, WHT_RATES } from "@/lib/utils/tax-calculator";
+import { Loader2, Receipt } from "lucide-react";
+import { calculateExpenseTotals } from "@/lib/utils/tax-calculator";
+import { useContacts } from "@/hooks/use-contacts";
+import { useCategories } from "@/hooks/use-categories";
+import { AmountInput } from "./shared/AmountInput";
+import { VatToggle } from "./shared/VatToggle";
+import { WhtSection } from "./shared/WhtSection";
+import { PaymentMethodSelect } from "./shared/PaymentMethodSelect";
+import { CalculationSummary } from "./shared/CalculationSummary";
+import { DocumentUploadSection } from "./shared/DocumentUploadSection";
+import { ContactSelector } from "./shared/ContactSelector";
+import { CategorySelector } from "./shared/CategorySelector";
+import type { ExpenseInput } from "@/lib/validations/expense";
+import type { ContactSummary } from "@/types";
 
 interface ExpenseFormProps {
   companyCode: string;
@@ -45,6 +51,14 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
     whtCertUrl?: string;
   }>({});
 
+  // Use custom hooks for data fetching
+  const { contacts, isLoading: contactsLoading } = useContacts(companyCode);
+  const { categories, isLoading: categoriesLoading } = useCategories(companyCode, "EXPENSE");
+  
+  // Contact and category state
+  const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -53,13 +67,10 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
     formState: { errors },
   } = useForm<any>({
     defaultValues: {
-      companyId: "",
       amount: 0,
       vatRate: 7,
       isWht: false,
-      whtRate: undefined,
       paymentMethod: "BANK_TRANSFER",
-      billDate: new Date(),
       status: "PENDING_PHYSICAL",
     },
   });
@@ -69,7 +80,6 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
   const watchIsWht = watch("isWht");
   const watchWhtRate = watch("whtRate");
 
-  // Recalculate totals when values change
   useEffect(() => {
     const calc = calculateExpenseTotals(
       watchAmount || 0,
@@ -88,6 +98,9 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
         body: JSON.stringify({
           ...data,
           companyCode: companyCode.toUpperCase(),
+          contactId: selectedContact?.id || null,
+          categoryId: selectedCategory,
+          category: undefined, // Remove old enum field
           vatAmount: calculation.vatAmount,
           whtAmount: calculation.whtAmount,
           netPaid: calculation.netAmount,
@@ -123,41 +136,17 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Amount Input */}
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-foreground font-medium">
-              จำนวนเงิน (ก่อน VAT)
-            </Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-                ฿
-              </span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                className="pl-10 text-2xl h-14 font-semibold bg-muted/30 border-border focus:bg-background transition-colors"
-                placeholder="0.00"
-                {...register("amount", { valueAsNumber: true })}
-              />
-            </div>
-          </div>
+          <AmountInput register={register} name="amount" />
 
-          {/* Vendor Name */}
-          <div className="space-y-2">
-            <Label htmlFor="vendorName" className="text-foreground font-medium">
-              ชื่อร้าน/ผู้ขาย
-            </Label>
-            <Input
-              id="vendorName"
-              placeholder="เช่น ร้านหมึก DTF"
-              className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-              {...register("vendorName")}
-            />
-          </div>
+          <ContactSelector
+            contacts={contacts}
+            isLoading={contactsLoading}
+            selectedContact={selectedContact}
+            onSelect={setSelectedContact}
+            label="ผู้ติดต่อ (ผู้ขาย/ร้านค้า)"
+            placeholder="เลือกผู้ติดต่อ..."
+          />
 
-          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description" className="text-foreground font-medium">
               รายละเอียด
@@ -170,180 +159,54 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
             />
           </div>
 
-          {/* Category */}
-          <div className="space-y-2">
-            <Label className="text-foreground font-medium">หมวดหมู่</Label>
-            <Select
-              onValueChange={(value) => setValue("category", value as ExpenseInput["category"])}
-            >
-              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-                <SelectValue placeholder="เลือกหมวดหมู่" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(EXPENSE_CATEGORY_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <CategorySelector
+            categories={categories}
+            isLoading={categoriesLoading}
+            selectedCategory={selectedCategory}
+            onSelect={setSelectedCategory}
+            label="หมวดหมู่"
+            placeholder="เลือกหมวดหมู่"
+          />
 
-          {/* File Upload */}
-          <div className="space-y-3">
-            <Label className="text-foreground font-medium">เอกสารประกอบ</Label>
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
-                <Label className="text-sm text-muted-foreground mb-3 block">
-                  สลิปโอนเงิน
-                </Label>
-                <FileUpload
-                  maxFiles={1}
-                  folder="slips"
-                  onChange={(files) =>
-                    setUploadedFiles((prev) => ({
-                      ...prev,
-                      slipUrl: files[0],
-                    }))
-                  }
-                />
-              </div>
-              <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
-                <Label className="text-sm text-muted-foreground mb-3 block">
-                  ใบกำกับภาษี/ใบเสร็จ
-                </Label>
-                <FileUpload
-                  maxFiles={1}
-                  folder="invoices"
-                  onChange={(files) =>
-                    setUploadedFiles((prev) => ({
-                      ...prev,
-                      taxInvoiceUrl: files[0],
-                    }))
-                  }
-                />
-              </div>
-              {watchIsWht && (
-                <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
-                  <Label className="text-sm text-muted-foreground mb-3 block">
-                    ใบหัก ณ ที่จ่าย (50 ทวิ)
-                  </Label>
-                  <FileUpload
-                    maxFiles={1}
-                    folder="wht-certs"
-                    onChange={(files) =>
-                      setUploadedFiles((prev) => ({
-                        ...prev,
-                        whtCertUrl: files[0],
-                      }))
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+          <DocumentUploadSection
+            type="expense"
+            onSlipUpload={(url) =>
+              setUploadedFiles((prev) => ({ ...prev, slipUrl: url }))
+            }
+            onInvoiceUpload={(url) =>
+              setUploadedFiles((prev) => ({ ...prev, taxInvoiceUrl: url }))
+            }
+            onWhtCertUpload={(url) =>
+              setUploadedFiles((prev) => ({ ...prev, whtCertUrl: url }))
+            }
+            showWhtCert={watchIsWht}
+          />
 
           <Separator className="my-6" />
 
-          {/* VAT Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label className="text-foreground font-medium">ภาษีมูลค่าเพิ่ม (VAT)</Label>
-              <p className="text-sm text-muted-foreground">มีใบกำกับภาษี?</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setValue("vatRate", 0)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  watchVatRate === 0
-                    ? "bg-foreground text-background"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                ไม่มี VAT
-              </button>
-              <button
-                type="button"
-                onClick={() => setValue("vatRate", 7)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  watchVatRate === 7
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                VAT 7%
-              </button>
-            </div>
-          </div>
+          <VatToggle value={watchVatRate} onChange={(value) => setValue("vatRate", value)} />
 
-          {/* WHT Section */}
-          <div className="space-y-4 rounded-xl border border-border/50 p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-foreground font-medium">หัก ณ ที่จ่าย</Label>
-                <p className="text-sm text-muted-foreground">หักภาษีผู้ขาย?</p>
-              </div>
-              <Switch
-                checked={watchIsWht}
-                onCheckedChange={(checked) => {
-                  setValue("isWht", checked);
-                  if (!checked) {
-                    setValue("whtRate", undefined);
-                    setValue("whtType", undefined);
-                  }
-                }}
-              />
-            </div>
+          <WhtSection
+            isEnabled={watchIsWht}
+            onToggle={(enabled) => {
+              setValue("isWht", enabled);
+              if (!enabled) {
+                setValue("whtRate", undefined);
+                setValue("whtType", undefined);
+              }
+            }}
+            selectedRate={watchWhtRate}
+            onRateSelect={(rate, type) => {
+              setValue("whtRate", rate);
+              setValue("whtType", type as ExpenseInput["whtType"]);
+            }}
+          />
 
-            {watchIsWht && (
-              <div className="space-y-3 pt-2">
-                <Label className="text-sm text-muted-foreground">ประเภทและอัตรา</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(WHT_RATES).map(([key, { rate, description }]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setValue("whtRate", rate);
-                        setValue("whtType", key as ExpenseInput["whtType"]);
-                      }}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        watchWhtRate === rate
-                          ? "border-primary bg-primary/5"
-                          : "border-border/50 hover:border-border bg-muted/20"
-                      }`}
-                    >
-                      <div className="font-medium text-foreground text-sm">{description}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{rate}%</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <PaymentMethodSelect
+            value={watch("paymentMethod")}
+            onChange={(value) => setValue("paymentMethod", value as ExpenseInput["paymentMethod"])}
+          />
 
-          {/* Payment Method */}
-          <div className="space-y-2">
-            <Label className="text-foreground font-medium">วิธีชำระเงิน</Label>
-            <Select
-              defaultValue="BANK_TRANSFER"
-              onValueChange={(value) => setValue("paymentMethod", value as ExpenseInput["paymentMethod"])}
-            >
-              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CASH">เงินสด</SelectItem>
-                <SelectItem value="BANK_TRANSFER">โอนเงิน</SelectItem>
-                <SelectItem value="PROMPTPAY">พร้อมเพย์</SelectItem>
-                <SelectItem value="CREDIT_CARD">บัตรเครดิต</SelectItem>
-                <SelectItem value="CHEQUE">เช็ค</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Document Status */}
           <div className="space-y-2">
             <Label className="text-foreground font-medium">สถานะเอกสาร</Label>
             <Select
@@ -372,47 +235,16 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
 
           <Separator className="my-6" />
 
-          {/* Calculation Summary */}
-          <div className="rounded-xl bg-muted/30 p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-foreground">
-                สรุปยอด
-              </span>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ยอดก่อน VAT</span>
-                <span className="text-foreground">{formatCurrency(calculation.baseAmount)}</span>
-              </div>
-              {watchVatRate > 0 && (
-                <div className="flex justify-between text-primary">
-                  <span>VAT {watchVatRate}%</span>
-                  <span>+{formatCurrency(calculation.vatAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ยอดรวม VAT</span>
-                <span className="text-foreground">{formatCurrency(calculation.totalWithVat)}</span>
-              </div>
-              {watchIsWht && watchWhtRate && (
-                <div className="flex justify-between text-destructive">
-                  <span>หัก ณ ที่จ่าย {watchWhtRate}%</span>
-                  <span>-{formatCurrency(calculation.whtAmount)}</span>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="flex justify-between text-lg font-semibold">
-              <span className="text-foreground">ยอดโอนจริง</span>
-              <span className="text-primary">
-                {formatCurrency(calculation.netAmount)}
-              </span>
-            </div>
-          </div>
+          <CalculationSummary
+            baseAmount={calculation.baseAmount}
+            vatRate={watchVatRate}
+            vatAmount={calculation.vatAmount}
+            totalWithVat={calculation.totalWithVat}
+            whtRate={watchWhtRate}
+            whtAmount={calculation.whtAmount}
+            netAmount={calculation.netAmount}
+            type="expense"
+          />
         </CardContent>
 
         <CardFooter className="flex gap-3 pt-2">

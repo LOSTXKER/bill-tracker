@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
-import { requireOwner } from "@/lib/permissions/checker";
+import { requirePermission } from "@/lib/permissions/checker";
 import { logMemberInvite } from "@/lib/audit/logger";
 
 /**
@@ -22,9 +22,9 @@ export async function GET(
 ) {
   try {
     const { id: companyId } = await params;
-    
-    // Require OWNER permission
-    await requireOwner(companyId);
+
+    // Require settings:manage-team permission (owners have all permissions automatically)
+    await requirePermission(companyId, "settings:manage-team");
 
     // Get all company access records with user details
     const members = await prisma.companyAccess.findMany({
@@ -60,8 +60,8 @@ export async function GET(
 /**
  * POST /api/companies/[id]/members
  * 
- * Invite a new member to the company
- * Body: { email: string, permissions: string[], isOwner?: boolean }
+ * Create a new member for the company
+ * Body: { name: string, email: string, password: string, permissions: string[], isOwner?: boolean }
  */
 export async function POST(
   request: Request,
@@ -70,16 +70,37 @@ export async function POST(
   try {
     const { id: companyId } = await params;
     const session = await auth();
-    
-    // Require OWNER permission
-    const currentUser = await requireOwner(companyId);
+
+    // Require settings:manage-team permission (owners have all permissions automatically)
+    const currentUser = await requirePermission(companyId, "settings:manage-team");
 
     const body = await request.json();
-    const { email, permissions = [], isOwner = false } = body;
+    const { name, email, password, permissions = [], isOwner = false } = body;
+
+    if (!name) {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 }
+      );
+    }
 
     if (!email) {
       return NextResponse.json(
         { error: "Email is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!password) {
+      return NextResponse.json(
+        { error: "Password is required" },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: "Password must be at least 6 characters" },
         { status: 400 }
       );
     }
@@ -93,49 +114,48 @@ export async function POST(
       );
     }
 
-    // Check if user exists
-    let user = await prisma.user.findUnique({
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
-    // If user doesn't exist, create a new one with a temporary password
-    if (!user) {
-      // In a real system, you would:
-      // 1. Generate a unique invite token
-      // 2. Send an email with registration link
-      // 3. Let them set their password
-      // For now, we'll create them with a placeholder
-      const tempPassword = require("crypto").randomBytes(32).toString("hex");
-      const bcrypt = require("bcryptjs");
-      const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: email.split("@")[0], // Use email prefix as temporary name
-          password: hashedPassword,
-          role: "STAFF",
-          isActive: false, // Inactive until they complete registration
+    if (existingUser) {
+      // Check if user already has access to this company
+      const existingAccess = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: existingUser.id,
+            companyId,
+          },
         },
       });
-    }
 
-    // Check if user already has access to this company
-    const existingAccess = await prisma.companyAccess.findUnique({
-      where: {
-        userId_companyId: {
-          userId: user.id,
-          companyId,
-        },
-      },
-    });
+      if (existingAccess) {
+        return NextResponse.json(
+          { error: "User already has access to this company" },
+          { status: 409 }
+        );
+      }
 
-    if (existingAccess) {
       return NextResponse.json(
-        { error: "User already has access to this company" },
+        { error: "Email already registered. Please use a different email." },
         { status: 409 }
       );
     }
+
+    // Hash password and create new user
+    const bcrypt = require("bcryptjs");
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        password: hashedPassword,
+        role: "STAFF",
+        isActive: true, // Active immediately
+      },
+    });
 
     // Create company access
     const access = await prisma.companyAccess.create({
@@ -157,29 +177,30 @@ export async function POST(
       },
     });
 
-    // Log the invitation
+    // Log the member creation
     await logMemberInvite(email, permissions, currentUser.id, companyId);
 
     return NextResponse.json(
-      { 
+      {
         member: access,
-        message: "Member invited successfully"
+        message: "Member created successfully"
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error inviting member:", error);
-    
+    console.error("Error creating member:", error);
+
     if (error instanceof Error && error.message.includes("redirect")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
       );
     }
-    
+
     return NextResponse.json(
-      { error: "Failed to invite member" },
+      { error: "Failed to create member" },
       { status: 500 }
     );
   }
 }
+

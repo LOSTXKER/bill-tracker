@@ -79,8 +79,8 @@
   --accent: oklch(0.965 0 0);
   --accent-foreground: oklch(0.205 0 0);
   
-  /* Destructive */
-  --destructive: oklch(0.577 0.245 27.325);
+  /* Destructive - Vibrant red */
+  --destructive: oklch(0.596 0.18 25);
   --destructive-foreground: oklch(0.985 0 0);
   
   /* Borders - Very subtle */
@@ -136,9 +136,9 @@
   --accent: oklch(0.22 0 0);
   --accent-foreground: oklch(0.93 0 0);
   
-  /* Destructive */
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
+  /* Destructive - Vibrant red for dark mode */
+  --destructive: oklch(0.696 0.20 25);
+  --destructive-foreground: oklch(0.12 0 0);
   
   /* Borders */
   --border: oklch(0.25 0 0);
@@ -278,6 +278,15 @@
   /* Subtle pulse for indicators */
   .pulse-subtle {
     animation: pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* Safe area insets for iOS devices */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
   }
 }
 

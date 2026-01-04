@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calculateVAT,
   calculateWHT,
+  calculateTransactionTotals,
   calculateExpenseTotals,
   calculateIncomeTotals,
   reverseVAT,
@@ -49,7 +50,27 @@ describe("Tax Calculator", () => {
     });
   });
 
-  describe("calculateExpenseTotals", () => {
+  describe("calculateTransactionTotals (unified)", () => {
+    it("should calculate transaction totals with VAT only", () => {
+      const result = calculateTransactionTotals(1000, 7, 0);
+      expect(result.baseAmount).toBe(1000);
+      expect(result.vatAmount).toBe(70);
+      expect(result.whtAmount).toBe(0);
+      expect(result.totalWithVat).toBe(1070);
+      expect(result.netAmount).toBe(1070);
+    });
+
+    it("should calculate transaction totals with VAT and WHT", () => {
+      const result = calculateTransactionTotals(1000, 7, 3);
+      expect(result.baseAmount).toBe(1000);
+      expect(result.vatAmount).toBe(70);
+      expect(result.whtAmount).toBe(30);
+      expect(result.totalWithVat).toBe(1070);
+      expect(result.netAmount).toBe(1040); // 1000 + 70 - 30
+    });
+  });
+
+  describe("calculateExpenseTotals (backward compat)", () => {
     it("should calculate expense totals with VAT only", () => {
       const result = calculateExpenseTotals(1000, 7, 0);
       expect(result.baseAmount).toBe(1000);

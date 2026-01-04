@@ -1,49 +1,15 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { expenseSchema } from "@/lib/validations/expense";
-import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
+import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
+import { logCreate } from "@/lib/audit/logger";
+import { notifyExpense } from "@/lib/notifications/line-messaging";
 
-export async function GET(request: Request) {
-  try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export const GET = withCompanyAccess(
+  async (request, { company }) => {
     const { searchParams } = new URL(request.url);
-    const companyCode = searchParams.get("company");
     const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
-
-    if (!companyCode) {
-      return NextResponse.json({ error: "Company code required" }, { status: 400 });
-    }
-
-    const company = await prisma.company.findUnique({
-      where: { code: companyCode.toUpperCase() },
-    });
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
-
-    // Check access
-    if (session.user.role !== "ADMIN") {
-      const access = await prisma.companyAccess.findUnique({
-        where: {
-          userId_companyId: {
-            userId: session.user.id,
-            companyId: company.id,
-          },
-        },
-      });
-      if (!access) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 });
-      }
-    }
 
     const where = {
       companyId: company.id,
@@ -54,7 +20,7 @@ export async function GET(request: Request) {
       prisma.expense.findMany({
         where,
         include: {
-          vendor: true,
+          contact: true,
           creator: {
             select: { id: true, name: true, email: true },
           },
@@ -66,7 +32,7 @@ export async function GET(request: Request) {
       prisma.expense.count({ where }),
     ]);
 
-    return NextResponse.json({
+    return apiResponse.success({
       expenses,
       pagination: {
         page,
@@ -75,67 +41,20 @@ export async function GET(request: Request) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
-    console.error("Error fetching expenses:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch expenses" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "expenses:read" }
+);
 
-export async function POST(request: Request) {
-  try {
-    // Rate limiting
-    const ip = getClientIP(request);
-    const { success, headers } = rateLimit(ip, { maxRequests: 30, windowMs: 60000 });
-    
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429, headers }
-      );
-    }
-
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export const POST = withCompanyAccess(
+  async (request, { company, session }) => {
     const body = await request.json();
-    const { companyCode, vatAmount, whtAmount, netPaid, ...data } = body;
-
-    // Find company
-    const company = await prisma.company.findUnique({
-      where: { code: companyCode },
-    });
-
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
-
-    // Check access
-    if (session.user.role !== "ADMIN") {
-      const access = await prisma.companyAccess.findUnique({
-        where: {
-          userId_companyId: {
-            userId: session.user.id,
-            companyId: company.id,
-          },
-        },
-      });
-      if (!access || access.role === "VIEWER") {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 });
-      }
-    }
+    const { vatAmount, whtAmount, netPaid, ...data } = body;
 
     // Create expense
     const expense = await prisma.expense.create({
       data: {
         companyId: company.id,
-        vendorName: data.vendorName,
-        vendorTaxId: data.vendorTaxId,
+        contactId: data.contactId || null,
         amount: data.amount,
         vatRate: data.vatRate || 0,
         vatAmount: vatAmount || null,
@@ -155,25 +74,38 @@ export async function POST(request: Request) {
         notes: data.notes,
         createdBy: session.user.id,
       },
+      include: { contact: true },
     });
 
     // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: "CREATE",
-        entityType: "Expense",
-        entityId: expense.id,
-        changes: { created: expense },
-      },
+    await logCreate("Expense", expense, session.user.id, company.id);
+
+    // Get base URL from request
+    const url = new URL(request.url);
+    const baseUrl = `${url.protocol}//${url.host}`;
+
+    // Send LINE notification (non-blocking)
+    notifyExpense(company.id, {
+      id: expense.id,
+      companyCode: company.code,
+      companyName: company.name,
+      vendorName: expense.contact?.name || data.description || undefined,
+      description: data.description || undefined,
+      amount: Number(data.amount),
+      vatAmount: vatAmount ? Number(vatAmount) : undefined,
+      isWht: data.isWht || false,
+      whtRate: data.whtRate ? Number(data.whtRate) : undefined,
+      whtAmount: whtAmount ? Number(whtAmount) : undefined,
+      netPaid: Number(netPaid),
+      status: data.status,
+    }, baseUrl).catch((error) => {
+      console.error("Failed to send LINE notification:", error);
     });
 
-    return NextResponse.json({ expense }, { status: 201 });
-  } catch (error) {
-    console.error("Error creating expense:", error);
-    return NextResponse.json(
-      { error: "Failed to create expense" },
-      { status: 500 }
-    );
+    return apiResponse.created({ expense });
+  },
+  {
+    permission: "expenses:create",
+    rateLimit: { maxRequests: 30, windowMs: 60000 },
   }
-}
+);

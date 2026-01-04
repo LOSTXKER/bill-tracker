@@ -1,8 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import type { UserRole, CompanyRole } from "@prisma/client";
-import { canPerformAction, type Permission } from "./permissions";
+import type { UserRole } from "@prisma/client";
+import type { PermissionKey } from "@/lib/permissions/checker";
 
 /**
  * Get the current session (server-side)
@@ -89,7 +89,8 @@ export async function getUserCompanies(userId: string) {
   return user.companies.map((c: typeof user.companies[number]) => ({
     ...c.company,
     access: c,
-    role: c.role,
+    isOwner: c.isOwner,
+    permissions: c.permissions,
   }));
 }
 
@@ -126,7 +127,8 @@ export async function requireCompanyAccess(companyId: string) {
   
   return {
     user,
-    companyRole: access?.role ?? null,
+    isOwner: access?.isOwner ?? false,
+    permissions: (access?.permissions as string[]) ?? [],
   };
 }
 
@@ -136,7 +138,7 @@ export async function requireCompanyAccess(companyId: string) {
 export async function checkPermission(
   userId: string,
   companyId: string,
-  permission: Permission
+  permission: PermissionKey
 ): Promise<boolean> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -149,18 +151,32 @@ export async function checkPermission(
 
   const access = await getUserCompanyAccess(userId, companyId);
   
-  return canPerformAction(user.role, access?.role ?? null, permission);
+  if (!access) return false;
+  
+  // Owner has all permissions
+  if (access.isOwner) return true;
+  
+  const permissions = (access.permissions as string[]) || [];
+  
+  // Check exact match
+  if (permissions.includes(permission)) return true;
+  
+  // Check module wildcard
+  const [module] = permission.split(":");
+  if (permissions.includes(`${module}:*`)) return true;
+  
+  return false;
 }
 
 /**
  * Require a specific permission
  */
-export async function requirePermission(companyId: string, permission: Permission) {
+export async function requirePermission(companyId: string, permission: PermissionKey) {
   const user = await requireAuth();
   
-  const hasPermission = await checkPermission(user.id, companyId, permission);
+  const allowed = await checkPermission(user.id, companyId, permission);
   
-  if (!hasPermission) {
+  if (!allowed) {
     redirect("/");
   }
   
@@ -168,21 +184,24 @@ export async function requirePermission(companyId: string, permission: Permissio
 }
 
 /**
- * Get company role for current user
+ * Check if user is owner of a company
  */
-export async function getCompanyRole(
+export async function isCompanyOwner(
   userId: string,
   companyId: string
-): Promise<CompanyRole | null> {
+): Promise<boolean> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
 
-  if (!user) return null;
+  if (!user) return false;
 
-  // ADMIN is treated as OWNER for any company
-  if (user.role === "ADMIN") return "OWNER";
+  // ADMIN is treated as owner for any company
+  if (user.role === "ADMIN") return true;
 
   const access = await getUserCompanyAccess(userId, companyId);
-  return access?.role ?? null;
+  return access?.isOwner ?? false;
 }
+
+// Re-export PermissionKey type for convenience
+export type { PermissionKey } from "@/lib/permissions/checker";

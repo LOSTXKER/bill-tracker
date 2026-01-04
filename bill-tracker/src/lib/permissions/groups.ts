@@ -8,9 +8,7 @@
 import {
   Receipt,
   TrendingUp,
-  Store,
   Users as UsersIcon,
-  Wallet,
   FileText,
   Settings,
   History,
@@ -103,87 +101,31 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
       },
     ],
   },
-  vendors: {
-    key: "vendors",
-    label: "ผู้ขาย (Vendors)",
-    description: "จัดการข้อมูลผู้ขายและร้านค้า",
-    icon: Store,
-    permissions: [
-      {
-        key: "vendors:read",
-        label: "ดูรายการ",
-        description: "ดูข้อมูลผู้ขาย",
-      },
-      {
-        key: "vendors:create",
-        label: "สร้างใหม่",
-        description: "เพิ่มผู้ขายใหม่",
-      },
-      {
-        key: "vendors:update",
-        label: "แก้ไข",
-        description: "แก้ไขข้อมูลผู้ขาย",
-      },
-      {
-        key: "vendors:delete",
-        label: "ลบ",
-        description: "ลบผู้ขายออกจากระบบ",
-      },
-    ],
-  },
-  customers: {
-    key: "customers",
-    label: "ลูกค้า (Customers)",
-    description: "จัดการข้อมูลลูกค้า",
+  contacts: {
+    key: "contacts",
+    label: "ผู้ติดต่อ (Contacts)",
+    description: "จัดการข้อมูลลูกค้าและผู้ขาย",
     icon: UsersIcon,
     permissions: [
       {
-        key: "customers:read",
+        key: "contacts:read",
         label: "ดูรายการ",
-        description: "ดูข้อมูลลูกค้า",
+        description: "ดูข้อมูลผู้ติดต่อ",
       },
       {
-        key: "customers:create",
+        key: "contacts:create",
         label: "สร้างใหม่",
-        description: "เพิ่มลูกค้าใหม่",
+        description: "เพิ่มผู้ติดต่อใหม่",
       },
       {
-        key: "customers:update",
+        key: "contacts:update",
         label: "แก้ไข",
-        description: "แก้ไขข้อมูลลูกค้า",
+        description: "แก้ไขข้อมูลผู้ติดต่อ",
       },
       {
-        key: "customers:delete",
+        key: "contacts:delete",
         label: "ลบ",
-        description: "ลบลูกค้าออกจากระบบ",
-      },
-    ],
-  },
-  budgets: {
-    key: "budgets",
-    label: "งบประมาณ (Budgets)",
-    description: "จัดการงบประมาณรายเดือน/รายปี",
-    icon: Wallet,
-    permissions: [
-      {
-        key: "budgets:read",
-        label: "ดูรายการ",
-        description: "ดูงบประมาณ",
-      },
-      {
-        key: "budgets:create",
-        label: "สร้างใหม่",
-        description: "ตั้งงบประมาณใหม่",
-      },
-      {
-        key: "budgets:update",
-        label: "แก้ไข",
-        description: "แก้ไขงบประมาณ",
-      },
-      {
-        key: "budgets:delete",
-        label: "ลบ",
-        description: "ลบงบประมาณ",
+        description: "ลบผู้ติดต่อออกจากระบบ",
       },
     ],
   },

@@ -11,6 +11,12 @@ import { redirect } from "next/navigation";
 import type { User } from "@prisma/client";
 
 /**
+ * Type representing a permission key
+ * Format: "module:action" (e.g., "expenses:create", "incomes:read")
+ */
+export type PermissionKey = string;
+
+/**
  * Check if a user has a specific permission in a company
  * 
  * @param userId - The user ID to check

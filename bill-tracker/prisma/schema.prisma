@@ -23,9 +23,10 @@ model Company {
   logoUrl   String?
 
   // LINE Bot Configuration
-  lineChannelSecret      String? // LINE Bot Channel Secret
-  lineChannelAccessToken String? // LINE Bot Channel Access Token
-  lineGroupId            String? // LINE Group ID (auto-filled by bot)
+  lineChannelSecret      String?  // LINE Bot Channel Secret
+  lineChannelAccessToken String?  // LINE Bot Channel Access Token
+  lineGroupId            String?  // LINE Group ID (auto-filled by bot)
+  lineNotifyEnabled      Boolean  @default(true) // Enable/disable LINE notifications
 
   // AI Configuration
   aiConfig Json? // AI preferences and settings
@@ -34,9 +35,8 @@ model Company {
   expenses          Expense[]
   incomes           Income[]
   users             CompanyAccess[]
-  vendors           Vendor[]
-  customers         Customer[]
-  budgets           Budget[]
+  contacts          Contact[]
+  categories        Category[]
   integrations      Integration[]
   recurringExpenses RecurringExpense[]
 
@@ -99,55 +99,74 @@ model CompanyAccess {
 }
 
 // =============================================================================
-// Vendors (ผู้ขาย/ร้านค้า)
+// Category (หมวดหมู่ - สำหรับรายจ่ายและรายรับ)
 // =============================================================================
 
-model Vendor {
-  id        String  @id @default(cuid())
+model Category {
+  id        String       @id @default(cuid())
   companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name      String
-  taxId     String? // เลขประจำตัวผู้เสียภาษีของผู้ขาย
-  address   String?
-  phone     String?
-  email     String?
-  notes     String?
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  name      String       // "วัตถุดิบ", "Custom Category"
+  type      CategoryType // EXPENSE or INCOME
+  isDefault Boolean      @default(false) // Is this a system default?
+  isActive  Boolean      @default(true)  // Can be toggled on/off
+  color     String?      // Optional hex color for UI
+  icon      String?      // Optional icon name
+  order     Int          @default(0)     // Display order
+  
+  // Relations
+  expenses  Expense[]
+  incomes   Income[]
+  
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  
+  @@unique([companyId, name, type])
+  @@index([companyId, type])
+  @@index([isActive])
+}
 
-  expenses Expense[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([taxId])
-  @@index([name])
+enum CategoryType {
+  EXPENSE
+  INCOME
 }
 
 // =============================================================================
-// Customers (ลูกค้า)
+// Contact (ผู้ติดต่อ - รวม Vendor และ Customer)
 // =============================================================================
 
-model Customer {
-  id              String   @id @default(cuid())
-  companyId       String
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name            String
-  taxId           String?  // เลขประจำตัวผู้เสียภาษีของลูกค้า
-  address         String?
-  phone           String?
-  email           String?
-  creditLimit     Decimal? @db.Decimal(12, 2)
-  paymentTermDays Int      @default(0) // จำนวนวันเครดิต
-  notes           String?
+model Contact {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  incomes Income[]
+  name      String
+  taxId     String?
+  address   String?
+  phone     String?
+  email     String?
+
+  // Banking
+  bankAccount String?
+  bankName    String?
+
+  // Business Terms
+  creditLimit    Decimal? @db.Decimal(12, 2)
+  paymentTerms   Int?     // วันเครดิต
+
+  notes String?
+
+  // Relations
+  expenses Expense[]
+  incomes  Income[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([companyId])
-  @@index([taxId])
   @@index([name])
+  @@index([taxId])
 }
 
 // =============================================================================
@@ -159,11 +178,9 @@ model Expense {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  // Vendor Information
-  vendorId   String?
-  vendor     Vendor? @relation(fields: [vendorId], references: [id])
-  vendorName String? // สำหรับกรณีไม่ได้เลือก vendor จาก master
-  vendorTaxId String?
+  // Contact Information (ผู้ขาย/ร้านค้า)
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
 
   // Financial Data
   amount    Decimal  @db.Decimal(12, 2) // ยอดเต็มก่อน VAT
@@ -179,7 +196,9 @@ model Expense {
 
   // Document Details
   description   String?
-  category      ExpenseCategory?
+  category      ExpenseCategory? // DEPRECATED: kept for migration
+  categoryId    String?
+  categoryRef   Category?        @relation(fields: [categoryId], references: [id])
   invoiceNumber String?              // เลขที่ใบกำกับภาษี
   referenceNo   String?              // เลขอ้างอิง transaction
   paymentMethod PaymentMethod        @default(BANK_TRANSFER)
@@ -210,7 +229,8 @@ model Expense {
   @@index([companyId, billDate])
   @@index([status])
   @@index([category])
-  @@index([vendorId])
+  @@index([categoryId])
+  @@index([contactId])
   @@index([createdAt])
 }
 
@@ -242,11 +262,9 @@ model Income {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  // Customer Information
-  customerId   String?
-  customer     Customer? @relation(fields: [customerId], references: [id])
-  customerName String?
-  customerTaxId String?
+  // Contact Information (ลูกค้า)
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
 
   // Financial Data
   amount    Decimal  @db.Decimal(12, 2) // ยอดเต็มก่อน VAT
@@ -262,6 +280,8 @@ model Income {
 
   // Document Details
   source        String? // แหล่งที่มา
+  categoryId    String?
+  categoryRef   Category? @relation(fields: [categoryId], references: [id])
   invoiceNumber String? // เลขที่ใบกำกับภาษีที่เราออกให้
   referenceNo   String?
   paymentMethod PaymentMethod @default(BANK_TRANSFER)
@@ -289,7 +309,8 @@ model Income {
 
   @@index([companyId, receiveDate])
   @@index([status])
-  @@index([customerId])
+  @@index([categoryId])
+  @@index([contactId])
   @@index([createdAt])
 }
 
@@ -349,35 +370,6 @@ model RecurringExpense {
 }
 
 enum RecurrenceFreq {
-  MONTHLY
-  QUARTERLY
-  YEARLY
-}
-
-// =============================================================================
-// Budget Management
-// =============================================================================
-
-model Budget {
-  id        String  @id @default(cuid())
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  category ExpenseCategory
-  amount   Decimal         @db.Decimal(12, 2) // งบประมาณที่ตั้งไว้
-  period   BudgetPeriod
-
-  startDate DateTime
-  endDate   DateTime
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId, startDate])
-  @@index([category])
-}
-
-enum BudgetPeriod {
   MONTHLY
   QUARTERLY
   YEARLY

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { LandingPage } from "@/components/landing-page";
 import { CreateCompanyDialog } from "@/components/create-company-dialog";
@@ -24,11 +24,11 @@ export default async function HomePage() {
     },
   });
 
-  // If user is admin, get all companies
+  // If user is admin, get all companies (admin has owner access to all)
   const companies =
     session.user.role === "ADMIN"
-      ? await prisma.company.findMany({ orderBy: { name: "asc" } })
-      : user?.companies.map((c: NonNullable<typeof user>["companies"][number]) => ({ ...c.company, role: c.role })) ?? [];
+      ? (await prisma.company.findMany({ orderBy: { name: "asc" } })).map((c) => ({ ...c, isOwner: true, permissions: [] }))
+      : user?.companies.map((c: NonNullable<typeof user>["companies"][number]) => ({ ...c.company, isOwner: c.isOwner, permissions: c.permissions })) ?? [];
 
   // If no companies, show setup page with create company option
   if (companies.length === 0) {
@@ -79,14 +79,23 @@ export default async function HomePage() {
           <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
             หรือติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เข้าถึงบริษัทที่มีอยู่แล้ว
           </p>
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/login" });
+            }}
+            className="mt-8"
+          >
+            <button
+              type="submit"
+              className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline"
+            >
+              ออกจากระบบ
+            </button>
+          </form>
         </div>
       </div>
     );
-  }
-
-  // If only one company, redirect directly
-  if (companies.length === 1) {
-    redirect(`/${companies[0].code.toLowerCase()}/dashboard`);
   }
 
   // Show company selector
@@ -119,6 +128,26 @@ export default async function HomePage() {
           <p className="text-slate-600 dark:text-slate-400 text-lg">
             สวัสดี, {session.user.name} - เลือกบริษัท
           </p>
+          <div className="mt-6">
+            <CreateCompanyDialog>
+              <button className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/25 hover:from-emerald-600 hover:to-teal-600 transition-all duration-200">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                สร้างบริษัทใหม่
+              </button>
+            </CreateCompanyDialog>
+          </div>
         </div>
 
         {/* Company Cards */}
@@ -142,7 +171,7 @@ export default async function HomePage() {
 function CompanyCard({
   company,
 }: {
-  company: { id: string; name: string; code: string; role?: string };
+  company: { id: string; name: string; code: string; isOwner?: boolean; permissions?: unknown };
 }) {
   const isAnajak = company.code === "ANJ";
   const isMeelike = company.code === "MLK";
@@ -203,12 +232,9 @@ function CompanyCard({
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               รหัส: {company.code}
             </p>
-            {company.role && (
+            {company.isOwner && (
               <span className="inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {company.role === "OWNER" && "เจ้าของ"}
-                {company.role === "MANAGER" && "ผู้จัดการ"}
-                {company.role === "ACCOUNTANT" && "บัญชี"}
-                {company.role === "VIEWER" && "ผู้ดู"}
+                เจ้าของ
               </span>
             )}
           </div>

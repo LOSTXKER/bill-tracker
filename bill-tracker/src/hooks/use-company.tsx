@@ -1,16 +1,17 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import type { Company, CompanyRole } from "@prisma/client";
+import type { Company } from "@prisma/client";
 
-interface CompanyWithRole extends Company {
-  role?: CompanyRole;
+interface CompanyWithAccess extends Company {
+  isOwner?: boolean;
+  permissions?: string[];
 }
 
 interface CompanyContextType {
-  companies: CompanyWithRole[];
-  selectedCompany: CompanyWithRole | null;
-  setSelectedCompany: (company: CompanyWithRole | null) => void;
+  companies: CompanyWithAccess[];
+  selectedCompany: CompanyWithAccess | null;
+  setSelectedCompany: (company: CompanyWithAccess | null) => void;
   isLoading: boolean;
   error: string | null;
   refreshCompanies: () => Promise<void>;
@@ -19,8 +20,8 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | null>(null);
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
-  const [companies, setCompanies] = useState<CompanyWithRole[]>([]);
-  const [selectedCompany, setSelectedCompanyState] = useState<CompanyWithRole | null>(null);
+  const [companies, setCompanies] = useState<CompanyWithAccess[]>([]);
+  const [selectedCompany, setSelectedCompanyState] = useState<CompanyWithAccess | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +44,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   };
 
   // Set selected company
-  const setSelectedCompany = (company: CompanyWithRole | null) => {
+  const setSelectedCompany = (company: CompanyWithAccess | null) => {
     setSelectedCompanyState(company);
     if (company) {
       localStorage.setItem("selectedCompanyId", company.id);

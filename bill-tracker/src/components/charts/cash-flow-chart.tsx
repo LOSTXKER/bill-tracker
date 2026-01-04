@@ -37,8 +37,8 @@ export function CashFlowChart({ data }: CashFlowChartProps) {
     <Card className="border-border/50 shadow-card">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <div className="p-1.5 rounded-lg bg-emerald-500/10">
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          <div className="p-1.5 rounded-lg bg-primary/10">
+            <TrendingUp className="h-4 w-4 text-primary" />
           </div>
           กระแสเงินสด 6 เดือนย้อนหลัง
         </CardTitle>

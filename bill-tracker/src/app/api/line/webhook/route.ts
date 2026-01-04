@@ -138,7 +138,7 @@ async function handleTextMessage(
       [
         {
           type: "text",
-          text: `🤖 คำสั่งที่ใช้ได้:\n\n📱 group id - ดู Group ID\n📊 summary / สรุป - สรุปรายการวันนี้\n💰 budget / งบประมาณ - สถานะงบประมาณ\n📷 ส่งรูปใบเสร็จ - วิเคราะห์ด้วย AI\n❓ help / ช่วยเหลือ - แสดงคำสั่งนี้`,
+          text: `🤖 คำสั่งที่ใช้ได้:\n\n📱 group id - ดู Group ID\n📊 summary / สรุป - สรุปรายการวันนี้\n📷 ส่งรูปใบเสร็จ - วิเคราะห์ด้วย AI\n❓ help / ช่วยเหลือ - แสดงคำสั่งนี้`,
         },
       ],
       channelAccessToken
@@ -201,82 +201,6 @@ async function handleTextMessage(
       ],
       channelAccessToken
     );
-    return;
-  }
-
-  // Command: Budget
-  if (text === "budget" || text === "งบประมาณ") {
-    // Get current month's budgets
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const budgets = await prisma.budget.findMany({
-      where: {
-        companyId: company.id,
-        startDate: { lte: endOfMonth },
-        endDate: { gte: startOfMonth },
-      },
-    });
-
-    if (budgets.length === 0) {
-      await replyToLine(
-        replyToken,
-        [
-          {
-            type: "text",
-            text: "📊 ยังไม่มีงบประมาณที่ตั้งไว้สำหรับเดือนนี้\n\nกรุณาตั้งงบประมาณในหน้าเว็บก่อนครับ",
-          },
-        ],
-        channelAccessToken
-      );
-      return;
-    }
-
-    // Get expenses for current month
-    const expenses = await prisma.expense.findMany({
-      where: {
-        companyId: company.id,
-        billDate: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-      },
-    });
-
-    const categoryLabels: Record<string, string> = {
-      MATERIAL: "วัตถุดิบ",
-      UTILITY: "สาธารณูปโภค",
-      MARKETING: "การตลาด",
-      SALARY: "เงินเดือน",
-      FREELANCE: "ฟรีแลนซ์",
-      TRANSPORT: "ค่าขนส่ง",
-      RENT: "ค่าเช่า",
-      OFFICE: "สำนักงาน",
-      OTHER: "อื่นๆ",
-    };
-
-    let budgetText = `💰 งบประมาณเดือน${now.toLocaleDateString("th-TH", { month: "long" })}\n\n`;
-
-    for (const budget of budgets) {
-      const filtered = expenses.filter((exp: typeof expenses[number]) => exp.category === budget.category);
-      let spent = 0;
-      for (const exp of filtered) {
-        spent += Number(exp.netPaid);
-      }
-
-      const budgetAmount = Number(budget.amount);
-      const percentage = (spent / budgetAmount) * 100;
-      const emoji =
-        percentage >= 100 ? "🔴" : percentage >= 80 ? "🟠" : "🟢";
-
-      budgetText += `${emoji} ${categoryLabels[budget.category] || budget.category}\n`;
-      budgetText += `   ใช้ไป: ฿${spent.toLocaleString("th-TH")}\n`;
-      budgetText += `   งบ: ฿${budgetAmount.toLocaleString("th-TH")}\n`;
-      budgetText += `   ${percentage.toFixed(0)}%\n\n`;
-    }
-
-    await replyToLine(replyToken, [{ type: "text", text: budgetText }], channelAccessToken);
     return;
   }
 

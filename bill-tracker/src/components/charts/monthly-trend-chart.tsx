@@ -55,8 +55,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <span
               className={`ml-2 font-medium ${
                 payload[0].value - payload[1].value >= 0
-                  ? "text-emerald-500"
-                  : "text-red-500"
+                  ? "text-primary"
+                  : "text-destructive"
               }`}
             >
               {formatCurrency(payload[0].value - payload[1].value)}

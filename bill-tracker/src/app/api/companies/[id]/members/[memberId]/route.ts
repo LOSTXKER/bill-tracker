@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireOwner } from "@/lib/permissions/checker";
+import { requirePermission } from "@/lib/permissions/checker";
 import { logPermissionChange, logMemberRemove } from "@/lib/audit/logger";
 
 /**
@@ -23,8 +23,8 @@ export async function PATCH(
   try {
     const { id: companyId, memberId } = await params;
     
-    // Require OWNER permission
-    const currentUser = await requireOwner(companyId);
+    // Require settings:manage-team permission (owners have all permissions automatically)
+    const currentUser = await requirePermission(companyId, "settings:manage-team");
 
     const body = await request.json();
     const { permissions, isOwner } = body;
@@ -126,8 +126,8 @@ export async function DELETE(
   try {
     const { id: companyId, memberId } = await params;
     
-    // Require OWNER permission
-    const currentUser = await requireOwner(companyId);
+    // Require settings:manage-team permission (owners have all permissions automatically)
+    const currentUser = await requirePermission(companyId, "settings:manage-team");
 
     // Get the member to be removed
     const memberToRemove = await prisma.companyAccess.findUnique({

@@ -26,7 +26,8 @@ export async function GET() {
 
     const companies = companyAccess.map((ca: typeof companyAccess[number]) => ({
       ...ca.company,
-      role: ca.role,
+      isOwner: ca.isOwner,
+      permissions: ca.permissions,
     }));
 
     return NextResponse.json({ companies });
@@ -89,7 +90,8 @@ export async function POST(request: Request) {
         users: {
           create: {
             userId: session.user.id,
-            role: "OWNER",
+            isOwner: true,
+            permissions: [],
           },
         },
       },
