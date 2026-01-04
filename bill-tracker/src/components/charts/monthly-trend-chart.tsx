@@ -24,33 +24,39 @@ interface MonthlyTrendChartProps {
   data: MonthlyData[];
 }
 
+// Chart colors
+const COLORS = {
+  income: "#10b981", // emerald-500
+  expense: "#ef4444", // red-500
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg">
-        <p className="font-medium mb-2">{label}</p>
+      <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
+        <p className="font-medium text-foreground mb-2">{label}</p>
         <div className="space-y-1">
           {payload.map((entry: any, index: number) => (
             <div key={index} className="flex items-center gap-2 text-sm">
               <div
-                className="w-3 h-3 rounded"
+                className="w-2.5 h-2.5 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-slate-600 dark:text-slate-400">
+              <span className="text-muted-foreground">
                 {entry.name}:
               </span>
-              <span className="font-medium">{formatCurrency(entry.value)}</span>
+              <span className="font-medium text-foreground">{formatCurrency(entry.value)}</span>
             </div>
           ))}
-          <div className="pt-2 mt-2 border-t border-slate-200">
-            <span className="text-slate-600 dark:text-slate-400 text-sm">
+          <div className="pt-2 mt-2 border-t border-border">
+            <span className="text-muted-foreground text-sm">
               สุทธิ:
             </span>
             <span
               className={`ml-2 font-medium ${
                 payload[0].value - payload[1].value >= 0
-                  ? "text-emerald-600"
-                  : "text-red-600"
+                  ? "text-emerald-500"
+                  : "text-red-500"
               }`}
             >
               {formatCurrency(payload[0].value - payload[1].value)}
@@ -65,40 +71,53 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-purple-500" />
+    <Card className="border-border/50 shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <div className="p-1.5 rounded-lg bg-amber-500/10">
+            <BarChart3 className="h-4 w-4 text-amber-500" />
+          </div>
           เปรียบเทียบรายรับ-รายจ่าย
         </CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+          <BarChart data={data} barGap={4}>
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke="#374151"
+              strokeOpacity={0.3}
+              vertical={false}
+            />
             <XAxis
               dataKey="month"
-              className="text-xs"
-              tick={{ fill: "currentColor" }}
+              tick={{ fill: "#9ca3af", fontSize: 12 }}
+              tickLine={false}
+              axisLine={false}
             />
             <YAxis
-              className="text-xs"
-              tick={{ fill: "currentColor" }}
+              tick={{ fill: "#9ca3af", fontSize: 12 }}
               tickFormatter={(value) => `฿${(value / 1000).toFixed(0)}k`}
+              tickLine={false}
+              axisLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#374151", fillOpacity: 0.2 }} />
+            <Legend 
+              wrapperStyle={{ paddingTop: "20px" }}
+              iconType="circle"
+              iconSize={8}
+            />
             <Bar
               dataKey="income"
-              fill="#10b981"
+              fill={COLORS.income}
               name="รายรับ"
-              radius={[4, 4, 0, 0]}
+              radius={[6, 6, 0, 0]}
             />
             <Bar
               dataKey="expense"
-              fill="#ef4444"
+              fill={COLORS.expense}
               name="รายจ่าย"
-              radius={[4, 4, 0, 0]}
+              radius={[6, 6, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>

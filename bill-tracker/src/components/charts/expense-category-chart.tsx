@@ -23,30 +23,29 @@ interface ExpenseCategoryChartProps {
   data: CategoryData[];
 }
 
+// Vibrant color palette for pie chart
 const COLORS = [
   "#ef4444", // red
   "#f97316", // orange
-  "#f59e0b", // amber
   "#eab308", // yellow
-  "#84cc16", // lime
   "#22c55e", // green
   "#10b981", // emerald
   "#14b8a6", // teal
   "#06b6d4", // cyan
-  "#0ea5e9", // sky
   "#3b82f6", // blue
-  "#6366f1", // indigo
+  "#8b5cf6", // violet
+  "#ec4899", // pink
 ];
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg">
-        <p className="font-medium">{payload[0].name}</p>
-        <p className="text-sm text-emerald-600">
+      <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
+        <p className="font-medium text-foreground">{payload[0].name}</p>
+        <p className="text-sm text-emerald-500 font-medium">
           {formatCurrency(payload[0].value)}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           {payload[0].payload.percentage.toFixed(1)}%
         </p>
       </div>
@@ -58,15 +57,17 @@ const CustomTooltip = ({ active, payload }: any) => {
 export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
   if (data.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PieChartIcon className="h-5 w-5 text-slate-400" />
+      <Card className="border-border/50 shadow-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <div className="p-1.5 rounded-lg bg-muted">
+              <PieChartIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
             รายจ่ายตามหมวดหมู่
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-64 text-slate-500">
+          <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
             ยังไม่มีข้อมูล
           </div>
         </CardContent>
@@ -75,10 +76,12 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <PieChartIcon className="h-5 w-5 text-red-500" />
+    <Card className="border-border/50 shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <div className="p-1.5 rounded-lg bg-red-500/10">
+            <PieChartIcon className="h-4 w-4 text-red-500" />
+          </div>
           รายจ่ายตามหมวดหมู่
         </CardTitle>
       </CardHeader>
@@ -91,21 +94,29 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
               cy="50%"
               labelLine={false}
               label={(props: any) =>
-                `${props.name} (${props.percentage?.toFixed(0) || 0}%)`
+                props.percentage > 5 ? `${props.percentage?.toFixed(0) || 0}%` : ""
               }
-              outerRadius={80}
+              outerRadius={90}
+              innerRadius={50}
               fill="#8884d8"
               dataKey="value"
+              paddingAngle={2}
             >
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
+                  stroke="transparent"
                 />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Legend 
+              wrapperStyle={{ paddingTop: "20px" }}
+              iconType="circle"
+              iconSize={8}
+              formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
+            />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>

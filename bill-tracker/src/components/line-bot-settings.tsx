@@ -32,6 +32,12 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
   });
 
   const [isEditing, setIsEditing] = React.useState(false);
+  const [webhookUrl, setWebhookUrl] = React.useState("/api/line/webhook");
+
+  // Set webhook URL on client
+  React.useEffect(() => {
+    setWebhookUrl(`${window.location.origin}/api/line/webhook`);
+  }, []);
 
   // Fetch current config
   React.useEffect(() => {
@@ -129,10 +135,6 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
       setSaving(false);
     }
   };
-
-  const webhookUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/api/line/webhook`
-    : "/api/line/webhook";
 
   if (loading) {
     return (

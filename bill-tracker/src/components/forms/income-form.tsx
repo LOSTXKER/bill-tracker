@@ -111,19 +111,23 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-emerald-600">
-            <Wallet className="h-5 w-5" />
+      <Card className="border-border/50 shadow-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Wallet className="h-5 w-5 text-primary" />
+            </div>
             บันทึกรายรับ
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Amount Input */}
           <div className="space-y-2">
-            <Label htmlFor="amount">จำนวนเงิน (ก่อน VAT)</Label>
+            <Label htmlFor="amount" className="text-foreground font-medium">
+              จำนวนเงิน (ก่อน VAT)
+            </Label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
                 ฿
               </span>
               <Input
@@ -131,7 +135,7 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
                 type="number"
                 step="0.01"
                 min="0"
-                className="pl-8 text-2xl h-14 font-bold"
+                className="pl-10 text-2xl h-14 font-semibold bg-muted/30 border-border focus:bg-background transition-colors"
                 placeholder="0.00"
                 {...register("amount", { valueAsNumber: true })}
               />
@@ -140,30 +144,36 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
 
           {/* Customer Name */}
           <div className="space-y-2">
-            <Label htmlFor="customerName">ชื่อลูกค้า</Label>
+            <Label htmlFor="customerName" className="text-foreground font-medium">
+              ชื่อลูกค้า
+            </Label>
             <Input
               id="customerName"
               placeholder="เช่น บริษัท ABC จำกัด"
+              className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
               {...register("customerName")}
             />
           </div>
 
           {/* Source */}
           <div className="space-y-2">
-            <Label htmlFor="source">แหล่งที่มา/รายละเอียด</Label>
+            <Label htmlFor="source" className="text-foreground font-medium">
+              แหล่งที่มา/รายละเอียด
+            </Label>
             <Input
               id="source"
               placeholder="เช่น ค่าสกรีนเสื้อ 100 ตัว"
+              className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
               {...register("source")}
             />
           </div>
 
           {/* File Upload */}
           <div className="space-y-3">
-            <Label>เอกสารประกอบ</Label>
+            <Label className="text-foreground font-medium">เอกสารประกอบ</Label>
             <div className="space-y-4">
-              <div>
-                <Label className="text-sm text-slate-600 mb-2 block">
+              <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
+                <Label className="text-sm text-muted-foreground mb-3 block">
                   สลิปลูกค้าโอนมา
                 </Label>
                 <FileUpload
@@ -177,8 +187,8 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
                   }
                 />
               </div>
-              <div>
-                <Label className="text-sm text-slate-600 mb-2 block">
+              <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
+                <Label className="text-sm text-muted-foreground mb-3 block">
                   สำเนาบิลที่เราเขียนให้
                 </Label>
                 <FileUpload
@@ -193,8 +203,8 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
                 />
               </div>
               {watchIsWhtDeducted && (
-                <div>
-                  <Label className="text-sm text-slate-600 mb-2 block">
+                <div className="p-4 rounded-xl border border-border/50 bg-muted/20">
+                  <Label className="text-sm text-muted-foreground mb-3 block">
                     ใบ 50 ทวิ ที่ลูกค้าให้มา
                   </Label>
                   <FileUpload
@@ -212,22 +222,22 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
             </div>
           </div>
 
-          <Separator />
+          <Separator className="my-6" />
 
           {/* VAT Toggle */}
           <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>ภาษีมูลค่าเพิ่ม (VAT)</Label>
-              <p className="text-sm text-slate-500">ออกใบกำกับภาษี?</p>
+            <div className="space-y-1">
+              <Label className="text-foreground font-medium">ภาษีมูลค่าเพิ่ม (VAT)</Label>
+              <p className="text-sm text-muted-foreground">ออกใบกำกับภาษี?</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setValue("vatRate", 0)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   watchVatRate === 0
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 ไม่มี VAT
@@ -235,10 +245,10 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
               <button
                 type="button"
                 onClick={() => setValue("vatRate", 7)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   watchVatRate === 7
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 VAT 7%
@@ -247,11 +257,11 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
           </div>
 
           {/* WHT Deducted Section */}
-          <div className="space-y-4 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+          <div className="space-y-4 rounded-xl border border-border/50 p-4">
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>โดนหัก ณ ที่จ่าย</Label>
-                <p className="text-sm text-slate-500">ลูกค้าหักภาษีเรา?</p>
+              <div className="space-y-1">
+                <Label className="text-foreground font-medium">โดนหัก ณ ที่จ่าย</Label>
+                <p className="text-sm text-muted-foreground">ลูกค้าหักภาษีเรา?</p>
               </div>
               <Switch
                 checked={watchIsWhtDeducted}
@@ -267,7 +277,7 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
 
             {watchIsWhtDeducted && (
               <div className="space-y-3 pt-2">
-                <Label>อัตราที่โดนหัก</Label>
+                <Label className="text-sm text-muted-foreground">อัตราที่โดนหัก</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(WHT_RATES).map(([key, { rate, description }]) => (
                     <button
@@ -277,14 +287,14 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
                         setValue("whtRate", rate);
                         setValue("whtType", key as IncomeInput["whtType"]);
                       }}
-                      className={`p-3 rounded-lg border text-left transition-colors ${
+                      className={`p-3 rounded-xl border text-left transition-all ${
                         watchWhtRate === rate
-                          ? "border-orange-500 bg-orange-50 dark:bg-orange-950"
-                          : "border-slate-200 hover:border-slate-300 dark:border-slate-700"
+                          ? "border-amber-500 bg-amber-500/5"
+                          : "border-border/50 hover:border-border bg-muted/20"
                       }`}
                     >
-                      <div className="font-medium">{description}</div>
-                      <div className="text-sm text-slate-500">{rate}%</div>
+                      <div className="font-medium text-foreground text-sm">{description}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{rate}%</div>
                     </button>
                   ))}
                 </div>
@@ -294,12 +304,12 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
 
           {/* Payment Method */}
           <div className="space-y-2">
-            <Label>วิธีรับเงิน</Label>
+            <Label className="text-foreground font-medium">วิธีรับเงิน</Label>
             <Select
               defaultValue="BANK_TRANSFER"
               onValueChange={(value) => setValue("paymentMethod", value as IncomeInput["paymentMethod"])}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -314,18 +324,18 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
 
           {/* Document Status */}
           <div className="space-y-2">
-            <Label>สถานะเอกสาร</Label>
+            <Label className="text-foreground font-medium">สถานะเอกสาร</Label>
             <Select
               defaultValue="PENDING_COPY_SEND"
               onValueChange={(value) => setValue("status", value as IncomeInput["status"])}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NO_DOC_REQUIRED">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground" />
                     ไม่ต้องทำเอกสาร
                   </div>
                 </SelectItem>
@@ -345,7 +355,7 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
                 )}
                 <SelectItem value="PENDING_COPY_SEND">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="w-2 h-2 rounded-full bg-destructive" />
                     เอกสารครบ (รอส่งบัญชี)
                   </div>
                 </SelectItem>
@@ -353,34 +363,34 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
             </Select>
           </div>
 
-          <Separator />
+          <Separator className="my-6" />
 
           {/* Calculation Summary */}
-          <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-4 space-y-3">
-            <div className="flex items-center gap-2 mb-3">
-              <Calculator className="h-4 w-4 text-slate-500" />
-              <span className="font-medium text-slate-700 dark:text-slate-300">
+          <div className="rounded-xl bg-muted/30 p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-foreground">
                 สรุปยอด
               </span>
             </div>
 
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500">ยอดก่อน VAT</span>
-                <span>{formatCurrency(calculation.baseAmount)}</span>
+                <span className="text-muted-foreground">ยอดก่อน VAT</span>
+                <span className="text-foreground">{formatCurrency(calculation.baseAmount)}</span>
               </div>
               {watchVatRate > 0 && (
-                <div className="flex justify-between text-blue-600">
+                <div className="flex justify-between text-primary">
                   <span>VAT {watchVatRate}%</span>
                   <span>+{formatCurrency(calculation.vatAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-slate-500">ยอดรวม VAT</span>
-                <span>{formatCurrency(calculation.totalWithVat)}</span>
+                <span className="text-muted-foreground">ยอดรวม VAT</span>
+                <span className="text-foreground">{formatCurrency(calculation.totalWithVat)}</span>
               </div>
               {watchIsWhtDeducted && watchWhtRate && (
-                <div className="flex justify-between text-orange-600">
+                <div className="flex justify-between text-amber-600">
                   <span>ลูกค้าหัก {watchWhtRate}%</span>
                   <span>-{formatCurrency(calculation.whtAmount)}</span>
                 </div>
@@ -389,33 +399,33 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
 
             <Separator />
 
-            <div className="flex justify-between text-lg font-bold">
-              <span>ยอดรับจริง</span>
-              <span className="text-emerald-600">
+            <div className="flex justify-between text-lg font-semibold">
+              <span className="text-foreground">ยอดรับจริง</span>
+              <span className="text-primary">
                 {formatCurrency(calculation.netAmount)}
               </span>
             </div>
 
             {watchIsWhtDeducted && watchWhtRate && (
-              <p className="text-xs text-orange-600">
+              <p className="text-xs text-amber-600">
                 * ต้องทวงใบ 50 ทวิ จากลูกค้า เพื่อใช้เป็นเครดิตภาษี
               </p>
             )}
           </div>
         </CardContent>
 
-        <CardFooter className="flex gap-3">
+        <CardFooter className="flex gap-3 pt-2">
           <Button
             type="button"
             variant="outline"
-            className="flex-1"
+            className="flex-1 h-11"
             onClick={() => router.back()}
           >
             ยกเลิก
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+            className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground"
             disabled={isLoading}
           >
             {isLoading ? (

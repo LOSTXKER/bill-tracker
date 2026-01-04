@@ -28,24 +28,33 @@ export default async function CompanyLayout({
     notFound();
   }
 
-  // Check if user has access
-  const hasAccess =
-    session.user.role === "ADMIN" ||
-    (await prisma.companyAccess.findUnique({
-      where: {
-        userId_companyId: {
-          userId: session.user.id,
-          companyId: company.id,
-        },
+  // Check if user has access and get permissions
+  const companyAccess = await prisma.companyAccess.findUnique({
+    where: {
+      userId_companyId: {
+        userId: session.user.id,
+        companyId: company.id,
       },
-    }));
+    },
+  });
+
+  const hasAccess = session.user.role === "ADMIN" || companyAccess;
 
   if (!hasAccess) {
     redirect("/");
   }
 
+  // Get user permissions
+  const isOwner = companyAccess?.isOwner || false;
+  const permissions = (companyAccess?.permissions as string[]) || [];
+
   return (
-    <DashboardShell company={company} user={session.user}>
+    <DashboardShell 
+      company={company} 
+      user={session.user}
+      isOwner={isOwner}
+      permissions={permissions}
+    >
       {children}
     </DashboardShell>
   );

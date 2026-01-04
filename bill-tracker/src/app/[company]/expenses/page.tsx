@@ -28,14 +28,14 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
   const { company: companyCode } = await params;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
             รายจ่าย
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-muted-foreground mt-1">
             จัดการรายจ่ายและติดตามสถานะเอกสาร
           </p>
         </div>
@@ -51,7 +51,7 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
           <Link href={`/${companyCode.toLowerCase()}/capture`}>
             <Button
               size="sm"
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Plus className="mr-2 h-4 w-4" />
               เพิ่มรายจ่าย
@@ -105,66 +105,54 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
       }),
     ]);
 
+  const stats = [
+    {
+      title: "รายจ่ายเดือนนี้",
+      value: formatCurrency(Number(monthlyTotal._sum.netPaid) || 0),
+      subtitle: `${monthlyTotal._count} รายการ`,
+      icon: ArrowUpCircle,
+      iconColor: "text-destructive",
+    },
+    {
+      title: "รอใบเสร็จ",
+      value: waitingDocs.toString(),
+      subtitle: "รายการ",
+      iconColor: "text-amber-500",
+    },
+    {
+      title: "รอส่งบัญชี",
+      value: pendingPhysical.toString(),
+      subtitle: "รายการ",
+      iconColor: "text-amber-500",
+    },
+    {
+      title: "ส่งแล้ว",
+      value: sentToAccount.toString(),
+      subtitle: "รายการ",
+      iconColor: "text-primary",
+    },
+  ];
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            รายจ่ายเดือนนี้
-          </CardTitle>
-          <ArrowUpCircle className="h-5 w-5 text-red-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            {formatCurrency(Number(monthlyTotal._sum.netPaid) || 0)}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            {monthlyTotal._count} รายการ
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            รอใบเสร็จ
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {waitingDocs}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">รายการ</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            รอส่งบัญชี
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-            {pendingPhysical}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">รายการ</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            ส่งแล้ว
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            {sentToAccount}
-          </div>
-          <p className="text-xs text-slate-500 mt-1">รายการ</p>
-        </CardContent>
-      </Card>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
+      {stats.map((stat, i) => (
+        <Card key={i} className="border-border/50 shadow-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {stat.title}
+            </CardTitle>
+            {stat.icon && <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />}
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-semibold ${stat.iconColor || "text-foreground"}`}>
+              {stat.value}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stat.subtitle}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -192,12 +180,12 @@ async function ExpensesTable({ companyCode }: { companyCode: string }) {
     };
     const colorMap: Record<string, string> = {
       orange:
-        "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
-      red: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800",
+      red: "bg-destructive/10 text-destructive border-destructive/20",
       yellow:
-        "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400",
+        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800",
       green:
-        "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
+        "bg-primary/10 text-primary border-primary/20",
     };
     return (
       <Badge
@@ -210,19 +198,21 @@ async function ExpensesTable({ companyCode }: { companyCode: string }) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>รายการรายจ่าย</CardTitle>
+    <Card className="border-border/50 shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold">รายการรายจ่าย</CardTitle>
       </CardHeader>
       <CardContent>
         {expenses.length === 0 ? (
-          <div className="text-center py-8">
-            <ArrowUpCircle className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" />
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <div className="text-center py-12">
+            <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+              <ArrowUpCircle className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
               ยังไม่มีรายจ่าย
             </p>
             <Link href={`/${companyCode.toLowerCase()}/capture`}>
-              <Button className="mt-4" variant="outline">
+              <Button variant="outline">
                 <Plus className="mr-2 h-4 w-4" />
                 เพิ่มรายจ่ายแรก
               </Button>
@@ -232,18 +222,18 @@ async function ExpensesTable({ companyCode }: { companyCode: string }) {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>วันที่</TableHead>
-                  <TableHead>ผู้ขาย/รายละเอียด</TableHead>
-                  <TableHead>หมวดหมู่</TableHead>
-                  <TableHead className="text-right">จำนวนเงิน</TableHead>
-                  <TableHead className="text-center">สถานะ</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย/รายละเอียด</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">หมวดหมู่</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-medium">จำนวนเงิน</TableHead>
+                  <TableHead className="text-center text-muted-foreground font-medium">สถานะ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {expenses.map((expense: typeof expenses[number]) => (
-                  <TableRow key={expense.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-                    <TableCell className="whitespace-nowrap">
+                  <TableRow key={expense.id} className="cursor-pointer hover:bg-muted/30 transition-colors">
+                    <TableCell className="whitespace-nowrap text-foreground">
                       {new Date(expense.billDate).toLocaleDateString("th-TH", {
                         day: "numeric",
                         month: "short",
@@ -252,25 +242,25 @@ async function ExpensesTable({ companyCode }: { companyCode: string }) {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">
+                        <p className="font-medium text-foreground">
                           {expense.vendor?.name ||
                             expense.vendorName ||
                             "ไม่ระบุผู้ขาย"}
                         </p>
                         {expense.description && (
-                          <p className="text-xs text-slate-500 truncate max-w-xs">
+                          <p className="text-xs text-muted-foreground truncate max-w-xs">
                             {expense.description}
                           </p>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-muted-foreground">
                       {expense.category
                         ? EXPENSE_CATEGORY_LABELS[expense.category] ||
                           expense.category
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-right font-medium text-red-600 dark:text-red-400">
+                    <TableCell className="text-right font-medium text-destructive">
                       {formatCurrency(Number(expense.netPaid))}
                     </TableCell>
                     <TableCell className="text-center">
@@ -291,7 +281,7 @@ function StatsSkeleton() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {[1, 2, 3, 4].map((i) => (
-        <Card key={i}>
+        <Card key={i} className="border-border/50">
           <CardHeader className="pb-2">
             <Skeleton className="h-4 w-24" />
           </CardHeader>
@@ -306,13 +296,13 @@ function StatsSkeleton() {
 
 function TableSkeleton() {
   return (
-    <Card>
+    <Card className="border-border/50">
       <CardHeader>
-        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-5 w-32" />
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2">
         {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-12 w-full" />
+          <Skeleton key={i} className="h-12 w-full rounded-xl" />
         ))}
       </CardContent>
     </Card>

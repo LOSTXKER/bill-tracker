@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LineBotSettings } from "@/components/line-bot-settings";
+import { TeamManagementCard } from "@/components/settings/team-management-card";
 import {
   Building2,
   User,
@@ -180,6 +181,9 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Team Management */}
+        <TeamManagementCard companyId={company.id} />
 
         {/* Data & Export */}
         <Card className="lg:col-span-2">

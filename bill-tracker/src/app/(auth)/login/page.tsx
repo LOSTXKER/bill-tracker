@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Loader2, Receipt, AlertCircle } from "lucide-react";
 import { authenticate } from "./actions";
 
@@ -45,102 +46,117 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      {/* Background pattern */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-40" />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      {/* Theme toggle in corner */}
+      <div className="fixed top-4 right-4">
+        <ThemeToggle />
+      </div>
       
-      <Card className="w-full max-w-md relative backdrop-blur-sm bg-white/95 dark:bg-slate-900/95 border-slate-200/50 dark:border-slate-700/50 shadow-2xl">
-        <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Receipt className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-              Bill Tracker
-            </CardTitle>
-            <CardDescription className="text-slate-500 dark:text-slate-400 mt-2">
-              ระบบจัดการเอกสารทางบัญชี & Mini-ERP
-            </CardDescription>
-          </div>
-        </CardHeader>
-
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            {errorMessage && (
-              <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errorMessage}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700 dark:text-slate-300">
-                อีเมล
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-                className="h-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-              />
+      <div className="w-full max-w-md animate-fade-in-up">
+        <Card className="border-border/50 shadow-elevated">
+          <CardHeader className="space-y-4 text-center pb-2">
+            <div className="mx-auto w-14 h-14 bg-primary rounded-2xl flex items-center justify-center">
+              <Receipt className="w-7 h-7 text-primary-foreground" />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 dark:text-slate-300">
-                รหัสผ่าน
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-                className="h-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-              />
+            <div>
+              <CardTitle className="text-2xl font-bold text-foreground">
+                Bill Tracker
+              </CardTitle>
+              <CardDescription className="text-muted-foreground mt-1">
+                ระบบจัดการเอกสารทางบัญชี
+              </CardDescription>
             </div>
-          </CardContent>
+          </CardHeader>
 
-          <CardFooter className="flex flex-col gap-4">
-            <Button
-              type="submit"
-              className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-medium shadow-lg shadow-emerald-500/25 transition-all duration-200"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังเข้าสู่ระบบ...
-                </>
-              ) : (
-                "เข้าสู่ระบบ"
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4 pt-4">
+              {errorMessage && (
+                <Alert variant="destructive" className="bg-destructive/10 border-destructive/20">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
               )}
-            </Button>
 
-            <p className="text-sm text-center text-slate-500 dark:text-slate-400">
-              ยังไม่มีบัญชี?{" "}
-              <Link
-                href="/register"
-                className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground">
+                  อีเมล
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="h-11 bg-muted/50 border-border focus:bg-background transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-foreground">
+                  รหัสผ่าน
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="h-11 bg-muted/50 border-border focus:bg-background transition-colors"
+                />
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-4 pt-2">
+              <Button
+                type="submit"
+                className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-colors"
+                disabled={isLoading}
               >
-                สมัครสมาชิก
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    กำลังเข้าสู่ระบบ...
+                  </>
+                ) : (
+                  "เข้าสู่ระบบ"
+                )}
+              </Button>
+
+              <p className="text-sm text-center text-muted-foreground">
+                ยังไม่มีบัญชี?{" "}
+                <Link
+                  href="/register"
+                  className="text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  สมัครสมาชิก
+                </Link>
+              </p>
+            </CardFooter>
+          </form>
+        </Card>
+
+        {/* Back to home */}
+        <p className="text-center mt-6 text-sm text-muted-foreground">
+          <Link href="/" className="hover:text-foreground transition-colors">
+            ← กลับหน้าหลัก
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">Loading...</div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    }>
       <LoginForm />
     </Suspense>
   );

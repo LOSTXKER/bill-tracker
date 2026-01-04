@@ -80,25 +80,22 @@ enum UserRole {
 }
 
 model CompanyAccess {
-  id        String      @id @default(cuid())
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId String
-  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  role      CompanyRole @default(VIEWER)
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // Custom Permission System
+  isOwner     Boolean  @default(false) // OWNER flag - มีสิทธิ์ทุกอย่าง
+  permissions Json     @default("[]")  // Custom permissions array: ["expenses:*", "incomes:read", ...]
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@unique([userId, companyId])
   @@index([userId])
   @@index([companyId])
-}
-
-enum CompanyRole {
-  OWNER      // เจ้าของ - จัดการทุกอย่างของบริษัท
-  MANAGER    // ผู้จัดการ - จัดการได้ทุกอย่างยกเว้นลบบริษัท
-  ACCOUNTANT // บัญชี - จัดการรายการเงินได้
-  VIEWER     // ดูอย่างเดียว
 }
 
 // =============================================================================
@@ -421,19 +418,22 @@ enum IntegrationType {
 // =============================================================================
 
 model AuditLog {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  companyId   String?     // บริษัทที่เกี่ยวข้อง (สำหรับ filter logs ตาม company)
 
-  action     AuditAction
-  entityType String      // "Expense", "Income", etc.
-  entityId   String
-  changes    Json?       // บันทึกการเปลี่ยนแปลง (before/after)
-  ipAddress  String?
-  userAgent  String?
+  action      AuditAction
+  entityType  String      // "Expense", "Income", etc.
+  entityId    String
+  changes     Json?       // บันทึกการเปลี่ยนแปลง (before/after)
+  description String?     // คำอธิบายสั้นๆ ของการเปลี่ยนแปลง
+  ipAddress   String?
+  userAgent   String?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime    @default(now())
 
+  @@index([companyId, createdAt])
   @@index([entityType, entityId])
   @@index([userId, createdAt])
   @@index([createdAt])

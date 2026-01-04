@@ -12,6 +12,7 @@ import {
   Clock,
   FileCheck,
   TrendingUp,
+  Plus,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import Link from "next/link";
@@ -27,20 +28,21 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   const { company: companyCode } = await params;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
             Dashboard
           </h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-muted-foreground mt-1">
             ภาพรวมรายรับ-รายจ่ายและเอกสารที่ต้องจัดการ
           </p>
         </div>
         <Link href={`/${companyCode.toLowerCase()}/capture`}>
-          <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
-            + บันทึกรายการ
+          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Plus className="mr-2 h-4 w-4" />
+            บันทึกรายการ
           </Button>
         </Link>
       </div>
@@ -121,69 +123,58 @@ async function StatsCards({ companyCode }: { companyCode: string }) {
   const totalExpense = Number(expenseSum._sum.netPaid) || 0;
   const netCashFlow = totalIncome - totalExpense;
 
+  const stats = [
+    {
+      title: "รายรับเดือนนี้",
+      value: formatCurrency(totalIncome),
+      icon: ArrowDownCircle,
+      iconColor: "text-primary",
+      trend: "positive" as const,
+    },
+    {
+      title: "รายจ่ายเดือนนี้",
+      value: formatCurrency(totalExpense),
+      icon: ArrowUpCircle,
+      iconColor: "text-destructive",
+      trend: "negative" as const,
+    },
+    {
+      title: "กระแสเงินสดสุทธิ",
+      value: formatCurrency(netCashFlow),
+      icon: TrendingUp,
+      iconColor: netCashFlow >= 0 ? "text-primary" : "text-destructive",
+      trend: netCashFlow >= 0 ? "positive" as const : "negative" as const,
+    },
+    {
+      title: "เอกสารค้าง",
+      value: `${pendingDocs} รายการ`,
+      icon: Clock,
+      iconColor: "text-amber-500",
+      trend: "neutral" as const,
+    },
+  ];
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-200/50 dark:border-emerald-800/50">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            รายรับเดือนนี้
-          </CardTitle>
-          <ArrowDownCircle className="h-5 w-5 text-emerald-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(totalIncome)}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border-red-200/50 dark:border-red-800/50">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            รายจ่ายเดือนนี้
-          </CardTitle>
-          <ArrowUpCircle className="h-5 w-5 text-red-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            {formatCurrency(totalExpense)}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-200/50 dark:border-blue-800/50">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            กระแสเงินสดสุทธิ
-          </CardTitle>
-          <TrendingUp className="h-5 w-5 text-blue-500" />
-        </CardHeader>
-        <CardContent>
-          <div
-            className={`text-2xl font-bold ${
-              netCashFlow >= 0
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-red-600 dark:text-red-400"
-            }`}
-          >
-            {formatCurrency(netCashFlow)}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border-amber-200/50 dark:border-amber-800/50">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            เอกสารค้าง
-          </CardTitle>
-          <Clock className="h-5 w-5 text-amber-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-            {pendingDocs} รายการ
-          </div>
-        </CardContent>
-      </Card>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
+      {stats.map((stat, i) => (
+        <Card key={i} className="border-border/50 shadow-card hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {stat.title}
+            </CardTitle>
+            <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-semibold tracking-tight ${
+              stat.trend === "positive" ? "text-foreground" :
+              stat.trend === "negative" ? "text-foreground" :
+              "text-foreground"
+            }`}>
+              {stat.value}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -217,40 +208,42 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
     waitingDocs.length > 0 || waitingWht.length > 0 || waitingIssue.length > 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-          <AlertCircle className="h-5 w-5" />
+    <Card className="border-border/50 shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <div className="p-1.5 rounded-lg bg-destructive/10">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+          </div>
           ด่วน! ต้องจัดการ
         </CardTitle>
       </CardHeader>
       <CardContent>
         {!hasItems ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-muted-foreground py-4 text-center">
             ไม่มีรายการที่ต้องจัดการ
           </p>
         ) : (
           <div className="space-y-4">
             {waitingDocs.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <p className="text-sm font-medium text-foreground mb-2">
                   รอใบเสร็จจากร้านค้า ({waitingDocs.length})
                 </p>
                 <div className="space-y-2">
                   {waitingDocs.map((expense: typeof waitingDocs[number]) => (
                     <div
                       key={expense.id}
-                      className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 p-3"
+                      className="flex items-center justify-between rounded-xl bg-muted/50 p-3"
                     >
                       <div>
-                        <p className="text-sm font-medium">
+                        <p className="text-sm font-medium text-foreground">
                           {expense.vendorName || expense.description || "ไม่ระบุ"}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {formatCurrency(Number(expense.netPaid))}
                         </p>
                       </div>
-                      <Badge variant="outline" className="text-orange-600 border-orange-200">
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50">
                         รอบิล
                       </Badge>
                     </div>
@@ -261,24 +254,24 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
 
             {waitingWht.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <p className="text-sm font-medium text-foreground mb-2">
                   รอใบ 50 ทวิ จากลูกค้า ({waitingWht.length})
                 </p>
                 <div className="space-y-2">
                   {waitingWht.map((income: typeof waitingWht[number]) => (
                     <div
                       key={income.id}
-                      className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 p-3"
+                      className="flex items-center justify-between rounded-xl bg-muted/50 p-3"
                     >
                       <div>
-                        <p className="text-sm font-medium">
+                        <p className="text-sm font-medium text-foreground">
                           {income.customerName || income.source || "ไม่ระบุ"}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {formatCurrency(Number(income.netReceived))}
                         </p>
                       </div>
-                      <Badge variant="outline" className="text-orange-600 border-orange-200">
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50">
                         รอใบ 50 ทวิ
                       </Badge>
                     </div>
@@ -289,24 +282,24 @@ async function ActionRequired({ companyCode }: { companyCode: string }) {
 
             {waitingIssue.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <p className="text-sm font-medium text-foreground mb-2">
                   รอออกบิลให้ลูกค้า ({waitingIssue.length})
                 </p>
                 <div className="space-y-2">
                   {waitingIssue.map((income: typeof waitingIssue[number]) => (
                     <div
                       key={income.id}
-                      className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800 p-3"
+                      className="flex items-center justify-between rounded-xl bg-muted/50 p-3"
                     >
                       <div>
-                        <p className="text-sm font-medium">
+                        <p className="text-sm font-medium text-foreground">
                           {income.customerName || income.source || "ไม่ระบุ"}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {formatCurrency(Number(income.netReceived))}
                         </p>
                       </div>
-                      <Badge variant="outline" className="text-amber-600 border-amber-200">
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50">
                         รอออกบิล
                       </Badge>
                     </div>
@@ -346,33 +339,39 @@ async function ReadyToSend({ companyCode }: { companyCode: string }) {
   const total = pendingExpenses + pendingIncomes;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-          <FileCheck className="h-5 w-5" />
+    <Card className="border-border/50 shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <div className="p-1.5 rounded-lg bg-amber-500/10">
+            <FileCheck className="h-4 w-4 text-amber-500" />
+          </div>
           รอส่งบัญชี
         </CardTitle>
       </CardHeader>
       <CardContent>
         {total === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-muted-foreground py-4 text-center">
             ไม่มีเอกสารรอส่ง
           </p>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-600 dark:text-slate-400">
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-muted-foreground">
                 ใบเสร็จรายจ่าย
               </span>
-              <Badge>{pendingExpenses} รายการ</Badge>
+              <Badge variant="secondary" className="font-medium">
+                {pendingExpenses} รายการ
+              </Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-600 dark:text-slate-400">
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-muted-foreground">
                 สำเนาบิลขาย
               </span>
-              <Badge>{pendingIncomes} รายการ</Badge>
+              <Badge variant="secondary" className="font-medium">
+                {pendingIncomes} รายการ
+              </Badge>
             </div>
-            <Button variant="outline" className="w-full mt-4">
+            <Button variant="outline" className="w-full mt-2">
               ทำเครื่องหมายว่าส่งแล้ว
             </Button>
           </div>
@@ -410,38 +409,38 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
     .slice(0, 10);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>รายการล่าสุด</CardTitle>
+    <Card className="border-border/50 shadow-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold">รายการล่าสุด</CardTitle>
       </CardHeader>
       <CardContent>
         {combined.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-muted-foreground py-8 text-center">
             ยังไม่มีรายการ
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {combined.map((item: typeof combined[number]) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 p-3"
+                className="flex items-center justify-between rounded-xl border border-border/50 p-3 hover:bg-muted/30 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div
                     className={`rounded-full p-2 ${
                       item.type === "income"
-                        ? "bg-emerald-100 dark:bg-emerald-900"
-                        : "bg-red-100 dark:bg-red-900"
+                        ? "bg-primary/10"
+                        : "bg-destructive/10"
                     }`}
                   >
                     {item.type === "income" ? (
-                      <ArrowDownCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <ArrowDownCircle className="h-4 w-4 text-primary" />
                     ) : (
-                      <ArrowUpCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <ArrowUpCircle className="h-4 w-4 text-destructive" />
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    <p className="text-sm font-medium text-foreground">
                       {item.type === "expense"
                         ? (item as (typeof recentExpenses)[0]).vendorName ||
                           (item as (typeof recentExpenses)[0]).description ||
@@ -450,7 +449,7 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
                           (item as (typeof recentIncomes)[0]).source ||
                           "ไม่ระบุ"}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       {new Date(item.createdAt).toLocaleDateString("th-TH", {
                         day: "numeric",
                         month: "short",
@@ -462,8 +461,8 @@ async function RecentTransactions({ companyCode }: { companyCode: string }) {
                 <span
                   className={`text-sm font-semibold ${
                     item.type === "income"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-red-600 dark:text-red-400"
+                      ? "text-primary"
+                      : "text-destructive"
                   }`}
                 >
                   {item.type === "income" ? "+" : "-"}
@@ -489,7 +488,7 @@ function StatsSkeleton() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {[1, 2, 3, 4].map((i) => (
-        <Card key={i}>
+        <Card key={i} className="border-border/50">
           <CardHeader className="pb-2">
             <Skeleton className="h-4 w-24" />
           </CardHeader>
@@ -504,13 +503,13 @@ function StatsSkeleton() {
 
 function ActionSkeleton() {
   return (
-    <Card>
+    <Card className="border-border/50">
       <CardHeader>
-        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-5 w-40" />
       </CardHeader>
       <CardContent className="space-y-3">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-16 w-full rounded-xl" />
       </CardContent>
     </Card>
   );
@@ -665,12 +664,12 @@ async function ExpenseCategoryChartData({
 
 function ChartSkeleton() {
   return (
-    <Card>
+    <Card className="border-border/50">
       <CardHeader>
-        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-5 w-40" />
       </CardHeader>
       <CardContent>
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </CardContent>
     </Card>
   );
@@ -678,13 +677,13 @@ function ChartSkeleton() {
 
 function RecentSkeleton() {
   return (
-    <Card>
+    <Card className="border-border/50">
       <CardHeader>
-        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-5 w-32" />
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2">
         {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-16 w-full" />
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
         ))}
       </CardContent>
     </Card>
