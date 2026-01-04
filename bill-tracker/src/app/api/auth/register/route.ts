@@ -66,6 +66,18 @@ export async function POST(request: Request) {
       );
     }
     
+    // Log detailed error for debugging
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Registration detailed error:", errorMessage);
+    
+    // Check for database connection errors
+    if (errorMessage.includes("connect") || errorMessage.includes("ECONNREFUSED") || errorMessage.includes("timeout")) {
+      return NextResponse.json(
+        { error: "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง" },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" },
       { status: 500 }
