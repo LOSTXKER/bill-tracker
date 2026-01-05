@@ -1,14 +1,27 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Lazy initialization of Supabase client
+let supabaseInstance: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error("Missing Supabase environment variables");
+function getSupabaseClient(): SupabaseClient {
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      "Missing Supabase environment variables. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment."
+    );
+  }
+
+  supabaseInstance = createClient(supabaseUrl, supabaseKey);
+  return supabaseInstance;
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export { getSupabaseClient as supabase };
 
 /**
  * Upload a file to Supabase Storage
@@ -17,6 +30,8 @@ export async function uploadToSupabase(
   file: File,
   folder: string = "receipts"
 ): Promise<{ url: string; path: string }> {
+  const supabase = getSupabaseClient();
+  
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 9);
   const extension = file.name.split(".").pop();
@@ -50,10 +65,12 @@ export async function uploadToSupabase(
 /**
  * Delete a file from Supabase Storage
  */
-export async function deleteFromSupabase(path: string): Promise<void> {
+export async function deleteFromSupabase(filePath: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  
   const { error } = await supabase.storage
     .from("bill-tracker")
-    .remove([path]);
+    .remove([filePath]);
 
   if (error) {
     console.error("Supabase delete error:", error);
