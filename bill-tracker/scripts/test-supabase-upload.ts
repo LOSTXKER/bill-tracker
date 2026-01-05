@@ -24,7 +24,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function testConnection() {
   console.log("🔗 Testing Supabase connection...\n");
   console.log(`📍 URL: ${supabaseUrl}`);
-  console.log(`🔑 Key: ${supabaseKey.substring(0, 20)}...\n`);
+  console.log(`🔑 Key: ${supabaseKey!.substring(0, 20)}...\n`);
 
   try {
     // Test 1: List buckets
