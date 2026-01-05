@@ -15,7 +15,9 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "storage:test": "tsx scripts/test-supabase-upload.ts",
+    "storage:migrate": "tsx scripts/migrate-to-supabase.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

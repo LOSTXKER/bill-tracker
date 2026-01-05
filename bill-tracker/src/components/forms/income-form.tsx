@@ -28,6 +28,7 @@ import { CalculationSummary } from "./shared/CalculationSummary";
 import { DocumentUploadSection } from "./shared/DocumentUploadSection";
 import { ContactSelector } from "./shared/ContactSelector";
 import { CategorySelector } from "./shared/CategorySelector";
+import { DatePicker } from "./shared/DatePicker";
 import type { IncomeInput } from "@/lib/validations/income";
 import type { ContactSummary } from "@/types";
 
@@ -72,6 +73,7 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
       isWhtDeducted: false,
       paymentMethod: "BANK_TRANSFER",
       status: "PENDING_COPY_SEND",
+      receiveDate: new Date(),
     },
   });
 
@@ -79,6 +81,7 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
   const watchVatRate = watch("vatRate");
   const watchIsWhtDeducted = watch("isWhtDeducted");
   const watchWhtRate = watch("whtRate");
+  const watchReceiveDate = watch("receiveDate");
 
   useEffect(() => {
     const calc = calculateIncomeTotals(
@@ -135,6 +138,13 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          <DatePicker
+            label="วันที่รับเงิน"
+            value={watchReceiveDate}
+            onChange={(date) => setValue("receiveDate", date || new Date())}
+            required
+          />
+
           <AmountInput register={register} name="amount" />
 
           <ContactSelector

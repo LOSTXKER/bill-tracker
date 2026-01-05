@@ -28,6 +28,7 @@ import { CalculationSummary } from "./shared/CalculationSummary";
 import { DocumentUploadSection } from "./shared/DocumentUploadSection";
 import { ContactSelector } from "./shared/ContactSelector";
 import { CategorySelector } from "./shared/CategorySelector";
+import { DatePicker } from "./shared/DatePicker";
 import type { ExpenseInput } from "@/lib/validations/expense";
 import type { ContactSummary } from "@/types";
 
@@ -72,6 +73,7 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
       isWht: false,
       paymentMethod: "BANK_TRANSFER",
       status: "PENDING_PHYSICAL",
+      billDate: new Date(),
     },
   });
 
@@ -79,6 +81,8 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
   const watchVatRate = watch("vatRate");
   const watchIsWht = watch("isWht");
   const watchWhtRate = watch("whtRate");
+  const watchBillDate = watch("billDate");
+  const watchDueDate = watch("dueDate");
 
   useEffect(() => {
     const calc = calculateExpenseTotals(
@@ -136,6 +140,13 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          <DatePicker
+            label="วันที่จ่ายเงิน"
+            value={watchBillDate}
+            onChange={(date) => setValue("billDate", date || new Date())}
+            required
+          />
+
           <AmountInput register={register} name="amount" />
 
           <ContactSelector
@@ -166,6 +177,12 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
             onSelect={setSelectedCategory}
             label="หมวดหมู่"
             placeholder="เลือกหมวดหมู่"
+          />
+
+          <DatePicker
+            label="วันครบกำหนด (ถ้ามี)"
+            value={watchDueDate}
+            onChange={(date) => setValue("dueDate", date)}
           />
 
           <DocumentUploadSection

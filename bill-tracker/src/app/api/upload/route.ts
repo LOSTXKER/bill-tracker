@@ -1,17 +1,6 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir, unlink } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
 import { auth } from "@/auth";
-
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
-
-// Ensure upload directory exists
-async function ensureUploadDir() {
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true });
-  }
-}
+import { uploadToSupabase } from "@/lib/storage/supabase";
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +13,6 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const folder = (formData.get("folder") as string) || "receipts";
-    const filename = (formData.get("filename") as string) || file.name;
 
     if (!file) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
@@ -47,36 +35,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure upload directory exists
-    await ensureUploadDir();
-
-    // Create folder if doesn't exist
-    const folderPath = join(UPLOAD_DIR, folder);
-    if (!existsSync(folderPath)) {
-      await mkdir(folderPath, { recursive: true });
-    }
-
-    // Convert file to buffer
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Save file
-    const filepath = join(folderPath, filename);
-    await writeFile(filepath, buffer);
-
-    // Return public URL
-    const url = `/uploads/${folder}/${filename}`;
+    // Upload to Supabase Storage
+    const { url, path } = await uploadToSupabase(file, folder);
 
     return NextResponse.json({
       url,
-      filename,
+      path,
+      filename: path.split("/").pop(),
       size: file.size,
       type: file.type,
     });
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json(
-      { error: "การอัพโหลดล้มเหลว" },
+      { error: error instanceof Error ? error.message : "การอัพโหลดล้มเหลว" },
       { status: 500 }
     );
   }
@@ -90,25 +62,31 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { url } = await request.json();
+    const { url, path } = await request.json();
 
-    if (!url) {
-      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
+    if (!url && !path) {
+      return NextResponse.json(
+        { error: "No URL or path provided" },
+        { status: 400 }
+      );
     }
 
-    // Extract file path from URL
-    const filepath = join(process.cwd(), "public", url);
-
-    // Delete file
-    if (existsSync(filepath)) {
-      await unlink(filepath);
+    // Extract path from URL if only URL is provided
+    let filePath = path;
+    if (!filePath && url) {
+      const { extractPathFromUrl } = await import("@/lib/storage/supabase");
+      filePath = extractPathFromUrl(url);
     }
+
+    // Delete from Supabase Storage
+    const { deleteFromSupabase } = await import("@/lib/storage/supabase");
+    await deleteFromSupabase(filePath);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete error:", error);
     return NextResponse.json(
-      { error: "การลบไฟล์ล้มเหลว" },
+      { error: error instanceof Error ? error.message : "การลบไฟล์ล้มเหลว" },
       { status: 500 }
     );
   }
