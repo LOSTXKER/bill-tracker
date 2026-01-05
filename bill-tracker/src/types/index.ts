@@ -102,24 +102,22 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-// Filter types
-export interface ExpenseFilters {
+// Filter types - Base transaction filters
+export interface BaseTransactionFilters {
   companyId?: string;
-  status?: ExpenseDocStatus;
-  category?: ExpenseCategory;
   startDate?: Date;
   endDate?: Date;
   contactId?: string;
   search?: string;
 }
 
-export interface IncomeFilters {
-  companyId?: string;
+export interface ExpenseFilters extends BaseTransactionFilters {
+  status?: ExpenseDocStatus;
+  category?: ExpenseCategory;
+}
+
+export interface IncomeFilters extends BaseTransactionFilters {
   status?: IncomeDocStatus;
-  startDate?: Date;
-  endDate?: Date;
-  contactId?: string;
-  search?: string;
 }
 
 // Report types
@@ -171,39 +169,32 @@ export interface CategorySummary {
   isActive: boolean;
 }
 
-// Form data types
-export interface ExpenseFormData {
+// Form data types - Base transaction form data
+export interface BaseTransactionFormData {
   companyId: string;
   contactId?: string;
   amount: number;
   vatRate: number;
-  isWht: boolean;
   whtRate?: number;
   whtType?: WhtType;
-  description?: string;
-  category?: ExpenseCategory;
   invoiceNumber?: string;
   referenceNo?: string;
   paymentMethod: PaymentMethod;
-  billDate: Date;
-  dueDate?: Date;
-  status: ExpenseDocStatus;
   notes?: string;
 }
 
-export interface IncomeFormData {
-  companyId: string;
-  contactId?: string;
-  amount: number;
-  vatRate: number;
+export interface ExpenseFormData extends BaseTransactionFormData {
+  isWht: boolean;
+  description?: string;
+  category?: ExpenseCategory;
+  billDate: Date;
+  dueDate?: Date;
+  status: ExpenseDocStatus;
+}
+
+export interface IncomeFormData extends BaseTransactionFormData {
   isWhtDeducted: boolean;
-  whtRate?: number;
-  whtType?: WhtType;
   source?: string;
-  invoiceNumber?: string;
-  referenceNo?: string;
-  paymentMethod: PaymentMethod;
   receiveDate: Date;
   status: IncomeDocStatus;
-  notes?: string;
 }

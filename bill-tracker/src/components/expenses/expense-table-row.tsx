@@ -1,14 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { toNumber } from "@/lib/utils/serializers";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/validations/expense";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { useLineNotification } from "@/hooks/use-line-notification";
+import { useTransactionRow } from "@/hooks/use-transaction-row";
 import { Send, Loader2 } from "lucide-react";
 
 interface ExpenseTableRowProps {
@@ -25,17 +24,11 @@ interface ExpenseTableRowProps {
 }
 
 export function ExpenseTableRow({ expense, companyCode }: ExpenseTableRowProps) {
-  const router = useRouter();
-  const { sending, sendNotification } = useLineNotification("expense");
-
-  const handleClick = () => {
-    router.push(`/${companyCode.toLowerCase()}/expenses/${expense.id}`);
-  };
-
-  const handleSendNotification = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click
-    await sendNotification(expense.id);
-  };
+  const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
+    companyCode,
+    transactionType: "expense",
+    transactionId: expense.id,
+  });
 
   // Convert Decimal to number safely
   const netPaid = toNumber(expense.netPaid);
@@ -43,7 +36,7 @@ export function ExpenseTableRow({ expense, companyCode }: ExpenseTableRowProps) 
   return (
     <TableRow
       className="cursor-pointer hover:bg-muted/30 transition-colors"
-      onClick={handleClick}
+      onClick={handleRowClick}
     >
       <TableCell className="whitespace-nowrap text-foreground">
         {formatThaiDate(expense.billDate)}

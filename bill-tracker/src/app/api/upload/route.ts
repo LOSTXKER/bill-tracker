@@ -18,19 +18,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    // Validate file type
-    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    // Validate file type - allow images and PDF
+    const validTypes = [
+      "image/jpeg",
+      "image/jpg", 
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "application/pdf",
+    ];
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: "ไฟล์ต้องเป็นรูปภาพเท่านั้น" },
+        { error: "ไฟล์ต้องเป็นรูปภาพหรือ PDF เท่านั้น" },
         { status: 400 }
       );
     }
 
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validate file size (10MB for PDF, 5MB for images)
+    const maxSize = file.type === "application/pdf" ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxSize) {
       return NextResponse.json(
-        { error: "ไฟล์ต้องมีขนาดไม่เกิน 5MB" },
+        { error: `ไฟล์ต้องมีขนาดไม่เกิน ${file.type === "application/pdf" ? "10MB" : "5MB"}` },
         { status: 400 }
       );
     }

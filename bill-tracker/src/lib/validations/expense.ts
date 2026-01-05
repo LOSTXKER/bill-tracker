@@ -1,32 +1,20 @@
 import { z } from "zod";
+import {
+  baseTransactionSchema,
+  whtFieldsSchema,
+  paymentMethodSchema,
+} from "./shared";
 
 // Base schema without refinements (for partial/extend operations)
-const expenseBaseSchema = z.object({
-  companyId: z.string().min(1, "กรุณาเลือกบริษัท"),
-  
-  // Contact (ผู้ติดต่อ - ผู้ขาย/ร้านค้า)
-  contactId: z.string().optional().nullable(),
-  
-  // Financial
-  amount: z
-    .number()
-    .positive("จำนวนเงินต้องมากกว่า 0")
-    .max(999999999.99, "จำนวนเงินมากเกินไป"),
+const expenseBaseSchema = baseTransactionSchema.extend({
+  // Expense-specific: Override vatRate default
   vatRate: z.number().min(0).max(100).default(7),
   
-  // WHT
+  // WHT (we withhold tax from vendor)
   isWht: z.boolean().default(false),
-  whtRate: z.number().min(0).max(100).optional(),
-  whtType: z.enum([
-    "SERVICE_3",
-    "PROFESSIONAL_5",
-    "TRANSPORT_1",
-    "RENT_5",
-    "ADVERTISING_2",
-    "OTHER",
-  ]).optional(),
+  ...whtFieldsSchema.shape,
   
-  // Details
+  // Expense-specific details
   description: z.string().max(500).optional(),
   category: z.enum([
     "MATERIAL",
@@ -39,16 +27,6 @@ const expenseBaseSchema = z.object({
     "OFFICE",
     "OTHER",
   ]).optional(), // DEPRECATED: kept for backward compatibility
-  categoryId: z.string().optional().nullable(),
-  invoiceNumber: z.string().max(50).optional(),
-  referenceNo: z.string().max(50).optional(),
-  paymentMethod: z.enum([
-    "CASH",
-    "BANK_TRANSFER",
-    "CREDIT_CARD",
-    "PROMPTPAY",
-    "CHEQUE",
-  ]).default("BANK_TRANSFER"),
   
   // Dates
   billDate: z.coerce.date(),
@@ -61,8 +39,6 @@ const expenseBaseSchema = z.object({
     "READY_TO_SEND",
     "SENT_TO_ACCOUNT",
   ]).default("PENDING_PHYSICAL"),
-  
-  notes: z.string().max(1000).optional(),
 });
 
 // Full schema with refinements
@@ -88,7 +64,11 @@ export const expenseUpdateSchema = expenseBaseSchema.partial().extend({
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type ExpenseUpdateInput = z.infer<typeof expenseUpdateSchema>;
 
-// Category labels in Thai
+/**
+ * DEPRECATED: Category labels for old enum-based categories
+ * Use Category model with categoryId instead
+ * Kept for backward compatibility only
+ */
 export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   MATERIAL: "วัตถุดิบ",
   UTILITY: "สาธารณูปโภค",

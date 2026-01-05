@@ -6,609 +6,848 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-    ArrowLeft,
-    Edit,
-    Save,
-    X,
-    Receipt,
-    FileText,
-    CreditCard,
-    Calendar,
-    User,
-    ExternalLink,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  ArrowLeft,
+  Edit,
+  Save,
+  X,
+  Receipt,
+  FileText,
+  CreditCard,
+  Calendar,
+  ChevronRight,
+  ChevronLeft,
+  Trash2,
+  Loader2,
+  User,
+  AlertCircle,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
-import { INCOME_STATUS_LABELS } from "@/lib/validations/income";
+import { formatCurrency, calculateIncomeTotals } from "@/lib/utils/tax-calculator";
 import { use } from "react";
+import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/forms/shared/DatePicker";
+import {
+  StatusProgressBar,
+  DocumentSection,
+  TransactionDetailSkeleton,
+} from "@/components/transactions";
+import {
+  INCOME_STATUS_FLOW,
+  INCOME_STATUS_INFO,
+  PAYMENT_METHOD_OPTIONS,
+  WHT_OPTIONS,
+} from "@/lib/constants/transaction";
 
 interface IncomeDetailPageProps {
-    params: Promise<{ company: string; id: string }>;
+  params: Promise<{ company: string; id: string }>;
 }
 
 interface Income {
-    id: string;
-    contact: { id: string; name: string; taxId: string | null } | null;
-    amount: number;
-    vatRate: number;
-    vatAmount: number | null;
-    isWhtDeducted: boolean;
-    whtRate: number | null;
-    whtAmount: number | null;
-    whtType: string | null;
-    netReceived: number;
-    source: string | null;
-    invoiceNumber: string | null;
-    referenceNo: string | null;
-    paymentMethod: string;
-    receiveDate: string;
-    status: string;
-    notes: string | null;
-    customerSlipUrl: string | null;
-    myBillCopyUrl: string | null;
-    whtCertUrl: string | null;
-    company: { code: string; name: string };
-    creator?: { name: string; email: string } | null;
-    createdAt: string;
-    updatedAt: string;
+  id: string;
+  contact: { id: string; name: string; taxId: string | null } | null;
+  amount: number;
+  vatRate: number;
+  vatAmount: number | null;
+  isWhtDeducted: boolean;
+  whtRate: number | null;
+  whtAmount: number | null;
+  whtType: string | null;
+  netReceived: number;
+  source: string | null;
+  invoiceNumber: string | null;
+  referenceNo: string | null;
+  paymentMethod: string;
+  receiveDate: string;
+  status: string;
+  notes: string | null;
+  customerSlipUrl: string | null;
+  myBillCopyUrl: string | null;
+  whtCertUrl: string | null;
+  customerSlipUrls?: string[];
+  myBillCopyUrls?: string[];
+  whtCertUrls?: string[];
+  company: { code: string; name: string };
+  creator?: { name: string; email: string } | null;
+  createdAt: string;
+  updatedAt: string;
 }
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-    CASH: "เงินสด",
-    BANK_TRANSFER: "โอนเงิน",
-    CREDIT_CARD: "บัตรเครดิต",
-    PROMPTPAY: "พร้อมเพย์",
-    CHEQUE: "เช็ค",
-};
 
 export default function IncomeDetailPage({ params }: IncomeDetailPageProps) {
-    const { company: companyCode, id } = use(params);
-    const router = useRouter();
-    const [income, setIncome] = useState<Income | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editData, setEditData] = useState<Partial<Income>>({});
+  const { company: companyCode, id } = use(params);
+  const router = useRouter();
+  const [income, setIncome] = useState<Income | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<Partial<Income>>({});
+  const [uploadingType, setUploadingType] = useState<string | null>(null);
+  const [calculation, setCalculation] = useState({ vatAmount: 0, whtAmount: 0, netAmount: 0 });
 
-    useEffect(() => {
-        fetchIncome();
-    }, [id]);
+  useEffect(() => {
+    fetchIncome();
+  }, [id]);
 
-    const fetchIncome = async () => {
-        try {
-            setLoading(true);
-            const res = await fetch(`/api/incomes/${id}`);
-            if (!res.ok) {
-                throw new Error("Failed to fetch income");
-            }
-            const result = await res.json();
-            // Handle both old format (data.income) and new format (data.data.income)
-            const income = result.data?.income || result.income;
-            setIncome(income);
-            setEditData(income);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSave = async () => {
-        if (!income) return;
-
-        try {
-            setSaving(true);
-            const res = await fetch(`/api/incomes/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...editData,
-                    vatAmount: editData.vatAmount,
-                    whtAmount: editData.whtAmount,
-                    netReceived: editData.netReceived,
-                }),
-            });
-
-            if (!res.ok) {
-                throw new Error("Failed to update income");
-            }
-
-            const result = await res.json();
-            const updatedIncome = result.data?.income || result.income;
-            setIncome(updatedIncome);
-            setEditData(updatedIncome);
-            setIsEditing(false);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleStatusChange = async (newStatus: string) => {
-        if (!income) return;
-
-        try {
-            setSaving(true);
-            const res = await fetch(`/api/incomes/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...income,
-                    status: newStatus,
-                    vatAmount: income.vatAmount,
-                    whtAmount: income.whtAmount,
-                    netReceived: income.netReceived,
-                }),
-            });
-
-            if (!res.ok) {
-                throw new Error("Failed to update status");
-            }
-
-            const result = await res.json();
-            const updatedIncome = result.data?.income || result.income;
-            setIncome(updatedIncome);
-            setEditData(updatedIncome);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const getStatusBadge = (status: string) => {
-        const statusInfo = INCOME_STATUS_LABELS[status] || {
-            label: status,
-            color: "gray",
-        };
-    const colorMap: Record<string, string> = {
-      gray: "bg-muted text-muted-foreground border-border",
-      orange:
-        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800",
-      red: "bg-destructive/10 text-destructive border-destructive/20",
-      green: "bg-primary/10 text-primary border-primary/20",
-    };
-        return (
-            <Badge variant="outline" className={colorMap[statusInfo.color] || ""}>
-                {statusInfo.label}
-            </Badge>
-        );
-    };
-
-    if (loading) {
-        return <LoadingSkeleton companyCode={companyCode} />;
+  // Recalculate when editing
+  useEffect(() => {
+    if (isEditing && editData.amount !== undefined) {
+      const calc = calculateIncomeTotals(
+        Number(editData.amount) || 0,
+        Number(editData.vatRate) || 0,
+        editData.isWhtDeducted ? (Number(editData.whtRate) || 0) : 0
+      );
+      setCalculation({
+        vatAmount: calc.vatAmount,
+        whtAmount: calc.whtAmount,
+        netAmount: calc.netAmount,
+      });
     }
+  }, [isEditing, editData.amount, editData.vatRate, editData.isWhtDeducted, editData.whtRate]);
 
-    if (error || !income) {
-        return (
-            <div className="space-y-4">
-                <Link href={`/${companyCode}/incomes`}>
-                    <Button variant="ghost" size="sm">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        กลับ
-                    </Button>
-                </Link>
-                <div className="text-center py-12">
-                    <p className="text-destructive">{error || "ไม่พบรายการ"}</p>
-                </div>
-            </div>
-        );
+  const fetchIncome = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/incomes/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch income");
+      const result = await res.json();
+      const income = result.data?.income || result.income;
+      setIncome(income);
+      setEditData(income);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
     }
+  };
 
+  const handleSave = async () => {
+    if (!income) return;
+
+    try {
+      setSaving(true);
+
+      // Recalculate final values
+      const calc = calculateIncomeTotals(
+        Number(editData.amount) || 0,
+        Number(editData.vatRate) || 0,
+        editData.isWhtDeducted ? (Number(editData.whtRate) || 0) : 0
+      );
+
+      const res = await fetch(`/api/incomes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editData,
+          amount: Number(editData.amount),
+          vatRate: Number(editData.vatRate),
+          vatAmount: calc.vatAmount,
+          whtRate: editData.isWhtDeducted ? Number(editData.whtRate) : null,
+          whtAmount: editData.isWhtDeducted ? calc.whtAmount : null,
+          netReceived: calc.netAmount,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update income");
+
+      const result = await res.json();
+      const updatedIncome = result.data?.income || result.income;
+      setIncome(updatedIncome);
+      setEditData(updatedIncome);
+      setIsEditing(false);
+      toast.success("บันทึกการแก้ไขสำเร็จ");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!income) return;
+
+    try {
+      setSaving(true);
+      const res = await fetch(`/api/incomes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...income,
+          status: newStatus,
+          vatAmount: income.vatAmount,
+          whtAmount: income.whtAmount,
+          netReceived: income.netReceived,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update status");
+
+      const result = await res.json();
+      const updatedIncome = result.data?.income || result.income;
+      setIncome(updatedIncome);
+      setEditData(updatedIncome);
+      toast.success(`เปลี่ยนสถานะเป็น "${INCOME_STATUS_INFO[newStatus].label}" สำเร็จ`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNextStatus = () => {
+    if (!income) return;
+    const currentIndex = INCOME_STATUS_FLOW.indexOf(income.status as typeof INCOME_STATUS_FLOW[number]);
+    if (currentIndex === -1 || currentIndex >= INCOME_STATUS_FLOW.length - 1) return;
+    handleStatusChange(INCOME_STATUS_FLOW[currentIndex + 1]);
+  };
+
+  const handlePreviousStatus = () => {
+    if (!income) return;
+    const currentIndex = INCOME_STATUS_FLOW.indexOf(income.status as typeof INCOME_STATUS_FLOW[number]);
+    if (currentIndex <= 0) return;
+    handleStatusChange(INCOME_STATUS_FLOW[currentIndex - 1]);
+  };
+
+  const handleDelete = async () => {
+    if (!income) return;
+
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/incomes/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const result = await res.json();
+        throw new Error(result.error || "ลบรายการล้มเหลว");
+      }
+
+      toast.success("ลบรายการสำเร็จ");
+      router.push(`/${companyCode}/incomes`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, type: "slip" | "bill" | "wht") => {
+    if (!income) return;
+
+    setUploadingType(type);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", `incomes/${income.id}`);
+
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!uploadRes.ok) throw new Error("อัปโหลดไฟล์ล้มเหลว");
+
+      const { url } = await uploadRes.json();
+
+      const updateData: Record<string, string[]> = {};
+      if (type === "slip") updateData.customerSlipUrls = [...(income.customerSlipUrls || []), url];
+      if (type === "bill") updateData.myBillCopyUrls = [...(income.myBillCopyUrls || []), url];
+      if (type === "wht") updateData.whtCertUrls = [...(income.whtCertUrls || []), url];
+
+      const res = await fetch(`/api/incomes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...income,
+          ...updateData,
+          vatAmount: income.vatAmount,
+          whtAmount: income.whtAmount,
+          netReceived: income.netReceived,
+        }),
+      });
+
+      if (!res.ok) throw new Error("บันทึกข้อมูลล้มเหลว");
+
+      const result = await res.json();
+      const updatedIncome = result.data?.income || result.income;
+      setIncome(updatedIncome);
+      setEditData(updatedIncome);
+      toast.success("อัปโหลดไฟล์สำเร็จ");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setUploadingType(null);
+    }
+  };
+
+  const handleDeleteFile = async (type: "slip" | "bill" | "wht", urlToDelete: string) => {
+    if (!income) return;
+
+    try {
+      setSaving(true);
+      const updateData: Record<string, string[]> = {};
+
+      if (type === "slip") updateData.customerSlipUrls = (income.customerSlipUrls || []).filter(url => url !== urlToDelete);
+      if (type === "bill") updateData.myBillCopyUrls = (income.myBillCopyUrls || []).filter(url => url !== urlToDelete);
+      if (type === "wht") updateData.whtCertUrls = (income.whtCertUrls || []).filter(url => url !== urlToDelete);
+
+      const res = await fetch(`/api/incomes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...income,
+          ...updateData,
+          vatAmount: income.vatAmount,
+          whtAmount: income.whtAmount,
+          netReceived: income.netReceived,
+        }),
+      });
+
+      if (!res.ok) throw new Error("ลบไฟล์ล้มเหลว");
+
+      const result = await res.json();
+      const updatedIncome = result.data?.income || result.income;
+      setIncome(updatedIncome);
+      setEditData(updatedIncome);
+      toast.success("ลบไฟล์สำเร็จ");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getCurrentStatusIndex = () => income ? INCOME_STATUS_FLOW.indexOf(income.status as typeof INCOME_STATUS_FLOW[number]) : -1;
+
+  const getNextStatusInfo = () => {
+    const idx = getCurrentStatusIndex();
+    if (idx === -1 || idx >= INCOME_STATUS_FLOW.length - 1) return null;
+    return INCOME_STATUS_INFO[INCOME_STATUS_FLOW[idx + 1]];
+  };
+
+  const getPreviousStatusInfo = () => {
+    const idx = getCurrentStatusIndex();
+    if (idx <= 0) return null;
+    return INCOME_STATUS_INFO[INCOME_STATUS_FLOW[idx - 1]];
+  };
+
+  if (loading) return <TransactionDetailSkeleton />;
+
+  if (error || !income) {
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                    <Link href={`/${companyCode}/incomes`}>
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-xl font-semibold text-foreground">
-                            {income.contact?.name || income.source || "รายรับ"}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {income.source || "ไม่มีรายละเอียด"}
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    {getStatusBadge(income.status)}
-                    {isEditing ? (
-                        <>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setIsEditing(false);
-                                    setEditData(income);
-                                }}
-                                disabled={saving}
-                            >
-                                <X className="mr-2 h-4 w-4" />
-                                ยกเลิก
-                            </Button>
-                            <Button size="sm" onClick={handleSave} disabled={saving}>
-                                <Save className="mr-2 h-4 w-4" />
-                                {saving ? "กำลังบันทึก..." : "บันทึก"}
-                            </Button>
-                        </>
-                    ) : (
-                        <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            แก้ไข
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-3">
-                {/* Main Content */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Financial Info */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <CreditCard className="h-4 w-4" />
-                                ข้อมูลการเงิน
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">
-                                        ยอดเงิน (ก่อน VAT)
-                                    </Label>
-                                    <p className="text-lg font-semibold text-foreground">
-                                        {formatCurrency(Number(income.amount))}
-                                    </p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">VAT</Label>
-                                    <p className="text-foreground">
-                                        {income.vatRate}%
-                                        {income.vatAmount &&
-                                            ` (${formatCurrency(Number(income.vatAmount))})`}
-                                    </p>
-                                </div>
-                                {income.isWhtDeducted && (
-                                    <>
-                                        <div>
-                                            <Label className="text-muted-foreground text-xs">
-                                                ถูกหัก ณ ที่จ่าย
-                                            </Label>
-                                            <p className="text-foreground">
-                                                {income.whtRate}%
-                                                {income.whtAmount &&
-                                                    ` (${formatCurrency(Number(income.whtAmount))})`}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <Label className="text-muted-foreground text-xs">
-                                                ประเภท WHT
-                                            </Label>
-                                            <p className="text-foreground">{income.whtType || "-"}</p>
-                                        </div>
-                                    </>
-                                )}
-                                <div className="sm:col-span-2">
-                                    <Label className="text-muted-foreground text-xs">
-                                        ยอดรับจริง
-                                    </Label>
-                                    <p className="text-2xl font-bold text-primary">
-                                        {formatCurrency(Number(income.netReceived))}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Document Info */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <FileText className="h-4 w-4" />
-                                ข้อมูลเอกสาร
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">แหล่งที่มา</Label>
-                                    {isEditing ? (
-                                        <Input
-                                            value={editData.source || ""}
-                                            onChange={(e) =>
-                                                setEditData({ ...editData, source: e.target.value })
-                                            }
-                                        />
-                                    ) : (
-                                        <p className="text-foreground">{income.source || "-"}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">
-                                        เลขที่ใบกำกับภาษี
-                                    </Label>
-                                    {isEditing ? (
-                                        <Input
-                                            value={editData.invoiceNumber || ""}
-                                            onChange={(e) =>
-                                                setEditData({ ...editData, invoiceNumber: e.target.value })
-                                            }
-                                        />
-                                    ) : (
-                                        <p className="text-foreground">{income.invoiceNumber || "-"}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">
-                                        วิธีการชำระเงิน
-                                    </Label>
-                                    <p className="text-foreground">
-                                        {PAYMENT_METHOD_LABELS[income.paymentMethod] ||
-                                            income.paymentMethod}
-                                    </p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">เลขอ้างอิง</Label>
-                                    {isEditing ? (
-                                        <Input
-                                            value={editData.referenceNo || ""}
-                                            onChange={(e) =>
-                                                setEditData({ ...editData, referenceNo: e.target.value })
-                                            }
-                                        />
-                                    ) : (
-                                        <p className="text-foreground">{income.referenceNo || "-"}</p>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Dates */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                วันที่
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">
-                                    วันที่รับเงิน
-                                </Label>
-                                <p className="text-foreground">
-                                    {new Date(income.receiveDate).toLocaleDateString("th-TH", {
-                                        day: "numeric",
-                                        month: "long",
-                                        year: "numeric",
-                                    })}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Notes */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">หมายเหตุ</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {isEditing ? (
-                                <Textarea
-                                    value={editData.notes || ""}
-                                    onChange={(e) =>
-                                        setEditData({ ...editData, notes: e.target.value })
-                                    }
-                                    placeholder="เพิ่มหมายเหตุ..."
-                                    rows={3}
-                                />
-                            ) : (
-                                <p className="text-foreground whitespace-pre-wrap">
-                                    {income.notes || "ไม่มีหมายเหตุ"}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Sidebar */}
-                <div className="space-y-6">
-                    {/* Status Actions */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">เปลี่ยนสถานะ</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {Object.entries(INCOME_STATUS_LABELS).map(([key, { label }]) => (
-                                <Button
-                                    key={key}
-                                    variant={income.status === key ? "default" : "outline"}
-                                    size="sm"
-                                    className="w-full justify-start"
-                                    onClick={() => handleStatusChange(key)}
-                                    disabled={saving || income.status === key}
-                                >
-                                    {label}
-                                </Button>
-                            ))}
-                        </CardContent>
-                    </Card>
-
-                    {/* Evidence Files */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Receipt className="h-4 w-4" />
-                                หลักฐาน
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <EvidenceItem
-                                label="สลิปลูกค้า"
-                                url={income.customerSlipUrl}
-                                placeholder="ยังไม่ได้อัพโหลด"
-                            />
-                            <EvidenceItem
-                                label="สำเนาบิลขาย"
-                                url={income.myBillCopyUrl}
-                                placeholder="ยังไม่ได้อัพโหลด"
-                            />
-                            {income.isWhtDeducted && (
-                                <EvidenceItem
-                                    label="ใบ 50 ทวิ (จากลูกค้า)"
-                                    url={income.whtCertUrl}
-                                    placeholder="ยังไม่ได้อัพโหลด"
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Contact Info */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                ผู้ติดต่อ
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="font-medium text-foreground">
-                                {income.contact?.name || "ไม่ระบุ"}
-                            </p>
-                            {income.contact?.taxId && (
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    เลขผู้เสียภาษี: {income.contact.taxId}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Meta Info */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">ข้อมูลระบบ</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">สร้างโดย</span>
-                                <span className="text-foreground">{income.creator?.name || "-"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">สร้างเมื่อ</span>
-                                <span className="text-foreground">
-                                    {new Date(income.createdAt).toLocaleDateString("th-TH")}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">แก้ไขล่าสุด</span>
-                                <span className="text-foreground">
-                                    {new Date(income.updatedAt).toLocaleDateString("th-TH")}
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
         </div>
+        <p className="text-destructive font-medium">{error || "ไม่พบรายการ"}</p>
+        <Link href={`/${companyCode}/incomes`}>
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            กลับหน้ารายรับ
+          </Button>
+        </Link>
+      </div>
     );
-}
+  }
 
-function EvidenceItem({
-    label,
-    url,
-    placeholder,
-}: {
-    label: string;
-    url: string | null;
-    placeholder: string;
-}) {
-    return (
-        <div>
-            <Label className="text-muted-foreground text-xs">{label}</Label>
-            {url ? (
-                <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-primary hover:underline mt-1"
+  const currentStatusIndex = getCurrentStatusIndex();
+  const nextStatusInfo = getNextStatusInfo();
+  const previousStatusInfo = getPreviousStatusInfo();
+  const isCompleted = income.status === "SENT_COPY";
+  const statusInfo = INCOME_STATUS_INFO[income.status] || INCOME_STATUS_INFO.PENDING_COPY_SEND;
+
+  return (
+    <div className="max-w-6xl mx-auto pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b -mx-4 px-4 py-3 mb-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link href={`/${companyCode}/incomes`}>
+              <Button variant="ghost" size="icon" className="shrink-0 -ml-2 rounded-full hover:bg-emerald-100 hover:text-emerald-600 dark:hover:bg-emerald-950">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-foreground flex items-center gap-2 truncate">
+                รายรับ
+                <Badge className={cn("text-xs shrink-0", statusInfo.bgColor, statusInfo.color)}>
+                  {statusInfo.label}
+                </Badge>
+              </h1>
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                {new Date(income.receiveDate).toLocaleDateString("th-TH", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {isEditing ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setIsEditing(false); setEditData(income); }}
+                  disabled={saving}
                 >
-                    <ExternalLink className="h-3 w-3" />
-                    ดูหลักฐาน
-                </a>
+                  <X className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">ยกเลิก</span>
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={saving} className="bg-primary">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1" /> : <Save className="h-4 w-4 sm:mr-1" />}
+                  <span className="hidden sm:inline">บันทึก</span>
+                </Button>
+              </div>
             ) : (
-                <p className="text-sm text-muted-foreground mt-1">{placeholder}</p>
+              <>
+                {/* Previous Status Button */}
+                {previousStatusInfo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousStatus}
+                    disabled={saving}
+                  >
+                    <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">ย้อนสถานะ</span>
+                  </Button>
+                )}
+
+                {/* Next Status Button */}
+                {nextStatusInfo && (
+                  <Button
+                    size="sm"
+                    onClick={handleNextStatus}
+                    disabled={saving}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin sm:mr-1" />
+                    ) : null}
+                    <span className="hidden sm:inline">{nextStatusInfo.label}</span>
+                    <span className="sm:hidden">ถัดไป</span>
+                    <ChevronRight className="h-4 w-4 sm:ml-1" />
+                  </Button>
+                )}
+
+                {/* Edit Button */}
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Edit className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">แก้ไข</span>
+                </Button>
+
+                {/* Delete Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">ลบ</span>
+                </Button>
+              </>
             )}
+          </div>
         </div>
-    );
-}
+      </div>
 
-function LoadingSkeleton({ companyCode }: { companyCode: string }) {
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <Link href={`/${companyCode}/incomes`}>
-                    <Button variant="ghost" size="icon">
-                        <ArrowLeft className="h-5 w-5" />
-                    </Button>
-                </Link>
-                <div>
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-4 w-32 mt-1" />
-                </div>
-            </div>
+      {/* Status Progress */}
+      <StatusProgressBar
+        statusFlow={INCOME_STATUS_FLOW}
+        statusInfo={INCOME_STATUS_INFO}
+        currentStatus={income.status}
+        className="mb-6"
+      />
 
-            <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
-                    {[1, 2, 3].map((i) => (
-                        <Card key={i}>
-                            <CardHeader>
-                                <Skeleton className="h-5 w-32" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    {[1, 2, 3, 4].map((j) => (
-                                        <div key={j}>
-                                            <Skeleton className="h-3 w-20 mb-2" />
-                                            <Skeleton className="h-5 w-32" />
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Left: Details */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Details Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                รายละเอียดเอกสาร
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Source */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">แหล่งที่มา / รายละเอียด</Label>
+                {isEditing ? (
+                  <Input
+                    value={editData.source || ""}
+                    onChange={(e) => setEditData({ ...editData, source: e.target.value })}
+                    placeholder="แหล่งที่มาของรายรับ"
+                    className="h-11 bg-muted/30"
+                  />
+                ) : (
+                  <p className="text-sm font-medium">{income.source || <span className="text-muted-foreground">-</span>}</p>
+                )}
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-6">
+                {/* Contact */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">ลูกค้า / ผู้ติดต่อ</Label>
+                  <p className="text-sm font-medium">{income.contact?.name || <span className="text-muted-foreground">-</span>}</p>
                 </div>
-                <div className="space-y-6">
-                    {[1, 2, 3].map((i) => (
-                        <Card key={i}>
-                            <CardHeader>
-                                <Skeleton className="h-5 w-24" />
-                            </CardHeader>
-                            <CardContent>
-                                <Skeleton className="h-20 w-full" />
-                            </CardContent>
-                        </Card>
-                    ))}
+
+                {/* Date - using DatePicker */}
+                {isEditing ? (
+                  <DatePicker
+                    label="วันที่รับเงิน"
+                    value={editData.receiveDate ? new Date(editData.receiveDate) : undefined}
+                    onChange={(date) => setEditData({ ...editData, receiveDate: date?.toISOString() })}
+                    required
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">วันที่รับเงิน</Label>
+                    <p className="text-sm font-medium">
+                      {new Date(income.receiveDate).toLocaleDateString("th-TH", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {/* Invoice Number */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">เลขที่ใบกำกับภาษี</Label>
+                  {isEditing ? (
+                    <Input
+                      value={editData.invoiceNumber || ""}
+                      onChange={(e) => setEditData({ ...editData, invoiceNumber: e.target.value })}
+                      placeholder="เลขที่ใบกำกับภาษี"
+                      className="h-11 bg-muted/30"
+                    />
+                  ) : (
+                    <p className="text-sm font-medium">{income.invoiceNumber || <span className="text-muted-foreground">-</span>}</p>
+                  )}
                 </div>
-            </div>
+
+                {/* Reference No */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">เลขอ้างอิง</Label>
+                  {isEditing ? (
+                    <Input
+                      value={editData.referenceNo || ""}
+                      onChange={(e) => setEditData({ ...editData, referenceNo: e.target.value })}
+                      placeholder="เลขอ้างอิง"
+                      className="h-11 bg-muted/30"
+                    />
+                  ) : (
+                    <p className="text-sm font-medium">{income.referenceNo || <span className="text-muted-foreground">-</span>}</p>
+                  )}
+                </div>
+
+                {/* Payment Method */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">วิธีรับเงิน</Label>
+                  {isEditing ? (
+                    <Select
+                      value={editData.paymentMethod || "BANK_TRANSFER"}
+                      onValueChange={(v) => setEditData({ ...editData, paymentMethod: v })}
+                    >
+                      <SelectTrigger className="h-11 bg-muted/30">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_METHOD_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {PAYMENT_METHOD_OPTIONS.find(o => o.value === income.paymentMethod)?.label}
+                    </p>
+                  )}
+                </div>
+
+                {/* Status - Display only */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">สถานะ</Label>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("w-2 h-2 rounded-full", statusInfo.dotColor)} />
+                    <span className="text-sm font-medium">{statusInfo.label}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">หมายเหตุ</Label>
+                {isEditing ? (
+                  <Textarea
+                    value={editData.notes || ""}
+                    onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                    placeholder="เพิ่มหมายเหตุ..."
+                    rows={3}
+                    className="bg-muted/30 resize-none"
+                  />
+                ) : (
+                  <p className="text-sm p-3 rounded-lg bg-muted/30 min-h-[60px] whitespace-pre-wrap">
+                    {income.notes || <span className="text-muted-foreground italic">ไม่มีหมายเหตุ</span>}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Amount Summary Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                รายละเอียดยอดเงิน
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Amount before tax */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-muted-foreground">จำนวนเงินก่อนภาษี</Label>
+                {isEditing ? (
+                  <Input
+                    type="number"
+                    value={editData.amount || ""}
+                    onChange={(e) => setEditData({ ...editData, amount: Number(e.target.value) })}
+                    className="w-40 h-10 text-right bg-muted/30"
+                    placeholder="0.00"
+                  />
+                ) : (
+                  <span className="font-mono font-medium">{formatCurrency(Number(income.amount))}</span>
+                )}
+              </div>
+
+              {/* VAT */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground">VAT</Label>
+                  {isEditing && (
+                    <Select
+                      value={String(editData.vatRate || 0)}
+                      onValueChange={(v) => setEditData({ ...editData, vatRate: Number(v) })}
+                    >
+                      <SelectTrigger className="w-20 h-8 bg-muted/30">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">0%</SelectItem>
+                        <SelectItem value="7">7%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {!isEditing && <span className="text-sm text-muted-foreground">({income.vatRate}%)</span>}
+                </div>
+                <span className="font-mono">
+                  {formatCurrency(isEditing ? calculation.vatAmount : Number(income.vatAmount || 0))}
+                </span>
+              </div>
+
+              <div className="h-px bg-border" />
+
+              {/* Total */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-muted-foreground">รวมเป็นเงิน</Label>
+                <span className="font-mono font-medium">
+                  {formatCurrency(
+                    isEditing
+                      ? (Number(editData.amount) || 0) + calculation.vatAmount
+                      : Number(income.amount) + Number(income.vatAmount || 0)
+                  )}
+                </span>
+              </div>
+
+              {/* WHT Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground">ถูกหัก ณ ที่จ่าย</Label>
+                  {isEditing && (
+                    <Switch
+                      checked={editData.isWhtDeducted || false}
+                      onCheckedChange={(checked) => setEditData({
+                        ...editData,
+                        isWhtDeducted: checked,
+                        whtRate: checked ? 3 : null,
+                        whtType: checked ? "SERVICE_3" : null,
+                      })}
+                    />
+                  )}
+                </div>
+                {(isEditing ? editData.isWhtDeducted : income.isWhtDeducted) && (
+                  <span className="font-mono text-destructive">
+                    -{formatCurrency(isEditing ? calculation.whtAmount : Number(income.whtAmount || 0))}
+                  </span>
+                )}
+              </div>
+
+              {/* WHT Type Selector */}
+              {isEditing && editData.isWhtDeducted && (
+                <Select
+                  value={editData.whtType || "SERVICE_3"}
+                  onValueChange={(v) => {
+                    const opt = WHT_OPTIONS.find(o => o.value === v);
+                    setEditData({
+                      ...editData,
+                      whtType: v,
+                      whtRate: opt?.rate || 0,
+                    });
+                  }}
+                >
+                  <SelectTrigger className="h-10 bg-muted/30">
+                    <SelectValue placeholder="เลือกประเภท" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WHT_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {!isEditing && income.isWhtDeducted && income.whtType && (
+                <div className="text-sm text-muted-foreground">
+                  ประเภท: {WHT_OPTIONS.find(o => o.value === income.whtType)?.label}
+                </div>
+              )}
+
+              <div className="h-px bg-border" />
+
+              {/* Net Amount */}
+              <div className="flex items-center justify-between pt-2">
+                <Label className="text-base font-medium">ยอดรับสุทธิ</Label>
+                <span className="text-xl font-bold text-emerald-600">
+                  {formatCurrency(isEditing ? calculation.netAmount : Number(income.netReceived))}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-    );
+
+        {/* Right: Documents */}
+        <div className="lg:col-span-2">
+          <Card className="sticky top-24">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+                หลักฐานการรับเงิน
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <DocumentSection
+                label="สลิปโอนจากลูกค้า"
+                urls={income.customerSlipUrls || []}
+                onUpload={(file) => handleFileUpload(file, "slip")}
+                onDelete={(url) => handleDeleteFile("slip", url)}
+                isUploading={uploadingType === "slip"}
+                icon={<CreditCard className="h-4 w-4" />}
+              />
+
+              <DocumentSection
+                label="สำเนาบิลขาย"
+                urls={income.myBillCopyUrls || []}
+                onUpload={(file) => handleFileUpload(file, "bill")}
+                onDelete={(url) => handleDeleteFile("bill", url)}
+                isUploading={uploadingType === "bill"}
+                icon={<FileText className="h-4 w-4" />}
+              />
+
+              {income.isWhtDeducted && (
+                <DocumentSection
+                  label="ใบ 50 ทวิ (จากลูกค้า)"
+                  urls={income.whtCertUrls || []}
+                  onUpload={(file) => handleFileUpload(file, "wht")}
+                  onDelete={(url) => handleDeleteFile("wht", url)}
+                  isUploading={uploadingType === "wht"}
+                  icon={<FileText className="h-4 w-4" />}
+                />
+              )}
+            </CardContent>
+
+            {/* Meta Info */}
+            <div className="px-6 py-4 border-t bg-muted/30 text-xs text-muted-foreground space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  สร้างโดย
+                </span>
+                <span className="font-medium text-foreground">{income.creator?.name || "-"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  วันที่สร้าง
+                </span>
+                <span>{new Date(income.createdAt).toLocaleDateString("th-TH")}</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบรายการ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบรายการนี้ใช่หรือไม่? การลบสามารถกู้คืนได้โดยผู้ดูแลระบบ
+              <br />
+              <span className="font-medium text-foreground">
+                {income.source || "รายรับ"} - {formatCurrency(Number(income.netReceived))}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  กำลังลบ...
+                </>
+              ) : (
+                "ลบรายการ"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }

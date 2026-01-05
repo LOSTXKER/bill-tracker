@@ -1,113 +1,96 @@
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
-import { apiResponse } from "@/lib/api/response";
-import { logCreate } from "@/lib/audit/logger";
+import { createTransactionRoutes } from "@/lib/api/transaction-routes";
 import { notifyIncome } from "@/lib/notifications/line-messaging";
 
-export const GET = withCompanyAccess(
-  async (request, { company }) => {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-
-    const where = {
-      companyId: company.id,
-      ...(status && { status: status as any }),
-    };
-
-    const [incomes, total] = await Promise.all([
-      prisma.income.findMany({
-        where,
-        include: {
-          contact: true,
-          creator: {
-            select: { id: true, name: true, email: true },
-          },
-        },
-        orderBy: { receiveDate: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.income.count({ where }),
-    ]);
-
-    return apiResponse.success({
-      incomes,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
+// Create income routes using the factory
+const incomeRoutes = createTransactionRoutes({
+  modelName: "income",
+  displayName: "Income",
+  prismaModel: prisma.income,
+  
+  permissions: {
+    read: "incomes:read",
+    create: "incomes:create",
+    update: "incomes:update",
   },
-  { permission: "incomes:read" }
-);
-
-export const POST = withCompanyAccess(
-  async (request, { company, session }) => {
-    const body = await request.json();
+  
+  fields: {
+    dateField: "receiveDate",
+    netAmountField: "netReceived",
+    statusField: "status",
+  },
+  
+  transformCreateData: (body) => {
     const { vatAmount, whtAmount, netReceived, ...data } = body;
-
-    // Create income
-    const income = await prisma.income.create({
-      data: {
-        companyId: company.id,
-        contactId: data.contactId || null,
-        amount: data.amount,
-        vatRate: data.vatRate || 0,
-        vatAmount: vatAmount || null,
-        isWhtDeducted: data.isWhtDeducted || false,
-        whtRate: data.whtRate || null,
-        whtAmount: whtAmount || null,
-        whtType: data.whtType || null,
-        netReceived: netReceived,
-        source: data.source,
-        categoryId: data.categoryId || null,
-        invoiceNumber: data.invoiceNumber,
-        referenceNo: data.referenceNo,
-        paymentMethod: data.paymentMethod,
-        receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
-        status: data.status,
-        notes: data.notes,
-        customerSlipUrl: data.customerSlipUrl || null,
-        myBillCopyUrl: data.myBillCopyUrl || null,
-        whtCertUrl: data.whtCertUrl || null,
-        createdBy: session.user.id,
-      },
-      include: { contact: true },
-    });
-
-    // Create audit log
-    await logCreate("Income", income, session.user.id, company.id);
-
-    // Get base URL from request
-    const url = new URL(request.url);
-    const baseUrl = `${url.protocol}//${url.host}`;
-
-    // Send LINE notification (non-blocking)
-    notifyIncome(company.id, {
-      id: income.id,
-      companyCode: company.code,
-      companyName: company.name,
-      customerName: income.contact?.name || data.source || undefined,
-      source: data.source || undefined,
+    return {
+      contactId: data.contactId || null,
+      amount: data.amount,
+      vatRate: data.vatRate || 0,
+      vatAmount: vatAmount || null,
+      isWhtDeducted: data.isWhtDeducted || false,
+      whtRate: data.whtRate || null,
+      whtAmount: whtAmount || null,
+      whtType: data.whtType || null,
+      netReceived: netReceived,
+      source: data.source,
+      categoryId: data.categoryId || null,
+      invoiceNumber: data.invoiceNumber,
+      referenceNo: data.referenceNo,
+      paymentMethod: data.paymentMethod,
+      receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
+      status: data.status,
+      notes: data.notes,
+      customerSlipUrl: data.customerSlipUrl || null,
+      myBillCopyUrl: data.myBillCopyUrl || null,
+      whtCertUrl: data.whtCertUrl || null,
+    };
+  },
+  
+  transformUpdateData: (body) => {
+    const { vatAmount, whtAmount, netReceived, ...data } = body;
+    return {
+      contactId: data.contactId || null,
+      amount: data.amount,
+      vatRate: data.vatRate,
+      vatAmount: vatAmount,
+      isWhtDeducted: data.isWhtDeducted,
+      whtRate: data.whtRate,
+      whtAmount: whtAmount,
+      whtType: data.whtType,
+      netReceived: netReceived,
+      source: data.source,
+      invoiceNumber: data.invoiceNumber,
+      referenceNo: data.referenceNo,
+      paymentMethod: data.paymentMethod,
+      receiveDate: data.receiveDate ? new Date(data.receiveDate) : undefined,
+      status: data.status,
+      notes: data.notes,
+      customerSlipUrl: data.customerSlipUrl,
+      myBillCopyUrl: data.myBillCopyUrl,
+      whtCertUrl: data.whtCertUrl,
+    };
+  },
+  
+  notifyCreate: async (companyId, data, baseUrl) => {
+    await notifyIncome(companyId, {
+      id: data.id,
+      companyCode: data.companyCode,
+      companyName: data.companyName,
+      customerName: data.customerName || data.source,
+      source: data.source,
       amount: Number(data.amount),
-      vatAmount: vatAmount ? Number(vatAmount) : undefined,
+      vatAmount: data.vatAmount ? Number(data.vatAmount) : undefined,
       isWhtDeducted: data.isWhtDeducted || false,
       whtRate: data.whtRate ? Number(data.whtRate) : undefined,
-      whtAmount: whtAmount ? Number(whtAmount) : undefined,
-      netReceived: Number(netReceived),
+      whtAmount: data.whtAmount ? Number(data.whtAmount) : undefined,
+      netReceived: Number(data.netReceived),
       status: data.status,
-    }, baseUrl).catch((error) => {
-      console.error("Failed to send LINE notification:", error);
-    });
-
-    return apiResponse.created({ income });
+    }, baseUrl);
   },
-  {
-    permission: "incomes:create",
-    rateLimit: { maxRequests: 30, windowMs: 60000 },
-  }
-);
+  
+  getEntityDisplayName: (income: any) => 
+    income.contact?.name || income.source || undefined,
+});
+
+export const GET = incomeRoutes.list;
+export const POST = incomeRoutes.create;

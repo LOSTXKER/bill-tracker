@@ -204,9 +204,14 @@ model Expense {
   paymentMethod PaymentMethod        @default(BANK_TRANSFER)
 
   // Evidence Files (Supabase Storage URLs)
-  slipUrl       String? // รูปสลิปโอนเงิน
-  taxInvoiceUrl String? // รูปใบกำกับภาษี
-  whtCertUrl    String? // รูปใบ 50 ทวิ
+  slipUrl       String? // รูปสลิปโอนเงิน (DEPRECATED - kept for migration)
+  taxInvoiceUrl String? // รูปใบกำกับภาษี (DEPRECATED - kept for migration)
+  whtCertUrl    String? // รูปใบ 50 ทวิ (DEPRECATED - kept for migration)
+  
+  // Multiple Files Support
+  slipUrls       Json @default("[]") // Array of slip URLs
+  taxInvoiceUrls Json @default("[]") // Array of tax invoice URLs
+  whtCertUrls    Json @default("[]") // Array of WHT cert URLs
 
   // Dates
   billDate DateTime  @default(now()) // วันที่จ่ายเงิน
@@ -225,6 +230,10 @@ model Expense {
   creator   User     @relation("ExpenseCreator", fields: [createdBy], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Soft Delete
+  deletedAt DateTime?
+  deletedBy String?
 
   @@index([companyId, billDate])
   @@index([status])
@@ -232,6 +241,7 @@ model Expense {
   @@index([categoryId])
   @@index([contactId])
   @@index([createdAt])
+  @@index([deletedAt])
 }
 
 enum ExpenseCategory {
@@ -287,9 +297,14 @@ model Income {
   paymentMethod PaymentMethod @default(BANK_TRANSFER)
 
   // Evidence Files (Supabase Storage URLs)
-  customerSlipUrl String? // สลิปที่ลูกค้าโอนมา
-  myBillCopyUrl   String? // สำเนาบิลที่เราเขียนให้
-  whtCertUrl      String? // ใบ 50 ทวิ ที่ลูกค้าให้มา
+  customerSlipUrl String? // สลิปที่ลูกค้าโอนมา (DEPRECATED - kept for migration)
+  myBillCopyUrl   String? // สำเนาบิลที่เราเขียนให้ (DEPRECATED - kept for migration)
+  whtCertUrl      String? // ใบ 50 ทวิ ที่ลูกค้าให้มา (DEPRECATED - kept for migration)
+  
+  // Multiple Files Support
+  customerSlipUrls Json @default("[]") // Array of customer slip URLs
+  myBillCopyUrls   Json @default("[]") // Array of bill copy URLs
+  whtCertUrls      Json @default("[]") // Array of WHT cert URLs
 
   // Dates
   receiveDate DateTime @default(now())
@@ -306,12 +321,17 @@ model Income {
   creator   User     @relation("IncomeCreator", fields: [createdBy], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Soft Delete
+  deletedAt DateTime?
+  deletedBy String?
 
   @@index([companyId, receiveDate])
   @@index([status])
   @@index([categoryId])
   @@index([contactId])
   @@index([createdAt])
+  @@index([deletedAt])
 }
 
 enum IncomeDocStatus {

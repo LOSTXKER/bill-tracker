@@ -1,132 +1,96 @@
 import { prisma } from "@/lib/db";
-import { withAuth } from "@/lib/api/with-auth";
-import { apiResponse } from "@/lib/api/response";
-import { ApiErrors } from "@/lib/api/errors";
-import { hasPermission } from "@/lib/permissions/checker";
-import { logUpdate, logStatusChange } from "@/lib/audit/logger";
+import { createTransactionRoutes } from "@/lib/api/transaction-routes";
+import { notifyExpense } from "@/lib/notifications/line-messaging";
 
 interface RouteParams {
     params: Promise<{ id: string }>;
 }
 
-export const GET = withAuth(async (request, { session }, routeContext?: RouteParams) => {
-    if (!routeContext) {
-        throw ApiErrors.badRequest("Missing route context");
-    }
-    const { id } = await routeContext.params;
-
-    const expense = await prisma.expense.findUnique({
-        where: { id },
-        include: {
-            contact: true,
-            company: true,
-            creator: {
-                select: { id: true, name: true, email: true },
-            },
-        },
-    });
-
-    if (!expense) {
-        throw ApiErrors.notFound("Expense");
-    }
-
-    // Check access
-    const hasAccess = await hasPermission(
-        session.user.id,
-        expense.companyId,
-        "expenses:read"
-    );
-
-    if (!hasAccess) {
-        throw ApiErrors.forbidden();
-    }
-
-    return apiResponse.success({ expense });
-});
-
-export const PUT = withAuth(async (request, { session }, routeContext?: RouteParams) => {
-    if (!routeContext) {
-        throw ApiErrors.badRequest("Missing route context");
-    }
-    const { id } = await routeContext.params;
-
-    // Find existing expense
-    const existingExpense = await prisma.expense.findUnique({
-        where: { id },
-        include: { contact: true },
-    });
-
-    if (!existingExpense) {
-        throw ApiErrors.notFound("Expense");
-    }
-
-    // Check access
-    const hasAccess = await hasPermission(
-        session.user.id,
-        existingExpense.companyId,
-        "expenses:update"
-    );
-
-    if (!hasAccess) {
-        throw ApiErrors.forbidden();
-    }
-
-    const body = await request.json();
+// Create expense routes using the factory
+const expenseRoutes = createTransactionRoutes({
+  modelName: "expense",
+  displayName: "Expense",
+  prismaModel: prisma.expense,
+  
+  permissions: {
+    read: "expenses:read",
+    create: "expenses:create",
+    update: "expenses:update",
+  },
+  
+  fields: {
+    dateField: "billDate",
+    netAmountField: "netPaid",
+    statusField: "status",
+  },
+  
+  transformCreateData: (body) => {
     const { vatAmount, whtAmount, netPaid, ...data } = body;
-
-    // Update expense
-    const expense = await prisma.expense.update({
-        where: { id },
-        data: {
-            contactId: data.contactId || null,
-            amount: data.amount,
-            vatRate: data.vatRate,
-            vatAmount: vatAmount,
-            isWht: data.isWht,
-            whtRate: data.whtRate,
-            whtAmount: whtAmount,
-            whtType: data.whtType,
-            netPaid: netPaid,
-            description: data.description,
-            category: data.category,
-            invoiceNumber: data.invoiceNumber,
-            referenceNo: data.referenceNo,
-            paymentMethod: data.paymentMethod,
-            billDate: data.billDate ? new Date(data.billDate) : undefined,
-            dueDate: data.dueDate ? new Date(data.dueDate) : null,
-            status: data.status,
-            notes: data.notes,
-            slipUrl: data.slipUrl,
-            taxInvoiceUrl: data.taxInvoiceUrl,
-            whtCertUrl: data.whtCertUrl,
-        },
-        include: {
-            contact: true,
-            company: true,
-        },
-    });
-
-    // Create audit log
-    if (data.status !== existingExpense.status) {
-        await logStatusChange(
-            "Expense",
-            expense.id,
-            existingExpense.status,
-            data.status,
-            session.user.id,
-            expense.companyId,
-            expense.contact?.name || expense.description || undefined
-        );
-    } else {
-        await logUpdate(
-            "Expense",
-            expense.id,
-            existingExpense,
-            expense,
-            session.user.id,
-            expense.companyId
-        );
-    }
-
-    return apiResponse.success({ expense });
+    return {
+      contactId: data.contactId || null,
+      amount: data.amount,
+      vatRate: data.vatRate || 0,
+      vatAmount: vatAmount || null,
+      isWht: data.isWht || false,
+      whtRate: data.whtRate || null,
+      whtAmount: whtAmount || null,
+      whtType: data.whtType || null,
+      netPaid: netPaid,
+      description: data.description,
+      category: data.category,
+      categoryId: data.categoryId || null,
+      invoiceNumber: data.invoiceNumber,
+      referenceNo: data.referenceNo,
+      paymentMethod: data.paymentMethod,
+      billDate: data.billDate ? new Date(data.billDate) : new Date(),
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      status: data.status,
+      notes: data.notes,
+      slipUrl: data.slipUrl || null,
+      taxInvoiceUrl: data.taxInvoiceUrl || null,
+      whtCertUrl: data.whtCertUrl || null,
+    };
+  },
+  
+  transformUpdateData: (body) => {
+    const { vatAmount, whtAmount, netPaid, ...data } = body;
+    const updateData: any = {};
+    
+    // Only update fields that are explicitly provided
+    if (data.contactId !== undefined) updateData.contactId = data.contactId || null;
+    if (data.amount !== undefined) updateData.amount = data.amount;
+    if (data.vatRate !== undefined) updateData.vatRate = data.vatRate;
+    if (vatAmount !== undefined) updateData.vatAmount = vatAmount;
+    if (data.isWht !== undefined) updateData.isWht = data.isWht;
+    if (data.whtRate !== undefined) updateData.whtRate = data.whtRate;
+    if (whtAmount !== undefined) updateData.whtAmount = whtAmount;
+    if (data.whtType !== undefined) updateData.whtType = data.whtType;
+    if (netPaid !== undefined) updateData.netPaid = netPaid;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
+    if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
+    if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
+    if (data.billDate !== undefined) updateData.billDate = data.billDate ? new Date(data.billDate) : undefined;
+    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    
+    // Handle file URLs
+    if (data.slipUrl !== undefined) updateData.slipUrl = data.slipUrl;
+    if (data.taxInvoiceUrl !== undefined) updateData.taxInvoiceUrl = data.taxInvoiceUrl;
+    if (data.whtCertUrl !== undefined) updateData.whtCertUrl = data.whtCertUrl;
+    if (data.slipUrls !== undefined) updateData.slipUrls = data.slipUrls;
+    if (data.taxInvoiceUrls !== undefined) updateData.taxInvoiceUrls = data.taxInvoiceUrls;
+    if (data.whtCertUrls !== undefined) updateData.whtCertUrls = data.whtCertUrls;
+    
+    return updateData;
+  },
+  
+  getEntityDisplayName: (expense: any) => 
+    expense.contact?.name || expense.description || undefined,
 });
+
+export const GET = expenseRoutes.get;
+export const PUT = expenseRoutes.update;
+export const DELETE = expenseRoutes.delete;

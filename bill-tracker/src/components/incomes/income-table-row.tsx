@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { useLineNotification } from "@/hooks/use-line-notification";
+import { useTransactionRow } from "@/hooks/use-transaction-row";
 import { Send, Loader2 } from "lucide-react";
 
 interface IncomeTableRowProps {
@@ -25,22 +24,16 @@ interface IncomeTableRowProps {
 }
 
 export function IncomeTableRow({ income, companyCode }: IncomeTableRowProps) {
-  const router = useRouter();
-  const { sending, sendNotification } = useLineNotification("income");
-
-  const handleClick = () => {
-    router.push(`/${companyCode.toLowerCase()}/incomes/${income.id}`);
-  };
-
-  const handleSendNotification = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click
-    await sendNotification(income.id);
-  };
+  const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
+    companyCode,
+    transactionType: "income",
+    transactionId: income.id,
+  });
 
   return (
     <TableRow
       className="cursor-pointer hover:bg-muted/50"
-      onClick={handleClick}
+      onClick={handleRowClick}
     >
       <TableCell className="whitespace-nowrap">
         {formatThaiDate(income.receiveDate)}

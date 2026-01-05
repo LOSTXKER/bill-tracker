@@ -1,43 +1,21 @@
 import { z } from "zod";
+import {
+  baseTransactionSchema,
+  whtFieldsSchema,
+  paymentMethodSchema,
+} from "./shared";
 
 // Base schema without refinements (for partial/extend operations)
-const incomeBaseSchema = z.object({
-  companyId: z.string().min(1, "กรุณาเลือกบริษัท"),
-  
-  // Contact (ผู้ติดต่อ - ลูกค้า)
-  contactId: z.string().optional().nullable(),
-  
-  // Financial
-  amount: z
-    .number()
-    .positive("จำนวนเงินต้องมากกว่า 0")
-    .max(999999999.99, "จำนวนเงินมากเกินไป"),
+const incomeBaseSchema = baseTransactionSchema.extend({
+  // Income-specific: vatRate defaults to 0
   vatRate: z.number().min(0).max(100).default(0),
   
-  // WHT (โดนหัก)
+  // WHT (customer withholds tax from us)
   isWhtDeducted: z.boolean().default(false),
-  whtRate: z.number().min(0).max(100).optional(),
-  whtType: z.enum([
-    "SERVICE_3",
-    "PROFESSIONAL_5",
-    "TRANSPORT_1",
-    "RENT_5",
-    "ADVERTISING_2",
-    "OTHER",
-  ]).optional(),
+  ...whtFieldsSchema.shape,
   
-  // Details
+  // Income-specific details
   source: z.string().max(200).optional(),
-  categoryId: z.string().optional().nullable(),
-  invoiceNumber: z.string().max(50).optional(),
-  referenceNo: z.string().max(50).optional(),
-  paymentMethod: z.enum([
-    "CASH",
-    "BANK_TRANSFER",
-    "CREDIT_CARD",
-    "PROMPTPAY",
-    "CHEQUE",
-  ]).default("BANK_TRANSFER"),
   
   // Dates
   receiveDate: z.coerce.date(),
@@ -50,8 +28,6 @@ const incomeBaseSchema = z.object({
     "PENDING_COPY_SEND",
     "SENT_COPY",
   ]).default("PENDING_COPY_SEND"),
-  
-  notes: z.string().max(1000).optional(),
 });
 
 // Full schema with refinements
