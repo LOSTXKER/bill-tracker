@@ -49,7 +49,10 @@ import { formatCurrency, calculateExpenseTotals } from "@/lib/utils/tax-calculat
 import { use } from "react";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "@/components/forms/shared/DatePicker";
+import { ContactSelector } from "@/components/forms/shared/ContactSelector";
 import { useCategories } from "@/hooks/use-categories";
+import { useContacts } from "@/hooks/use-contacts";
+import type { ContactSummary } from "@/types";
 import {
   StatusProgressBar,
   DocumentSection,
@@ -114,8 +117,21 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
   const [uploadingType, setUploadingType] = useState<string | null>(null);
   const [calculation, setCalculation] = useState({ vatAmount: 0, whtAmount: 0, netAmount: 0 });
 
-  // Fetch categories for the selector
+  // Fetch categories and contacts for the selectors
   const { categories, isLoading: categoriesLoading } = useCategories(companyCode, "EXPENSE");
+  const { contacts, isLoading: contactsLoading, refetch: refetchContacts } = useContacts(companyCode);
+  const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
+
+  // Set selected contact when expense is loaded
+  useEffect(() => {
+    if (expense?.contact) {
+      setSelectedContact({
+        id: expense.contact.id,
+        name: expense.contact.name,
+        taxId: expense.contact.taxId,
+      });
+    }
+  }, [expense?.contact]);
 
   useEffect(() => {
     fetchExpense();
@@ -171,6 +187,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...editData,
+          contactId: selectedContact?.id || null,
           amount: Number(editData.amount),
           vatRate: Number(editData.vatRate),
           vatAmount: calc.vatAmount,
@@ -269,9 +286,13 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
 
     setUploadingType(type);
     try {
+      // New folder structure: {companyCode}/expenses/{expenseId}/{type}/filename
+      const typeFolder = type === "slip" ? "slips" : type === "invoice" ? "invoices" : "wht";
+      const folder = `${companyCode.toUpperCase()}/expenses/${expense.id}/${typeFolder}`;
+      
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("folder", `expenses/${expense.id}`);
+      formData.append("folder", folder);
 
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
       if (!uploadRes.ok) throw new Error("อัปโหลดไฟล์ล้มเหลว");
@@ -562,10 +583,26 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
                 </div>
 
                 {/* Contact */}
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">ผู้ติดต่อ / ร้านค้า</Label>
-                  <p className="text-sm font-medium">{expense.contact?.name || <span className="text-muted-foreground">-</span>}</p>
-                </div>
+                {isEditing ? (
+                  <ContactSelector
+                    contacts={contacts}
+                    isLoading={contactsLoading}
+                    selectedContact={selectedContact}
+                    onSelect={setSelectedContact}
+                    label="ผู้ติดต่อ / ร้านค้า"
+                    placeholder="เลือกผู้ติดต่อ..."
+                    companyCode={companyCode}
+                    onContactCreated={(contact) => {
+                      refetchContacts();
+                      setSelectedContact(contact);
+                    }}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">ผู้ติดต่อ / ร้านค้า</Label>
+                    <p className="text-sm font-medium">{expense.contact?.name || <span className="text-muted-foreground">-</span>}</p>
+                  </div>
+                )}
 
                 {/* Date - using DatePicker */}
                 {isEditing ? (
