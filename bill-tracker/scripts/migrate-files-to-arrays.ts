@@ -5,7 +5,9 @@
  */
 
 // Load environment variables first (before any imports that use them)
-require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
+import * as dotenv from "dotenv";
+import * as path from "path";
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 import { prisma } from "../src/lib/db";
 

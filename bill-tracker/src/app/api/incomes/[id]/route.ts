@@ -45,9 +45,9 @@ const incomeRoutes = createTransactionRoutes({
       receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
       status: data.status,
       notes: data.notes,
-      customerSlipUrl: data.customerSlipUrl || null,
-      myBillCopyUrl: data.myBillCopyUrl || null,
-      whtCertUrl: data.whtCertUrl || null,
+      customerSlipUrls: data.customerSlipUrls || [],
+      myBillCopyUrls: data.myBillCopyUrls || [],
+      whtCertUrls: data.whtCertUrls || [],
     };
   },
   
@@ -66,17 +66,13 @@ const incomeRoutes = createTransactionRoutes({
     if (data.whtType !== undefined) updateData.whtType = data.whtType;
     if (netReceived !== undefined) updateData.netReceived = netReceived;
     if (data.source !== undefined) updateData.source = data.source;
+    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.receiveDate !== undefined) updateData.receiveDate = data.receiveDate ? new Date(data.receiveDate) : undefined;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.notes !== undefined) updateData.notes = data.notes;
-    
-    // Handle single file URLs (legacy)
-    if (data.customerSlipUrl !== undefined) updateData.customerSlipUrl = data.customerSlipUrl;
-    if (data.myBillCopyUrl !== undefined) updateData.myBillCopyUrl = data.myBillCopyUrl;
-    if (data.whtCertUrl !== undefined) updateData.whtCertUrl = data.whtCertUrl;
     
     // Handle multiple file URLs
     if (data.customerSlipUrls !== undefined) updateData.customerSlipUrls = data.customerSlipUrls;

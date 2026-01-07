@@ -7,12 +7,14 @@
  */
 
 import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 
@@ -20,6 +22,7 @@ interface AuditLog {
   id: string;
   action: string;
   entityType: string;
+  entityId: string;
   description: string | null;
   createdAt: Date;
   user: {
@@ -50,7 +53,121 @@ const ACTION_LABELS = {
   EXPORT: "ส่งออก",
 };
 
+// Status labels for translation
+const STATUS_LABELS: Record<string, string> = {
+  // Expense statuses
+  PENDING_PHYSICAL: "ร้านส่งบิลตามมา",
+  WAITING_FOR_DOC: "ได้บิลครบแล้ว",
+  READY_TO_SEND: "พร้อมส่ง",
+  SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
+  // Income statuses
+  PENDING_INVOICE: "รอออกบิล",
+  INVOICE_ISSUED: "ออกบิลแล้ว",
+  COPY_SENT: "ส่งสำเนาแล้ว",
+  COMPLETED: "เสร็จสิ้น",
+};
+
+// Entity type labels
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  Expense: "รายจ่าย",
+  Income: "รายรับ",
+  Contact: "ผู้ติดต่อ",
+  Category: "หมวดหมู่",
+};
+
+// Field labels for translation
+const FIELD_LABELS: Record<string, string> = {
+  amount: "จำนวนเงิน",
+  description: "รายละเอียด",
+  billDate: "วันที่",
+  dueDate: "วันครบกำหนด",
+  status: "สถานะ",
+  category: "หมวดหมู่",
+  categoryId: "หมวดหมู่",
+  contactId: "ผู้ติดต่อ",
+  notes: "หมายเหตุ",
+  invoiceNumber: "เลขที่ใบกำกับ",
+  referenceNo: "เลขอ้างอิง",
+  paymentMethod: "วิธีชำระเงิน",
+  vatRate: "อัตรา VAT",
+  whtRate: "อัตราหัก ณ ที่จ่าย",
+  slipUrls: "สลิปโอนเงิน",
+  taxInvoiceUrls: "ใบกำกับภาษี",
+  whtCertUrls: "หนังสือรับรองหัก ณ ที่จ่าย",
+  customerSlipUrls: "สลิปลูกค้า",
+  myBillCopyUrls: "สำเนาบิล",
+};
+
+/**
+ * Translate status code to Thai label
+ */
+function getStatusLabel(status: string): string {
+  return STATUS_LABELS[status] || status;
+}
+
+/**
+ * Translate entity type to Thai label
+ */
+function getEntityTypeLabel(entityType: string): string {
+  return ENTITY_TYPE_LABELS[entityType] || entityType;
+}
+
+/**
+ * Translate field name to Thai label
+ */
+function getFieldLabel(field: string): string {
+  return FIELD_LABELS[field] || field;
+}
+
+/**
+ * Format a user-friendly description for an audit log
+ */
+function formatDescription(log: AuditLog): string {
+  const typeLabel = getEntityTypeLabel(log.entityType);
+  
+  // Fallback: use original description but try to translate
+  if (log.description) {
+    let desc = log.description;
+    // Replace entity type names
+    Object.entries(ENTITY_TYPE_LABELS).forEach(([en, th]) => {
+      desc = desc.replace(new RegExp(en, "g"), th);
+    });
+    // Replace status codes
+    Object.entries(STATUS_LABELS).forEach(([code, label]) => {
+      desc = desc.replace(new RegExp(code, "g"), label);
+    });
+    // Replace field names in parentheses (e.g., "(slipUrls, whtCertUrls)")
+    const fieldMatch = desc.match(/\(([^)]+)\)/);
+    if (fieldMatch) {
+      const fields = fieldMatch[1].split(", ").map(f => f.trim());
+      const translatedFields = fields
+        .map(getFieldLabel)
+        .filter(f => !["วันที่อัปเดต", "บริษัท", "ผู้สร้าง", "updatedAt", "company", "creator"].includes(f));
+      if (translatedFields.length > 0) {
+        desc = desc.replace(fieldMatch[0], `(${translatedFields.join(", ")})`);
+      } else {
+        desc = desc.replace(fieldMatch[0], "");
+      }
+    }
+    // Remove ID references like "cmk2aylx...:" or "ID: cmk2aylx..."
+    desc = desc.replace(/\s*[a-z]{3}[a-z0-9]{5,}\.{0,3}:?\s*/gi, " ");
+    desc = desc.replace(/: ID: [a-z0-9]+\.\.\.?/gi, "");
+    desc = desc.replace(/ID: [a-z0-9]+\.\.\.?/gi, "");
+    // Clean up extra colons and spaces
+    desc = desc.replace(/:\s*:/g, ":");
+    desc = desc.replace(/\s+/g, " ").trim();
+    // Remove trailing colon
+    desc = desc.replace(/:$/, "").trim();
+    return desc;
+  }
+  
+  return `${ACTION_LABELS[log.action as keyof typeof ACTION_LABELS] || log.action}${typeLabel}`;
+}
+
 export function AuditLogTable({ companyId }: AuditLogTableProps) {
+  const params = useParams();
+  const companyCode = params.company as string;
+  
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -61,6 +178,27 @@ export function AuditLogTable({ companyId }: AuditLogTableProps) {
 
   const limit = 50;
   const totalPages = Math.ceil(total / limit);
+  
+  // Generate link to the related entity
+  const getEntityLink = (entityType: string, entityId: string): string | null => {
+    // Skip bulk operations, exports, and other non-linkable entities
+    if (entityId.startsWith("bulk_") || entityId.startsWith("export_") || 
+        entityId.startsWith("invite_") || entityId.startsWith("remove_") ||
+        entityId.startsWith("permission_")) {
+      return null;
+    }
+    
+    switch (entityType) {
+      case "Expense":
+        return `/${companyCode}/expenses/${entityId}`;
+      case "Income":
+        return `/${companyCode}/incomes/${entityId}`;
+      case "Contact":
+        return `/${companyCode}/contacts`;
+      default:
+        return null;
+    }
+  };
 
   useEffect(() => {
     loadLogs();
@@ -162,38 +300,52 @@ export function AuditLogTable({ companyId }: AuditLogTableProps) {
           </div>
         ) : (
           <div className="space-y-3">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge
-                        className={ACTION_COLORS[log.action as keyof typeof ACTION_COLORS]}
-                      >
-                        {ACTION_LABELS[log.action as keyof typeof ACTION_LABELS] || log.action}
-                      </Badge>
-                      <Badge variant="outline">{log.entityType}</Badge>
+            {logs.map((log) => {
+              const entityLink = getEntityLink(log.entityType, log.entityId);
+              
+              return (
+                <div
+                  key={log.id}
+                  className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge
+                          className={ACTION_COLORS[log.action as keyof typeof ACTION_COLORS]}
+                        >
+                          {ACTION_LABELS[log.action as keyof typeof ACTION_LABELS] || log.action}
+                        </Badge>
+                        <Badge variant="outline">{getEntityTypeLabel(log.entityType)}</Badge>
+                      </div>
+                      <p className="text-sm font-medium">
+                        {formatDescription(log)}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <span>{log.user.name}</span>
+                        <span>•</span>
+                        <span>
+                          {formatDistanceToNow(new Date(log.createdAt), {
+                            addSuffix: true,
+                            locale: th,
+                          })}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-sm font-medium">
-                      {log.description || `${log.action} ${log.entityType}`}
-                    </p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>{log.user.name}</span>
-                      <span>•</span>
-                      <span>
-                        {formatDistanceToNow(new Date(log.createdAt), {
-                          addSuffix: true,
-                          locale: th,
-                        })}
-                      </span>
-                    </div>
+                    
+                    {/* Link to related entity */}
+                    {entityLink && log.action !== "DELETE" && (
+                      <Link href={entityLink}>
+                        <Button variant="ghost" size="sm" className="shrink-0">
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          ดูรายการ
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

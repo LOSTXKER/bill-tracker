@@ -4,8 +4,10 @@ import * as React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { UserBadge } from "@/components/shared/UserBadge";
 import { useTransactionRow } from "@/hooks/use-transaction-row";
 import { Send, Loader2 } from "lucide-react";
 
@@ -19,11 +21,24 @@ interface IncomeTableRowProps {
     whtRate: number | null;
     status: string;
     contact: { name: string } | null;
+    creator?: {
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string | null;
+    } | null;
   };
   companyCode: string;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export function IncomeTableRow({ income, companyCode }: IncomeTableRowProps) {
+export function IncomeTableRow({ 
+  income, 
+  companyCode,
+  selected = false,
+  onToggleSelect
+}: IncomeTableRowProps) {
   const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
     companyCode,
     transactionType: "income",
@@ -35,20 +50,41 @@ export function IncomeTableRow({ income, companyCode }: IncomeTableRowProps) {
       className="cursor-pointer hover:bg-muted/50"
       onClick={handleRowClick}
     >
+      {onToggleSelect && (
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={selected}
+            onCheckedChange={onToggleSelect}
+            aria-label={`เลือกรายการ`}
+          />
+        </TableCell>
+      )}
       <TableCell className="whitespace-nowrap">
         {formatThaiDate(income.receiveDate)}
       </TableCell>
+      <TableCell className="text-center">
+        <StatusBadge status={income.status} type="income" />
+      </TableCell>
       <TableCell>
-        <div>
-          <p className="font-medium">
-            {income.contact?.name || "ไม่ระบุผู้ติดต่อ"}
+        <p className="font-medium">
+          {income.contact?.name || "ไม่ระบุผู้ติดต่อ"}
+        </p>
+      </TableCell>
+      <TableCell>
+        {income.source ? (
+          <p className="text-sm text-muted-foreground truncate max-w-xs">
+            {income.source}
           </p>
-          {income.source && (
-            <p className="text-xs text-muted-foreground truncate max-w-xs">
-              {income.source}
-            </p>
-          )}
-        </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        {income.creator ? (
+          <UserBadge user={income.creator} showEmail />
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
       </TableCell>
       <TableCell className="text-right font-medium text-primary">
         {formatCurrency(income.netReceived)}
@@ -61,9 +97,6 @@ export function IncomeTableRow({ income, companyCode }: IncomeTableRowProps) {
         ) : (
           <span className="text-muted-foreground">-</span>
         )}
-      </TableCell>
-      <TableCell className="text-center">
-        <StatusBadge status={income.status} type="income" />
       </TableCell>
       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
         <Button

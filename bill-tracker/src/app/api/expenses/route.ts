@@ -33,7 +33,6 @@ const expenseRoutes = createTransactionRoutes({
       whtType: data.whtType || null,
       netPaid: netPaid,
       description: data.description,
-      category: data.category,
       categoryId: data.categoryId || null,
       invoiceNumber: data.invoiceNumber,
       referenceNo: data.referenceNo,
@@ -42,9 +41,9 @@ const expenseRoutes = createTransactionRoutes({
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       status: data.status,
       notes: data.notes,
-      slipUrl: data.slipUrl || null,
-      taxInvoiceUrl: data.taxInvoiceUrl || null,
-      whtCertUrl: data.whtCertUrl || null,
+      slipUrls: data.slipUrls || [],
+      taxInvoiceUrls: data.taxInvoiceUrls || [],
+      whtCertUrls: data.whtCertUrls || [],
     };
   },
   
@@ -63,7 +62,7 @@ const expenseRoutes = createTransactionRoutes({
     if (data.whtType !== undefined) updateData.whtType = data.whtType;
     if (netPaid !== undefined) updateData.netPaid = netPaid;
     if (data.description !== undefined) updateData.description = data.description;
-    if (data.category !== undefined) updateData.category = data.category;
+    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
@@ -72,10 +71,7 @@ const expenseRoutes = createTransactionRoutes({
     if (data.status !== undefined) updateData.status = data.status;
     if (data.notes !== undefined) updateData.notes = data.notes;
     
-    // Handle file URLs
-    if (data.slipUrl !== undefined) updateData.slipUrl = data.slipUrl;
-    if (data.taxInvoiceUrl !== undefined) updateData.taxInvoiceUrl = data.taxInvoiceUrl;
-    if (data.whtCertUrl !== undefined) updateData.whtCertUrl = data.whtCertUrl;
+    // Handle file URLs (array versions only)
     if (data.slipUrls !== undefined) updateData.slipUrls = data.slipUrls;
     if (data.taxInvoiceUrls !== undefined) updateData.taxInvoiceUrls = data.taxInvoiceUrls;
     if (data.whtCertUrls !== undefined) updateData.whtCertUrls = data.whtCertUrls;

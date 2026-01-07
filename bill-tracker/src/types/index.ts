@@ -6,7 +6,6 @@ import type {
   Contact,
   CompanyAccess,
   UserRole,
-  ExpenseCategory,
   ExpenseDocStatus,
   IncomeDocStatus,
   PaymentMethod,
@@ -22,7 +21,6 @@ export type {
   Contact,
   CompanyAccess,
   UserRole,
-  ExpenseCategory,
   ExpenseDocStatus,
   IncomeDocStatus,
   PaymentMethod,
@@ -113,7 +111,7 @@ export interface BaseTransactionFilters {
 
 export interface ExpenseFilters extends BaseTransactionFilters {
   status?: ExpenseDocStatus;
-  category?: ExpenseCategory;
+  categoryId?: string;
 }
 
 export interface IncomeFilters extends BaseTransactionFilters {
@@ -186,7 +184,7 @@ export interface BaseTransactionFormData {
 export interface ExpenseFormData extends BaseTransactionFormData {
   isWht: boolean;
   description?: string;
-  category?: ExpenseCategory;
+  categoryId?: string;
   billDate: Date;
   dueDate?: Date;
   status: ExpenseDocStatus;

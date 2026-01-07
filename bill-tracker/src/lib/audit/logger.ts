@@ -78,6 +78,7 @@ export async function logCreate(
   companyId?: string
 ): Promise<void> {
   const entityName = getEntityName(entity);
+  const typeLabel = getEntityTypeLabel(entityType);
   
   await createAuditLog({
     userId,
@@ -86,8 +87,38 @@ export async function logCreate(
     entityType,
     entityId: entity.id,
     changes: { created: entity },
-    description: `สร้าง${entityType}ใหม่: ${entityName}`,
+    description: `สร้าง${typeLabel}ใหม่: ${entityName}`,
   });
+}
+
+// Thai labels for field names
+const FIELD_LABELS: Record<string, string> = {
+  amount: "จำนวนเงิน",
+  description: "รายละเอียด",
+  billDate: "วันที่",
+  dueDate: "วันครบกำหนด",
+  status: "สถานะ",
+  category: "หมวดหมู่",
+  categoryId: "หมวดหมู่",
+  contactId: "ผู้ติดต่อ",
+  notes: "หมายเหตุ",
+  invoiceNumber: "เลขที่ใบกำกับ",
+  referenceNo: "เลขอ้างอิง",
+  paymentMethod: "วิธีชำระเงิน",
+  vatRate: "อัตรา VAT",
+  whtRate: "อัตราหัก ณ ที่จ่าย",
+  slipUrls: "สลิปโอนเงิน",
+  taxInvoiceUrls: "ใบกำกับภาษี",
+  whtCertUrls: "หนังสือรับรองหัก ณ ที่จ่าย",
+  customerSlipUrls: "สลิปลูกค้า",
+  myBillCopyUrls: "สำเนาบิล",
+};
+
+/**
+ * Get Thai label for field name
+ */
+function getFieldLabel(field: string): string {
+  return FIELD_LABELS[field] || field;
 }
 
 /**
@@ -102,6 +133,7 @@ export async function logUpdate(
   companyId?: string
 ): Promise<void> {
   const entityName = getEntityName(after || before);
+  const typeLabel = getEntityTypeLabel(entityType);
   
   // Calculate what fields changed
   const changedFields: string[] = [];
@@ -113,8 +145,10 @@ export async function logUpdate(
     });
   }
   
-  const fieldsDesc = changedFields.length > 0 
-    ? ` (${changedFields.join(", ")})` 
+  // Convert field names to Thai labels
+  const changedFieldLabels = changedFields.map(getFieldLabel);
+  const fieldsDesc = changedFieldLabels.length > 0 
+    ? ` (${changedFieldLabels.join(", ")})` 
     : "";
   
   await createAuditLog({
@@ -123,8 +157,8 @@ export async function logUpdate(
     action: "UPDATE",
     entityType,
     entityId,
-    changes: { before, after, changedFields },
-    description: `แก้ไข${entityType}: ${entityName}${fieldsDesc}`,
+    changes: { before, after, changedFields, changedFieldLabels },
+    description: `แก้ไข${typeLabel}: ${entityName}${fieldsDesc}`,
   });
 }
 
@@ -138,6 +172,7 @@ export async function logDelete(
   companyId?: string
 ): Promise<void> {
   const entityName = getEntityName(entity);
+  const typeLabel = getEntityTypeLabel(entityType);
   
   await createAuditLog({
     userId,
@@ -146,8 +181,52 @@ export async function logDelete(
     entityType,
     entityId: entity.id,
     changes: { deleted: entity },
-    description: `ลบ${entityType}: ${entityName}`,
+    description: `ลบ${typeLabel}: ${entityName}`,
   });
+}
+
+// Thai labels for expense statuses
+const EXPENSE_STATUS_LABELS: Record<string, string> = {
+  PENDING_PHYSICAL: "ร้านส่งบิลตามมา",
+  WAITING_FOR_DOC: "ได้บิลครบแล้ว (รอส่งบัญชี)",
+  READY_TO_SEND: "พร้อมส่ง",
+  SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
+};
+
+// Thai labels for income statuses
+const INCOME_STATUS_LABELS: Record<string, string> = {
+  PENDING_INVOICE: "รอออกบิล",
+  INVOICE_ISSUED: "ออกบิลแล้ว",
+  COPY_SENT: "ส่งสำเนาแล้ว",
+  COMPLETED: "เสร็จสิ้น",
+};
+
+// Thai labels for entity types
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  Expense: "รายจ่าย",
+  Income: "รายรับ",
+  Contact: "ผู้ติดต่อ",
+  Category: "หมวดหมู่",
+};
+
+/**
+ * Get Thai label for status
+ */
+function getStatusLabel(entityType: string, status: string): string {
+  if (entityType === "Expense") {
+    return EXPENSE_STATUS_LABELS[status] || status;
+  }
+  if (entityType === "Income") {
+    return INCOME_STATUS_LABELS[status] || status;
+  }
+  return status;
+}
+
+/**
+ * Get Thai label for entity type
+ */
+function getEntityTypeLabel(entityType: string): string {
+  return ENTITY_TYPE_LABELS[entityType] || entityType;
 }
 
 /**
@@ -162,7 +241,14 @@ export async function logStatusChange(
   companyId?: string,
   entityName?: string
 ): Promise<void> {
-  const name = entityName || entityId.substring(0, 8) + "...";
+  const typeLabel = getEntityTypeLabel(entityType);
+  const oldLabel = getStatusLabel(entityType, oldStatus);
+  const newLabel = getStatusLabel(entityType, newStatus);
+  const name = entityName || "";
+  
+  const description = name 
+    ? `เปลี่ยนสถานะ${typeLabel} "${name}": ${oldLabel} → ${newLabel}`
+    : `เปลี่ยนสถานะ${typeLabel}: ${oldLabel} → ${newLabel}`;
   
   await createAuditLog({
     userId,
@@ -170,8 +256,13 @@ export async function logStatusChange(
     action: "STATUS_CHANGE",
     entityType,
     entityId,
-    changes: { oldStatus, newStatus },
-    description: `เปลี่ยนสถานะ${entityType} ${name}: ${oldStatus} → ${newStatus}`,
+    changes: { 
+      oldStatus, 
+      newStatus,
+      oldStatusLabel: oldLabel,
+      newStatusLabel: newLabel,
+    },
+    description,
   });
 }
 

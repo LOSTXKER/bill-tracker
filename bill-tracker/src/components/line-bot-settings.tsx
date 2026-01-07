@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, CheckCircle2, XCircle, Loader2, ExternalLink, Bell, BellOff, Send } from "lucide-react";
+import { MessageSquare, CheckCircle2, XCircle, Loader2, ExternalLink, Bell, BellOff, Send, Settings2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { LineNotificationSettings } from "./line-notification-settings";
+import { LineNotifySettings } from "@/lib/notifications/settings";
 
 interface LineBotSettingsProps {
   companyId: string;
@@ -27,6 +29,8 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
     notifyEnabled: boolean;
     isConfigured: boolean;
   } | null>(null);
+  const [notifySettings, setNotifySettings] = React.useState<LineNotifySettings | null>(null);
+  const [showSettings, setShowSettings] = React.useState(false);
 
   const [formData, setFormData] = React.useState({
     channelSecret: "",
@@ -42,20 +46,30 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
     setWebhookUrl(`${window.location.origin}/api/line/webhook`);
   }, []);
 
-  // Fetch current config
+  // Fetch current config and settings
   React.useEffect(() => {
     async function fetchConfig() {
       setLoading(true);
       try {
-        const response = await fetch(`/api/companies/${companyId}/line-config`);
-        if (response.ok) {
-          const data = await response.json();
+        // Fetch both config and settings in parallel
+        const [configRes, settingsRes] = await Promise.all([
+          fetch(`/api/companies/${companyId}/line-config`),
+          fetch(`/api/companies/${companyId}/line-config/settings`),
+        ]);
+
+        if (configRes.ok) {
+          const data = await configRes.json();
           setConfig(data);
           setFormData({
             channelSecret: "",
             channelAccessToken: "",
             groupId: data.groupId || "",
           });
+        }
+
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          setNotifySettings(settingsData.settings);
         }
       } catch (error) {
         console.error("Failed to fetch LINE config:", error);
@@ -279,6 +293,18 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
               </Button>
             )}
 
+            {/* Advanced Settings Button */}
+            {config.groupId && config.notifyEnabled && (
+              <Button
+                variant={showSettings ? "secondary" : "outline"}
+                className="w-full gap-2"
+                onClick={() => setShowSettings(!showSettings)}
+              >
+                <Settings2 className="h-4 w-4" />
+                {showSettings ? "ซ่อนการตั้งค่าขั้นสูง" : "ตั้งค่าแจ้งเตือนขั้นสูง"}
+              </Button>
+            )}
+
             <Separator />
 
             <div className="space-y-2">
@@ -448,6 +474,17 @@ export function LineBotSettings({ companyId, companyCode }: LineBotSettingsProps
           </>
         )}
       </CardContent>
+
+      {/* Advanced Notification Settings Panel */}
+      {showSettings && config?.isConfigured && config.notifyEnabled && (
+        <div className="border-t">
+          <LineNotificationSettings
+            companyId={companyId}
+            initialSettings={notifySettings || undefined}
+            onSettingsChange={(newSettings) => setNotifySettings(newSettings)}
+          />
+        </div>
+      )}
     </Card>
   );
 }

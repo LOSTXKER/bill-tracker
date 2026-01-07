@@ -1,0 +1,124 @@
+"use server";
+
+import { prisma } from "@/lib/db";
+import { serializeExpenses } from "@/lib/utils/serializers";
+
+export interface FetchExpensesParams {
+  companyCode: string;
+  search?: string;
+  status?: string;
+  category?: string;
+  contact?: string;
+  creator?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export async function fetchExpenses(params: FetchExpensesParams) {
+  const {
+    companyCode,
+    search,
+    status,
+    category,
+    contact,
+    creator,
+    dateFrom,
+    dateTo,
+    page = 1,
+    limit = 20,
+    sortBy = "billDate",
+    sortOrder = "desc",
+  } = params;
+
+  const company = await prisma.company.findUnique({
+    where: { code: companyCode.toUpperCase() },
+  });
+
+  if (!company) {
+    return { expenses: [], total: 0 };
+  }
+
+  // Build where clause
+  const where: any = {
+    companyId: company.id,
+    deletedAt: null,
+  };
+
+  if (search) {
+    where.OR = [
+      { description: { contains: search, mode: "insensitive" } },
+      { invoiceNumber: { contains: search, mode: "insensitive" } },
+      { contact: { name: { contains: search, mode: "insensitive" } } },
+    ];
+  }
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (category) {
+    where.category = category;
+  }
+
+  if (contact) {
+    where.contactId = contact;
+  }
+
+  if (creator) {
+    where.createdBy = creator;
+  }
+
+  if (dateFrom || dateTo) {
+    where.billDate = {};
+    if (dateFrom) {
+      where.billDate.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      where.billDate.lte = new Date(dateTo);
+    }
+  }
+
+  // Build orderBy
+  const orderBy: any = {};
+  if (sortBy === "billDate") {
+    orderBy.billDate = sortOrder;
+  } else if (sortBy === "amount") {
+    orderBy.netPaid = sortOrder;
+  } else if (sortBy === "creator") {
+    orderBy.creator = { name: sortOrder };
+  } else if (sortBy === "contact") {
+    orderBy.contact = { name: sortOrder };
+  } else {
+    orderBy.billDate = "desc";
+  }
+
+  const [expenses, total] = await Promise.all([
+    prisma.expense.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        contact: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    }),
+    prisma.expense.count({ where }),
+  ]);
+
+  return {
+    expenses: serializeExpenses(expenses),
+    total,
+  };
+}

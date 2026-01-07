@@ -82,12 +82,13 @@ function buildReceiptPrompt(): string {
   - วันที่
 
 **หมายเหตุสำคัญ:**
-- ถ้าข้อมูลใดไม่พบหรือไม่ชัดเจน ให้ใช้ null
+- ถ้าข้อมูลใดไม่พบหรือไม่ชัดเจน ให้ใช้ null (ห้ามใช้ undefined)
 - ยอดเงินให้ระบุเป็นตัวเลขอย่างเดียว ไม่ต้องมีสกุลเงิน
 - วันที่ให้แปลงเป็นรูปแบบ YYYY-MM-DD (ปี ค.ศ.)
 - ถ้าเป็นวันที่ไทย (พ.ศ.) ให้แปลงเป็น ค.ศ. โดยลบ 543
 - เลขผู้เสียภาษีไทยมี 13 หลัก
 - วิธีชำระเงินให้ใช้ภาษาอังกฤษ: CASH, BANK_TRANSFER, CREDIT_CARD, PROMPTPAY, CHEQUE
+- ใน items ถ้าไม่รู้ quantity หรือ unitPrice ให้ใส่ null ไม่ใช่ undefined
 
 ตอบกลับด้วย JSON เท่านั้น ตามโครงสร้างนี้:
 
@@ -148,6 +149,9 @@ export async function analyzeReceipt(
     if (jsonText.startsWith("```")) {
       jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
     }
+
+    // Fix invalid JSON: replace undefined with null (AI sometimes returns undefined which is not valid JSON)
+    jsonText = jsonText.replace(/:\s*undefined\b/g, ": null");
 
     try {
       const data = JSON.parse(jsonText) as ReceiptData;

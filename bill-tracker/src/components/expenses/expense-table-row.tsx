@@ -3,10 +3,12 @@
 import * as React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { toNumber } from "@/lib/utils/serializers";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/validations/expense";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { UserBadge } from "@/components/shared/UserBadge";
 import { useTransactionRow } from "@/hooks/use-transaction-row";
 import { Send, Loader2 } from "lucide-react";
 
@@ -19,11 +21,24 @@ interface ExpenseTableRowProps {
     netPaid: number | bigint | { toNumber?: () => number };
     status: string;
     contact: { name: string } | null;
+    creator?: {
+      id: string;
+      name: string;
+      email: string;
+      avatarUrl: string | null;
+    } | null;
   };
   companyCode: string;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-export function ExpenseTableRow({ expense, companyCode }: ExpenseTableRowProps) {
+export function ExpenseTableRow({ 
+  expense, 
+  companyCode,
+  selected = false,
+  onToggleSelect
+}: ExpenseTableRowProps) {
   const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
     companyCode,
     transactionType: "expense",
@@ -38,31 +53,49 @@ export function ExpenseTableRow({ expense, companyCode }: ExpenseTableRowProps) 
       className="cursor-pointer hover:bg-muted/30 transition-colors"
       onClick={handleRowClick}
     >
+      {onToggleSelect && (
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={selected}
+            onCheckedChange={onToggleSelect}
+            aria-label={`เลือกรายการ`}
+          />
+        </TableCell>
+      )}
       <TableCell className="whitespace-nowrap text-foreground">
         {formatThaiDate(expense.billDate)}
       </TableCell>
+      <TableCell className="text-center">
+        <StatusBadge status={expense.status} type="expense" />
+      </TableCell>
       <TableCell>
-        <div>
-          <p className="font-medium text-foreground">
-            {expense.contact?.name || "ไม่ระบุผู้ติดต่อ"}
-          </p>
-          {expense.description && (
-            <p className="text-xs text-muted-foreground truncate max-w-xs">
-              {expense.description}
-            </p>
-          )}
-        </div>
+        <p className="font-medium text-foreground">
+          {expense.contact?.name || "ไม่ระบุผู้ติดต่อ"}
+        </p>
       </TableCell>
       <TableCell className="text-muted-foreground">
         {expense.category
           ? EXPENSE_CATEGORY_LABELS[expense.category] || expense.category
           : "-"}
       </TableCell>
+      <TableCell>
+        {expense.description ? (
+          <p className="text-sm text-muted-foreground truncate max-w-xs">
+            {expense.description}
+          </p>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        {expense.creator ? (
+          <UserBadge user={expense.creator} showEmail />
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
+      </TableCell>
       <TableCell className="text-right font-medium text-destructive">
         {formatCurrency(netPaid)}
-      </TableCell>
-      <TableCell className="text-center">
-        <StatusBadge status={expense.status} type="expense" />
       </TableCell>
       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
         <Button

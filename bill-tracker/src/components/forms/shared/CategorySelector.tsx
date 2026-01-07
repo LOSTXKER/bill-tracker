@@ -41,15 +41,7 @@ export function CategorySelector({
         <SelectContent>
           {categories.map((category) => (
             <SelectItem key={category.id} value={category.id}>
-              <div className="flex items-center gap-2">
-                {category.color && (
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                  />
-                )}
-                {category.name}
-              </div>
+              {category.name}
             </SelectItem>
           ))}
         </SelectContent>

@@ -30,19 +30,31 @@ export function generateUniqueFilename(originalName: string): string {
   return `${timestamp}-${random}.${extension}`;
 }
 
-export function validateImageFile(file: File): boolean {
-  const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-  const maxSize = 5 * 1024 * 1024; // 5MB
+export function validateFile(file: File): boolean {
+  const imageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  const pdfTypes = ["application/pdf"];
+  const validTypes = [...imageTypes, ...pdfTypes];
+  
+  const maxImageSize = 5 * 1024 * 1024; // 5MB for images
+  const maxPdfSize = 10 * 1024 * 1024; // 10MB for PDF
 
   if (!validTypes.includes(file.type)) {
-    throw new Error("ไฟล์ต้องเป็นรูปภาพเท่านั้น (JPEG, PNG, WebP)");
+    throw new Error("ไฟล์ต้องเป็นรูปภาพ (JPEG, PNG, WebP) หรือ PDF เท่านั้น");
   }
 
+  const isPdf = pdfTypes.includes(file.type);
+  const maxSize = isPdf ? maxPdfSize : maxImageSize;
+  
   if (file.size > maxSize) {
-    throw new Error("ไฟล์ต้องมีขนาดไม่เกิน 5MB");
+    throw new Error(`ไฟล์ต้องมีขนาดไม่เกิน ${isPdf ? "10MB" : "5MB"}`);
   }
 
   return true;
+}
+
+// Keep for backward compatibility
+export function validateImageFile(file: File): boolean {
+  return validateFile(file);
 }
 
 export async function uploadFile(
@@ -51,17 +63,20 @@ export async function uploadFile(
 ): Promise<{ url: string; filename: string }> {
   try {
     // Validate file
-    validateImageFile(file);
+    validateFile(file);
 
-    // Compress image
-    const compressedFile = await compressImage(file);
+    // Check if file is an image (skip compression for PDF)
+    const isImage = file.type.startsWith("image/");
+    
+    // Compress only images, not PDF
+    const fileToUpload = isImage ? await compressImage(file) : file;
 
     // Generate unique filename
     const filename = generateUniqueFilename(file.name);
 
     // Create form data
     const formData = new FormData();
-    formData.append("file", compressedFile);
+    formData.append("file", fileToUpload);
     formData.append("folder", folder);
     formData.append("filename", filename);
 

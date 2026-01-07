@@ -140,6 +140,50 @@ export async function generateText(
 }
 
 /**
+ * Fetch image from URL and convert to base64
+ */
+async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+  }
+  
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const base64 = buffer.toString("base64");
+  
+  // Detect mime type from Content-Type header or URL
+  let mimeType = response.headers.get("content-type") || "image/jpeg";
+  
+  // Clean up mime type (remove charset etc)
+  mimeType = mimeType.split(";")[0].trim();
+  
+  // If blob or unknown, try to detect from URL
+  if (mimeType === "application/octet-stream" || mimeType.includes("blob")) {
+    const ext = url.split(".").pop()?.toLowerCase();
+    const mimeMap: Record<string, string> = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      webp: "image/webp",
+      gif: "image/gif",
+      pdf: "application/pdf",
+    };
+    mimeType = mimeMap[ext || ""] || "image/jpeg";
+  }
+  
+  return { data: base64, mimeType };
+}
+
+/**
+ * Check if string is a URL
+ */
+function isUrl(str: string): boolean {
+  return str.startsWith("http://") || str.startsWith("https://");
+}
+
+/**
  * Analyze image with text prompt (Vision)
  */
 export async function analyzeImage(
@@ -155,6 +199,44 @@ export async function analyzeImage(
   const maxRetries = options?.retries ?? MAX_RETRIES;
   let lastError: Error | null = null;
 
+  // Prepare image data (fetch from URL if needed)
+  let imageBase64: string;
+  let imageMimeType: string = options?.mimeType || "image/jpeg";
+  
+  try {
+    if (Buffer.isBuffer(imageData)) {
+      imageBase64 = imageData.toString("base64");
+    } else if (typeof imageData === "string") {
+      if (isUrl(imageData)) {
+        // Fetch image from URL
+        console.log("Fetching image from URL:", imageData.substring(0, 100) + "...");
+        const fetched = await fetchImageAsBase64(imageData);
+        imageBase64 = fetched.data;
+        imageMimeType = options?.mimeType || fetched.mimeType;
+      } else if (imageData.startsWith("data:")) {
+        // Data URL - extract base64 part
+        const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          imageMimeType = options?.mimeType || matches[1];
+          imageBase64 = matches[2];
+        } else {
+          throw new Error("Invalid data URL format");
+        }
+      } else {
+        // Assume it's already base64
+        imageBase64 = imageData;
+      }
+    } else {
+      throw new Error("Invalid image data type");
+    }
+  } catch (error) {
+    console.error("Failed to prepare image data:", error);
+    return {
+      data: "",
+      error: error instanceof Error ? error.message : "Failed to prepare image data",
+    };
+  }
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const model = getVisionModel();
@@ -164,16 +246,10 @@ export async function analyzeImage(
         maxOutputTokens: options?.maxTokens ?? 2048,
       };
 
-      // Convert image data to base64 if it's a Buffer
-      const imageBase64 =
-        typeof imageData === "string"
-          ? imageData.replace(/^data:image\/\w+;base64,/, "")
-          : imageData.toString("base64");
-
       const imagePart = {
         inlineData: {
           data: imageBase64,
-          mimeType: options?.mimeType || "image/jpeg",
+          mimeType: imageMimeType,
         },
       };
 

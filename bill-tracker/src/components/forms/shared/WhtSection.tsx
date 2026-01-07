@@ -2,6 +2,13 @@
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { WHT_RATES } from "@/lib/utils/tax-calculator";
 
 interface WhtSectionProps {
@@ -21,6 +28,11 @@ export function WhtSection({
   label = "หัก ณ ที่จ่าย",
   description = "หักภาษีผู้ขาย?",
 }: WhtSectionProps) {
+  // Find current selected key based on rate
+  const selectedKey = Object.entries(WHT_RATES).find(
+    ([, { rate }]) => rate === selectedRate
+  )?.[0];
+
   return (
     <div className="space-y-4 rounded-xl border border-border/50 p-4">
       <div className="flex items-center justify-between">
@@ -32,25 +44,28 @@ export function WhtSection({
       </div>
 
       {isEnabled && (
-        <div className="space-y-3 pt-2">
+        <div className="space-y-2">
           <Label className="text-sm text-muted-foreground">ประเภทและอัตรา</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {Object.entries(WHT_RATES).map(([key, { rate, description }]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onRateSelect(rate, key)}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  selectedRate === rate
-                    ? "border-primary bg-primary/5"
-                    : "border-border/50 hover:border-border bg-muted/20"
-                }`}
-              >
-                <div className="font-medium text-foreground text-sm">{description}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{rate}%</div>
-              </button>
-            ))}
-          </div>
+          <Select
+            value={selectedKey || ""}
+            onValueChange={(key) => {
+              const whtInfo = WHT_RATES[key as keyof typeof WHT_RATES];
+              if (whtInfo) {
+                onRateSelect(whtInfo.rate, key);
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
+              <SelectValue placeholder="เลือกประเภทภาษีหัก ณ ที่จ่าย" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(WHT_RATES).map(([key, { rate, description }]) => (
+                <SelectItem key={key} value={key}>
+                  {description} ({rate}%)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
     </div>

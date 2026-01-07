@@ -62,7 +62,6 @@ export default function CategoriesPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    color: "#808080",
     isActive: true,
   });
 
@@ -126,7 +125,7 @@ export default function CategoriesPage() {
         toast.success(editingCategory ? "แก้ไขหมวดหมู่สำเร็จ" : "สร้างหมวดหมู่สำเร็จ");
         setDialogOpen(false);
         setEditingCategory(null);
-        setFormData({ name: "", color: "#808080", isActive: true });
+        setFormData({ name: "", isActive: true });
         fetchCategories();
       } else {
         const error = await response.json();
@@ -141,7 +140,6 @@ export default function CategoriesPage() {
     setEditingCategory(category);
     setFormData({
       name: category.name,
-      color: category.color || "#808080",
       isActive: category.isActive,
     });
     setDialogOpen(true);
@@ -193,7 +191,7 @@ export default function CategoriesPage() {
 
   const openCreateDialog = () => {
     setEditingCategory(null);
-    setFormData({ name: "", color: "#808080", isActive: true });
+    setFormData({ name: "", isActive: true });
     setDialogOpen(true);
   };
 
@@ -258,25 +256,6 @@ export default function CategoriesPage() {
                   placeholder="เช่น ค่าอาหาร, ค่าเดินทาง"
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="color">สี</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="color"
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="w-20 h-10"
-                  />
-                  <Input
-                    type="text"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    placeholder="#808080"
-                    className="flex-1"
-                  />
-                </div>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
@@ -346,7 +325,6 @@ function CategoryTable({ categories, onEdit, onDelete, onToggleActive, loading }
         <TableHeader>
           <TableRow>
             <TableHead>ชื่อหมวดหมู่</TableHead>
-            <TableHead className="w-24">สี</TableHead>
             <TableHead className="w-32">ประเภท</TableHead>
             <TableHead className="w-24">สถานะ</TableHead>
             <TableHead className="w-32 text-right">การกระทำ</TableHead>
@@ -356,14 +334,6 @@ function CategoryTable({ categories, onEdit, onDelete, onToggleActive, loading }
           {categories.map((category) => (
             <TableRow key={category.id}>
               <TableCell className="font-medium">{category.name}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-6 h-6 rounded border"
-                    style={{ backgroundColor: category.color || "#808080" }}
-                  />
-                </div>
-              </TableCell>
               <TableCell>
                 <span className="text-xs px-2 py-1 rounded-full bg-muted">
                   {category.isDefault ? "เริ่มต้น" : "กำหนดเอง"}

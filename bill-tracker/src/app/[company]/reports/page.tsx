@@ -161,6 +161,7 @@ async function VATReport({
         companyId: company.id,
         billDate: { gte: startDate, lte: endDate },
         vatRate: { gt: 0 },
+        deletedAt: null,
       },
       orderBy: { billDate: "asc" },
     }),
@@ -169,6 +170,7 @@ async function VATReport({
         companyId: company.id,
         receiveDate: { gte: startDate, lte: endDate },
         vatRate: { gt: 0 },
+        deletedAt: null,
       },
       orderBy: { receiveDate: "asc" },
     }),
@@ -369,6 +371,7 @@ async function WHTReport({
         companyId: company.id,
         billDate: { gte: startDate, lte: endDate },
         isWht: true,
+        deletedAt: null,
       },
       orderBy: { billDate: "asc" },
     }),
@@ -377,6 +380,7 @@ async function WHTReport({
         companyId: company.id,
         receiveDate: { gte: startDate, lte: endDate },
         isWhtDeducted: true,
+        deletedAt: null,
       },
       orderBy: { receiveDate: "asc" },
     }),
@@ -543,7 +547,7 @@ async function WHTReport({
                       {formatCurrency(Number(income.whtAmount) || 0)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {income.whtCertUrl ? (
+                      {income.whtCertUrls && (income.whtCertUrls as string[]).length > 0 ? (
                         <Badge variant="outline" className="text-green-600 border-green-200">
                           ได้รับแล้ว
                         </Badge>
@@ -587,6 +591,7 @@ async function MonthlySummary({
       where: {
         companyId: company.id,
         billDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
       },
       _sum: { netPaid: true },
       _count: true,
@@ -595,6 +600,7 @@ async function MonthlySummary({
       where: {
         companyId: company.id,
         receiveDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
       },
       _sum: { netReceived: true },
       _count: true,
@@ -604,6 +610,7 @@ async function MonthlySummary({
       where: {
         companyId: company.id,
         billDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
       },
       _sum: { netPaid: true },
       _count: true,

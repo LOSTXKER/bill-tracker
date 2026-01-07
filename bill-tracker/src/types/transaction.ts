@@ -42,12 +42,12 @@ export interface ExpenseTransaction extends BaseTransaction {
   isWht: boolean;
   netPaid: number;
   description?: string | null;
-  category?: string | null;
+  categoryId?: string | null;
   billDate: Date;
   dueDate?: Date | null;
-  slipUrl?: string | null;
-  taxInvoiceUrl?: string | null;
-  whtCertUrl?: string | null;
+  slipUrls?: string[];
+  taxInvoiceUrls?: string[];
+  whtCertUrls?: string[];
 }
 
 export interface IncomeTransaction extends BaseTransaction {
@@ -56,9 +56,9 @@ export interface IncomeTransaction extends BaseTransaction {
   netReceived: number;
   source?: string | null;
   receiveDate: Date;
-  customerSlipUrl?: string | null;
-  myBillCopyUrl?: string | null;
-  whtCertUrl?: string | null;
+  customerSlipUrls?: string[];
+  myBillCopyUrls?: string[];
+  whtCertUrls?: string[];
 }
 
 export type Transaction = ExpenseTransaction | IncomeTransaction;

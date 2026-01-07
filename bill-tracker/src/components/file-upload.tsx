@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useDropzone } from "react-dropzone";
-import { X, Upload, Image as ImageIcon, Loader2 } from "lucide-react";
+import { X, Upload, Image as ImageIcon, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { uploadFile, deleteFile } from "@/lib/storage/upload";
@@ -58,6 +58,7 @@ export function FileUpload({
     onDrop,
     accept: {
       "image/*": [".jpeg", ".jpg", ".png", ".webp"],
+      "application/pdf": [".pdf"],
     },
     maxFiles: maxFiles - files.length,
     disabled: disabled || files.length >= maxFiles,
@@ -121,7 +122,7 @@ export function FileUpload({
                   หรือลากไฟล์มาวาง
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  รองรับ JPEG, PNG, WebP (สูงสุด 5MB)
+                  รองรับ: รูปภาพ (JPEG, PNG, WebP), PDF
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {files.length}/{maxFiles} ไฟล์
@@ -142,37 +143,48 @@ export function FileUpload({
       {/* Preview */}
       {files.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {files.map((url, index) => (
-            <div
-              key={url}
-              className="relative group aspect-square rounded-lg overflow-hidden border border-border"
-            >
-              <img
-                src={url}
-                alt={`Upload ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
+          {files.map((url, index) => {
+            const isPdf = url.toLowerCase().endsWith(".pdf");
+            
+            return (
+              <div
+                key={url}
+                className="relative group aspect-square rounded-lg overflow-hidden border border-border"
+              >
+                {isPdf ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
+                    <FileText className="h-12 w-12 text-red-500" />
+                    <span className="text-xs text-muted-foreground mt-2">PDF</span>
+                  </div>
+                ) : (
+                  <img
+                    src={url}
+                    alt={`Upload ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                )}
 
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  onClick={() => removeFile(url)}
-                  disabled={disabled}
-                  className="rounded-full"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => removeFile(url)}
+                    disabled={disabled}
+                    className="rounded-full"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
 
-              {/* Badge */}
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                {index + 1}
+                {/* Badge */}
+                <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                  {index + 1}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -30,6 +30,7 @@ import {
   PieChart,
   History,
   Tags,
+  Download,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
 import { PermissionProvider } from "@/components/providers/permission-provider";
@@ -100,6 +101,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       href: `/${companyCode}/audit-logs`,
       icon: History,
       permission: "audit:read",
+    },
+    {
+      name: "ส่งออกข้อมูล",
+      href: `/${companyCode}/exports`,
+      icon: Download,
+      permission: "settings:read",
     },
     {
       name: "ตั้งค่า",

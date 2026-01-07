@@ -10,6 +10,13 @@
  */
 
 import { prisma } from "@/lib/db";
+import { 
+  LineNotifySettings, 
+  mergeSettings, 
+  parseTemplate, 
+  formatCurrency,
+  STATUS_LABELS 
+} from "./settings";
 
 const LINE_API_URL = "https://api.line.me/v2/bot/message";
 
@@ -17,13 +24,15 @@ interface CompanyLineConfig {
   channelAccessToken: string;
   groupId: string;
   notifyEnabled: boolean;
+  notifySettings: LineNotifySettings;
 }
 
 /**
  * Get LINE configuration for a company from database
  */
 export async function getCompanyLineConfig(
-  companyId: string
+  companyId: string,
+  checkEnabled: boolean = true
 ): Promise<CompanyLineConfig | null> {
   try {
     const company = await prisma.company.findUnique({
@@ -32,6 +41,7 @@ export async function getCompanyLineConfig(
         lineChannelAccessToken: true,
         lineGroupId: true,
         lineNotifyEnabled: true,
+        lineNotifySettings: true,
       },
     });
 
@@ -42,8 +52,8 @@ export async function getCompanyLineConfig(
       return null;
     }
 
-    // Check if notifications are enabled
-    if (!company.lineNotifyEnabled) {
+    // Check if notifications are enabled (unless bypassed)
+    if (checkEnabled && !company.lineNotifyEnabled) {
       console.log(`LINE notifications disabled for company ${companyId}`);
       return null;
     }
@@ -52,6 +62,7 @@ export async function getCompanyLineConfig(
       channelAccessToken: company.lineChannelAccessToken,
       groupId: company.lineGroupId,
       notifyEnabled: company.lineNotifyEnabled,
+      notifySettings: mergeSettings(company.lineNotifySettings as Partial<LineNotifySettings> | null),
     };
   } catch (error) {
     console.error("Failed to get LINE config:", error);
@@ -63,7 +74,8 @@ export async function getCompanyLineConfig(
  * Get LINE configuration by company code
  */
 export async function getCompanyLineConfigByCode(
-  companyCode: string
+  companyCode: string,
+  checkEnabled: boolean = true
 ): Promise<CompanyLineConfig | null> {
   try {
     const company = await prisma.company.findUnique({
@@ -72,6 +84,7 @@ export async function getCompanyLineConfigByCode(
         lineChannelAccessToken: true,
         lineGroupId: true,
         lineNotifyEnabled: true,
+        lineNotifySettings: true,
       },
     });
 
@@ -82,8 +95,8 @@ export async function getCompanyLineConfigByCode(
       return null;
     }
 
-    // Check if notifications are enabled
-    if (!company.lineNotifyEnabled) {
+    // Check if notifications are enabled (unless bypassed)
+    if (checkEnabled && !company.lineNotifyEnabled) {
       console.log(`LINE notifications disabled for company code ${companyCode}`);
       return null;
     }
@@ -92,6 +105,7 @@ export async function getCompanyLineConfigByCode(
       channelAccessToken: company.lineChannelAccessToken,
       groupId: company.lineGroupId,
       notifyEnabled: company.lineNotifyEnabled,
+      notifySettings: mergeSettings(company.lineNotifySettings as Partial<LineNotifySettings> | null),
     };
   } catch (error) {
     console.error("Failed to get LINE config:", error);
@@ -188,6 +202,12 @@ function formatNumber(amount: number): string {
   }).format(amount);
 }
 
+interface MessageFormatOptions {
+  showDetailLink?: boolean;
+  showVatBreakdown?: boolean;
+  showWhtInfo?: boolean;
+}
+
 /**
  * Create expense notification (Flex Message)
  */
@@ -204,7 +224,13 @@ export function createExpenseFlexMessage(expense: {
   whtAmount?: number;
   netPaid: number;
   status: string;
-}, baseUrl?: string): LineMessage {
+}, baseUrl?: string, formatOptions?: MessageFormatOptions): LineMessage {
+  const options: MessageFormatOptions = {
+    showDetailLink: true,
+    showVatBreakdown: true,
+    showWhtInfo: true,
+    ...formatOptions,
+  };
   const statusConfig: Record<string, { emoji: string; text: string; color: string; bgColor: string }> = {
     WAITING_FOR_DOC: { emoji: "📋", text: "รอใบเสร็จ", color: "#F59E0B", bgColor: "#FEF3C7" },
     PENDING_PHYSICAL: { emoji: "📄", text: "รอส่งบัญชี", color: "#EF4444", bgColor: "#FEE2E2" },
@@ -284,8 +310,8 @@ export function createExpenseFlexMessage(expense: {
     },
   ];
 
-  // Add VAT row if applicable
-  if (expense.vatAmount && expense.vatAmount > 0) {
+  // Add VAT row if applicable and enabled in options
+  if (options.showVatBreakdown && expense.vatAmount && expense.vatAmount > 0) {
     bodyContents.push({
       type: "box",
       layout: "horizontal",
@@ -311,8 +337,8 @@ export function createExpenseFlexMessage(expense: {
     });
   }
 
-  // Add WHT row if applicable
-  if (expense.isWht && expense.whtAmount) {
+  // Add WHT row if applicable and enabled in options
+  if (options.showWhtInfo && expense.isWht && expense.whtAmount) {
     bodyContents.push({
       type: "box",
       layout: "horizontal",
@@ -358,8 +384,8 @@ export function createExpenseFlexMessage(expense: {
     margin: "lg",
   });
 
-  // Build footer with view button if id and companyCode are provided
-  const viewUrl = expense.id && expense.companyCode && baseUrl 
+  // Build footer with view button if id and companyCode are provided and enabled
+  const viewUrl = options.showDetailLink && expense.id && expense.companyCode && baseUrl 
     ? `${baseUrl}/${expense.companyCode}/expenses/${expense.id}`
     : null;
 
@@ -464,7 +490,13 @@ export function createIncomeFlexMessage(income: {
   whtAmount?: number;
   netReceived: number;
   status: string;
-}, baseUrl?: string): LineMessage {
+}, baseUrl?: string, formatOptions?: MessageFormatOptions): LineMessage {
+  const options: MessageFormatOptions = {
+    showDetailLink: true,
+    showVatBreakdown: true,
+    showWhtInfo: true,
+    ...formatOptions,
+  };
   const statusConfig: Record<string, { emoji: string; text: string; color: string; bgColor: string }> = {
     NO_DOC_REQUIRED: { emoji: "⚪", text: "ไม่ต้องทำเอกสาร", color: "#6B7280", bgColor: "#F3F4F6" },
     WAITING_ISSUE: { emoji: "📝", text: "รอออกบิล", color: "#F59E0B", bgColor: "#FEF3C7" },
@@ -545,8 +577,8 @@ export function createIncomeFlexMessage(income: {
     },
   ];
 
-  // Add VAT row if applicable
-  if (income.vatAmount && income.vatAmount > 0) {
+  // Add VAT row if applicable and enabled in options
+  if (options.showVatBreakdown && income.vatAmount && income.vatAmount > 0) {
     bodyContents.push({
       type: "box",
       layout: "horizontal",
@@ -572,8 +604,8 @@ export function createIncomeFlexMessage(income: {
     });
   }
 
-  // Add WHT row if applicable
-  if (income.isWhtDeducted && income.whtAmount) {
+  // Add WHT row if applicable and enabled in options
+  if (options.showWhtInfo && income.isWhtDeducted && income.whtAmount) {
     bodyContents.push({
       type: "box",
       layout: "horizontal",
@@ -635,8 +667,8 @@ export function createIncomeFlexMessage(income: {
     });
   }
 
-  // Build footer with view button if id and companyCode are provided
-  const viewUrl = income.id && income.companyCode && baseUrl 
+  // Build footer with view button if id and companyCode are provided and enabled
+  const viewUrl = options.showDetailLink && income.id && income.companyCode && baseUrl 
     ? `${baseUrl}/${income.companyCode}/incomes/${income.id}`
     : null;
 
@@ -970,12 +1002,9 @@ export async function notifyCompanyText(
   return sendTextMessage(config.channelAccessToken, config.groupId, text);
 }
 
-/**
- * Send expense notification to company
- */
-export async function notifyExpense(
-  companyId: string,
-  expense: {
+export type NotificationScenario = "onCreate" | "onStatusChange" | "onUpdate" | "onDelete";
+
+interface ExpenseNotificationData {
     id?: string;
     companyCode?: string;
     companyName: string;
@@ -988,19 +1017,12 @@ export async function notifyExpense(
     whtAmount?: number;
     netPaid: number;
     status: string;
-  },
-  baseUrl?: string
-): Promise<boolean> {
-  const message = createExpenseFlexMessage(expense, baseUrl);
-  return notifyCompanyById(companyId, message);
+  oldStatus?: string;
+  category?: string;
+  invoiceNumber?: string;
 }
 
-/**
- * Send income notification to company
- */
-export async function notifyIncome(
-  companyId: string,
-  income: {
+interface IncomeNotificationData {
     id?: string;
     companyCode?: string;
     companyName: string;
@@ -1013,11 +1035,135 @@ export async function notifyIncome(
     whtAmount?: number;
     netReceived: number;
     status: string;
-  },
-  baseUrl?: string
+  oldStatus?: string;
+  category?: string;
+  invoiceNumber?: string;
+}
+
+/**
+ * Send expense notification to company with scenario check
+ */
+export async function notifyExpense(
+  companyId: string,
+  expense: ExpenseNotificationData,
+  baseUrl?: string,
+  scenario: NotificationScenario = "onCreate"
 ): Promise<boolean> {
-  const message = createIncomeFlexMessage(income, baseUrl);
-  return notifyCompanyById(companyId, message);
+  const config = await getCompanyLineConfig(companyId);
+  
+  if (!config) {
+    console.warn(`LINE not configured for company ${companyId}`);
+    return false;
+  }
+
+  // Check if this scenario is enabled
+  const settings = config.notifySettings;
+  const scenarioConfig = settings.expenses[scenario];
+  
+  if (!scenarioConfig?.enabled) {
+    console.log(`Expense notification for scenario "${scenario}" is disabled`);
+    return false;
+  }
+
+  // Decide message format based on settings
+  let message: LineMessage;
+  
+  if (settings.messageFormat.useFlexMessage) {
+    message = createExpenseFlexMessage(expense, baseUrl, settings.messageFormat);
+  } else {
+    // Use custom template
+    const template = scenario === "onStatusChange" 
+      ? settings.customTemplates.expenseStatusChange
+      : settings.customTemplates.expenseCreate;
+    
+    const text = parseTemplate(template, {
+      companyName: expense.companyName,
+      vendorName: expense.vendorName || "ไม่ระบุผู้ขาย",
+      description: expense.description || "",
+      amount: formatCurrency(expense.amount),
+      vatAmount: expense.vatAmount ? formatCurrency(expense.vatAmount) : "0",
+      whtRate: expense.whtRate?.toString() || "0",
+      whtAmount: expense.whtAmount ? formatCurrency(expense.whtAmount) : "0",
+      netPaid: formatCurrency(expense.netPaid),
+      status: STATUS_LABELS[expense.status] || expense.status,
+      oldStatus: expense.oldStatus ? (STATUS_LABELS[expense.oldStatus] || expense.oldStatus) : "",
+      newStatus: STATUS_LABELS[expense.status] || expense.status,
+      category: expense.category || "",
+      date: new Date().toLocaleDateString("th-TH"),
+      invoiceNumber: expense.invoiceNumber || "",
+    });
+    
+    message = { type: "text", text };
+  }
+
+  return sendLineMessage({
+    channelAccessToken: config.channelAccessToken,
+    to: config.groupId,
+    messages: [message],
+  });
+}
+
+/**
+ * Send income notification to company with scenario check
+ */
+export async function notifyIncome(
+  companyId: string,
+  income: IncomeNotificationData,
+  baseUrl?: string,
+  scenario: NotificationScenario = "onCreate"
+): Promise<boolean> {
+  const config = await getCompanyLineConfig(companyId);
+  
+  if (!config) {
+    console.warn(`LINE not configured for company ${companyId}`);
+    return false;
+  }
+
+  // Check if this scenario is enabled
+  const settings = config.notifySettings;
+  const scenarioConfig = settings.incomes[scenario];
+  
+  if (!scenarioConfig?.enabled) {
+    console.log(`Income notification for scenario "${scenario}" is disabled`);
+    return false;
+  }
+
+  // Decide message format based on settings
+  let message: LineMessage;
+  
+  if (settings.messageFormat.useFlexMessage) {
+    message = createIncomeFlexMessage(income, baseUrl, settings.messageFormat);
+  } else {
+    // Use custom template
+    const template = scenario === "onStatusChange" 
+      ? settings.customTemplates.incomeStatusChange
+      : settings.customTemplates.incomeCreate;
+    
+    const text = parseTemplate(template, {
+      companyName: income.companyName,
+      customerName: income.customerName || "ไม่ระบุลูกค้า",
+      source: income.source || "",
+      amount: formatCurrency(income.amount),
+      vatAmount: income.vatAmount ? formatCurrency(income.vatAmount) : "0",
+      whtRate: income.whtRate?.toString() || "0",
+      whtAmount: income.whtAmount ? formatCurrency(income.whtAmount) : "0",
+      netReceived: formatCurrency(income.netReceived),
+      status: STATUS_LABELS[income.status] || income.status,
+      oldStatus: income.oldStatus ? (STATUS_LABELS[income.oldStatus] || income.oldStatus) : "",
+      newStatus: STATUS_LABELS[income.status] || income.status,
+      category: income.category || "",
+      date: new Date().toLocaleDateString("th-TH"),
+      invoiceNumber: income.invoiceNumber || "",
+    });
+    
+    message = { type: "text", text };
+  }
+
+  return sendLineMessage({
+    channelAccessToken: config.channelAccessToken,
+    to: config.groupId,
+    messages: [message],
+  });
 }
 
 /**

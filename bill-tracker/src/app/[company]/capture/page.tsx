@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { ExpenseForm } from "@/components/forms/expense-form";
@@ -12,10 +13,22 @@ interface CapturePageProps {
 
 export default function CapturePage({ params }: CapturePageProps) {
   const { company: companyCode } = use(params);
-  const [activeTab, setActiveTab] = useState<"expense" | "income">("expense");
+  const searchParams = useSearchParams();
+  const typeParam = searchParams.get("type");
+  
+  // Set initial tab based on query parameter, default to "expense"
+  const initialTab = (typeParam === "income" || typeParam === "expense") ? typeParam : "expense";
+  const [activeTab, setActiveTab] = useState<"expense" | "income">(initialTab);
+  
+  // Update tab when query parameter changes
+  useEffect(() => {
+    if (typeParam === "income" || typeParam === "expense") {
+      setActiveTab(typeParam);
+    }
+  }, [typeParam]);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl lg:max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">
           บันทึกรายการ
@@ -26,7 +39,7 @@ export default function CapturePage({ params }: CapturePageProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "expense" | "income")}>
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
           <TabsTrigger
             value="expense"
             className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground"

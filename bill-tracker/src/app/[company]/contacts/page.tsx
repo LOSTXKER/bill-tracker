@@ -1,13 +1,10 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -16,14 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,20 +32,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
-
-interface Contact {
-  id: string;
-  name: string;
-  taxId?: string | null;
-  address?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  bankAccount?: string | null;
-  bankName?: string | null;
-  creditLimit?: number | null;
-  paymentTerms?: number | null;
-  notes?: string | null;
-}
+import { CreateContactDialog, Contact } from "@/components/forms/shared/CreateContactDialog";
 
 interface ContactsPageProps {
   params: Promise<{ company: string }>;
@@ -64,27 +40,11 @@ interface ContactsPageProps {
 
 export default function ContactsPage({ params }: ContactsPageProps) {
   const { company: companyCode } = use(params);
-  const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    taxId: "",
-    address: "",
-    phone: "",
-    email: "",
-    bankAccount: "",
-    bankName: "",
-    creditLimit: "",
-    paymentTerms: "",
-    notes: "",
-  });
 
   const fetchContacts = async () => {
     setIsLoading(true);
@@ -107,80 +67,20 @@ export default function ContactsPage({ params }: ContactsPageProps) {
     fetchContacts();
   }, [companyCode, search]);
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      taxId: "",
-      address: "",
-      phone: "",
-      email: "",
-      bankAccount: "",
-      bankName: "",
-      creditLimit: "",
-      paymentTerms: "",
-      notes: "",
-    });
-    setEditingContact(null);
-  };
-
   const handleOpenDialog = (contact?: Contact) => {
-    if (contact) {
-      setEditingContact(contact);
-      setFormData({
-        name: contact.name || "",
-        taxId: contact.taxId || "",
-        address: contact.address || "",
-        phone: contact.phone || "",
-        email: contact.email || "",
-        bankAccount: contact.bankAccount || "",
-        bankName: contact.bankName || "",
-        creditLimit: contact.creditLimit?.toString() || "",
-        paymentTerms: contact.paymentTerms?.toString() || "",
-        notes: contact.notes || "",
-      });
-    } else {
-      resetForm();
-    }
+    setEditingContact(contact || null);
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      toast.error("กรุณาระบุชื่อ");
-      return;
+  const handleDialogClose = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setEditingContact(null);
     }
+  };
 
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        ...formData,
-        companyCode: companyCode.toUpperCase(),
-        creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : null,
-        paymentTerms: formData.paymentTerms ? parseInt(formData.paymentTerms) : null,
-        ...(editingContact && { id: editingContact.id }),
-      };
-
-      const res = await fetch("/api/contacts", {
-        method: editingContact ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        toast.success(editingContact ? "แก้ไขสำเร็จ" : "เพิ่มผู้ติดต่อสำเร็จ");
-        setIsDialogOpen(false);
-        resetForm();
-        fetchContacts();
-      } else {
-        throw new Error(data.error || "เกิดข้อผิดพลาด");
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleContactSuccess = () => {
+    fetchContacts();
   };
 
   const handleDelete = async (id: string) => {
@@ -213,151 +113,20 @@ export default function ContactsPage({ params }: ContactsPageProps) {
             จัดการรายชื่อลูกค้าและผู้ขาย
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              เพิ่มผู้ติดต่อ
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingContact ? "แก้ไขผู้ติดต่อ" : "เพิ่มผู้ติดต่อใหม่"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">ชื่อ *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="ชื่อบุคคลหรือบริษัท"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">เบอร์โทร</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="08x-xxx-xxxx"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">อีเมล</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="email@example.com"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="taxId">เลขประจำตัวผู้เสียภาษี</Label>
-                <Input
-                  id="taxId"
-                  value={formData.taxId}
-                  onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                  placeholder="13 หลัก"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">ที่อยู่</Label>
-                <Textarea
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="ที่อยู่เต็ม"
-                  rows={2}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bankName">ธนาคาร</Label>
-                  <Input
-                    id="bankName"
-                    value={formData.bankName}
-                    onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                    placeholder="เช่น กสิกรไทย"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bankAccount">เลขบัญชี</Label>
-                  <Input
-                    id="bankAccount"
-                    value={formData.bankAccount}
-                    onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
-                    placeholder="xxx-x-xxxxx-x"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="creditLimit">วงเงินเครดิต</Label>
-                  <Input
-                    id="creditLimit"
-                    type="number"
-                    value={formData.creditLimit}
-                    onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="paymentTerms">เครดิต (วัน)</Label>
-                  <Input
-                    id="paymentTerms"
-                    type="number"
-                    value={formData.paymentTerms}
-                    onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                    placeholder="30"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">หมายเหตุ</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="หมายเหตุเพิ่มเติม"
-                  rows={2}
-                />
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  ยกเลิก
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      กำลังบันทึก...
-                    </>
-                  ) : (
-                    "บันทึก"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => handleOpenDialog()}>
+          <Plus className="h-4 w-4 mr-2" />
+          เพิ่มผู้ติดต่อ
+        </Button>
       </div>
+
+      {/* Create/Edit Contact Dialog */}
+      <CreateContactDialog
+        open={isDialogOpen}
+        onOpenChange={handleDialogClose}
+        companyCode={companyCode}
+        editingContact={editingContact}
+        onSuccess={handleContactSuccess}
+      />
 
       {/* Search */}
       <Card>
