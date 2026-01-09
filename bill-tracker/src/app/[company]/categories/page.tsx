@@ -73,8 +73,9 @@ export default function CategoriesPage() {
     try {
       const response = await fetch(`/api/${companyCode}/categories?type=${activeTab}`);
       if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
+        const result = await response.json();
+        // API returns { success: true, data: { categories: [...] } }
+        setCategories(result.data?.categories || []);
       }
     } catch (error) {
       console.error("Error fetching categories:", error);

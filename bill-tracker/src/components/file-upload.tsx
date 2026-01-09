@@ -22,10 +22,12 @@ export function FileUpload({
   folder = "receipts",
   disabled = false,
 }: FileUploadProps) {
-  const [files, setFiles] = React.useState<string[]>(value);
+  // Filter out null/undefined values from initial value
+  const initialFiles = (value || []).filter((v) => v && typeof v === "string");
+  const [files, setFiles] = React.useState<string[]>(initialFiles);
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const prevValueRef = React.useRef<string>(JSON.stringify(value));
+  const prevValueRef = React.useRef<string>(JSON.stringify(initialFiles));
 
   const onDrop = React.useCallback(
     async (acceptedFiles: File[]) => {
@@ -79,11 +81,13 @@ export function FileUpload({
 
   // Update internal state when value prop changes
   React.useEffect(() => {
-    const valueStr = JSON.stringify(value);
+    // Filter out null/undefined values
+    const filteredValue = (value || []).filter((v) => v && typeof v === "string");
+    const valueStr = JSON.stringify(filteredValue);
     // Only update if content has actually changed (not just reference)
     if (valueStr !== prevValueRef.current) {
       prevValueRef.current = valueStr;
-      setFiles(value);
+      setFiles(filteredValue);
     }
   }, [value]);
 
@@ -143,7 +147,7 @@ export function FileUpload({
       {/* Preview */}
       {files.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {files.map((url, index) => {
+          {files.filter((url) => url && typeof url === "string").map((url, index) => {
             const isPdf = url.toLowerCase().endsWith(".pdf");
             
             return (
