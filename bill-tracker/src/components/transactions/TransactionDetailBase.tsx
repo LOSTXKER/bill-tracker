@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { DatePicker } from "@/components/forms/shared/DatePicker";
 import { ContactSelector } from "@/components/forms/shared/ContactSelector";
 import { useContacts } from "@/hooks/use-contacts";
+import { useCategories } from "@/hooks/use-categories";
 import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 import type { ContactSummary } from "@/types";
@@ -166,6 +167,13 @@ export function TransactionDetailBase({
   const { contacts, isLoading: contactsLoading, refetch: refetchContacts } = useContacts(companyCode);
   const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
 
+  // Fetch categories for the selector
+  const { categories, isLoading: categoriesLoading } = useCategories(
+    companyCode,
+    config.type.toUpperCase() as "EXPENSE" | "INCOME"
+  );
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   // Fetch transaction
   const fetchTransaction = useCallback(async () => {
     try {
@@ -231,6 +239,13 @@ export function TransactionDetailBase({
     }
   }, [transaction?.contact]);
 
+  // Set selected category when transaction is loaded
+  useEffect(() => {
+    if (transaction?.categoryId) {
+      setSelectedCategory(transaction.categoryId);
+    }
+  }, [transaction?.categoryId]);
+
   useEffect(() => {
     fetchTransaction();
   }, [fetchTransaction]);
@@ -266,6 +281,7 @@ export function TransactionDetailBase({
         body: JSON.stringify({
           ...editData,
           contactId: selectedContact?.id || null,
+          categoryId: selectedCategory || null,
           amount: Number(editData.amount),
           vatRate: Number(editData.vatRate),
           vatAmount: calc.vatAmount,
@@ -504,31 +520,30 @@ export function TransactionDetailBase({
               </div>
 
               <div className="grid sm:grid-cols-2 gap-6">
-                {/* Category (expense only) */}
-                {config.showCategory && config.categoryLabels && (
+                {/* Category - using new Category model */}
+                {config.showCategory && (
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">หมวดหมู่</Label>
                     {isEditing ? (
                       <Select
-                        value={(editData.category as string) || ""}
-                        onValueChange={(v) => setEditData({ ...editData, category: v })}
+                        value={selectedCategory || ""}
+                        onValueChange={(v) => setSelectedCategory(v || null)}
+                        disabled={categoriesLoading}
                       >
                         <SelectTrigger className="h-11 bg-muted/30">
                           <SelectValue placeholder="เลือกหมวดหมู่" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(config.categoryLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
                       <p className="text-sm font-medium">
-                        {transaction.category && config.categoryLabels[transaction.category as string] 
-                          ? config.categoryLabels[transaction.category as string] 
-                          : <span className="text-muted-foreground">-</span>}
+                        {transaction.categoryRef?.name || <span className="text-muted-foreground">-</span>}
                       </p>
                     )}
                   </div>
