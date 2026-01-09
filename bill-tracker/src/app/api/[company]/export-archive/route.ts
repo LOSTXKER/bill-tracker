@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
@@ -477,7 +477,7 @@ export async function GET(
       })();
 
       // Return streaming response
-      return new Response(readable, { headers });
+      return new NextResponse(readable, { headers });
     } catch (error) {
       console.error("Export archive error:", error);
       return apiResponse.error("เกิดข้อผิดพลาดในการส่งออกข้อมูล");
