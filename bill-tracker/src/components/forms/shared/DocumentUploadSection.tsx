@@ -197,14 +197,14 @@ export function DocumentUploadSection({
   const [isAnalyzed, setIsAnalyzed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get all files as flat array
+  // Get all files as flat array (filter out null/undefined)
   const getAllFiles = useCallback(() => {
     return [
       ...files.uncategorized,
       ...files.invoice,
       ...files.slip,
       ...files.whtCert,
-    ];
+    ].filter((url): url is string => url != null && url !== "");
   }, [files]);
 
   const totalFileCount = getAllFiles().length;
