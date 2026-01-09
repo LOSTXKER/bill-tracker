@@ -118,6 +118,7 @@ export async function fetchExpenses(params: FetchExpensesParams) {
       take: limit,
       include: {
         contact: true,
+        categoryRef: true,
         creator: {
           select: {
             id: true,

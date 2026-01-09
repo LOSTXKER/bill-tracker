@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { toNumber } from "@/lib/utils/serializers";
-import { EXPENSE_CATEGORY_LABELS } from "@/lib/validations/expense";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { useTransactionRow } from "@/hooks/use-transaction-row";
@@ -17,7 +16,8 @@ interface ExpenseTableRowProps {
     id: string;
     billDate: Date;
     description: string | null;
-    category: string | null;
+    category: string | null; // deprecated
+    categoryRef?: { id: string; name: string } | null; // new
     netPaid: number | bigint | { toNumber?: () => number };
     status: string;
     contact: { name: string } | null;
@@ -74,9 +74,7 @@ export function ExpenseTableRow({
         </p>
       </TableCell>
       <TableCell className="text-muted-foreground">
-        {expense.category
-          ? EXPENSE_CATEGORY_LABELS[expense.category] || expense.category
-          : "-"}
+        {expense.categoryRef?.name || "-"}
       </TableCell>
       <TableCell>
         {expense.description ? (
