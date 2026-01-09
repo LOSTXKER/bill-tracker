@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { uploadFile, deleteFile } from "@/lib/storage/upload";
 
@@ -465,33 +471,51 @@ export function DocumentUploadSection({
                 </p>
               </div>
             </div>
-            <Button
-              type="button"
-              variant={isAnalyzed ? "outline" : "default"}
-              size="sm"
-              onClick={analyzeDocuments}
-              disabled={isAnalyzing || !hasAnyFiles}
-              className={cn(
-                !isAnalyzed && "bg-primary hover:bg-primary/90"
-              )}
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังวิเคราะห์...
-                </>
-              ) : isAnalyzed ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  วิเคราะห์ใหม่
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  วิเคราะห์
-                </>
-              )}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={isAnalyzed ? "outline" : "default"}
+                    size="sm"
+                    onClick={analyzeDocuments}
+                    disabled={isAnalyzing || !hasAnyFiles}
+                    className={cn(
+                      !isAnalyzed && "bg-primary hover:bg-primary/90"
+                    )}
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        กำลังวิเคราะห์...
+                      </>
+                    ) : isAnalyzed ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        วิเคราะห์ใหม่
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        วิเคราะห์
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-sm">
+                  <p className="font-semibold mb-1">AI วิเคราะห์เอกสาร</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    ระบบจะอ่านและวิเคราะห์เอกสารทั้งหมดพร้อมกัน เพื่อดึงข้อมูล:
+                  </p>
+                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                    <li>ชื่อร้าน/ผู้ขาย และเลขผู้เสียภาษี</li>
+                    <li>ยอดเงิน VAT วันที่ เลขที่เอกสาร</li>
+                    <li>รายการสินค้า/บริการที่ซื้อ</li>
+                    <li>ค้นหา vendor mapping ที่เคยสอนไว้</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}

@@ -26,6 +26,12 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, LucideIcon, GraduationCap, Sparkles, Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useContacts } from "@/hooks/use-contacts";
 import { useCategories } from "@/hooks/use-categories";
 import { AmountInput } from "./AmountInput";
@@ -870,23 +876,36 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       <div className="flex items-center justify-between">
                         <Label className="text-sm font-medium">หมวดหมู่</Label>
                         {/* AI Suggest Category Button - Always visible, compact */}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs text-muted-foreground hover:text-primary"
-                          onClick={suggestCategory}
-                          disabled={isSuggestingCategory}
-                        >
-                          {isSuggestingCategory ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <>
-                              <Sparkles className="h-3 w-3 mr-1" />
-                              AI แนะนำ
-                            </>
-                          )}
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-muted-foreground hover:text-primary"
+                                onClick={suggestCategory}
+                                disabled={isSuggestingCategory}
+                              >
+                                {isSuggestingCategory ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    AI แนะนำ
+                                  </>
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-xs">
+                              <p className="font-semibold mb-1">AI แนะนำหมวดหมู่</p>
+                              <p className="text-xs text-muted-foreground">
+                                วิเคราะห์ชื่อคู่ค้า รายละเอียด และรายการสินค้า
+                                เพื่อแนะนำหมวดหมู่ที่เหมาะสม พร้อมแสดงความมั่นใจ
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                       <CategorySelector
                         categories={categories}
@@ -918,15 +937,33 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                           <div className="flex items-center gap-2 mb-2">
                             <Sparkles className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">AI แนะนำ</span>
-                            <Badge variant="outline" className={
-                              (suggestion.confidence || 0) >= 80 
-                                ? "border-green-500 text-green-600" 
-                                : (suggestion.confidence || 0) >= 60
-                                ? "border-yellow-500 text-yellow-600"
-                                : "border-red-500 text-red-600"
-                            }>
-                              {suggestion.confidence}%
-                            </Badge>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className={
+                                    (suggestion.confidence || 0) >= 80 
+                                      ? "border-green-500 text-green-600 cursor-help" 
+                                      : (suggestion.confidence || 0) >= 60
+                                      ? "border-yellow-500 text-yellow-600 cursor-help"
+                                      : "border-red-500 text-red-600 cursor-help"
+                                  }>
+                                    {suggestion.confidence}%
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs space-y-1">
+                                    <p className="font-semibold">ความมั่นใจของ AI</p>
+                                    <p className="text-muted-foreground">
+                                      {(suggestion.confidence || 0) >= 80 
+                                        ? "สูงมาก - แนะนำให้ใช้" 
+                                        : (suggestion.confidence || 0) >= 60
+                                        ? "ปานกลาง - ควรตรวจสอบ"
+                                        : "ต่ำ - ลองดูอีกครั้ง"}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">
                             {suggestion.reason}
@@ -948,12 +985,25 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       );
                     })()}
                     
-                    {/* Quick Train AI Button - Show when contact+category selected but no existing mapping */}
+                    {/* Quick Train AI Info - Show when contact+category selected but no existing mapping */}
                     {selectedContact && selectedCategory && !aiResult?.smart?.mapping && (
-                      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                        <Brain className="h-3 w-3" />
-                        <span>เมื่อบันทึก AI จะจดจำ: &quot;{selectedContact.name}&quot; → หมวดหมู่นี้</span>
-                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground cursor-help">
+                              <Brain className="h-3 w-3" />
+                              <span>เมื่อบันทึก AI จะจดจำ: &quot;{selectedContact.name}&quot; → หมวดหมู่นี้</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="font-semibold mb-1">การเรียนรู้อัตโนมัติ</p>
+                            <p className="text-xs text-muted-foreground">
+                              AI จะจดจำความสัมพันธ์ระหว่างคู่ค้ากับหมวดหมู่นี้
+                              เมื่อพบคู่ค้าเดียวกันครั้งต่อไป AI จะใส่หมวดหมู่ให้อัตโนมัติ
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
 
