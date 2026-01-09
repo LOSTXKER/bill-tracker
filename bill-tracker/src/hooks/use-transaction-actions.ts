@@ -38,6 +38,7 @@ export function useTransactionActions({
       }
 
       toast.success("ลบรายการสำเร็จ");
+      router.refresh();
       router.push(`/${companyCode}/${transactionType}s`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -64,6 +65,9 @@ export function useTransactionActions({
       toast.success(
         `เปลี่ยนสถานะเป็น "${statusInfo[newStatus]?.label || newStatus}" สำเร็จ`
       );
+      
+      // Trigger real-time update
+      router.refresh();
       onSuccess?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");

@@ -97,6 +97,27 @@ export function TransactionListClient({
     });
   }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
 
+  // Real-time update: Refetch when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      startTransition(async () => {
+        const result = await fetchData({
+          companyCode,
+          ...filters,
+          page,
+          limit,
+          sortBy,
+          sortOrder,
+        });
+        setData(result.data);
+        setTotal(result.total);
+      });
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
+
   // Selection handlers
   const toggleSelectAll = () => {
     if (selectedIds.length === data.length) {
@@ -122,7 +143,22 @@ export function TransactionListClient({
           fetch(`${config.apiEndpoint}/${id}`, { method: "DELETE" })
         )
       );
+      
+      // Real-time update: Refetch immediately
       router.refresh();
+      startTransition(async () => {
+        const result = await fetchData({
+          companyCode,
+          ...filters,
+          page,
+          limit,
+          sortBy,
+          sortOrder,
+        });
+        setData(result.data);
+        setTotal(result.total);
+        setSelectedIds([]);
+      });
     } catch (error) {
       console.error("Bulk delete failed:", error);
     }
@@ -139,7 +175,21 @@ export function TransactionListClient({
           })
         )
       );
+      
+      // Real-time update: Refetch immediately
       router.refresh();
+      startTransition(async () => {
+        const result = await fetchData({
+          companyCode,
+          ...filters,
+          page,
+          limit,
+          sortBy,
+          sortOrder,
+        });
+        setData(result.data);
+        setTotal(result.total);
+      });
     } catch (error) {
       console.error("Bulk status change failed:", error);
     }

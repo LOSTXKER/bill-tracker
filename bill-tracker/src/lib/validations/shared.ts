@@ -43,16 +43,18 @@ export const paymentMethodSchema = z.enum([
 
 /**
  * Contact reference (vendor/customer)
+ * REQUIRED: All transactions must have a contact
  */
 export const contactReferenceSchema = z.object({
-  contactId: z.string().optional().nullable(),
+  contactId: z.string().min(1, "กรุณาเลือกผู้ติดต่อ"),
 });
 
 /**
  * Category reference
+ * REQUIRED: All transactions must have a category
  */
 export const categoryReferenceSchema = z.object({
-  categoryId: z.string().optional().nullable(),
+  categoryId: z.string().min(1, "กรุณาเลือกหมวดหมู่"),
 });
 
 /**

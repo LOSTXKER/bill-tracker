@@ -15,7 +15,7 @@ const expenseBaseSchema = baseTransactionSchema.extend({
   ...whtFieldsSchema.shape,
   
   // Expense-specific details
-  description: z.string().max(500).optional(),
+  description: z.string().min(1, "กรุณาระบุรายละเอียด").max(500),
   category: z.enum([
     "MATERIAL",
     "UTILITY",

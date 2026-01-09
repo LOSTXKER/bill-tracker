@@ -15,7 +15,7 @@ const incomeBaseSchema = baseTransactionSchema.extend({
   ...whtFieldsSchema.shape,
   
   // Income-specific details
-  source: z.string().max(200).optional(),
+  source: z.string().min(1, "กรุณาระบุรายละเอียด").max(200),
   
   // Dates
   receiveDate: z.coerce.date(),

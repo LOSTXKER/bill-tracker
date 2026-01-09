@@ -32,6 +32,7 @@ interface ContactSelectorProps {
   companyCode?: string;
   onContactCreated?: (contact: ContactSummary) => void;
   allowCreate?: boolean;
+  required?: boolean;
 }
 
 export function ContactSelector({
@@ -44,6 +45,7 @@ export function ContactSelector({
   companyCode,
   onContactCreated,
   allowCreate = true,
+  required = false,
 }: ContactSelectorProps) {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -63,7 +65,11 @@ export function ContactSelector({
 
   return (
     <div className="space-y-2">
-      {label && <Label className="text-foreground font-medium">{label}</Label>}
+      {label && (
+        <Label className="text-foreground font-medium">
+          {label} {required && <span className="text-red-500">*</span>}
+        </Label>
+      )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button

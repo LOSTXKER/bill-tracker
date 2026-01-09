@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,48 +86,59 @@ export default function ReimbursementsPage() {
   }, [companyCode]);
 
   // Fetch data - using new ReimbursementRequest API
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!companyId) return;
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const myRequests = activeTab === "my";
-        const [requestsRes, summaryRes] = await Promise.all([
-          fetch(
-            `/api/reimbursement-requests?companyId=${companyId}${myRequests ? "&myRequests=true" : ""}`
-          ),
-          fetch(`/api/reimbursement-requests/summary?companyId=${companyId}`),
-        ]);
+    setIsLoading(true);
+    try {
+      const myRequests = activeTab === "my";
+      const [requestsRes, summaryRes] = await Promise.all([
+        fetch(
+          `/api/reimbursement-requests?companyId=${companyId}${myRequests ? "&myRequests=true" : ""}`
+        ),
+        fetch(`/api/reimbursement-requests/summary?companyId=${companyId}`),
+      ]);
 
-        const requestsResult = await requestsRes.json();
-        const summaryResult = await summaryRes.json();
+      const requestsResult = await requestsRes.json();
+      const summaryResult = await summaryRes.json();
 
-        // Map from requests to reimbursements format for compatibility
-        const mappedData = (requestsResult.data?.requests || []).map((req: any) => ({
-          id: req.id,
-          description: req.description,
-          netPaid: req.netAmount,
-          billDate: req.billDate,
-          reimbursementStatus: req.status,
-          createdAt: req.createdAt,
-          fraudScore: req.fraudScore,
-          requester: req.requester,
-          categoryRef: req.categoryRef,
-          reimbursementRejectedReason: req.rejectedReason,
-          slipUrls: req.receiptUrls,
-        }));
+      // Map from requests to reimbursements format for compatibility
+      const mappedData = (requestsResult.data?.requests || []).map((req: any) => ({
+        id: req.id,
+        description: req.description,
+        netPaid: req.netAmount,
+        billDate: req.billDate,
+        reimbursementStatus: req.status,
+        createdAt: req.createdAt,
+        fraudScore: req.fraudScore,
+        requester: req.requester,
+        categoryRef: req.categoryRef,
+        reimbursementRejectedReason: req.rejectedReason,
+        slipUrls: req.receiptUrls,
+      }));
 
-        setReimbursements(mappedData);
-        setSummary(summaryResult.data?.summary || null);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
+      setReimbursements(mappedData);
+      setSummary(summaryResult.data?.summary || null);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [companyId, activeTab]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Real-time update: Refetch when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchData]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("th-TH", {

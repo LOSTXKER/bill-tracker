@@ -869,12 +869,15 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                         refetchContacts();
                         setSelectedContact(newContact);
                       }}
+                      required
                     />
 
                     {/* Category Selector with AI Button */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2">
-                        <Label className="text-sm font-medium">หมวดหมู่</Label>
+                        <Label className="text-sm font-medium">
+                          หมวดหมู่ <span className="text-red-500">*</span>
+                        </Label>
                         {/* AI Suggest Category Button - Always visible, compact */}
                         <TooltipProvider>
                           <Tooltip>
@@ -1010,13 +1013,14 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                   {config.fields.descriptionField && (
                     <div className="space-y-2">
                       <Label htmlFor={config.fields.descriptionField.name} className="text-sm text-muted-foreground">
-                        {config.fields.descriptionField.label}
+                        {config.fields.descriptionField.label} <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id={config.fields.descriptionField.name}
                         placeholder={config.fields.descriptionField.placeholder}
                         className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
                         {...register(config.fields.descriptionField.name)}
+                        required
                       />
                     </div>
                   )}

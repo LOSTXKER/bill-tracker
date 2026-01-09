@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -111,7 +111,7 @@ export default function PayoutsPage() {
   }, [companyCode]);
 
   // Fetch summary
-  const fetchSummary = async () => {
+  const fetchSummary = useCallback(async () => {
     if (!companyId) return;
 
     setIsLoading(true);
@@ -143,11 +143,21 @@ export default function PayoutsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     fetchSummary();
-  }, [companyId]);
+  }, [fetchSummary]);
+
+  // Real-time update: Refetch when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchSummary();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchSummary]);
 
   const toggleItemSelection = (itemId: string) => {
     const newSelected = new Set(selectedItems);

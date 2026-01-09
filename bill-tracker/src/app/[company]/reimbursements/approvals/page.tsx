@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,7 +93,7 @@ export default function ApprovalsPage() {
   }, [companyCode]);
 
   // Fetch pending reimbursements
-  const fetchReimbursements = async () => {
+  const fetchReimbursements = useCallback(async () => {
     if (!companyId) return;
     
     setIsLoading(true);
@@ -131,11 +131,21 @@ export default function ApprovalsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     fetchReimbursements();
-  }, [companyId]);
+  }, [fetchReimbursements]);
+
+  // Real-time update: Refetch when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchReimbursements();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchReimbursements]);
 
   const handleApprove = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
