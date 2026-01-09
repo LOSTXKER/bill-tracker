@@ -520,7 +520,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
         }
       }
 
-      // Call API to create mapping
+      // Call API to create mapping (ไม่ส่ง categoryId - AI ไม่จำหมวดหมู่)
       const response = await fetch("/api/vendor-mappings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -530,7 +530,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
           vendorName: combined.vendorName,
           vendorTaxId: combined.vendorTaxId,
           contactId: selectedContact?.id,
-          categoryId: selectedCategory,
+          // ไม่ส่ง categoryId - ให้ user เลือกหมวดหมู่เองทุกครั้ง
           defaultVatRate: watchVatRate,
           paymentMethod: watch("paymentMethod"),
           descriptionTemplate,
@@ -545,7 +545,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
       }
 
       toast.success("สอน AI สำเร็จ!", {
-        description: `AI จะจดจำ "${combined.vendorName}" สำหรับการใช้งานครั้งต่อไป`,
+        description: `AI จะจดจำผู้ติดต่อ VAT และวิธีชำระเงิน (ไม่รวมหมวดหมู่)`,
       });
 
       setShowTrainDialog(false);
@@ -559,7 +559,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
     } finally {
       setIsTraining(false);
     }
-  }, [aiResult, companyCode, selectedContact, selectedCategory, watchVatRate, watch, config, router]);
+  }, [aiResult, companyCode, selectedContact, watchVatRate, watch, config, router]);
 
   // AI Category Suggestion (without OCR)
   const suggestCategory = useCallback(async () => {
@@ -685,11 +685,11 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
       const matchConfidence = aiResult?.smart?.matchConfidence || 0;
       const existingMappingId = aiResult?.smart?.mapping?.id || null;
       
-      // Learn if: has contact OR has vendor from OCR, AND has category selected
-      const shouldAutoLearn = hasVendorIdentifier && selectedCategory && selectedContact?.id;
+      // Learn if: has contact - AI จำแค่ contact, VAT, payment method (ไม่จำ category)
+      const shouldAutoLearn = hasVendorIdentifier && selectedContact?.id;
 
-      if (shouldAutoLearn) {
-        // Auto learn - create mapping for this vendor/contact + category combo
+      if (shouldAutoLearn && !existingMappingId) {
+        // Auto learn - create mapping WITHOUT category (user must choose category each time)
         try {
           const learnResponse = await fetch("/api/vendor-mappings", {
             method: "POST",
@@ -700,7 +700,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
               vendorName,
               vendorTaxId,
               contactId: selectedContact.id,
-              categoryId: selectedCategory,
+              // ไม่ส่ง categoryId - AI ไม่จำหมวดหมู่
               defaultVatRate: watchVatRate,
               paymentMethod: watch("paymentMethod"),
               learnSource: "AUTO",
@@ -709,11 +709,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
           if (learnResponse.ok) {
             toast.success(`บันทึก${config.title}สำเร็จ`, {
-              description: `AI จดจำ "${vendorName}" แล้ว`,
-              action: {
-                label: "ดูการตั้งค่า",
-                onClick: () => router.push(`/${companyCode}/settings`),
-              },
+              description: `AI จดจำ "${vendorName}" แล้ว (ไม่รวมหมวดหมู่)`,
             });
           } else {
             toast.success(`บันทึก${config.title}สำเร็จ`);
@@ -723,14 +719,6 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
           toast.success(`บันทึก${config.title}สำเร็จ`);
         }
         
-        router.push(config.redirectPath);
-        router.refresh();
-        return;
-      } else if (hasVendorIdentifier && !existingMappingId) {
-        // Has vendor but no category - suggest training
-        toast.success(`บันทึก${config.title}สำเร็จ`, {
-          description: selectedCategory ? undefined : "เลือกหมวดหมู่เพื่อให้ AI เรียนรู้",
-        });
         router.push(config.redirectPath);
         router.refresh();
         return;
@@ -1015,21 +1003,22 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       );
                     })()}
                     
-                    {/* Quick Train AI Info - Show when contact+category selected but no existing mapping */}
-                    {selectedContact && selectedCategory && !aiResult?.smart?.mapping && (
+                    {/* Quick Train AI Info - Show when contact selected but no existing mapping */}
+                    {selectedContact && !aiResult?.smart?.mapping && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground cursor-help">
                               <Brain className="h-3 w-3" />
-                              <span>เมื่อบันทึก AI จะจดจำ: &quot;{selectedContact.name}&quot; → หมวดหมู่นี้</span>
+                              <span>AI จะจดจำ: &quot;{selectedContact.name}&quot; (ผู้ติดต่อ, VAT, วิธีชำระเงิน)</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-xs">
                             <p className="font-semibold mb-1">🧠 การเรียนรู้อัตโนมัติ</p>
                             <p className="text-xs">
-                              AI จะจดจำความสัมพันธ์ระหว่างคู่ค้ากับหมวดหมู่นี้
-                              เมื่อพบคู่ค้าเดียวกันครั้งต่อไป AI จะใส่หมวดหมู่ให้อัตโนมัติ
+                              AI จะจดจำ: ผู้ติดต่อ, VAT, วิธีชำระเงิน
+                              <br />
+                              <strong>หมวดหมู่</strong>: ต้องเลือกเองทุกครั้ง (เพราะร้านเดียวกันอาจมีหลายหมวดหมู่)
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -1180,8 +1169,9 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
             <DialogDescription>
               {aiResult?.combined?.vendorName && (
                 <span className="block mt-2">
-                  AI จะจดจำ <strong>&ldquo;{aiResult.combined.vendorName}&rdquo;</strong> พร้อมการตั้งค่าที่คุณเลือก
-                  เพื่อกรอกข้อมูลอัตโนมัติในครั้งต่อไป
+                  AI จะจดจำ <strong>&ldquo;{aiResult.combined.vendorName}&rdquo;</strong> เพื่อกรอกผู้ติดต่อ VAT วิธีชำระเงินอัตโนมัติ
+                  <br />
+                  <span className="text-xs text-muted-foreground">(หมวดหมู่ต้องเลือกเองทุกครั้ง)</span>
                 </span>
               )}
             </DialogDescription>
@@ -1189,7 +1179,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
           <div className="py-4 space-y-3 text-sm">
             <div className="p-3 rounded-lg bg-muted/50 space-y-2">
-              <p className="font-medium">ข้อมูลที่จะบันทึก:</p>
+              <p className="font-medium">ข้อมูลที่ AI จะจดจำ:</p>
               <ul className="text-muted-foreground space-y-1 text-xs">
                 {aiResult?.combined?.vendorName && (
                   <li>• ชื่อร้าน: {aiResult.combined.vendorName}</li>
@@ -1198,14 +1188,14 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                   <li>• เลขผู้เสียภาษี: {aiResult.combined.vendorTaxId}</li>
                 )}
                 {selectedContact && <li>• ผู้ติดต่อ: {selectedContact.name}</li>}
-                {selectedCategory && (
-                  <li>• หมวดหมู่: {categories.find((c) => c.id === selectedCategory)?.name}</li>
-                )}
                 {watchVatRate !== undefined && <li>• VAT: {watchVatRate}%</li>}
                 {watch("paymentMethod") && (
                   <li>• วิธีชำระเงิน: {watch("paymentMethod")}</li>
                 )}
               </ul>
+              <p className="text-xs text-amber-600 mt-2">
+                ⚠️ หมวดหมู่: ไม่จำ (ต้องเลือกเองทุกครั้งเพราะร้านเดียวกันอาจมีหลายหมวดหมู่)
+              </p>
             </div>
           </div>
 

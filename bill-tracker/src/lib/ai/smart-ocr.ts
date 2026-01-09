@@ -284,10 +284,9 @@ function buildSuggestedValues(
       suggested.contactId = mapping.contactId;
     }
     
-    // Category
-    if (mapping.categoryId) {
-      suggested.categoryId = mapping.categoryId;
-    }
+    // ไม่ใช้ categoryId จาก mapping
+    // เพราะร้านเดียวกันอาจมีหลายหมวดหมู่ ให้ user เลือกเอง
+    // Category suggestion จะใช้ AI แนะนำแทน
     
     // VAT Rate (use mapping if OCR is uncertain)
     if (mapping.defaultVatRate !== null && mapping.defaultVatRate !== undefined) {
