@@ -140,11 +140,28 @@ export const POST = withCompanyAccess(
 export const PATCH = withCompanyAccess(
   async (request, { company, session }) => {
     const body = await request.json();
-    const { id, ...data } = body;
+    const { id } = body;
 
     if (!id) {
       return apiResponse.error(new Error("Mapping ID is required"));
     }
+
+    // Only allow updating these specific fields (filter out companyCode, transactionType, etc.)
+    const allowedFields = {
+      vendorName: body.vendorName,
+      vendorTaxId: body.vendorTaxId,
+      namePattern: body.namePattern,
+      contactId: body.contactId,
+      categoryId: body.categoryId,
+      defaultVatRate: body.defaultVatRate,
+      paymentMethod: body.paymentMethod,
+      descriptionTemplate: body.descriptionTemplate,
+    };
+
+    // Remove undefined values
+    const data = Object.fromEntries(
+      Object.entries(allowedFields).filter(([, v]) => v !== undefined)
+    );
 
     const updated = await updateVendorMapping(id, company.id, data);
 
