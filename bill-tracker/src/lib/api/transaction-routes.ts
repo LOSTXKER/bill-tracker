@@ -160,7 +160,7 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
           companyId: company.id,
           createdBy: session.user.id,
         },
-        include: { contact: true },
+        include: { contact: true, categoryRef: true },
       });
 
       // Create audit log
@@ -204,6 +204,7 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
       where: { id },
       include: {
         contact: true,
+        categoryRef: true,
         company: true,
         creator: {
           select: { id: true, name: true, email: true },
@@ -270,6 +271,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       data: updateData,
       include: {
         contact: true,
+        categoryRef: true,
         company: true,
         creator: {
           select: { id: true, name: true, email: true },
