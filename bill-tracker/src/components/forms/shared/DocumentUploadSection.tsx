@@ -422,7 +422,7 @@ export function DocumentUploadSection({
           <div className="flex flex-wrap gap-2">
             {files.uncategorized.map((url, index) => (
               <FilePreviewChip
-                key={url}
+                key={`uncategorized-${index}-${url || 'empty'}`}
                 url={url}
                 index={index}
                 onRemove={() => removeFile(url, "uncategorized")}
@@ -512,7 +512,7 @@ export function DocumentUploadSection({
                   <div className="flex flex-wrap gap-2">
                     {categoryFiles.map((url, index) => (
                       <FilePreviewChip
-                        key={url}
+                        key={`${category}-${index}-${url || 'empty'}`}
                         url={url}
                         index={index}
                         onRemove={() => removeFile(url, category)}
@@ -548,7 +548,7 @@ export function DocumentUploadSection({
               <div className="flex flex-wrap gap-2">
                 {files.uncategorized.map((url, index) => (
                   <FilePreviewChip
-                    key={url}
+                    key={`uncategorized-move-${index}-${url || 'empty'}`}
                     url={url}
                     index={index}
                     onRemove={() => removeFile(url, "uncategorized")}
@@ -594,9 +594,9 @@ function FilePreviewChip({
   disabled = false,
 }: FilePreviewChipProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const fileName = url.split("/").pop() || `ไฟล์ ${index + 1}`;
+  const fileName = url?.split("/").pop() || `ไฟล์ ${index + 1}`;
   const shortName = fileName.length > 20 ? fileName.slice(0, 17) + "..." : fileName;
-  const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
+  const isImage = url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(url) : false;
 
   return (
     <div className="relative group">
