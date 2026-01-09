@@ -186,13 +186,27 @@ export default function NewReimbursementPage() {
       return;
     }
 
+    // Validate required fields
+    const validationErrors: string[] = [];
+    
     if (!data.amount || data.amount <= 0) {
-      toast.error("กรุณาระบุจำนวนเงิน");
-      return;
+      validationErrors.push("กรุณาระบุจำนวนเงิน");
+    }
+
+    if (!data.description || data.description.trim() === "") {
+      validationErrors.push("กรุณาระบุรายละเอียด");
+    }
+
+    if (!data.categoryId) {
+      validationErrors.push("กรุณาเลือกหมวดหมู่");
     }
 
     if (receiptUrls.length === 0) {
-      toast.error("กรุณาอัปโหลดรูปใบเสร็จ");
+      validationErrors.push("กรุณาอัปโหลดรูปใบเสร็จ");
+    }
+
+    if (validationErrors.length > 0) {
+      toast.error(validationErrors.join(", "));
       return;
     }
 
@@ -360,7 +374,7 @@ export default function NewReimbursementPage() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Tag className="h-4 w-4 text-muted-foreground" />
-                    หมวดหมู่
+                    หมวดหมู่ <span className="text-destructive">*</span>
                   </Label>
                   <Select
                     value={watch("categoryId")}

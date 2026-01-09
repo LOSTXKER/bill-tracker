@@ -620,6 +620,33 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
   }, [selectedContact, config, companyCode, watch]);
 
   const onSubmit = async (data: any) => {
+    // Validate required fields before submit
+    const validationErrors: string[] = [];
+    
+    if (!selectedContact?.id) {
+      validationErrors.push("กรุณาเลือกผู้ติดต่อ");
+    }
+    
+    if (!selectedCategory) {
+      validationErrors.push("กรุณาเลือกหมวดหมู่");
+    }
+    
+    const descriptionValue = config.fields.descriptionField 
+      ? data[config.fields.descriptionField.name]
+      : null;
+    if (config.fields.descriptionField && (!descriptionValue || descriptionValue.trim() === "")) {
+      validationErrors.push("กรุณาระบุรายละเอียด");
+    }
+    
+    if (!data.amount || data.amount <= 0) {
+      validationErrors.push("กรุณาระบุจำนวนเงิน");
+    }
+
+    if (validationErrors.length > 0) {
+      toast.error(validationErrors.join(", "));
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Map categorized files to the expected field names
