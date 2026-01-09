@@ -393,8 +393,15 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
     };
 
     // Apply amount from combined data
-    // Use amount (before VAT) if available, otherwise calculate from totalAmount
-    if (extendedCombined.amount) {
+    // PRIORITY: If currency was converted, use the converted totalAmount
+    const hasCurrencyConversion = result.currencyConversion?.convertedAmount !== null && 
+      result.currencyConversion?.convertedAmount !== undefined &&
+      result.currencyConversion?.currency !== "THB";
+    
+    if (hasCurrencyConversion && result.currencyConversion?.convertedAmount) {
+      // Use converted amount (already in THB)
+      setValue("amount", result.currencyConversion.convertedAmount);
+    } else if (extendedCombined.amount) {
       // Use the amount before VAT directly
       setValue("amount", extendedCombined.amount);
     } else if (combined.totalAmount && extendedCombined.vatRate) {
