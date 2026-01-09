@@ -261,16 +261,10 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
   // Effect to apply pending category when categories are loaded
   useEffect(() => {
     if (pendingCategoryId && categories.length > 0 && !selectedCategory) {
-      // Find the category in the flat list (categories might be hierarchical)
-      const findCategory = (cats: typeof categories, id: string): boolean => {
-        for (const cat of cats) {
-          if (cat.id === id) return true;
-          if (cat.children && findCategory(cat.children, id)) return true;
-        }
-        return false;
-      };
+      // Check if the category exists in the flat list
+      const categoryExists = categories.some(cat => cat.id === pendingCategoryId);
       
-      if (findCategory(categories, pendingCategoryId)) {
+      if (categoryExists) {
         setSelectedCategory(pendingCategoryId);
         setPendingCategoryId(null);
         console.log("Applied pending category:", pendingCategoryId);
