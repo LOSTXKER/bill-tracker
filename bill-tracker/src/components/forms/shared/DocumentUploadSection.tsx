@@ -208,6 +208,12 @@ export function DocumentUploadSection({
   }, [files]);
 
   const totalFileCount = getAllFiles().length;
+  
+  // Count all files including potentially empty URLs (for UI display)
+  const hasAnyFiles = files.uncategorized.length > 0 || 
+                      files.invoice.length > 0 || 
+                      files.slip.length > 0 || 
+                      files.whtCert.length > 0;
 
   // Handle file drop
   const onDrop = useCallback(
@@ -307,11 +313,14 @@ export function DocumentUploadSection({
         }),
       });
 
-      const result = await response.json();
+      const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "การวิเคราะห์ล้มเหลว");
+        throw new Error(responseData.error || "การวิเคราะห์ล้มเหลว");
       }
+      
+      // Extract data from apiResponse wrapper: { success: true, data: { ... } }
+      const result = responseData.data || responseData;
 
       // Organize files by AI classification
       const newFiles: CategorizedFiles = {
@@ -440,7 +449,7 @@ export function DocumentUploadSection({
       )}
 
       {/* AI Analyze Button */}
-      {totalFileCount > 0 && (
+      {hasAnyFiles && (
         <div className="p-4 rounded-xl border border-primary/20 bg-primary/5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -461,7 +470,7 @@ export function DocumentUploadSection({
               variant={isAnalyzed ? "outline" : "default"}
               size="sm"
               onClick={analyzeDocuments}
-              disabled={isAnalyzing || totalFileCount === 0}
+              disabled={isAnalyzing || !hasAnyFiles}
               className={cn(
                 !isAnalyzed && "bg-primary hover:bg-primary/90"
               )}
@@ -479,7 +488,7 @@ export function DocumentUploadSection({
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  วิเคราะห์ ({totalFileCount} ไฟล์)
+                  วิเคราะห์
                 </>
               )}
             </Button>

@@ -27,10 +27,13 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ChevronRight } from "lucide-react";
 import {
   Brain,
   Plus,
@@ -786,14 +789,53 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="เลือกหมวดหมู่" />
+                    <SelectValue placeholder="เลือกหมวดหมู่">
+                      {formData.categoryId && (() => {
+                        const cat = categories.find(c => c.id === formData.categoryId);
+                        if (!cat) return "เลือกหมวดหมู่";
+                        if (cat.parentId) {
+                          const parent = categories.find(c => c.id === cat.parentId);
+                          return parent ? `${parent.name} › ${cat.name}` : cat.name;
+                        }
+                        return cat.name;
+                      })()}
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-[300px]">
+                    {/* Build hierarchical display */}
+                    {(() => {
+                      const groups = categories.filter(c => !c.parentId && c.isActive);
+                      const children = categories.filter(c => c.parentId && c.isActive);
+                      const childrenByParent = new Map<string, typeof categories>();
+                      
+                      for (const child of children) {
+                        if (!childrenByParent.has(child.parentId!)) {
+                          childrenByParent.set(child.parentId!, []);
+                        }
+                        childrenByParent.get(child.parentId!)!.push(child);
+                      }
+                      
+                      return groups.map(group => (
+                        <SelectGroup key={group.id}>
+                          <SelectLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            {group.name}
+                          </SelectLabel>
+                          {(childrenByParent.get(group.id) || []).map(child => (
+                            <SelectItem key={child.id} value={child.id} className="pl-6">
+                              <span className="flex items-center gap-2">
+                                <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                                {child.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                          {!(childrenByParent.get(group.id) || []).length && (
+                            <SelectItem key={group.id} value={group.id} className="pl-6">
+                              <span className="text-muted-foreground italic">(เลือกกลุ่มนี้)</span>
+                            </SelectItem>
+                          )}
+                        </SelectGroup>
+                      ));
+                    })()}
                   </SelectContent>
                 </Select>
               </div>

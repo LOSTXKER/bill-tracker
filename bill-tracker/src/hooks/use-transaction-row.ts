@@ -5,11 +5,20 @@
 import { useRouter } from "next/navigation";
 import { useLineNotification } from "./use-line-notification";
 
+export type TransactionType = "expense" | "income" | "reimbursement";
+
 export interface UseTransactionRowOptions {
   companyCode: string;
-  transactionType: "expense" | "income";
+  transactionType: TransactionType;
   transactionId: string;
 }
+
+// Map transaction type to URL path
+const typeToPath: Record<TransactionType, string> = {
+  expense: "expenses",
+  income: "incomes",
+  reimbursement: "reimbursements",
+};
 
 export function useTransactionRow({
   companyCode,
@@ -17,10 +26,13 @@ export function useTransactionRow({
   transactionId,
 }: UseTransactionRowOptions) {
   const router = useRouter();
-  const { sending, sendNotification } = useLineNotification(transactionType);
+  // LINE notification is only for expense/income, not reimbursement
+  const notificationType = transactionType === "reimbursement" ? "expense" : transactionType;
+  const { sending, sendNotification } = useLineNotification(notificationType);
 
   const handleRowClick = () => {
-    router.push(`/${companyCode.toLowerCase()}/${transactionType}s/${transactionId}`);
+    const path = typeToPath[transactionType];
+    router.push(`/${companyCode.toLowerCase()}/${path}/${transactionId}`);
   };
 
   const handleSendNotification = async (e: React.MouseEvent) => {

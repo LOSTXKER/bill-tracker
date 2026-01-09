@@ -83,6 +83,25 @@ export function ContactSelector({
               <CommandEmpty>
                 {isLoading ? "กำลังโหลด..." : "ไม่พบผู้ติดต่อ"}
               </CommandEmpty>
+              
+              {/* Create new contact option - at top */}
+              {allowCreate && companyCode && (
+                <>
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        setShowCreateDialog(true);
+                      }}
+                      className="text-primary font-medium"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>สร้างผู้ติดต่อใหม่...</span>
+                    </CommandItem>
+                  </CommandGroup>
+                  <CommandSeparator />
+                </>
+              )}
+              
               <CommandGroup>
                 <CommandItem
                   onSelect={() => {
@@ -123,24 +142,6 @@ export function ContactSelector({
                   </CommandItem>
                 ))}
               </CommandGroup>
-              
-              {/* Create new contact option */}
-              {allowCreate && companyCode && (
-                <>
-                  <CommandSeparator />
-                  <CommandGroup>
-                    <CommandItem
-                      onSelect={() => {
-                        setShowCreateDialog(true);
-                      }}
-                      className="text-primary"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>สร้างผู้ติดต่อใหม่...</span>
-                    </CommandItem>
-                  </CommandGroup>
-                </>
-              )}
             </CommandList>
           </Command>
         </PopoverContent>

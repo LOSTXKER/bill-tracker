@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, ChevronRight, Search, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface AuditLog {
   id: string;
@@ -334,11 +335,18 @@ export function AuditLogTable({ companyId }: AuditLogTableProps) {
                     </div>
                     
                     {/* Link to related entity */}
-                    {entityLink && log.action !== "DELETE" && (
+                    {entityLink && (
                       <Link href={entityLink}>
-                        <Button variant="ghost" size="sm" className="shrink-0">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className={cn(
+                            "shrink-0",
+                            log.action === "DELETE" && "text-muted-foreground"
+                          )}
+                        >
                           <ExternalLink className="h-4 w-4 mr-1" />
-                          ดูรายการ
+                          {log.action === "DELETE" ? "ดูรายการที่ลบ" : "ดูรายการ"}
                         </Button>
                       </Link>
                     )}

@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Receipt, Send, ArrowLeft, Calendar, Tag, CreditCard } from "lucide-react";
+import { Loader2, Receipt, Send, ArrowLeft, Calendar, Tag, CreditCard, Sparkles, CheckCircle2 } from "lucide-react";
 import { useCategories } from "@/hooks/use-categories";
 import { FileUpload } from "@/components/file-upload";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -44,6 +44,8 @@ export default function NewReimbursementPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [receiptUrls, setReceiptUrls] = useState<string[]>([]);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalyzed, setAiAnalyzed] = useState(false);
 
   const { categories, isLoading: categoriesLoading } = useCategories(
     companyCode,
@@ -82,6 +84,101 @@ export default function NewReimbursementPage() {
   }, [companyCode]);
 
   const watchAmount = watch("amount");
+
+  // AI Analysis function
+  const analyzeReceipt = async () => {
+    if (receiptUrls.length === 0) {
+      toast.error("กรุณาอัปโหลดรูปใบเสร็จก่อน");
+      return;
+    }
+
+    // Only analyze images, not PDFs
+    const imageUrl = receiptUrls.find((url) => 
+      !url.toLowerCase().endsWith(".pdf")
+    );
+
+    if (!imageUrl) {
+      toast.error("ไม่พบไฟล์รูปภาพที่สามารถวิเคราะห์ได้ (รองรับเฉพาะ JPEG, PNG, WebP)");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch("/api/ai/analyze-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl,
+          companyCode,
+          smartMatch: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "ไม่สามารถวิเคราะห์ใบเสร็จได้");
+      }
+
+      const data = result.data?.data;
+      const smart = result.data?.smart;
+
+      if (!data) {
+        toast.warning("ไม่พบข้อมูลในใบเสร็จ กรุณากรอกข้อมูลด้วยตนเอง");
+        return;
+      }
+
+      // Apply extracted data to form
+      let appliedFields = 0;
+
+      // Amount - prefer totalAmount over items
+      const amount = smart?.suggested?.amount || data.totalAmount || data.items?.[0]?.totalPrice;
+      if (amount && amount > 0) {
+        setValue("amount", amount);
+        appliedFields++;
+      }
+
+      // Date
+      const date = smart?.suggested?.date || data.date;
+      if (date) {
+        setValue("billDate", date);
+        appliedFields++;
+      }
+
+      // Description - use vendor name or first item
+      let description = smart?.suggested?.description || data.vendorName;
+      if (data.items?.length > 0 && data.items[0]?.name) {
+        description = description 
+          ? `${description} - ${data.items[0].name}`
+          : data.items[0].name;
+      }
+      if (description && !watch("description")) {
+        setValue("description", description);
+        appliedFields++;
+      }
+
+      // Category from smart matching
+      if (smart?.suggested?.categoryId) {
+        setValue("categoryId", smart.suggested.categoryId);
+        appliedFields++;
+      }
+
+      setAiAnalyzed(true);
+
+      if (appliedFields > 0) {
+        toast.success(`AI กรอกข้อมูลแล้ว ${appliedFields} รายการ`, {
+          description: "ตรวจสอบความถูกต้องก่อนส่ง",
+        });
+      } else {
+        toast.warning("ไม่สามารถดึงข้อมูลจากใบเสร็จได้ กรุณากรอกข้อมูลด้วยตนเอง");
+      }
+    } catch (error) {
+      console.error("AI Analysis error:", error);
+      toast.error(error instanceof Error ? error.message : "วิเคราะห์ใบเสร็จล้มเหลว");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const onSubmit = async (data: ReimbursementFormData) => {
     if (!companyId) {
@@ -172,7 +269,10 @@ export default function NewReimbursementPage() {
                 </Label>
                 <FileUpload
                   value={receiptUrls}
-                  onChange={setReceiptUrls}
+                  onChange={(urls) => {
+                    setReceiptUrls(urls);
+                    setAiAnalyzed(false); // Reset AI state when files change
+                  }}
                   folder="receipts"
                   maxFiles={5}
                 />
@@ -180,6 +280,51 @@ export default function NewReimbursementPage() {
                   อัปโหลดรูปใบเสร็จหรือหลักฐานการจ่ายเงิน (สูงสุด 5 รูป)
                 </p>
               </div>
+
+              {/* AI Analyze Button */}
+              {receiptUrls.length > 0 && (
+                <div className="p-4 rounded-xl border border-primary/20 bg-primary/5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">AI วิเคราะห์ใบเสร็จ</p>
+                        <p className="text-xs text-muted-foreground">
+                          {aiAnalyzed 
+                            ? "กดวิเคราะห์ใหม่หากเพิ่มไฟล์" 
+                            : "ดึงจำนวนเงินและรายละเอียดอัตโนมัติ"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={aiAnalyzed ? "outline" : "default"}
+                      size="sm"
+                      onClick={analyzeReceipt}
+                      disabled={isAnalyzing || receiptUrls.length === 0}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          กำลังวิเคราะห์...
+                        </>
+                      ) : aiAnalyzed ? (
+                        <>
+                          <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                          วิเคราะห์ใหม่
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          วิเคราะห์
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Amount */}
               <div className="space-y-2">

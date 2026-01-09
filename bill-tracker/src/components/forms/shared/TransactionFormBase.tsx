@@ -24,7 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, LucideIcon, GraduationCap } from "lucide-react";
+import { Loader2, LucideIcon, GraduationCap, Sparkles, Brain } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useContacts } from "@/hooks/use-contacts";
 import { useCategories } from "@/hooks/use-categories";
 import { AmountInput } from "./AmountInput";
@@ -34,7 +35,7 @@ import { PaymentMethodSelect } from "./PaymentMethodSelect";
 import { CalculationSummary } from "./CalculationSummary";
 import { DocumentUploadSection, CategorizedFiles, MultiDocAnalysisResult } from "./DocumentUploadSection";
 import { ContactSelector } from "./ContactSelector";
-import { CategorySelector } from "./CategorySelector";
+import { HierarchicalCategorySelector as CategorySelector } from "./HierarchicalCategorySelector";
 import { DatePicker } from "./DatePicker";
 import { MergeOptionsDialog, MergeData, MergeDecision } from "./MergeOptionsDialog";
 import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } from "./ConflictDialog";
@@ -223,7 +224,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
   // Use custom hooks for data fetching
   const { contacts, isLoading: contactsLoading, refetch: refetchContacts } = useContacts(companyCode);
-  const { categories, isLoading: categoriesLoading } = useCategories(
+  const { categories, isLoading: categoriesLoading, refetch: refetchCategories } = useCategories(
     companyCode,
     config.type.toUpperCase() as "EXPENSE" | "INCOME"
   );
@@ -231,6 +232,15 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
   // Contact and category state
   const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // AI Category Suggestion (standalone - without OCR)
+  const [categorySuggestion, setCategorySuggestion] = useState<{
+    categoryId: string | null;
+    categoryName: string | null;
+    confidence: number;
+    reason: string;
+  } | null>(null);
+  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
 
   const {
     register,
@@ -286,7 +296,15 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
   // Helper to extract AI result as MergeData
   const extractAiData = useCallback((result: MultiDocAnalysisResult): MergeData => {
-    const { combined, smart } = result;
+    if (!result) {
+      return {
+        amount: null, vatAmount: null, vatRate: null, vendorName: null,
+        vendorTaxId: null, contactId: null, date: null, invoiceNumber: null,
+        description: null, categoryId: null, paymentMethod: null,
+      };
+    }
+    const combined = result.combined || { totalAmount: 0, vatAmount: 0, date: null, invoiceNumbers: [], vendorName: null, vendorTaxId: null };
+    const smart = result.smart;
     const suggested = (smart?.suggested || {}) as Record<string, any>;
     const vendorName = combined.vendorName || suggested.vendorName || null;
     
@@ -351,7 +369,13 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
   // Apply AI data to form
   const applyAiResult = useCallback((result: MultiDocAnalysisResult) => {
-    const { combined, smart } = result;
+    if (!result) {
+      console.error("applyAiResult: result is null/undefined");
+      return;
+    }
+    
+    const combined = result.combined || { totalAmount: 0, vatAmount: 0, date: null, invoiceNumbers: [], vendorName: null, vendorTaxId: null };
+    const smart = result.smart;
     const suggested = (smart?.suggested || {}) as Record<string, any>;
     
     // Extended combined type with additional fields from OCR
@@ -480,6 +504,64 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
     }
   }, [aiResult, companyCode, selectedContact, selectedCategory, watchVatRate, watch, config, router]);
 
+  // AI Category Suggestion (without OCR)
+  const suggestCategory = useCallback(async () => {
+    const vendorName = selectedContact?.name || null;
+    // Get current description value directly from the form
+    const descFieldName = config.fields.descriptionField?.name || "description";
+    const description = watch(descFieldName) || null;
+    
+    if (!vendorName && !description) {
+      toast.error("กรุณาเลือกผู้ติดต่อหรือกรอกรายละเอียดก่อน");
+      return;
+    }
+
+    setIsSuggestingCategory(true);
+    setCategorySuggestion(null);
+
+    try {
+      const response = await fetch(`/api/${companyCode}/ai/suggest-category`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionType: config.type.toUpperCase(),
+          vendorName,
+          description,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "ไม่สามารถแนะนำหมวดหมู่ได้");
+      }
+
+      const suggestion = result.data;
+      setCategorySuggestion(suggestion);
+
+      if (suggestion.categoryId && suggestion.confidence >= 70) {
+        // Auto-select if confident
+        setSelectedCategory(suggestion.categoryId);
+        toast.success(`AI เลือก "${suggestion.categoryName}" (${suggestion.confidence}%)`, {
+          description: suggestion.reason,
+        });
+      } else if (suggestion.categoryId) {
+        // Show suggestion but don't auto-select
+        toast.info("AI แนะนำหมวดหมู่", {
+          description: `${suggestion.categoryName} (${suggestion.confidence}%) - ${suggestion.reason}`,
+        });
+      } else {
+        toast.warning("AI ไม่แน่ใจหมวดหมู่", {
+          description: suggestion.reason || "กรุณาเลือกหมวดหมู่เอง",
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSuggestingCategory(false);
+    }
+  }, [selectedContact, config, companyCode, watch]);
+
   const onSubmit = async (data: any) => {
     setIsLoading(true);
     try {
@@ -512,59 +594,62 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
         throw new Error(result.error || "เกิดข้อผิดพลาด");
       }
 
-      // Smart learning decision
-      const vendorName = aiResult?.combined?.vendorName || null;
-      const vendorTaxId = aiResult?.combined?.vendorTaxId || null;
+      // Smart learning decision - use OCR vendor info OR selected contact
+      const vendorName = aiResult?.combined?.vendorName || selectedContact?.name || null;
+      const vendorTaxId = aiResult?.combined?.vendorTaxId || selectedContact?.taxId || null;
       const hasVendorIdentifier = !!(vendorName || vendorTaxId);
       const matchConfidence = aiResult?.smart?.matchConfidence || 0;
       const existingMappingId = aiResult?.smart?.mapping?.id || null;
+      
+      // Learn if: has contact OR has vendor from OCR, AND has category selected
+      const shouldAutoLearn = hasVendorIdentifier && selectedCategory && selectedContact?.id;
 
-      const learnDecision = decideToLearn(
-        matchConfidence,
-        hasVendorIdentifier,
-        existingMappingId
-      );
+      if (shouldAutoLearn) {
+        // Auto learn - create mapping for this vendor/contact + category combo
+        try {
+          const learnResponse = await fetch("/api/vendor-mappings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              companyCode: companyCode.toUpperCase(),
+              transactionType: config.type.toUpperCase(),
+              vendorName,
+              vendorTaxId,
+              contactId: selectedContact.id,
+              categoryId: selectedCategory,
+              defaultVatRate: watchVatRate,
+              paymentMethod: watch("paymentMethod"),
+              learnSource: "AUTO",
+            }),
+          });
 
-      if (learnDecision.shouldLearn) {
-        if (learnDecision.suggestAsk) {
-          // Ask user before learning
-          setShowTrainDialog(true);
-          return; // Don't redirect yet
-        } else {
-          // Auto learn without asking - call API
-          try {
-            const learnResponse = await fetch("/api/vendor-mappings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                companyCode: companyCode.toUpperCase(),
-                transactionType: config.type.toUpperCase(),
-                vendorName,
-                vendorTaxId,
-                contactId: selectedContact?.id,
-                categoryId: selectedCategory,
-                defaultVatRate: watchVatRate,
-                paymentMethod: watch("paymentMethod"),
-                learnSource: "AUTO",
-              }),
+          if (learnResponse.ok) {
+            toast.success(`บันทึก${config.title}สำเร็จ`, {
+              description: `AI จดจำ "${vendorName}" แล้ว`,
+              action: {
+                label: "ดูการตั้งค่า",
+                onClick: () => router.push(`/${companyCode}/settings`),
+              },
             });
-
-            if (learnResponse.ok) {
-              toast.success(`บันทึก${config.title}สำเร็จ`, {
-                description: `AI จดจำ "${vendorName}" แล้ว`,
-              });
-            } else {
-              toast.success(`บันทึก${config.title}สำเร็จ`);
-            }
-          } catch {
-            // Ignore learning errors, transaction was saved
+          } else {
             toast.success(`บันทึก${config.title}สำเร็จ`);
           }
-          
-          router.push(config.redirectPath);
-          router.refresh();
-          return;
+        } catch {
+          // Ignore learning errors, transaction was saved
+          toast.success(`บันทึก${config.title}สำเร็จ`);
         }
+        
+        router.push(config.redirectPath);
+        router.refresh();
+        return;
+      } else if (hasVendorIdentifier && !existingMappingId) {
+        // Has vendor but no category - suggest training
+        toast.success(`บันทึก${config.title}สำเร็จ`, {
+          description: selectedCategory ? undefined : "เลือกหมวดหมู่เพื่อให้ AI เรียนรู้",
+        });
+        router.push(config.redirectPath);
+        router.refresh();
+        return;
       }
 
       toast.success(`บันทึก${config.title}สำเร็จ`);
@@ -722,6 +807,11 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       onSelect={setSelectedContact}
                       label="ผู้ติดต่อ"
                       placeholder="เลือกผู้ติดต่อ..."
+                      companyCode={companyCode}
+                      onContactCreated={(newContact) => {
+                        refetchContacts();
+                        setSelectedContact(newContact);
+                      }}
                     />
 
                     <CategorySelector
@@ -731,7 +821,89 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       onSelect={setSelectedCategory}
                       label="หมวดหมู่"
                       placeholder="เลือกหมวดหมู่"
+                      companyCode={companyCode}
+                      categoryType={config.type.toUpperCase() as "EXPENSE" | "INCOME"}
+                      onCategoryCreated={(newCategory) => {
+                        refetchCategories();
+                        setSelectedCategory(newCategory.id);
+                      }}
                     />
+                    
+                    {/* AI Category Suggestion Button - Always show when no category selected */}
+                    {!selectedCategory && !categorySuggestion && !(aiResult?.smart && 'aiCategorySuggestion' in aiResult.smart && aiResult.smart.aiCategorySuggestion) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 w-full border-dashed"
+                        onClick={suggestCategory}
+                        disabled={isSuggestingCategory}
+                      >
+                        {isSuggestingCategory ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            กำลังวิเคราะห์...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            AI แนะนำหมวดหมู่
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {/* AI Category Suggestion from OCR or Manual */}
+                    {(() => {
+                      const aiSuggestion = aiResult?.smart && 'aiCategorySuggestion' in aiResult.smart 
+                        ? aiResult.smart.aiCategorySuggestion as { categoryId: string | null; categoryName: string | null; confidence: number; reason: string; } | undefined
+                        : null;
+                      const suggestion = categorySuggestion || aiSuggestion;
+                      
+                      if (!suggestion || selectedCategory) return null;
+                      
+                      return (
+                        <div className="mt-2 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">AI แนะนำ</span>
+                            <Badge variant="outline" className={
+                              (suggestion.confidence || 0) >= 80 
+                                ? "border-green-500 text-green-600" 
+                                : (suggestion.confidence || 0) >= 60
+                                ? "border-yellow-500 text-yellow-600"
+                                : "border-red-500 text-red-600"
+                            }>
+                              {suggestion.confidence}%
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {suggestion.reason}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (suggestion.categoryId) {
+                                setSelectedCategory(suggestion.categoryId);
+                                toast.success(`เลือกหมวดหมู่ "${suggestion.categoryName}" แล้ว`);
+                              }
+                            }}
+                          >
+                            ใช้หมวดหมู่นี้: {suggestion.categoryName}
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                    
+                    {/* Quick Train AI Button - Show when contact+category selected but no existing mapping */}
+                    {selectedContact && selectedCategory && !aiResult?.smart?.mapping && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Brain className="h-3 w-3" />
+                        <span>เมื่อบันทึก AI จะจดจำ: &quot;{selectedContact.name}&quot; → หมวดหมู่นี้</span>
+                      </div>
+                    )}
                   </div>
 
                   {config.fields.descriptionField && (
@@ -874,7 +1046,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
               สอน AI ให้จดจำร้านค้านี้?
             </DialogTitle>
             <DialogDescription>
-              {aiResult?.combined.vendorName && (
+              {aiResult?.combined?.vendorName && (
                 <span className="block mt-2">
                   AI จะจดจำ <strong>&ldquo;{aiResult.combined.vendorName}&rdquo;</strong> พร้อมการตั้งค่าที่คุณเลือก
                   เพื่อกรอกข้อมูลอัตโนมัติในครั้งต่อไป
@@ -887,10 +1059,10 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
             <div className="p-3 rounded-lg bg-muted/50 space-y-2">
               <p className="font-medium">ข้อมูลที่จะบันทึก:</p>
               <ul className="text-muted-foreground space-y-1 text-xs">
-                {aiResult?.combined.vendorName && (
+                {aiResult?.combined?.vendorName && (
                   <li>• ชื่อร้าน: {aiResult.combined.vendorName}</li>
                 )}
-                {aiResult?.combined.vendorTaxId && (
+                {aiResult?.combined?.vendorTaxId && (
                   <li>• เลขผู้เสียภาษี: {aiResult.combined.vendorTaxId}</li>
                 )}
                 {selectedContact && <li>• ผู้ติดต่อ: {selectedContact.name}</li>}

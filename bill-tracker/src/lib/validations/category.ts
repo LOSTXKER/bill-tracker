@@ -9,6 +9,7 @@ export const categorySchema = z.object({
   icon: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
   order: z.number().int().default(0),
+  parentId: z.string().cuid().optional().nullable(), // For 2-level hierarchy
 });
 
 export const updateCategorySchema = categorySchema.partial().extend({

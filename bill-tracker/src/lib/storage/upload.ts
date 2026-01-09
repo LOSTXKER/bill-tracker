@@ -88,11 +88,19 @@ export async function uploadFile(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "การอัพโหลดล้มเหลว");
+      throw new Error(error.message || error.error || "การอัพโหลดล้มเหลว");
     }
 
-    const data = await response.json();
-    return data;
+    const result = await response.json();
+    // Handle apiResponse wrapper: { success: true, data: { url, ... } }
+    const data = result.data || result;
+    
+    if (!data.url) {
+      console.error("Upload response missing URL:", result);
+      throw new Error("ไม่ได้รับ URL จากการอัปโหลด");
+    }
+    
+    return { url: data.url, filename: data.filename || data.path?.split("/").pop() || "" };
   } catch (error) {
     console.error("Upload error:", error);
     throw error;

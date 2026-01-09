@@ -165,6 +165,20 @@ export interface CategorySummary {
   name: string;
   color?: string | null;
   isActive: boolean;
+  parentId?: string | null;
+  icon?: string | null;
+  order?: number;
+}
+
+// Category with hierarchy (2-level)
+export interface CategoryWithChildren extends CategorySummary {
+  children: CategorySummary[];
+}
+
+// Grouped categories for selectors
+export interface GroupedCategories {
+  groups: CategoryWithChildren[];
+  flat: CategorySummary[];
 }
 
 // Form data types - Base transaction form data

@@ -3,13 +3,14 @@ import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { categorySchema } from "@/lib/validations/category";
 import { apiResponse } from "@/lib/api/response";
 
-// GET /api/[company]/categories?type=EXPENSE|INCOME
+// GET /api/[company]/categories?type=EXPENSE|INCOME&grouped=true
 async function handleGet(
   req: Request,
   context: { company: { id: string }; companyCode: string }
 ) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
+  const grouped = searchParams.get("grouped") === "true";
 
   const categories = await prisma.category.findMany({
     where: {
@@ -20,9 +21,53 @@ async function handleGet(
       { order: "asc" },
       { createdAt: "asc" },
     ],
+    include: {
+      children: {
+        orderBy: { order: "asc" },
+        include: {
+          _count: {
+            select: {
+              expenses: {
+                where: { deletedAt: null },
+              },
+              incomes: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          expenses: {
+            where: { deletedAt: null },
+          },
+          incomes: {
+            where: { deletedAt: null },
+          },
+        },
+      },
+    },
   });
 
-  return apiResponse.success({ categories });
+  // If grouped=true, return hierarchical structure for categories page
+  if (grouped) {
+    // Get only groups (categories without parent)
+    const groups = categories.filter((c) => !c.parentId && c.isActive);
+    // Get all leaf categories (with parents) for flat list
+    const leafCategories = categories.filter((c) => c.parentId && c.isActive);
+
+    return apiResponse.success({
+      groups,
+      flat: leafCategories,
+      all: categories,
+    });
+  }
+
+  // Return flat list (both groups and children) for form selectors
+  // Remove nested children to avoid duplication
+  const flatCategories = categories.map(({ children, ...rest }) => rest);
+  return apiResponse.success({ categories: flatCategories });
 }
 
 // POST /api/[company]/categories

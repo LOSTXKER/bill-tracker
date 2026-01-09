@@ -150,6 +150,65 @@ export const INCOME_STATUS_INFO: Record<string, StatusInfo> = {
 };
 
 // =============================================================================
+// Reimbursement Status Configuration
+// =============================================================================
+
+export const REIMBURSEMENT_STATUS_FLOW = [
+  "PENDING",
+  "FLAGGED",
+  "APPROVED",
+  "REJECTED",
+  "PAID",
+] as const;
+
+export const REIMBURSEMENT_STATUS_INFO: Record<string, StatusInfo> = {
+  PENDING: {
+    label: "รออนุมัติ",
+    description: "รอผู้จัดการอนุมัติ",
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
+    dotColor: "bg-amber-500",
+  },
+  FLAGGED: {
+    label: "AI พบปัญหา",
+    description: "AI ตรวจพบปัญหา รอตรวจสอบเพิ่ม",
+    color: "text-red-600",
+    bgColor: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900",
+    dotColor: "bg-red-500",
+  },
+  APPROVED: {
+    label: "รอจ่ายเงิน",
+    description: "อนุมัติแล้ว รอจ่ายเงินคืน",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
+    dotColor: "bg-blue-500",
+  },
+  REJECTED: {
+    label: "ถูกปฏิเสธ",
+    description: "คำขอถูกปฏิเสธ",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
+    dotColor: "bg-slate-400",
+  },
+  PAID: {
+    label: "จ่ายแล้ว",
+    description: "จ่ายเงินคืนแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+};
+
+// Status labels for StatusBadge component
+export const REIMBURSEMENT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  PENDING: { label: "รออนุมัติ", color: "orange" },
+  FLAGGED: { label: "AI พบปัญหา", color: "red" },
+  APPROVED: { label: "รอจ่ายเงิน", color: "yellow" },
+  REJECTED: { label: "ถูกปฏิเสธ", color: "gray" },
+  PAID: { label: "จ่ายแล้ว", color: "green" },
+};
+
+// =============================================================================
 // Legacy Category Colors (for backward compatibility)
 // =============================================================================
 

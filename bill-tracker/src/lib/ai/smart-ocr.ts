@@ -49,6 +49,13 @@ export interface MultiDocAnalysisResult {
     suggested: SuggestedValues;
     isNewVendor: boolean;
     suggestTraining: boolean;
+    // AI category suggestion when no mapping found
+    aiCategorySuggestion?: {
+      categoryId: string | null;
+      categoryName: string | null;
+      confidence: number;
+      reason: string;
+    };
   } | null;
   fileAssignments: Record<string, DocumentCategory>;
 }
@@ -647,6 +654,152 @@ export async function updateVendorMapping(
 }
 
 // =============================================================================
+// AI Category Suggestion Functions
+// =============================================================================
+
+interface CategoryForAI {
+  id: string;
+  name: string;
+  parentName: string | null;
+  type: "EXPENSE" | "INCOME";
+}
+
+/**
+ * AI-based category suggestion from document content or description
+ * Uses Gemini to analyze content and suggest the best matching category
+ */
+export async function suggestCategoryFromContent(
+  companyId: string,
+  transactionType: "EXPENSE" | "INCOME",
+  content: {
+    vendorName?: string | null;
+    description?: string | null;
+    items?: string[];
+    imageUrls?: string[];
+  }
+): Promise<{
+  categoryId: string | null;
+  categoryName: string | null;
+  confidence: number;
+  reason: string;
+}> {
+  try {
+    // Get all categories for this company and type
+    const categories = await prisma.category.findMany({
+      where: {
+        companyId,
+        type: transactionType,
+        isActive: true,
+        parentId: { not: null }, // Only sub-categories (not groups)
+      },
+      include: {
+        parent: true,
+      },
+      orderBy: { order: "asc" },
+    });
+
+    if (categories.length === 0) {
+      return { categoryId: null, categoryName: null, confidence: 0, reason: "ไม่มีหมวดหมู่" };
+    }
+
+    // Build category list for AI
+    const categoryList: CategoryForAI[] = categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      parentName: c.parent?.name || null,
+      type: c.type,
+    }));
+
+    const categoryListText = categoryList
+      .map((c, i) => `${i + 1}. ${c.parentName ? `[${c.parentName}] ` : ""}${c.name} (ID: ${c.id})`)
+      .join("\n");
+
+    // Build content description
+    let contentDescription = "";
+    if (content.vendorName) {
+      contentDescription += `ร้านค้า/บริษัท: ${content.vendorName}\n`;
+    }
+    if (content.description) {
+      contentDescription += `รายละเอียด: ${content.description}\n`;
+    }
+    if (content.items && content.items.length > 0) {
+      contentDescription += `รายการสินค้า/บริการ: ${content.items.join(", ")}\n`;
+    }
+
+    if (!contentDescription.trim()) {
+      return { categoryId: null, categoryName: null, confidence: 0, reason: "ไม่มีข้อมูลเนื้อหา" };
+    }
+
+    const prompt = `คุณเป็น AI ผู้เชี่ยวชาญด้านบัญชีไทย ช่วยแนะนำหมวดหมู่ที่เหมาะสมที่สุดสำหรับธุรกรรมนี้
+
+ประเภทธุรกรรม: ${transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
+
+ข้อมูลธุรกรรม:
+${contentDescription}
+
+หมวดหมู่ที่มี:
+${categoryListText}
+
+กรุณาเลือกหมวดหมู่ที่เหมาะสมที่สุด ตอบเป็น JSON:
+{
+  "categoryId": "ID ของหมวดหมู่ที่เลือก หรือ null ถ้าไม่แน่ใจ",
+  "categoryName": "ชื่อหมวดหมู่ที่เลือก หรือ null",
+  "confidence": 0-100,
+  "reason": "เหตุผลสั้นๆ ที่เลือกหมวดหมู่นี้"
+}
+
+ถ้าไม่แน่ใจ ให้ตั้ง confidence ต่ำ (< 50) และอธิบายเหตุผล`;
+
+    // If we have images, use image analysis
+    let response;
+    if (content.imageUrls && content.imageUrls.length > 0) {
+      response = await analyzeImage(content.imageUrls[0], prompt, {
+        temperature: 0.3,
+        maxTokens: 512,
+      });
+    } else {
+      // Text-only analysis using Gemini
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const result = await model.generateContent(prompt);
+      response = { data: result.response.text(), error: null };
+    }
+
+    if (response.error) {
+      console.error("AI category suggestion error:", response.error);
+      return { categoryId: null, categoryName: null, confidence: 0, reason: "AI error" };
+    }
+
+    // Parse response
+    let jsonText = response.data.trim();
+    if (jsonText.startsWith("```")) {
+      jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
+    }
+
+    try {
+      const result = JSON.parse(jsonText);
+      
+      // Validate categoryId exists
+      const matchedCategory = categoryList.find((c) => c.id === result.categoryId);
+      
+      return {
+        categoryId: matchedCategory ? result.categoryId : null,
+        categoryName: matchedCategory ? matchedCategory.name : null,
+        confidence: Math.max(0, Math.min(100, result.confidence || 0)),
+        reason: result.reason || "",
+      };
+    } catch {
+      console.error("Failed to parse AI category response:", jsonText);
+      return { categoryId: null, categoryName: null, confidence: 0, reason: "Parse error" };
+    }
+  } catch (error) {
+    console.error("Category suggestion error:", error);
+    return { categoryId: null, categoryName: null, confidence: 0, reason: "Error" };
+  }
+}
+
+// =============================================================================
 // Multi-Document Analysis Functions
 // =============================================================================
 
@@ -824,6 +977,37 @@ export async function analyzeAndClassifyMultiple(
 
     const suggested = buildSuggestedValues(pseudoData, matchResult.mapping);
 
+    // If no mapping found, use AI to suggest category from content
+    let aiCategorySuggestion: {
+      categoryId: string | null;
+      categoryName: string | null;
+      confidence: number;
+      reason: string;
+    } | null = null;
+
+    if (!matchResult.mapping) {
+      // Extract items from OCR for better category suggestion
+      const items = extractedDataList.flatMap((d) => 
+        (d.items || []).map((item) => typeof item === "string" ? item : item.description || "")
+      ).filter(Boolean);
+
+      aiCategorySuggestion = await suggestCategoryFromContent(
+        companyId,
+        transactionType,
+        {
+          vendorName: combined.vendorName,
+          description: combined.vendorName ? `ค่าใช้จ่ายจาก ${combined.vendorName}` : null,
+          items: items.length > 0 ? items : undefined,
+          imageUrls: imageUrls.slice(0, 1), // Use first image for context
+        }
+      );
+
+      // Apply AI suggestion to suggested values if confident enough
+      if (aiCategorySuggestion.categoryId && aiCategorySuggestion.confidence >= 60) {
+        suggested.categoryId = aiCategorySuggestion.categoryId;
+      }
+    }
+
     smartResult = {
       mapping: matchResult.mapping
         ? {
@@ -845,6 +1029,8 @@ export async function analyzeAndClassifyMultiple(
       suggestTraining:
         !matchResult.mapping &&
         (combined.vendorName !== null || combined.vendorTaxId !== null),
+      // Include AI category suggestion for UI to show confidence
+      aiCategorySuggestion: aiCategorySuggestion || undefined,
     };
   }
 

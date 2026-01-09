@@ -93,8 +93,8 @@ export async function StatsCards({ companyCode }: { companyCode: string }) {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-semibold tracking-tight ${
-              stat.trend === "positive" ? "text-foreground" :
-              stat.trend === "negative" ? "text-foreground" :
+              stat.trend === "positive" ? "text-primary" :
+              stat.trend === "negative" ? "text-destructive" :
               "text-foreground"
             }`}>
               {stat.value}

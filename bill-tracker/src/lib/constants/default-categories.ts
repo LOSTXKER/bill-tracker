@@ -1,131 +1,192 @@
 /**
  * Default Categories for Bill Tracker
- * ครอบคลุมธุรกิจสินค้าและบริการ
+ * ระบบหมวดหมู่ 2 ขั้น: กลุ่ม (Group) → หมวดย่อย (Sub-category)
  */
 
-export interface DefaultCategory {
+export interface CategoryGroup {
   name: string;
   key: string;
   order: number;
   color: string;
   icon?: string;
+  children: SubCategory[];
+}
+
+export interface SubCategory {
+  name: string;
+  key: string;
+  order: number;
+  color?: string; // ถ้าไม่ระบุจะใช้สีของ group
+  icon?: string;
 }
 
 // =============================================================================
-// Default Expense Categories
+// Default Expense Categories - หมวดค่าใช้จ่ายตามมาตรฐานบัญชี (2 ขั้น)
 // =============================================================================
-export const DEFAULT_EXPENSE_CATEGORIES: DefaultCategory[] = [
-  // --- ต้นทุนสินค้า/บริการ ---
-  { name: "วัตถุดิบ", key: "MATERIAL", order: 1, color: "#8B4513", icon: "Package" },
-  { name: "สินค้าเพื่อขาย", key: "GOODS_FOR_SALE", order: 2, color: "#CD853F", icon: "ShoppingCart" },
-  { name: "ค่าจ้างผลิต/รับเหมา", key: "SUBCONTRACT", order: 3, color: "#D2691E", icon: "Hammer" },
-
-  // --- ค่าแรง/บุคลากร ---
-  { name: "เงินเดือน/ค่าจ้าง", key: "SALARY", order: 10, color: "#4169E1", icon: "Users" },
-  { name: "ค่าจ้างฟรีแลนซ์", key: "FREELANCE", order: 11, color: "#9370DB", icon: "User" },
-  { name: "ค่าล่วงเวลา (OT)", key: "OVERTIME", order: 12, color: "#6A5ACD", icon: "Clock" },
-  { name: "สวัสดิการพนักงาน", key: "WELFARE", order: 13, color: "#7B68EE", icon: "Heart" },
-  { name: "ประกันสังคม", key: "SOCIAL_SECURITY", order: 14, color: "#483D8B", icon: "Shield" },
-
-  // --- ค่าดำเนินงาน ---
-  { name: "สาธารณูปโภค", key: "UTILITY", order: 20, color: "#FFD700", icon: "Zap" },
-  { name: "ค่าเช่าสถานที่", key: "RENT", order: 21, color: "#FF8C00", icon: "Home" },
-  { name: "ค่าอินเทอร์เน็ต/โทรศัพท์", key: "TELECOM", order: 22, color: "#FFA500", icon: "Wifi" },
-  { name: "อุปกรณ์สำนักงาน", key: "OFFICE", order: 23, color: "#20B2AA", icon: "Briefcase" },
-  { name: "ซอฟต์แวร์/บริการออนไลน์", key: "SOFTWARE", order: 24, color: "#00CED1", icon: "Monitor" },
-
-  // --- ค่าขนส่ง/เดินทาง ---
-  { name: "ค่าขนส่ง/โลจิสติกส์", key: "TRANSPORT", order: 30, color: "#32CD32", icon: "Truck" },
-  { name: "ค่าเดินทาง/น้ำมัน", key: "TRAVEL", order: 31, color: "#228B22", icon: "Car" },
-  { name: "ค่าจอดรถ/ทางด่วน", key: "PARKING_TOLL", order: 32, color: "#2E8B57", icon: "MapPin" },
-
-  // --- การตลาด/ขาย ---
-  { name: "การตลาด/โฆษณา", key: "MARKETING", order: 40, color: "#FF69B4", icon: "Megaphone" },
-  { name: "ค่าคอมมิชชั่นขาย", key: "SALES_COMMISSION", order: 41, color: "#DB7093", icon: "Percent" },
-  { name: "ค่าบรรจุภัณฑ์", key: "PACKAGING", order: 42, color: "#C71585", icon: "Box" },
-
-  // --- ค่าที่ปรึกษา/วิชาชีพ ---
-  { name: "ค่าที่ปรึกษา/วิชาชีพ", key: "PROFESSIONAL", order: 50, color: "#8A2BE2", icon: "GraduationCap" },
-  { name: "ค่าบัญชี/สอบบัญชี", key: "ACCOUNTING", order: 51, color: "#9932CC", icon: "Calculator" },
-  { name: "ค่าทนายความ/กฎหมาย", key: "LEGAL", order: 52, color: "#BA55D3", icon: "Scale" },
-
-  // --- ค่าบำรุงรักษา ---
-  { name: "ค่าซ่อมบำรุง", key: "MAINTENANCE", order: 60, color: "#DC143C", icon: "Wrench" },
-  { name: "ค่าประกันภัย", key: "INSURANCE", order: 61, color: "#B22222", icon: "ShieldCheck" },
-
-  // --- ค่าใช้จ่ายทางการเงิน ---
-  { name: "ดอกเบี้ยจ่าย", key: "INTEREST_EXPENSE", order: 70, color: "#800000", icon: "TrendingDown" },
-  { name: "ค่าธรรมเนียมธนาคาร", key: "BANK_FEE", order: 71, color: "#A52A2A", icon: "CreditCard" },
-  { name: "ค่าธรรมเนียม/ภาษีอื่น", key: "TAX_FEE", order: 72, color: "#8B0000", icon: "FileText" },
-
-  // --- อื่นๆ ---
-  { name: "ค่าเลี้ยงรับรอง", key: "ENTERTAINMENT", order: 80, color: "#FF4500", icon: "Coffee" },
-  { name: "เบ็ดเตล็ด", key: "MISCELLANEOUS", order: 81, color: "#696969", icon: "MoreHorizontal" },
-  { name: "อื่นๆ", key: "OTHER", order: 99, color: "#808080", icon: "HelpCircle" },
+export const DEFAULT_EXPENSE_GROUPS: CategoryGroup[] = [
+  {
+    name: "ต้นทุนขาย",
+    key: "COST_OF_SALES",
+    order: 1,
+    color: "#8B4513",
+    icon: "Package",
+    children: [
+      { name: "ซื้อสินค้า", key: "PURCHASE", order: 1 },
+      { name: "วัตถุดิบ", key: "MATERIAL", order: 2 },
+      { name: "ค่าแรงงาน (ผลิต)", key: "LABOR_PRODUCTION", order: 3 },
+      { name: "ค่าโสหุ้ยการผลิต", key: "OVERHEAD", order: 4 },
+    ],
+  },
+  {
+    name: "ค่าใช้จ่ายในการขาย",
+    key: "SELLING_EXPENSE",
+    order: 2,
+    color: "#FF69B4",
+    icon: "Megaphone",
+    children: [
+      { name: "ค่าโฆษณา", key: "ADVERTISING", order: 1 },
+      { name: "ค่าส่งเสริมการขาย", key: "PROMOTION", order: 2 },
+      { name: "ค่าขนส่ง", key: "TRANSPORT", order: 3 },
+      { name: "ค่าคอมมิชชั่น", key: "COMMISSION", order: 4 },
+    ],
+  },
+  {
+    name: "ค่าใช้จ่ายในการบริหาร",
+    key: "ADMIN_EXPENSE",
+    order: 3,
+    color: "#4169E1",
+    icon: "Building",
+    children: [
+      { name: "เงินเดือน/ค่าจ้าง", key: "SALARY", order: 1 },
+      { name: "ค่าเช่าสำนักงาน", key: "RENT", order: 2 },
+      { name: "ค่าสาธารณูปโภค", key: "UTILITY", order: 3 },
+      { name: "ค่าใช้จ่ายสำนักงาน", key: "OFFICE", order: 4 },
+      { name: "ค่าซ่อมแซม/บำรุงรักษา", key: "MAINTENANCE", order: 5 },
+      { name: "ค่าที่ปรึกษา/วิชาชีพ", key: "PROFESSIONAL", order: 6 },
+      { name: "ค่าประกันภัย", key: "INSURANCE", order: 7 },
+      { name: "ค่าเสื่อมราคา", key: "DEPRECIATION", order: 8 },
+    ],
+  },
+  {
+    name: "ค่าใช้จ่ายทางการเงิน",
+    key: "FINANCE_EXPENSE",
+    order: 4,
+    color: "#800000",
+    icon: "CreditCard",
+    children: [
+      { name: "ดอกเบี้ยจ่าย", key: "INTEREST_EXPENSE", order: 1 },
+      { name: "ค่าธรรมเนียมธนาคาร", key: "BANK_FEE", order: 2 },
+    ],
+  },
+  {
+    name: "ค่าใช้จ่ายอื่น",
+    key: "OTHER_EXPENSE",
+    order: 99,
+    color: "#808080",
+    icon: "MoreHorizontal",
+    children: [
+      { name: "ค่าใช้จ่ายเบ็ดเตล็ด", key: "MISCELLANEOUS", order: 1 },
+    ],
+  },
 ];
 
 // =============================================================================
-// Default Income Categories
+// Default Income Categories - หมวดรายได้ตามมาตรฐานบัญชี (2 ขั้น)
 // =============================================================================
-export const DEFAULT_INCOME_CATEGORIES: DefaultCategory[] = [
-  // --- รายได้จากขาย ---
-  { name: "ขายสินค้า", key: "PRODUCT_SALES", order: 1, color: "#32CD32", icon: "ShoppingCart" },
-  { name: "ขายสินค้าออนไลน์", key: "ONLINE_SALES", order: 2, color: "#00FA9A", icon: "Globe" },
-  { name: "ขายส่ง", key: "WHOLESALE", order: 3, color: "#3CB371", icon: "Package" },
-  { name: "ขายปลีก", key: "RETAIL", order: 4, color: "#2E8B57", icon: "Store" },
-
-  // --- รายได้จากบริการ ---
-  { name: "ค่าบริการ", key: "SERVICE_INCOME", order: 10, color: "#4169E1", icon: "Settings" },
-  { name: "งานออกแบบ/ครีเอทีฟ", key: "DESIGN", order: 11, color: "#6495ED", icon: "Palette" },
-  { name: "งานพัฒนา/IT", key: "DEVELOPMENT", order: 12, color: "#1E90FF", icon: "Code" },
-  { name: "ค่าที่ปรึกษา", key: "CONSULTING", order: 13, color: "#00BFFF", icon: "MessageSquare" },
-  { name: "ค่าอบรม/สัมมนา", key: "TRAINING", order: 14, color: "#87CEEB", icon: "BookOpen" },
-
-  // --- รายได้จากการผลิต ---
-  { name: "ค่าจ้างผลิต/รับเหมา", key: "MANUFACTURING", order: 20, color: "#FF8C00", icon: "Factory" },
-  { name: "ค่าพิมพ์/ผลิตสื่อ", key: "PRINTING", order: 21, color: "#FFA500", icon: "Printer" },
-
-  // --- รายได้อื่น ---
-  { name: "ค่าคอมมิชชั่น", key: "COMMISSION", order: 30, color: "#FF69B4", icon: "Percent" },
-  { name: "ค่าเช่า/ค่าลิขสิทธิ์", key: "RENTAL_ROYALTY", order: 31, color: "#DA70D6", icon: "Key" },
-  { name: "ค่าโฆษณา/สปอนเซอร์", key: "ADVERTISING", order: 32, color: "#EE82EE", icon: "Award" },
-
-  // --- รายได้ทางการเงิน ---
-  { name: "ดอกเบี้ยรับ", key: "INTEREST", order: 40, color: "#FFD700", icon: "TrendingUp" },
-  { name: "เงินปันผล", key: "DIVIDEND", order: 41, color: "#FFEC8B", icon: "PieChart" },
-  { name: "กำไรจากการขายทรัพย์สิน", key: "ASSET_SALE", order: 42, color: "#F0E68C", icon: "DollarSign" },
-
-  // --- อื่นๆ ---
-  { name: "เงินคืน/เครดิต", key: "REFUND", order: 50, color: "#98FB98", icon: "RotateCcw" },
-  { name: "รายได้เบ็ดเตล็ด", key: "MISCELLANEOUS", order: 51, color: "#696969", icon: "MoreHorizontal" },
-  { name: "อื่นๆ", key: "OTHER", order: 99, color: "#808080", icon: "HelpCircle" },
+export const DEFAULT_INCOME_GROUPS: CategoryGroup[] = [
+  {
+    name: "รายได้จากการดำเนินงาน",
+    key: "OPERATING_INCOME",
+    order: 1,
+    color: "#32CD32",
+    icon: "TrendingUp",
+    children: [
+      { name: "รายได้จากการขาย", key: "SALES", order: 1 },
+      { name: "รายได้จากการให้บริการ", key: "SERVICE", order: 2 },
+      { name: "รายได้ค่าจ้างผลิต", key: "MANUFACTURING", order: 3 },
+    ],
+  },
+  {
+    name: "รายได้อื่น",
+    key: "OTHER_INCOME",
+    order: 2,
+    color: "#FFD700",
+    icon: "Star",
+    children: [
+      { name: "ดอกเบี้ยรับ", key: "INTEREST_INCOME", order: 1 },
+      { name: "กำไรจากการขายสินทรัพย์", key: "ASSET_GAIN", order: 2 },
+      { name: "รายได้ค่าเช่า", key: "RENTAL_INCOME", order: 3 },
+      { name: "รายได้เบ็ดเตล็ด", key: "MISCELLANEOUS", order: 4 },
+    ],
+  },
 ];
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+// นับจำนวน categories ทั้งหมด (รวม groups และ children)
+export function countCategories(groups: CategoryGroup[]): number {
+  return groups.reduce((total, group) => total + 1 + group.children.length, 0);
+}
+
+// Flatten categories สำหรับ backward compatibility
+export interface FlatCategory {
+  name: string;
+  key: string;
+  order: number;
+  color: string;
+  icon?: string;
+  parentKey?: string; // key ของ parent group
+  isGroup: boolean;
+}
+
+export function flattenCategories(groups: CategoryGroup[]): FlatCategory[] {
+  const result: FlatCategory[] = [];
+  let globalOrder = 0;
+
+  for (const group of groups) {
+    // Add group
+    result.push({
+      name: group.name,
+      key: group.key,
+      order: globalOrder++,
+      color: group.color,
+      icon: group.icon,
+      isGroup: true,
+    });
+
+    // Add children
+    for (const child of group.children) {
+      result.push({
+        name: child.name,
+        key: child.key,
+        order: globalOrder++,
+        color: child.color || group.color,
+        icon: child.icon,
+        parentKey: group.key,
+        isGroup: false,
+      });
+    }
+  }
+
+  return result;
+}
+
+// Legacy exports for backward compatibility
+export const DEFAULT_EXPENSE_CATEGORIES = flattenCategories(DEFAULT_EXPENSE_GROUPS);
+export const DEFAULT_INCOME_CATEGORIES = flattenCategories(DEFAULT_INCOME_GROUPS);
 
 // Summary
 export const CATEGORY_SUMMARY = {
   expense: {
-    count: DEFAULT_EXPENSE_CATEGORIES.length,
-    groups: [
-      "ต้นทุนสินค้า/บริการ (3)",
-      "ค่าแรง/บุคลากร (5)",
-      "ค่าดำเนินงาน (5)",
-      "ค่าขนส่ง/เดินทาง (3)",
-      "การตลาด/ขาย (3)",
-      "ค่าที่ปรึกษา/วิชาชีพ (3)",
-      "ค่าบำรุงรักษา (2)",
-      "ค่าใช้จ่ายทางการเงิน (3)",
-      "อื่นๆ (3)",
-    ],
+    groupCount: DEFAULT_EXPENSE_GROUPS.length,
+    totalCount: countCategories(DEFAULT_EXPENSE_GROUPS),
+    groups: DEFAULT_EXPENSE_GROUPS.map(g => g.name),
   },
   income: {
-    count: DEFAULT_INCOME_CATEGORIES.length,
-    groups: [
-      "รายได้จากขาย (4)",
-      "รายได้จากบริการ (5)",
-      "รายได้จากการผลิต (2)",
-      "รายได้อื่น (3)",
-      "รายได้ทางการเงิน (3)",
-      "อื่นๆ (3)",
-    ],
+    groupCount: DEFAULT_INCOME_GROUPS.length,
+    totalCount: countCategories(DEFAULT_INCOME_GROUPS),
+    groups: DEFAULT_INCOME_GROUPS.map(g => g.name),
   },
 };

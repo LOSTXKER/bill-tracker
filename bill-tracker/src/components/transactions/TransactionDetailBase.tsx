@@ -361,9 +361,24 @@ export function TransactionDetailBase({
   const dateValue = transaction[config.dateField] as string;
   const netAmount = transaction[config.netAmountField] as number;
   const description = transaction[config.descriptionField] as string | null;
+  const isDeleted = !!transaction.deletedAt;
 
   return (
     <div className="max-w-6xl mx-auto pb-24">
+      {/* Deleted Warning Banner */}
+      {isDeleted && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 mb-4 flex items-center gap-3">
+          <Trash2 className="h-5 w-5 text-destructive shrink-0" />
+          <div>
+            <p className="font-medium text-destructive">รายการนี้ถูกลบแล้ว</p>
+            <p className="text-sm text-muted-foreground">
+              ลบเมื่อ {new Date(transaction.deletedAt).toLocaleString("th-TH")}
+              {transaction.deletedByUser && ` โดย ${transaction.deletedByUser.name}`}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b -mx-4 px-4 py-3 mb-6">
         <div className="flex items-center justify-between gap-4">
@@ -392,7 +407,12 @@ export function TransactionDetailBase({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isEditing ? (
+            {isDeleted ? (
+              <Badge variant="destructive" className="gap-1">
+                <Trash2 className="h-3 w-3" />
+                ถูกลบแล้ว
+              </Badge>
+            ) : isEditing ? (
               <div className="flex gap-2">
                 <Button
                   variant="outline"

@@ -75,7 +75,7 @@ export async function fetchExpenses(params: FetchExpensesParams) {
   }
 
   if (category) {
-    where.category = category;
+    where.categoryId = category;
   }
 
   if (contact) {

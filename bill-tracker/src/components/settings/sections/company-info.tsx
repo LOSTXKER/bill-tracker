@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Edit, MapPin, Phone, FileText, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { Building2, Edit, MapPin, Phone, FileText } from "lucide-react";
 
 interface Company {
   id: string;
@@ -70,49 +70,6 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
           </div>
         </CardContent>
       </Card>
-
-      {/* Quick Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                <TrendingDown className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">-</p>
-                <p className="text-sm text-muted-foreground">รายการรายจ่าย</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">-</p>
-                <p className="text-sm text-muted-foreground">รายการรายรับ</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">-</p>
-                <p className="text-sm text-muted-foreground">สมาชิกทีม</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

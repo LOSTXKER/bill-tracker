@@ -62,6 +62,11 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
     async (request, { company }) => {
       const { searchParams } = new URL(request.url);
       const status = searchParams.get("status");
+      const category = searchParams.get("category");
+      const contact = searchParams.get("contact");
+      const search = searchParams.get("search");
+      const dateFrom = searchParams.get("dateFrom");
+      const dateTo = searchParams.get("dateTo");
       const includeDeleted = searchParams.get("includeDeleted") === "true";
       const includeReimbursements = searchParams.get("includeReimbursements") === "true";
       const page = parseInt(searchParams.get("page") || "1");
@@ -71,9 +76,30 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const where: any = {
         companyId: company.id,
         ...(status && { [config.fields.statusField]: status as any }),
+        ...(category && { categoryId: category }),
+        ...(contact && { contactId: contact }),
         // Soft delete filter - exclude deleted items unless explicitly requested
         ...(!includeDeleted && { deletedAt: null }),
       };
+
+      // Date range filter
+      if (dateFrom || dateTo) {
+        where[config.fields.dateField] = {};
+        if (dateFrom) {
+          where[config.fields.dateField].gte = new Date(dateFrom);
+        }
+        if (dateTo) {
+          where[config.fields.dateField].lte = new Date(dateTo);
+        }
+      }
+
+      // Search filter (description)
+      if (search) {
+        where.OR = [
+          ...(where.OR || []),
+          { description: { contains: search, mode: "insensitive" } },
+        ];
+      }
 
       // For expenses, filter out reimbursements that are not PAID
       // Reimbursements should only appear as expenses after they're paid
@@ -92,6 +118,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
           where,
           include: {
             contact: true,
+            categoryRef: true,
             creator: {
               select: { id: true, name: true, email: true },
             },

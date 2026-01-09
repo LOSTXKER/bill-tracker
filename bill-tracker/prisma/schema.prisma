@@ -128,6 +128,11 @@ model Category {
   icon      String? // Optional icon name
   order     Int          @default(0) // Display order
 
+  // Hierarchy (2-level: Group → Sub-category)
+  parentId  String? // If null, this is a top-level group
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CategoryHierarchy")
+
   // Relations
   expenses              Expense[]
   incomes               Income[]
@@ -140,6 +145,7 @@ model Category {
   @@unique([companyId, name, type])
   @@index([companyId, type])
   @@index([isActive])
+  @@index([parentId])
 }
 
 enum CategoryType {

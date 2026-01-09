@@ -7,6 +7,7 @@ export interface FetchIncomesParams {
   companyCode: string;
   search?: string;
   status?: string;
+  category?: string;
   contact?: string;
   creator?: string;
   dateFrom?: string;
@@ -22,6 +23,7 @@ export async function fetchIncomes(params: FetchIncomesParams) {
     companyCode,
     search,
     status,
+    category,
     contact,
     creator,
     dateFrom,
@@ -56,6 +58,10 @@ export async function fetchIncomes(params: FetchIncomesParams) {
 
   if (status) {
     where.status = status;
+  }
+
+  if (category) {
+    where.categoryId = category;
   }
 
   if (contact) {

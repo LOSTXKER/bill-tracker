@@ -2,105 +2,266 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import {
-  DEFAULT_EXPENSE_CATEGORIES,
-  DEFAULT_INCOME_CATEGORIES,
+  DEFAULT_EXPENSE_GROUPS,
+  DEFAULT_INCOME_GROUPS,
 } from "@/lib/constants/default-categories";
 
 // POST /api/[company]/categories/reset
-// Creates missing default categories and reactivates all default categories
+// Resets to default categories with 2-level hierarchy (groups → sub-categories)
 async function handlePost(
   req: Request,
   context: { company: { id: string }; companyCode: string }
 ) {
   try {
-    let created = 0;
-    let activated = 0;
+    let groupsCreated = 0;
+    let childrenCreated = 0;
+    let updated = 0;
+    let deactivated = 0;
+    let deleted = 0;
 
-    // Create or update expense categories
-    for (const cat of DEFAULT_EXPENSE_CATEGORIES) {
-      const result = await prisma.category.upsert({
+    // Build sets of default category names for checking
+    const defaultExpenseGroupNames = new Set(
+      DEFAULT_EXPENSE_GROUPS.map((g) => g.name)
+    );
+    const defaultExpenseChildNames = new Set(
+      DEFAULT_EXPENSE_GROUPS.flatMap((g) => g.children.map((c) => c.name))
+    );
+    const defaultIncomeGroupNames = new Set(
+      DEFAULT_INCOME_GROUPS.map((g) => g.name)
+    );
+    const defaultIncomeChildNames = new Set(
+      DEFAULT_INCOME_GROUPS.flatMap((g) => g.children.map((c) => c.name))
+    );
+
+    const allDefaultExpenseNames = new Set([
+      ...defaultExpenseGroupNames,
+      ...defaultExpenseChildNames,
+    ]);
+    const allDefaultIncomeNames = new Set([
+      ...defaultIncomeGroupNames,
+      ...defaultIncomeChildNames,
+    ]);
+
+    // Get all existing categories
+    const existingCategories = await prisma.category.findMany({
+      where: {
+        companyId: context.company.id,
+        isDefault: true,
+      },
+      include: {
+        _count: { select: { expenses: true, incomes: true } },
+      },
+    });
+
+    // Delete or deactivate old categories
+    for (const cat of existingCategories) {
+      const isInNewDefaults =
+        (cat.type === "EXPENSE" && allDefaultExpenseNames.has(cat.name)) ||
+        (cat.type === "INCOME" && allDefaultIncomeNames.has(cat.name));
+
+      if (!isInNewDefaults) {
+        const hasTransactions =
+          cat._count.expenses > 0 || cat._count.incomes > 0;
+
+        if (!hasTransactions) {
+          await prisma.category.delete({ where: { id: cat.id } });
+          deleted++;
+        } else {
+          await prisma.category.update({
+            where: { id: cat.id },
+            data: { isActive: false },
+          });
+          deactivated++;
+        }
+      }
+    }
+
+    // ==================== EXPENSE GROUPS ====================
+    for (const group of DEFAULT_EXPENSE_GROUPS) {
+      // Create or update group (parent)
+      const parentCategory = await prisma.category.upsert({
         where: {
           companyId_name_type: {
             companyId: context.company.id,
-            name: cat.name,
+            name: group.name,
             type: "EXPENSE",
           },
         },
         update: {
           isDefault: true,
           isActive: true,
-          color: cat.color,
-          order: cat.order,
-          icon: cat.icon,
+          color: group.color,
+          icon: group.icon,
+          order: group.order,
+          parentId: null,
         },
         create: {
           companyId: context.company.id,
-          name: cat.name,
+          name: group.name,
           type: "EXPENSE",
           isDefault: true,
           isActive: true,
-          color: cat.color,
-          order: cat.order,
-          icon: cat.icon,
+          color: group.color,
+          icon: group.icon,
+          order: group.order,
+          parentId: null,
         },
       });
 
-      // Check if it was created or updated
-      if (result.createdAt.getTime() === result.updatedAt.getTime()) {
-        created++;
-      } else {
-        activated++;
+      const isNew =
+        parentCategory.createdAt.getTime() === parentCategory.updatedAt.getTime();
+      if (isNew) groupsCreated++;
+      else updated++;
+
+      // Create or update children
+      for (const child of group.children) {
+        const childOrder = group.order * 100 + child.order;
+
+        const childCategory = await prisma.category.upsert({
+          where: {
+            companyId_name_type: {
+              companyId: context.company.id,
+              name: child.name,
+              type: "EXPENSE",
+            },
+          },
+          update: {
+            isDefault: true,
+            isActive: true,
+            color: child.color || group.color,
+            icon: child.icon,
+            order: childOrder,
+            parentId: parentCategory.id,
+          },
+          create: {
+            companyId: context.company.id,
+            name: child.name,
+            type: "EXPENSE",
+            isDefault: true,
+            isActive: true,
+            color: child.color || group.color,
+            icon: child.icon,
+            order: childOrder,
+            parentId: parentCategory.id,
+          },
+        });
+
+        const isChildNew =
+          childCategory.createdAt.getTime() === childCategory.updatedAt.getTime();
+        if (isChildNew) childrenCreated++;
+        else updated++;
       }
     }
 
-    // Create or update income categories
-    for (const cat of DEFAULT_INCOME_CATEGORIES) {
-      const result = await prisma.category.upsert({
+    // ==================== INCOME GROUPS ====================
+    for (const group of DEFAULT_INCOME_GROUPS) {
+      // Create or update group (parent)
+      const parentCategory = await prisma.category.upsert({
         where: {
           companyId_name_type: {
             companyId: context.company.id,
-            name: cat.name,
+            name: group.name,
             type: "INCOME",
           },
         },
         update: {
           isDefault: true,
           isActive: true,
-          color: cat.color,
-          order: cat.order,
-          icon: cat.icon,
+          color: group.color,
+          icon: group.icon,
+          order: group.order,
+          parentId: null,
         },
         create: {
           companyId: context.company.id,
-          name: cat.name,
+          name: group.name,
           type: "INCOME",
           isDefault: true,
           isActive: true,
-          color: cat.color,
-          order: cat.order,
-          icon: cat.icon,
+          color: group.color,
+          icon: group.icon,
+          order: group.order,
+          parentId: null,
         },
       });
 
-      // Check if it was created or updated
-      if (result.createdAt.getTime() === result.updatedAt.getTime()) {
-        created++;
-      } else {
-        activated++;
+      const isNew =
+        parentCategory.createdAt.getTime() === parentCategory.updatedAt.getTime();
+      if (isNew) groupsCreated++;
+      else updated++;
+
+      // Create or update children
+      for (const child of group.children) {
+        const childOrder = group.order * 100 + child.order;
+
+        const childCategory = await prisma.category.upsert({
+          where: {
+            companyId_name_type: {
+              companyId: context.company.id,
+              name: child.name,
+              type: "INCOME",
+            },
+          },
+          update: {
+            isDefault: true,
+            isActive: true,
+            color: child.color || group.color,
+            icon: child.icon,
+            order: childOrder,
+            parentId: parentCategory.id,
+          },
+          create: {
+            companyId: context.company.id,
+            name: child.name,
+            type: "INCOME",
+            isDefault: true,
+            isActive: true,
+            color: child.color || group.color,
+            icon: child.icon,
+            order: childOrder,
+            parentId: parentCategory.id,
+          },
+        });
+
+        const isChildNew =
+          childCategory.createdAt.getTime() === childCategory.updatedAt.getTime();
+        if (isChildNew) childrenCreated++;
+        else updated++;
       }
     }
 
-    const total = DEFAULT_EXPENSE_CATEGORIES.length + DEFAULT_INCOME_CATEGORIES.length;
+    // Summary
+    const totalExpense =
+      DEFAULT_EXPENSE_GROUPS.length +
+      DEFAULT_EXPENSE_GROUPS.reduce((sum, g) => sum + g.children.length, 0);
+    const totalIncome =
+      DEFAULT_INCOME_GROUPS.length +
+      DEFAULT_INCOME_GROUPS.reduce((sum, g) => sum + g.children.length, 0);
 
     return apiResponse.success(
       {
-        total,
-        created,
-        activated,
-        expense: DEFAULT_EXPENSE_CATEGORIES.length,
-        income: DEFAULT_INCOME_CATEGORIES.length,
+        total: totalExpense + totalIncome,
+        groupsCreated,
+        childrenCreated,
+        updated,
+        deleted,
+        deactivated,
+        expense: {
+          groups: DEFAULT_EXPENSE_GROUPS.length,
+          children: DEFAULT_EXPENSE_GROUPS.reduce(
+            (sum, g) => sum + g.children.length,
+            0
+          ),
+        },
+        income: {
+          groups: DEFAULT_INCOME_GROUPS.length,
+          children: DEFAULT_INCOME_GROUPS.reduce(
+            (sum, g) => sum + g.children.length,
+            0
+          ),
+        },
       },
-      `รีเซ็ตหมวดหมู่สำเร็จ: สร้างใหม่ ${created} รายการ, เปิดใช้งาน ${activated} รายการ`
+      `รีเซ็ตหมวดหมู่สำเร็จ: สร้างกลุ่ม ${groupsCreated}, สร้างหมวดย่อย ${childrenCreated}, อัพเดต ${updated}, ลบ ${deleted}, ปิดใช้งาน ${deactivated}`
     );
   } catch (error: unknown) {
     console.error("Reset categories error:", error);

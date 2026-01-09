@@ -26,6 +26,7 @@ import {
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { toNumber } from "@/lib/utils/serializers";
 import { UserBadge } from "@/components/shared/UserBadge";
+import { cn } from "@/lib/utils";
 import { EditPermissionsDialog } from "@/components/settings/edit-permissions-dialog";
 import { useIsOwner } from "@/components/guards/permission-guard";
 
@@ -79,10 +80,120 @@ interface Reimbursement {
 interface AuditLog {
   id: string;
   action: string;
+  entityType: string;
+  entityId: string;
+  description: string | null;
+  changes: any;
   details: any;
   createdAt: string;
   ipAddress?: string;
 }
+
+// Action colors
+const ACTION_COLORS: Record<string, string> = {
+  CREATE: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+  UPDATE: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+  DELETE: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+  STATUS_CHANGE: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+  APPROVE: "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+};
+
+// Entity type labels
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  Expense: "รายจ่าย",
+  Income: "รายรับ",
+  Contact: "ผู้ติดต่อ",
+  Category: "หมวดหมู่",
+  ReimbursementRequest: "คำขอเบิกจ่าย",
+};
+
+// Status labels for translation  
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_PHYSICAL: "ร้านส่งบิลตามมา",
+  WAITING_FOR_DOC: "ได้บิลครบแล้ว",
+  READY_TO_SEND: "พร้อมส่ง",
+  SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
+  PENDING_INVOICE: "รอออกบิล",
+  INVOICE_ISSUED: "ออกบิลแล้ว",
+  COPY_SENT: "ส่งสำเนาแล้ว",
+  COMPLETED: "เสร็จสิ้น",
+  PENDING: "รออนุมัติ",
+  APPROVED: "อนุมัติแล้ว",
+  PAID: "จ่ายแล้ว",
+  REJECTED: "ปฏิเสธ",
+};
+
+// Field labels
+const FIELD_LABELS: Record<string, string> = {
+  amount: "จำนวนเงิน",
+  description: "รายละเอียด",
+  billDate: "วันที่",
+  status: "สถานะ",
+  categoryId: "หมวดหมู่",
+  contactId: "ผู้ติดต่อ",
+  notes: "หมายเหตุ",
+  invoiceNumber: "เลขที่ใบกำกับ",
+  paymentMethod: "วิธีชำระเงิน",
+  vatRate: "อัตรา VAT",
+  slipUrls: "สลิปโอนเงิน",
+  taxInvoiceUrls: "ใบกำกับภาษี",
+};
+
+const getFieldLabel = (field: string): string => FIELD_LABELS[field] || field;
+const getStatusLabel = (status: string): string => STATUS_LABELS[status] || status;
+const getEntityTypeLabel = (entityType: string): string => ENTITY_TYPE_LABELS[entityType] || entityType;
+
+const formatAuditDescription = (log: AuditLog): string => {
+  const typeLabel = getEntityTypeLabel(log.entityType);
+  
+  if (log.action === "STATUS_CHANGE" && log.changes) {
+    const oldLabel = log.changes.oldStatusLabel || getStatusLabel(log.changes.oldStatus);
+    const newLabel = log.changes.newStatusLabel || getStatusLabel(log.changes.newStatus);
+    return `เปลี่ยนสถานะ${typeLabel}: ${oldLabel} → ${newLabel}`;
+  }
+  
+  if (log.action === "CREATE") {
+    return `สร้าง${typeLabel}ใหม่`;
+  }
+  
+  if (log.action === "DELETE") {
+    return `ลบ${typeLabel}`;
+  }
+  
+  if (log.action === "UPDATE" && log.changes?.changedFields) {
+    const fields = log.changes.changedFieldLabels || log.changes.changedFields.map(getFieldLabel);
+    const userFacingFields = fields.filter((f: string) => 
+      !["updatedAt", "company", "creator"].includes(f)
+    );
+    if (userFacingFields.length > 0) {
+      return `แก้ไข${typeLabel}: ${userFacingFields.join(", ")}`;
+    }
+    return `แก้ไข${typeLabel}`;
+  }
+  
+  if (log.description) {
+    let desc = log.description;
+    Object.entries(ENTITY_TYPE_LABELS).forEach(([en, th]) => {
+      desc = desc.replace(new RegExp(en, "g"), th);
+    });
+    Object.entries(STATUS_LABELS).forEach(([code, label]) => {
+      desc = desc.replace(new RegExp(code, "g"), label);
+    });
+    desc = desc.replace(/\s*[a-z]{3}[a-z0-9]{5,}\.{0,3}:?\s*/gi, " ");
+    desc = desc.replace(/\s+/g, " ").trim();
+    desc = desc.replace(/:$/, "").trim();
+    return desc;
+  }
+  
+  const actionLabels: Record<string, string> = {
+    CREATE: "สร้าง",
+    UPDATE: "แก้ไข",
+    DELETE: "ลบ",
+    STATUS_CHANGE: "เปลี่ยนสถานะ",
+    APPROVE: "อนุมัติ",
+  };
+  return `${actionLabels[log.action] || log.action}${typeLabel}`;
+};
 
 export default function EmployeeDetailPage() {
   const params = useParams();
@@ -124,7 +235,8 @@ export default function EmployeeDetailPage() {
       // Fetch employee basic info
       const membersRes = await fetch(`/api/companies/${companyId}/members`);
       const membersData = await membersRes.json();
-      const employeeData = membersData.members?.find(
+      const members = membersData.data?.members || membersData.members || [];
+      const employeeData = members.find(
         (m: any) => m.userId === userId
       );
       setEmployee(employeeData);
@@ -134,21 +246,21 @@ export default function EmployeeDetailPage() {
         `/api/companies/${companyId}/members/${userId}/stats`
       );
       const statsData = await statsRes.json();
-      setStats(statsData.stats);
+      setStats(statsData.data?.stats || statsData.stats);
 
       // Fetch reimbursements
       const reimbursementsRes = await fetch(
         `/api/companies/${companyId}/members/${userId}/reimbursements?limit=20`
       );
       const reimbursementsData = await reimbursementsRes.json();
-      setReimbursements(reimbursementsData.reimbursements || []);
+      setReimbursements(reimbursementsData.data?.reimbursements || reimbursementsData.reimbursements || []);
 
       // Fetch audit logs
       const logsRes = await fetch(
         `/api/companies/${companyId}/members/${userId}/audit-logs?limit=20`
       );
       const logsData = await logsRes.json();
-      setAuditLogs(logsData.logs || []);
+      setAuditLogs(logsData.data?.logs || logsData.logs || []);
     } catch (error) {
       console.error("Error fetching employee data:", error);
     } finally {
@@ -491,7 +603,13 @@ export default function EmployeeDetailPage() {
         <TabsContent value="audit" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">ประวัติการใช้งาน</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="h-5 w-5 text-muted-foreground" />
+                ประวัติการใช้งาน
+                {auditLogs.length > 0 && (
+                  <Badge variant="secondary">{auditLogs.length}</Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {auditLogs.length === 0 ? (
@@ -499,30 +617,68 @@ export default function EmployeeDetailPage() {
                   ยังไม่มีประวัติการใช้งาน
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {auditLogs.map((log) => (
+                <div className="space-y-4">
+                  {auditLogs.map((log, index) => (
                     <div
                       key={log.id}
-                      className="p-4 border rounded-lg flex items-start justify-between gap-4"
+                      className={cn(
+                        "relative pl-6 pb-4",
+                        index !== auditLogs.length - 1 && "border-l-2 border-muted ml-2"
+                      )}
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">
-                          {getActionLabel(log.action)}
-                        </p>
-                        {log.details && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {typeof log.details === "object"
-                              ? JSON.stringify(log.details)
-                              : log.details}
-                          </p>
-                        )}
+                      {/* Timeline dot */}
+                      <div className={cn(
+                        "absolute left-0 top-0 w-4 h-4 rounded-full -translate-x-1/2 flex items-center justify-center",
+                        index === 0 ? "bg-primary" : "bg-muted"
+                      )}>
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          index === 0 ? "bg-white" : "bg-muted-foreground"
+                        )} />
                       </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        <p>
-                          {new Date(log.createdAt).toLocaleDateString("th-TH")}
+                      
+                      <div className="space-y-2">
+                        {/* Action badge and time */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge
+                            className={cn(
+                              "text-xs",
+                              ACTION_COLORS[log.action] || "bg-gray-100 text-gray-800"
+                            )}
+                          >
+                            {getActionLabel(log.action)}
+                          </Badge>
+                          {log.entityType && (
+                            <Badge variant="outline" className="text-xs">
+                              {getEntityTypeLabel(log.entityType)}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Description */}
+                        <p className="text-sm font-medium">
+                          {formatAuditDescription(log)}
                         </p>
-                        <p>
-                          {new Date(log.createdAt).toLocaleTimeString("th-TH")}
+                        
+                        {/* Status change details */}
+                        {log.action === "STATUS_CHANGE" && log.changes && (
+                          <div className="p-2 bg-muted/50 rounded text-xs inline-block">
+                            <span className="text-muted-foreground">
+                              {log.changes.oldStatusLabel || getStatusLabel(log.changes.oldStatus)} → {log.changes.newStatusLabel || getStatusLabel(log.changes.newStatus)}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Time and date */}
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(log.createdAt).toLocaleDateString("th-TH", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })} เวลา {new Date(log.createdAt).toLocaleTimeString("th-TH", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </p>
                       </div>
                     </div>
