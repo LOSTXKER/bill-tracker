@@ -64,7 +64,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ company: string }> }
 ) {
-  return withAuth(async (req, session) => {
+  return withAuth(async (req, { session }) => {
     try {
       const { company: companyCode } = await context.params;
       const { searchParams } = new URL(req.url);
