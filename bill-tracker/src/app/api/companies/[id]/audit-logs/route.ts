@@ -5,9 +5,9 @@
  * Requires audit:read permission
  */
 
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/permissions/checker";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 import type { AuditAction } from "@prisma/client";
 
 /**
@@ -25,16 +25,8 @@ import type { AuditAction } from "@prisma/client";
  * - endDate: ISO string (filter to date)
  * - search: string (search in description)
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: companyId } = await params;
-    
-    // Require audit:read permission
-    await requirePermission(companyId, "audit:read");
-
+export const GET = withCompanyAccessFromParams(
+  async (request, { company }) => {
     const { searchParams } = new URL(request.url);
     
     // Pagination
@@ -52,7 +44,7 @@ export async function GET(
 
     // Build where clause
     const where: any = {
-      companyId,
+      companyId: company.id,
     };
 
     if (userId) {
@@ -115,7 +107,7 @@ export async function GET(
     const hasNextPage = page < totalPages;
     const hasPreviousPage = page > 1;
 
-    return NextResponse.json({
+    return apiResponse.success({
       logs,
       pagination: {
         page,
@@ -126,44 +118,23 @@ export async function GET(
         hasPreviousPage,
       },
     });
-  } catch (error) {
-    console.error("Error fetching audit logs:", error);
-    
-    if (error instanceof Error && error.message.includes("redirect")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: "Failed to fetch audit logs" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "audit:read" }
+);
 
 /**
- * GET /api/companies/[id]/audit-logs/stats
+ * POST /api/companies/[id]/audit-logs (for stats)
  * 
  * Get audit log statistics
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: companyId } = await params;
-    
-    // Require audit:read permission
-    await requirePermission(companyId, "audit:read");
-
+export const POST = withCompanyAccessFromParams(
+  async (request, { company }) => {
     // Get stats for the last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const where = {
-      companyId,
+      companyId: company.id,
       createdAt: {
         gte: thirtyDaysAgo,
       },
@@ -242,7 +213,7 @@ export async function POST(
     
     const recentLogs = await prisma.auditLog.findMany({
       where: {
-        companyId,
+        companyId: company.id,
         createdAt: {
           gte: sevenDaysAgo,
         },
@@ -259,7 +230,7 @@ export async function POST(
       return acc;
     }, {} as Record<string, number>);
 
-    return NextResponse.json({
+    return apiResponse.success({
       stats: {
         totalLogs,
         actionCounts: actionCounts.map((a) => ({
@@ -274,19 +245,6 @@ export async function POST(
         logsByDay,
       },
     });
-  } catch (error) {
-    console.error("Error fetching audit log stats:", error);
-    
-    if (error instanceof Error && error.message.includes("redirect")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: "Failed to fetch audit log stats" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "audit:read" }
+);

@@ -174,6 +174,15 @@ export function TransactionDetailBase({
       if (!res.ok) throw new Error(`Failed to fetch ${config.type}`);
       const result = await res.json();
       const data = result.data?.[config.type] || result[config.type];
+      
+      // If this is an expense that was created from a reimbursement,
+      // and it's still PAID status, redirect to reimbursement detail
+      // (Note: New reimbursements use ReimbursementRequest model, not Expense)
+      if (config.type === "expense" && data?.isReimbursement && data?.reimbursementRequest) {
+        router.replace(`/${companyCode.toLowerCase()}/reimbursements/${data.reimbursementRequest.id}`);
+        return;
+      }
+      
       setTransaction(data);
       setEditData(data);
     } catch (err) {
@@ -181,7 +190,7 @@ export function TransactionDetailBase({
     } finally {
       setLoading(false);
     }
-  }, [config.apiEndpoint, config.type, id]);
+  }, [config.apiEndpoint, config.type, id, router, companyCode]);
 
   // Refresh both transaction data and audit history
   const refreshAll = useCallback(async () => {

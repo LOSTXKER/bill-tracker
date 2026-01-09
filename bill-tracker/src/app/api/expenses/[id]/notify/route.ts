@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/api/with-auth";
+import { apiResponse } from "@/lib/api/response";
 import { notifyExpense } from "@/lib/notifications/line-messaging";
 
 interface RouteParams {
@@ -11,13 +11,8 @@ interface RouteParams {
  * POST /api/expenses/[id]/notify
  * Send LINE notification for an expense
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export async function POST(request: Request, { params }: RouteParams) {
+  return withAuth(async (req, { session }) => {
     const { id } = await params;
 
     // Get expense with company and contact details
@@ -36,7 +31,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!expense) {
-      return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+      return apiResponse.notFound("Expense not found");
     }
 
     // Check user has access to this company
@@ -50,7 +45,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!access) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      return apiResponse.forbidden("Access denied");
     }
 
     // Get base URL from request
@@ -78,21 +73,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
 
     if (!success) {
-      return NextResponse.json(
-        { error: "ไม่สามารถส่งการแจ้งเตือนได้ กรุณาตรวจสอบการตั้งค่า LINE Bot" },
-        { status: 400 }
+      return apiResponse.badRequest(
+        "ไม่สามารถส่งการแจ้งเตือนได้ กรุณาตรวจสอบการตั้งค่า LINE Bot"
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "ส่งการแจ้งเตือนสำเร็จ",
-    });
-  } catch (error) {
-    console.error("Failed to send notification:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return apiResponse.success(
+      { message: "ส่งการแจ้งเตือนสำเร็จ" }
     );
-  }
+  })(request);
 }

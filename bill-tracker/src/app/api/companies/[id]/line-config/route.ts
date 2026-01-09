@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 import { sendTestNotification } from "@/lib/notifications/line-messaging";
 
 interface RouteParams {
@@ -11,32 +11,11 @@ interface RouteParams {
  * GET /api/companies/[id]/line-config
  * Get LINE Bot configuration (with masked tokens for security)
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: companyId } = await params;
-
-    // Verify user has access to this company
-    const access = await prisma.companyAccess.findUnique({
-      where: {
-        userId_companyId: {
-          userId: session.user.id,
-          companyId,
-        },
-      },
-    });
-
-    if (!access) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    }
-
+export const GET = withCompanyAccessFromParams(
+  async (request, { company }) => {
     // Get company LINE config
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
+    const lineConfig = await prisma.company.findUnique({
+      where: { id: company.id },
       select: {
         lineChannelSecret: true,
         lineChannelAccessToken: true,
@@ -45,8 +24,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    if (!lineConfig) {
+      return apiResponse.notFound("Company not found");
     }
 
     // Mask sensitive data
@@ -56,90 +35,54 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return token.substring(0, 4) + "••••••••" + token.substring(token.length - 4);
     };
 
-    return NextResponse.json({
-      channelSecret: maskToken(company.lineChannelSecret),
-      channelAccessToken: maskToken(company.lineChannelAccessToken),
-      groupId: company.lineGroupId,
-      notifyEnabled: company.lineNotifyEnabled,
-      isConfigured: !!(company.lineChannelSecret && company.lineChannelAccessToken),
+    return apiResponse.success({
+      channelSecret: maskToken(lineConfig.lineChannelSecret),
+      channelAccessToken: maskToken(lineConfig.lineChannelAccessToken),
+      groupId: lineConfig.lineGroupId,
+      notifyEnabled: lineConfig.lineNotifyEnabled,
+      isConfigured: !!(lineConfig.lineChannelSecret && lineConfig.lineChannelAccessToken),
     });
-  } catch (error) {
-    console.error("Failed to get LINE config:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "settings:read" }
+);
 
 /**
  * POST /api/companies/[id]/line-config
  * Update LINE Bot configuration
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: companyId } = await params;
-
-    // Verify user has OWNER access
-    const access = await prisma.companyAccess.findUnique({
-      where: {
-        userId_companyId: {
-          userId: session.user.id,
-          companyId,
-        },
-      },
-    });
-
-    if (!access || !access.isOwner) {
-      return NextResponse.json(
-        { error: "Only owners can update LINE configuration" },
-        { status: 403 }
-      );
-    }
-
+export const POST = withCompanyAccessFromParams(
+  async (request, { company }) => {
     const body = await request.json();
     const { channelSecret, channelAccessToken, groupId, notifyEnabled } = body;
 
     // If only toggling notification
     if (typeof notifyEnabled === "boolean" && !channelSecret && !channelAccessToken) {
       await prisma.company.update({
-        where: { id: companyId },
+        where: { id: company.id },
         data: {
           lineNotifyEnabled: notifyEnabled,
         },
       });
 
-      return NextResponse.json({
-        success: true,
-        message: `LINE notifications ${notifyEnabled ? "enabled" : "disabled"}`,
-        notifyEnabled,
-      });
+      return apiResponse.success(
+        { notifyEnabled },
+        `LINE notifications ${notifyEnabled ? "enabled" : "disabled"}`
+      );
     }
 
     // Validate required fields for full config update
     if (!channelSecret || !channelAccessToken) {
-      return NextResponse.json(
-        { error: "Channel Secret and Access Token are required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Channel Secret and Access Token are required");
     }
 
     // Basic validation
     if (channelSecret.length < 10 || channelAccessToken.length < 10) {
-      return NextResponse.json(
-        { error: "Invalid credentials format" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Invalid credentials format");
     }
 
     // Update company LINE config
     await prisma.company.update({
-      where: { id: companyId },
+      where: { id: company.id },
       data: {
         lineChannelSecret: channelSecret,
         lineChannelAccessToken: channelAccessToken,
@@ -148,53 +91,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "LINE Bot configuration updated successfully",
-      isConfigured: true,
-    });
-  } catch (error) {
-    console.error("Failed to update LINE config:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return apiResponse.success(
+      { isConfigured: true },
+      "LINE Bot configuration updated successfully"
     );
+  },
+  {
+    permission: "settings:edit",
+    requireOwner: true,
   }
-}
+);
 
 /**
  * DELETE /api/companies/[id]/line-config
  * Remove LINE Bot configuration
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: companyId } = await params;
-
-    // Verify user has OWNER access
-    const access = await prisma.companyAccess.findUnique({
-      where: {
-        userId_companyId: {
-          userId: session.user.id,
-          companyId,
-        },
-      },
-    });
-
-    if (!access || !access.isOwner) {
-      return NextResponse.json(
-        { error: "Only owners can remove LINE configuration" },
-        { status: 403 }
-      );
-    }
-
+export const DELETE = withCompanyAccessFromParams(
+  async (request, { company }) => {
     // Clear LINE config
     await prisma.company.update({
-      where: { id: companyId },
+      where: { id: company.id },
       data: {
         lineChannelSecret: null,
         lineChannelAccessToken: null,
@@ -202,65 +118,32 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "LINE Bot configuration removed successfully",
-    });
-  } catch (error) {
-    console.error("Failed to remove LINE config:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return apiResponse.success(
+      { message: "LINE Bot configuration removed successfully" }
     );
+  },
+  {
+    permission: "settings:edit",
+    requireOwner: true,
   }
-}
+);
 
 /**
  * PUT /api/companies/[id]/line-config
  * Send test notification
  */
-export async function PUT(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: companyId } = await params;
-
-    // Verify user has access to this company
-    const access = await prisma.companyAccess.findUnique({
-      where: {
-        userId_companyId: {
-          userId: session.user.id,
-          companyId,
-        },
-      },
-    });
-
-    if (!access) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    }
-
+export const PUT = withCompanyAccessFromParams(
+  async (request, { company }) => {
     // Send test notification
-    const result = await sendTestNotification(companyId);
+    const result = await sendTestNotification(company.id);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
-      );
+      return apiResponse.badRequest(result.error || "Failed to send test notification");
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "ส่งข้อความทดสอบสำเร็จ!",
-    });
-  } catch (error) {
-    console.error("Failed to send test notification:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return apiResponse.success(
+      { message: "ส่งข้อความทดสอบสำเร็จ!" }
     );
-  }
-}
+  },
+  { permission: "settings:read" }
+);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
 import {
   exportExpensesToExcel,
@@ -17,10 +18,7 @@ export const GET = withCompanyAccess(
     const year = searchParams.get("year");
 
     if (!type || !month || !year) {
-      return NextResponse.json(
-        { error: "Missing required parameters" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Missing required parameters");
     }
 
     const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -124,7 +122,7 @@ export const GET = withCompanyAccess(
         filename = `รายงาน_WHT_${company.code}_${month}-${year}.xlsx`;
         break;
       default:
-        return NextResponse.json({ error: "Invalid export type" }, { status: 400 });
+        return apiResponse.badRequest("Invalid export type");
     }
 
     return new NextResponse(new Uint8Array(buffer), {

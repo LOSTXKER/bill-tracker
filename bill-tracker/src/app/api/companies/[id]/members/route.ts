@@ -5,10 +5,9 @@
  * Requires OWNER permissions to access
  */
 
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { auth } from "@/auth";
-import { requirePermission } from "@/lib/permissions/checker";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 import { logMemberInvite } from "@/lib/audit/logger";
 
 /**
@@ -16,19 +15,11 @@ import { logMemberInvite } from "@/lib/audit/logger";
  * 
  * Get all members of a company with their permissions
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: companyId } = await params;
-
-    // Require settings:manage-team permission (owners have all permissions automatically)
-    await requirePermission(companyId, "settings:manage-team");
-
+export const GET = withCompanyAccessFromParams(
+  async (request, { company }) => {
     // Get all company access records with user details
     const members = await prisma.companyAccess.findMany({
-      where: { companyId },
+      where: { companyId: company.id },
       include: {
         user: {
           select: {
@@ -47,15 +38,10 @@ export async function GET(
       ],
     });
 
-    return NextResponse.json({ members }, { status: 200 });
-  } catch (error) {
-    console.error("Error fetching team members:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch team members" },
-      { status: 500 }
-    );
+    return apiResponse.success({ members });
   }
-}
+  // No permission required - all team members can view the employee list
+);
 
 /**
  * POST /api/companies/[id]/members
@@ -63,55 +49,31 @@ export async function GET(
  * Create a new member for the company
  * Body: { name: string, email: string, password: string, permissions: string[], isOwner?: boolean }
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: companyId } = await params;
-    const session = await auth();
-
-    // Require settings:manage-team permission (owners have all permissions automatically)
-    const currentUser = await requirePermission(companyId, "settings:manage-team");
-
+export const POST = withCompanyAccessFromParams(
+  async (request, { company, session }) => {
     const body = await request.json();
     const { name, email, password, permissions = [], isOwner = false } = body;
 
     if (!name) {
-      return NextResponse.json(
-        { error: "Name is required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Name is required");
     }
 
     if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Email is required");
     }
 
     if (!password) {
-      return NextResponse.json(
-        { error: "Password is required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Password is required");
     }
 
     if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Password must be at least 6 characters");
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Invalid email format");
     }
 
     // Check if user already exists
@@ -125,22 +87,16 @@ export async function POST(
         where: {
           userId_companyId: {
             userId: existingUser.id,
-            companyId,
+            companyId: company.id,
           },
         },
       });
 
       if (existingAccess) {
-        return NextResponse.json(
-          { error: "User already has access to this company" },
-          { status: 409 }
-        );
+        return apiResponse.error("User already has access to this company");
       }
 
-      return NextResponse.json(
-        { error: "Email already registered. Please use a different email." },
-        { status: 409 }
-      );
+      return apiResponse.error("Email already registered. Please use a different email.");
     }
 
     // Hash password and create new user
@@ -161,7 +117,7 @@ export async function POST(
     const access = await prisma.companyAccess.create({
       data: {
         userId: user.id,
-        companyId,
+        companyId: company.id,
         isOwner,
         permissions,
       },
@@ -178,29 +134,16 @@ export async function POST(
     });
 
     // Log the member creation
-    await logMemberInvite(email, permissions, currentUser.id, companyId);
+    await logMemberInvite(email, permissions, session.user.id, company.id);
 
-    return NextResponse.json(
-      {
-        member: access,
-        message: "Member created successfully"
-      },
-      { status: 201 }
+    return apiResponse.created(
+      { member: access },
+      "Member created successfully"
     );
-  } catch (error) {
-    console.error("Error creating member:", error);
-
-    if (error instanceof Error && error.message.includes("redirect")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Failed to create member" },
-      { status: 500 }
-    );
+  },
+  {
+    permission: "settings:manage-team",
+    rateLimit: { maxRequests: 10, windowMs: 60000 },
   }
-}
+);
 

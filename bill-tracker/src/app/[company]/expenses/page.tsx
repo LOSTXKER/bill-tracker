@@ -61,6 +61,16 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+  // Filter: Only count regular expenses OR reimbursements that have been PAID
+  const expenseFilter = {
+    companyId: company.id,
+    deletedAt: null,
+    OR: [
+      { isReimbursement: false },
+      { isReimbursement: true, reimbursementStatus: "PAID" as const },
+    ],
+  };
+
   const [
     monthlyTotal,
     lastMonthTotal,
@@ -71,32 +81,30 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
   ] = await Promise.all([
     prisma.expense.aggregate({
       where: {
-        companyId: company.id,
+        ...expenseFilter,
         billDate: { gte: startOfMonth, lte: endOfMonth },
-        deletedAt: null,
       },
       _sum: { netPaid: true },
       _count: true,
     }),
     prisma.expense.aggregate({
       where: {
-        companyId: company.id,
+        ...expenseFilter,
         billDate: { gte: startOfLastMonth, lte: endOfLastMonth },
-        deletedAt: null,
       },
       _sum: { netPaid: true },
     }),
     prisma.expense.count({
-      where: { companyId: company.id, status: "WAITING_FOR_DOC", deletedAt: null },
+      where: { ...expenseFilter, status: "WAITING_FOR_DOC" },
     }),
     prisma.expense.count({
-      where: { companyId: company.id, status: "PENDING_PHYSICAL", deletedAt: null },
+      where: { ...expenseFilter, status: "PENDING_PHYSICAL" },
     }),
     prisma.expense.count({
-      where: { companyId: company.id, status: "SENT_TO_ACCOUNT", deletedAt: null },
+      where: { ...expenseFilter, status: "SENT_TO_ACCOUNT" },
     }),
     prisma.expense.count({
-      where: { companyId: company.id, deletedAt: null },
+      where: expenseFilter,
     }),
   ]);
 
@@ -164,9 +172,20 @@ async function ExpensesData({ companyCode }: { companyCode: string }) {
 
   if (!company) return null;
 
+  // Filter: Only show regular expenses OR reimbursements that have been PAID
+  // REJECTED/PENDING/APPROVED reimbursements should NOT appear in expenses
+  const whereClause = {
+    companyId: company.id,
+    deletedAt: null,
+    OR: [
+      { isReimbursement: false },
+      { isReimbursement: true, reimbursementStatus: "PAID" as const },
+    ],
+  };
+
   const [expenses, total] = await Promise.all([
     prisma.expense.findMany({
-      where: { companyId: company.id, deletedAt: null },
+      where: whereClause,
       orderBy: { billDate: "desc" },
       take: 20,
       include: {
@@ -181,7 +200,7 @@ async function ExpensesData({ companyCode }: { companyCode: string }) {
         },
       },
     }),
-    prisma.expense.count({ where: { companyId: company.id, deletedAt: null } }),
+    prisma.expense.count({ where: whereClause }),
   ]);
 
   // Serialize expenses for client component

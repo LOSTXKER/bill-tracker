@@ -5,9 +5,9 @@
  * Requires OWNER permissions
  */
 
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/permissions/checker";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 import { logPermissionChange, logMemberRemove } from "@/lib/audit/logger";
 
 /**
@@ -16,16 +16,9 @@ import { logPermissionChange, logMemberRemove } from "@/lib/audit/logger";
  * Update member permissions
  * Body: { permissions: string[], isOwner?: boolean }
  */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string; memberId: string }> }
-) {
-  try {
-    const { id: companyId, memberId } = await params;
-    
-    // Require settings:manage-team permission (owners have all permissions automatically)
-    const currentUser = await requirePermission(companyId, "settings:manage-team");
-
+export const PATCH = withCompanyAccessFromParams(
+  async (request, { company, session, params }) => {
+    const { memberId } = params;
     const body = await request.json();
     const { permissions, isOwner } = body;
 
@@ -44,18 +37,12 @@ export async function PATCH(
     });
 
     if (!currentAccess) {
-      return NextResponse.json(
-        { error: "Member not found" },
-        { status: 404 }
-      );
+      return apiResponse.notFound("Member not found");
     }
 
     // Prevent user from modifying their own permissions
-    if (currentAccess.userId === currentUser.id) {
-      return NextResponse.json(
-        { error: "Cannot modify your own permissions" },
-        { status: 403 }
-      );
+    if (currentAccess.userId === session.user.id) {
+      return apiResponse.forbidden("Cannot modify your own permissions");
     }
 
     // Prepare update data
@@ -85,49 +72,27 @@ export async function PATCH(
         currentAccess.user.name,
         currentAccess.permissions as string[],
         permissions,
-        currentUser.id,
-        companyId
+        session.user.id,
+        company.id
       );
     }
 
-    return NextResponse.json(
-      {
-        member: updated,
-        message: "Permissions updated successfully",
-      },
-      { status: 200 }
+    return apiResponse.success(
+      { member: updated },
+      "Permissions updated successfully"
     );
-  } catch (error) {
-    console.error("Error updating member permissions:", error);
-    
-    if (error instanceof Error && error.message.includes("redirect")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: "Failed to update permissions" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "settings:manage-team" }
+);
 
 /**
  * DELETE /api/companies/[id]/members/[memberId]
  * 
  * Remove a member from the company
  */
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string; memberId: string }> }
-) {
-  try {
-    const { id: companyId, memberId } = await params;
-    
-    // Require settings:manage-team permission (owners have all permissions automatically)
-    const currentUser = await requirePermission(companyId, "settings:manage-team");
+export const DELETE = withCompanyAccessFromParams(
+  async (request, { company, session, params }) => {
+    const { memberId } = params;
 
     // Get the member to be removed
     const memberToRemove = await prisma.companyAccess.findUnique({
@@ -144,33 +109,26 @@ export async function DELETE(
     });
 
     if (!memberToRemove) {
-      return NextResponse.json(
-        { error: "Member not found" },
-        { status: 404 }
-      );
+      return apiResponse.notFound("Member not found");
     }
 
     // Prevent user from removing themselves
-    if (memberToRemove.userId === currentUser.id) {
-      return NextResponse.json(
-        { error: "Cannot remove yourself from the company" },
-        { status: 403 }
-      );
+    if (memberToRemove.userId === session.user.id) {
+      return apiResponse.forbidden("Cannot remove yourself from the company");
     }
 
     // Prevent removing the last owner
     if (memberToRemove.isOwner) {
       const ownerCount = await prisma.companyAccess.count({
         where: {
-          companyId,
+          companyId: company.id,
           isOwner: true,
         },
       });
 
       if (ownerCount <= 1) {
-        return NextResponse.json(
-          { error: "Cannot remove the last owner. Assign another owner first." },
-          { status: 403 }
+        return apiResponse.forbidden(
+          "Cannot remove the last owner. Assign another owner first."
         );
       }
     }
@@ -184,27 +142,13 @@ export async function DELETE(
     await logMemberRemove(
       memberToRemove.user.name,
       memberToRemove.user.email,
-      currentUser.id,
-      companyId
+      session.user.id,
+      company.id
     );
 
-    return NextResponse.json(
-      { message: "Member removed successfully" },
-      { status: 200 }
+    return apiResponse.success(
+      { message: "Member removed successfully" }
     );
-  } catch (error) {
-    console.error("Error removing member:", error);
-    
-    if (error instanceof Error && error.message.includes("redirect")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: "Failed to remove member" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: "settings:manage-team" }
+);

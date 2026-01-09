@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { withAuth } from "@/lib/api/with-auth";
+import { apiResponse } from "@/lib/api/response";
 import { analyzeAndClassifyMultiple } from "@/lib/ai/smart-ocr";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { prisma } from "@/lib/db";
@@ -8,24 +8,16 @@ import { prisma } from "@/lib/db";
  * POST /api/ai/analyze-documents
  * Analyze multiple document images, classify them, and extract combined data
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export async function POST(request: Request) {
+  return withAuth(async (req, { session }) => {
     // Check if Gemini API is configured
     if (!isGeminiConfigured()) {
-      return NextResponse.json(
-        {
-          error: "AI features not configured. Please set GOOGLE_GEMINI_API_KEY.",
-        },
-        { status: 503 }
+      return apiResponse.error(
+        "AI features not configured. Please set GOOGLE_GEMINI_API_KEY."
       );
     }
 
-    const body = await request.json();
+    const body = await req.json();
     const {
       imageUrls,
       companyCode,
@@ -33,17 +25,11 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
-      return NextResponse.json(
-        { error: "imageUrls array is required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("imageUrls array is required");
     }
 
     if (!companyCode) {
-      return NextResponse.json(
-        { error: "companyCode is required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("companyCode is required");
     }
 
     // Find company
@@ -52,10 +38,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
+      return apiResponse.notFound("Company not found");
     }
 
     const startTime = Date.now();
@@ -71,10 +54,7 @@ export async function POST(request: NextRequest) {
     const processingTime = Date.now() - startTime;
 
     if ("error" in result) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 500 }
-      );
+      return apiResponse.error(result.error);
     }
 
     // Log analysis
@@ -89,8 +69,7 @@ export async function POST(request: NextRequest) {
       isNewVendor: result.smart?.isNewVendor,
     });
 
-    return NextResponse.json({
-      success: true,
+    return apiResponse.success({
       ...result,
       meta: {
         processingTime,
@@ -100,15 +79,7 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       },
     });
-  } catch (error) {
-    console.error("Multi-document analysis error:", error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500 }
-    );
-  }
+  })(request);
 }
 
 /**
@@ -118,7 +89,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const isConfigured = isGeminiConfigured();
 
-  return NextResponse.json({
+  return apiResponse.success({
     available: isConfigured,
     message: isConfigured
       ? "Multi-document analysis is available"

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 
 // POST /api/[company]/categories/reset
 // Reactivates all default categories
@@ -20,16 +20,15 @@ async function handlePost(
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      count: result.count,
-      message: `เปิดใช้งานหมวดหมู่เริ่มต้น ${result.count} รายการ`,
-    });
+    return apiResponse.success(
+      { count: result.count },
+      `เปิดใช้งานหมวดหมู่เริ่มต้น ${result.count} รายการ`
+    );
   } catch (error: unknown) {
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return apiResponse.badRequest(error.message);
     }
-    return NextResponse.json({ error: "เกิดข้อผิดพลาด" }, { status: 500 });
+    return apiResponse.error("เกิดข้อผิดพลาด");
   }
 }
 

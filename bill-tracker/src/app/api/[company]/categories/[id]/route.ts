@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { updateCategorySchema } from "@/lib/validations/category";
+import { apiResponse } from "@/lib/api/response";
 
 // GET /api/[company]/categories/[id]
 async function handleGet(
@@ -20,10 +20,10 @@ async function handleGet(
   });
 
   if (!category) {
-    return NextResponse.json({ error: "ไม่พบหมวดหมู่" }, { status: 404 });
+    return apiResponse.notFound("ไม่พบหมวดหมู่");
   }
 
-  return NextResponse.json(category);
+  return apiResponse.success({ category });
 }
 
 // PUT /api/[company]/categories/[id]
@@ -48,7 +48,7 @@ async function handlePut(
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "ไม่พบหมวดหมู่" }, { status: 404 });
+      return apiResponse.notFound("ไม่พบหมวดหมู่");
     }
 
     // If name is being changed, check for duplicates
@@ -64,10 +64,7 @@ async function handlePut(
       });
 
       if (duplicate) {
-        return NextResponse.json(
-          { error: "หมวดหมู่นี้มีอยู่แล้ว" },
-          { status: 400 }
-        );
+        return apiResponse.badRequest("หมวดหมู่นี้มีอยู่แล้ว");
       }
     }
 
@@ -79,12 +76,12 @@ async function handlePut(
       },
     });
 
-    return NextResponse.json(category);
+    return apiResponse.success({ category }, "Category updated successfully");
   } catch (error: unknown) {
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return apiResponse.badRequest(error.message);
     }
-    return NextResponse.json({ error: "เกิดข้อผิดพลาด" }, { status: 500 });
+    return apiResponse.error("เกิดข้อผิดพลาด");
   }
 }
 
@@ -107,15 +104,12 @@ async function handleDelete(
     });
 
     if (!category) {
-      return NextResponse.json({ error: "ไม่พบหมวดหมู่" }, { status: 404 });
+      return apiResponse.notFound("ไม่พบหมวดหมู่");
     }
 
     // Don't allow deleting default categories
     if (category.isDefault) {
-      return NextResponse.json(
-        { error: "ไม่สามารถลบหมวดหมู่เริ่มต้นได้ กรุณาปิดการใช้งานแทน" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("ไม่สามารถลบหมวดหมู่เริ่มต้นได้ กรุณาปิดการใช้งานแทน");
     }
 
     // Check if category is in use
@@ -128,22 +122,19 @@ async function handleDelete(
     });
 
     if (expenseCount > 0 || incomeCount > 0) {
-      return NextResponse.json(
-        { error: `ไม่สามารถลบหมวดหมู่ที่มีการใช้งานอยู่ได้ (${expenseCount + incomeCount} รายการ)` },
-        { status: 400 }
-      );
+      return apiResponse.badRequest(`ไม่สามารถลบหมวดหมู่ที่มีการใช้งานอยู่ได้ (${expenseCount + incomeCount} รายการ)`);
     }
 
     await prisma.category.delete({
       where: { id },
     });
 
-    return NextResponse.json({ success: true });
+    return apiResponse.success({ success: true }, "Category deleted successfully");
   } catch (error: unknown) {
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return apiResponse.badRequest(error.message);
     }
-    return NextResponse.json({ error: "เกิดข้อผิดพลาด" }, { status: 500 });
+    return apiResponse.error("เกิดข้อผิดพลาด");
   }
 }
 

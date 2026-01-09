@@ -220,10 +220,10 @@ export function AuditHistorySection({
         throw new Error("Failed to load audit history");
       }
 
-      const data = await response.json();
+      const result = await response.json();
       
       // Filter logs that match this specific entity
-      const filteredLogs = data.logs.filter(
+      const filteredLogs = result.data.logs.filter(
         (log: AuditLog) => log.entityId === entityId
       );
       

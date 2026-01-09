@@ -187,8 +187,25 @@ export function withCompanyAccessFromParams(
       {
         ...options,
         getCompanyCode: async () => {
-          // Try different param names
-          return params.company || params.companyId || params.code;
+          // Try different param names - for ID-based routes, we need to look up the company
+          const companyIdentifier = params.company || params.companyId || params.code || params.id;
+          if (!companyIdentifier) {
+            return "";
+          }
+          
+          // If it looks like a company code (short string), return as-is
+          // If it's a long ID, we need to look up the company code
+          if (companyIdentifier.length <= 10 && /^[A-Z0-9]+$/i.test(companyIdentifier)) {
+            return companyIdentifier;
+          }
+          
+          // Look up company by ID and return the code
+          const company = await prisma.company.findUnique({
+            where: { id: companyIdentifier },
+            select: { code: true },
+          });
+          
+          return company?.code || "";
         },
       }
     )(request);

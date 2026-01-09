@@ -31,6 +31,8 @@ import {
   History,
   Tags,
   Download,
+  Wallet,
+  User,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
 import { PermissionProvider } from "@/components/providers/permission-provider";
@@ -79,6 +81,11 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       permission: "incomes:read",
     },
     {
+      name: "เบิกจ่าย",
+      href: `/${companyCode}/reimbursements`,
+      icon: Wallet,
+    },
+    {
       name: "รายงาน",
       href: `/${companyCode}/reports`,
       icon: PieChart,
@@ -89,6 +96,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       href: `/${companyCode}/contacts`,
       icon: Users,
       permission: "contacts:read",
+    },
+    {
+      name: "พนักงาน",
+      href: `/${companyCode}/employees`,
+      icon: Users,
+      permission: "settings:manage-team",
     },
     {
       name: "หมวดหมู่",
@@ -233,6 +246,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/${companyCode}/profile`} className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    โปรไฟล์
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href={`/${companyCode}/settings`} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />

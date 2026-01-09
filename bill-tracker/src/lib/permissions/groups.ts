@@ -12,6 +12,7 @@ import {
   FileText,
   Settings,
   History,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -180,6 +181,34 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
         key: "audit:read",
         label: "ดูประวัติ",
         description: "ดูประวัติการแก้ไขทั้งหมดในระบบ",
+      },
+    ],
+  },
+  reimbursements: {
+    key: "reimbursements",
+    label: "เบิกจ่ายพนักงาน (Reimbursements)",
+    description: "จัดการคำขอเบิกจ่ายจากพนักงาน",
+    icon: Wallet,
+    permissions: [
+      {
+        key: "reimbursements:read",
+        label: "ดูรายการ",
+        description: "ดูรายการเบิกจ่ายทั้งหมด",
+      },
+      {
+        key: "reimbursements:create",
+        label: "ส่งคำขอ",
+        description: "ส่งคำขอเบิกจ่ายใหม่",
+      },
+      {
+        key: "reimbursements:approve",
+        label: "อนุมัติ",
+        description: "อนุมัติหรือปฏิเสธคำขอเบิกจ่าย (สำหรับผู้จัดการ)",
+      },
+      {
+        key: "reimbursements:pay",
+        label: "จ่ายเงิน",
+        description: "บันทึกการจ่ายเงินคืน (สำหรับบัญชี)",
       },
     ],
   },

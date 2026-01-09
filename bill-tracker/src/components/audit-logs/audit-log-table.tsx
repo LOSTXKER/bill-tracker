@@ -225,9 +225,9 @@ export function AuditLogTable({ companyId }: AuditLogTableProps) {
         throw new Error("Failed to load audit logs");
       }
 
-      const data = await response.json();
-      setLogs(data.logs);
-      setTotal(data.pagination.total);
+      const result = await response.json();
+      setLogs(result.data.logs);
+      setTotal(result.data.pagination.total);
     } catch (error) {
       console.error("Error loading audit logs:", error);
     } finally {

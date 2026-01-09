@@ -63,15 +63,29 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const { searchParams } = new URL(request.url);
       const status = searchParams.get("status");
       const includeDeleted = searchParams.get("includeDeleted") === "true";
+      const includeReimbursements = searchParams.get("includeReimbursements") === "true";
       const page = parseInt(searchParams.get("page") || "1");
       const limit = parseInt(searchParams.get("limit") || "20");
 
-      const where = {
+      // Base where clause
+      const where: any = {
         companyId: company.id,
         ...(status && { [config.fields.statusField]: status as any }),
         // Soft delete filter - exclude deleted items unless explicitly requested
         ...(!includeDeleted && { deletedAt: null }),
       };
+
+      // For expenses, filter out reimbursements that are not PAID
+      // Reimbursements should only appear as expenses after they're paid
+      // REJECTED reimbursements should never appear as expenses
+      if (config.modelName === "expense" && !includeReimbursements) {
+        where.OR = [
+          // Regular expenses (not reimbursements)
+          { isReimbursement: false },
+          // Reimbursements that have been paid (now part of normal expense flow)
+          { isReimbursement: true, reimbursementStatus: "PAID" },
+        ];
+      }
 
       const [items, total] = await Promise.all([
         config.prismaModel.findMany({

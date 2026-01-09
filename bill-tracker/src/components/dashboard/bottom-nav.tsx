@@ -18,6 +18,8 @@ import {
   History,
   Tags,
   ChevronLeft,
+  Wallet,
+  User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -72,6 +74,22 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
   ];
 
   const moreNavItems: NavigationItem[] = [
+    {
+      name: "เบิกจ่าย",
+      href: `/${companyCode}/reimbursements`,
+      icon: Wallet,
+    },
+    {
+      name: "โปรไฟล์",
+      href: `/${companyCode}/profile`,
+      icon: User,
+    },
+    {
+      name: "พนักงาน",
+      href: `/${companyCode}/employees`,
+      icon: Users,
+      permission: "settings:manage-team",
+    },
     {
       name: "รายงาน",
       href: `/${companyCode}/reports`,

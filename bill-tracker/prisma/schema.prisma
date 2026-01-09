@@ -33,14 +33,15 @@ model Company {
   aiConfig Json? // AI preferences and settings
 
   // Relations
-  expenses          Expense[]
-  incomes           Income[]
-  users             CompanyAccess[]
-  contacts          Contact[]
-  categories        Category[]
-  integrations      Integration[]
-  recurringExpenses RecurringExpense[]
-  vendorMappings    VendorMapping[]
+  expenses              Expense[]
+  incomes               Income[]
+  users                 CompanyAccess[]
+  contacts              Contact[]
+  categories            Category[]
+  integrations          Integration[]
+  recurringExpenses     RecurringExpense[]
+  vendorMappings        VendorMapping[]
+  reimbursementRequests ReimbursementRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -67,6 +68,16 @@ model User {
   expenses  Expense[]       @relation("ExpenseCreator")
   incomes   Income[]        @relation("IncomeCreator")
   auditLogs AuditLog[]
+
+  // Reimbursement Relations (Legacy - for old Expense-based reimbursements)
+  reimbursementRequests  Expense[] @relation("ReimbursementRequester")
+  reimbursementApprovals Expense[] @relation("ReimbursementApprover")
+  reimbursementPayments  Expense[] @relation("ReimbursementPayer")
+
+  // New ReimbursementRequest Relations
+  myReimbursementRequests       ReimbursementRequest[] @relation("ReimbursementRequests")
+  myReimbursementApprovals      ReimbursementRequest[] @relation("ReimbursementApprovals")
+  myReimbursementPayments       ReimbursementRequest[] @relation("ReimbursementPayments")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -118,9 +129,10 @@ model Category {
   order     Int          @default(0) // Display order
 
   // Relations
-  expenses       Expense[]
-  incomes        Income[]
-  vendorMappings VendorMapping[]
+  expenses              Expense[]
+  incomes               Income[]
+  vendorMappings        VendorMapping[]
+  reimbursementRequests ReimbursementRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,9 +173,10 @@ model Contact {
   notes String?
 
   // Relations
-  expenses       Expense[]
-  incomes        Income[]
-  vendorMappings VendorMapping[]
+  expenses              Expense[]
+  incomes               Income[]
+  vendorMappings        VendorMapping[]
+  reimbursementRequests ReimbursementRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -234,6 +247,36 @@ model Expense {
   deletedAt DateTime?
   deletedBy String?
 
+  // ==========================================================================
+  // Reimbursement Fields (เบิกจ่ายพนักงาน)
+  // ==========================================================================
+  isReimbursement Boolean @default(false) // เป็นรายการเบิกจ่ายหรือไม่
+
+  // ผู้ขอเบิก (ถ้าไม่ใช่ createdBy)
+  requesterId String?
+  requester   User?   @relation("ReimbursementRequester", fields: [requesterId], references: [id])
+
+  // Approval Workflow
+  reimbursementStatus         ReimbursementStatus?
+  reimbursementApprovedBy     String?
+  reimbursementApprover       User?                @relation("ReimbursementApprover", fields: [reimbursementApprovedBy], references: [id])
+  reimbursementApprovedAt     DateTime?
+  reimbursementRejectedReason String?
+
+  // Payout (การจ่ายเงินคืน)
+  reimbursementPaidAt     DateTime?
+  reimbursementPaidBy     String?
+  reimbursementPayer      User?     @relation("ReimbursementPayer", fields: [reimbursementPaidBy], references: [id])
+  reimbursementPaymentRef String? // เลขอ้างอิงการโอนเงิน
+
+  // AI Fraud Detection
+  fraudScore      Int?  // 0-100 (0=สะอาด, 100=น่าสงสัยมาก)
+  fraudFlags      Json? // รายละเอียดที่ AI ตรวจพบ
+  fraudAnalyzedAt DateTime?
+
+  // Link from ReimbursementRequest (reverse relation)
+  reimbursementRequest ReimbursementRequest?
+
   @@index([companyId, billDate])
   @@index([status])
   @@index([category])
@@ -241,6 +284,8 @@ model Expense {
   @@index([contactId])
   @@index([createdAt])
   @@index([deletedAt])
+  @@index([isReimbursement, reimbursementStatus])
+  @@index([requesterId])
 }
 
 enum ExpenseCategory {
@@ -260,6 +305,84 @@ enum ExpenseDocStatus {
   PENDING_PHYSICAL // 🔴 ได้ใบเสร็จแล้ว แต่ตัวจริงยังอยู่ที่ตัว
   READY_TO_SEND // 🟡 รวบรวมใส่ซองแล้ว รอส่งบัญชี
   SENT_TO_ACCOUNT // 🟢 ส่งให้บัญชีเรียบร้อยแล้ว
+}
+
+// =============================================================================
+// Reimbursement Status (สถานะเบิกจ่ายพนักงาน)
+// =============================================================================
+
+enum ReimbursementStatus {
+  PENDING // 🟠 รอผู้จัดการอนุมัติ
+  FLAGGED // 🔴 AI พบปัญหา รอตรวจสอบเพิ่ม
+  APPROVED // 🟢 อนุมัติแล้ว รอจ่ายเงินคืน
+  REJECTED // ❌ ถูกปฏิเสธ
+  PAID // ✅ จ่ายเงินคืนแล้ว
+}
+
+// =============================================================================
+// ReimbursementRequest (คำขอเบิกจ่ายพนักงาน) - แยกจาก Expense
+// สร้าง Expense เมื่อ PAID เท่านั้น
+// =============================================================================
+
+model ReimbursementRequest {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // ผู้ขอเบิก
+  requesterId String
+  requester   User   @relation("ReimbursementRequests", fields: [requesterId], references: [id])
+
+  // Financial Data
+  amount    Decimal  @db.Decimal(12, 2) // ยอดก่อน VAT
+  vatRate   Int      @default(7)
+  vatAmount Decimal? @db.Decimal(12, 2)
+  netAmount Decimal  @db.Decimal(12, 2) // ยอดรวมที่ต้องจ่ายคืน
+
+  // Details
+  description   String?
+  categoryId    String?
+  categoryRef   Category?     @relation(fields: [categoryId], references: [id])
+  contactId     String?
+  contact       Contact?      @relation(fields: [contactId], references: [id])
+  invoiceNumber String?
+  paymentMethod PaymentMethod @default(CASH)
+  billDate      DateTime      @default(now()) // วันที่จ่ายเงินจริง
+
+  // Evidence Files (receipts)
+  receiptUrls Json @default("[]") // Array of receipt URLs
+
+  // Status & Workflow
+  status ReimbursementStatus @default(PENDING)
+
+  // Approval
+  approvedBy     String?
+  approver       User?     @relation("ReimbursementApprovals", fields: [approvedBy], references: [id])
+  approvedAt     DateTime?
+  rejectedReason String?
+
+  // Payout (การจ่ายเงินคืน)
+  paidAt     DateTime?
+  paidBy     String?
+  payer      User?   @relation("ReimbursementPayments", fields: [paidBy], references: [id])
+  paymentRef String? // เลขอ้างอิงการโอน
+
+  // Link to Expense (สร้างเมื่อ PAID)
+  linkedExpenseId String?  @unique
+  linkedExpense   Expense? @relation(fields: [linkedExpenseId], references: [id])
+
+  // AI Fraud Detection
+  fraudScore      Int?      // 0-100
+  fraudFlags      Json?     // รายละเอียดที่ AI ตรวจพบ
+  fraudAnalyzedAt DateTime?
+
+  // Tracking
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([requesterId])
+  @@index([createdAt])
 }
 
 // =============================================================================

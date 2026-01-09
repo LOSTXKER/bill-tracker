@@ -9,7 +9,6 @@ import {
   User,
   Bell,
   MessageSquare,
-  Users,
   Palette,
   Settings,
   Brain,
@@ -18,7 +17,6 @@ import {
 // Settings sections
 import { CompanyInfoSection } from "./sections/company-info";
 import { UserInfoSection } from "./sections/user-info";
-import { TeamSection } from "./sections/team-section";
 import { LineBotSection } from "./sections/line-bot-section";
 import { NotificationSection } from "./sections/notification-section";
 import { AppearanceSection } from "./sections/appearance-section";
@@ -54,7 +52,6 @@ interface SettingsLayoutProps {
 type SettingSection =
   | "company"
   | "user"
-  | "team"
   | "line-bot"
   | "notifications"
   | "ai-training"
@@ -79,12 +76,6 @@ const navItems: NavItem[] = [
     label: "บัญชีผู้ใช้",
     icon: <User className="h-4 w-4" />,
     description: "ข้อมูลและสิทธิ์ของคุณ",
-  },
-  {
-    id: "team",
-    label: "ทีมงาน",
-    icon: <Users className="h-4 w-4" />,
-    description: "จัดการสมาชิกและสิทธิ์",
   },
   {
     id: "line-bot",
@@ -126,8 +117,6 @@ export function SettingsLayout({
         return <CompanyInfoSection company={company} />;
       case "user":
         return <UserInfoSection user={user} companyAccess={companyAccess} />;
-      case "team":
-        return <TeamSection companyId={company.id} />;
       case "line-bot":
         return <LineBotSection companyId={company.id} companyCode={company.code} />;
       case "notifications":

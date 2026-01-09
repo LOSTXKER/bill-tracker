@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { withAuth } from "@/lib/api/with-auth";
+import { apiResponse } from "@/lib/api/response";
 import { analyzeReceipt, validateReceiptData, ReceiptData } from "@/lib/ai/receipt-ocr";
-import { analyzeAndMatch, SmartOcrResult } from "@/lib/ai/smart-ocr";
+import { analyzeAndMatch } from "@/lib/ai/smart-ocr";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { prisma } from "@/lib/db";
 import fs from "fs";
@@ -11,24 +11,16 @@ import path from "path";
  * POST /api/ai/analyze-receipt
  * Analyze receipt image using AI OCR with smart vendor matching
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export async function POST(request: Request) {
+  return withAuth(async (req, { session }) => {
     // Check if Gemini API is configured
     if (!isGeminiConfigured()) {
-      return NextResponse.json(
-        {
-          error: "AI features not configured. Please set GOOGLE_GEMINI_API_KEY.",
-        },
-        { status: 503 }
+      return apiResponse.error(
+        "AI features not configured. Please set GOOGLE_GEMINI_API_KEY."
       );
     }
 
-    const body = await request.json();
+    const body = await req.json();
     const { 
       imageUrl, 
       imageData, 
@@ -38,10 +30,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!imageUrl && !imageData) {
-      return NextResponse.json(
-        { error: "Either imageUrl or imageData is required" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("Either imageUrl or imageData is required");
     }
 
     let imageBuffer: Buffer | string;
@@ -55,10 +44,7 @@ export async function POST(request: NextRequest) {
           const filePath = path.join(publicDir, imageUrl);
 
           if (!fs.existsSync(filePath)) {
-            return NextResponse.json(
-              { error: "Image file not found" },
-              { status: 404 }
-            );
+            return apiResponse.notFound("Image file not found");
           }
 
           imageBuffer = fs.readFileSync(filePath);
@@ -66,20 +52,14 @@ export async function POST(request: NextRequest) {
           // External URL - fetch it
           const response = await fetch(imageUrl);
           if (!response.ok) {
-            return NextResponse.json(
-              { error: "Failed to fetch image from URL" },
-              { status: 400 }
-            );
+            return apiResponse.badRequest("Failed to fetch image from URL");
           }
           const arrayBuffer = await response.arrayBuffer();
           imageBuffer = Buffer.from(arrayBuffer);
         }
       } catch (error) {
         console.error("Failed to load image:", error);
-        return NextResponse.json(
-          { error: "Failed to load image" },
-          { status: 400 }
-        );
+        return apiResponse.badRequest("Failed to load image");
       }
     } else {
       // Handle base64 image data
@@ -101,10 +81,7 @@ export async function POST(request: NextRequest) {
         const processingTime = Date.now() - startTime;
 
         if ("error" in smartResult) {
-          return NextResponse.json(
-            { error: smartResult.error },
-            { status: 500 }
-          );
+          return apiResponse.error(smartResult.error);
         }
 
         // Validate the OCR data
@@ -121,8 +98,7 @@ export async function POST(request: NextRequest) {
           isNewVendor: smartResult.isNewVendor,
         });
 
-        return NextResponse.json({
-          success: true,
+        return apiResponse.success({
           data: smartResult.ocr,
           smart: {
             mapping: smartResult.mapping ? {
@@ -163,10 +139,7 @@ export async function POST(request: NextRequest) {
     const processingTime = Date.now() - startTime;
 
     if ("error" in result) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 500 }
-      );
+      return apiResponse.error(result.error);
     }
 
     const receiptData = result as ReceiptData;
@@ -184,8 +157,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Return the analyzed data
-    return NextResponse.json({
-      success: true,
+    return apiResponse.success({
       data: receiptData,
       smart: null, // No smart matching
       validation: {
@@ -200,15 +172,7 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       },
     });
-  } catch (error) {
-    console.error("Receipt analysis error:", error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500 }
-    );
-  }
+  })(request);
 }
 
 /**
@@ -218,7 +182,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const isConfigured = isGeminiConfigured();
 
-  return NextResponse.json({
+  return apiResponse.success({
     available: isConfigured,
     message: isConfigured
       ? "AI receipt analysis is available"

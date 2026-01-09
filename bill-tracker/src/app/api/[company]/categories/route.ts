@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { categorySchema } from "@/lib/validations/category";
+import { apiResponse } from "@/lib/api/response";
 
 // GET /api/[company]/categories?type=EXPENSE|INCOME
 async function handleGet(
@@ -22,7 +22,7 @@ async function handleGet(
     ],
   });
 
-  return NextResponse.json(categories);
+  return apiResponse.success({ categories });
 }
 
 // POST /api/[company]/categories
@@ -46,10 +46,7 @@ async function handlePost(
     });
 
     if (existing) {
-      return NextResponse.json(
-        { error: "หมวดหมู่นี้มีอยู่แล้ว" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("หมวดหมู่นี้มีอยู่แล้ว");
     }
 
     // Get the highest order for this type
@@ -72,12 +69,12 @@ async function handlePost(
       },
     });
 
-    return NextResponse.json(category, { status: 201 });
+    return apiResponse.created({ category }, "Category created successfully");
   } catch (error: unknown) {
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return apiResponse.badRequest(error.message);
     }
-    return NextResponse.json({ error: "เกิดข้อผิดพลาด" }, { status: 500 });
+    return apiResponse.error("เกิดข้อผิดพลาด");
   }
 }
 

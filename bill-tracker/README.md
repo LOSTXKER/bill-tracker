@@ -134,6 +134,21 @@ SUPABASE_SERVICE_ROLE_KEY=""
 LINE_NOTIFY_TOKEN=""
 ```
 
+## Documentation
+
+Additional documentation can be found in the `/docs` folder:
+
+- **[REFACTORING_GUIDE.md](docs/REFACTORING_GUIDE.md)** - Refactoring patterns and best practices
+- **[REFACTORING_PROGRESS.md](docs/REFACTORING_PROGRESS.md)** - Complete refactoring history and stats
+- **[CLEANUP_GUIDE.md](docs/CLEANUP_GUIDE.md)** - Database cleanup and migration guide
+- **[MIGRATION_DEPRECATED_FIELDS.md](docs/MIGRATION_DEPRECATED_FIELDS.md)** - Deprecated fields migration steps
+- **[REIMBURSEMENT_CONSOLIDATION_PLAN.md](docs/REIMBURSEMENT_CONSOLIDATION_PLAN.md)** - Reimbursement systems consolidation plan
+
+Other guides:
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Production deployment instructions
+- **[PERMISSIONS_IMPLEMENTATION.md](PERMISSIONS_IMPLEMENTATION.md)** - Permission system documentation
+- **[SUPABASE_SETUP.md](SUPABASE_SETUP.md)** - Supabase storage setup guide
+
 ## License
 
 MIT License

@@ -35,9 +35,11 @@ export function useCategories(
       const response = await fetch(`/api/${companyCode}/categories?type=${type}`);
       
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        // Handle both old format (data array) and new format (data.data.categories)
+        const categoriesData = result.data?.categories || result;
         // Filter only active categories
-        const activeCategories = data.filter((cat: CategorySummary) => cat.isActive);
+        const activeCategories = categoriesData.filter((cat: CategorySummary) => cat.isActive);
         setCategories(activeCategories);
       } else {
         setError("Failed to fetch categories");

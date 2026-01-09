@@ -33,8 +33,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         throw new Error("Failed to fetch companies");
       }
-      const data = await response.json();
-      setCompanies(data.companies || []);
+      const result = await response.json();
+      setCompanies(result.data?.companies || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setCompanies([]);

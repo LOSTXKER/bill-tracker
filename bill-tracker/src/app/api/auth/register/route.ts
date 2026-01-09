@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
+import { apiResponse } from "@/lib/api/response";
 
 export async function POST(request: Request) {
   try {
@@ -11,10 +11,7 @@ export async function POST(request: Request) {
     const result = registerSchema.safeParse(body);
     if (!result.success) {
       const firstError = result.error.issues?.[0]?.message ?? "ข้อมูลไม่ถูกต้อง";
-      return NextResponse.json(
-        { error: firstError },
-        { status: 400 }
-      );
+      return apiResponse.badRequest(firstError);
     }
 
     const { name, email, password } = result.data;
@@ -25,10 +22,7 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "อีเมลนี้ถูกใช้งานแล้ว" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("อีเมลนี้ถูกใช้งานแล้ว");
     }
 
     // Hash password
@@ -44,26 +38,22 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(
+    return apiResponse.created(
       {
-        message: "สร้างบัญชีสำเร็จ",
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
         },
       },
-      { status: 201 }
+      "สร้างบัญชีสำเร็จ"
     );
   } catch (error) {
     console.error("Registration error:", error);
     
     // Handle Prisma unique constraint error
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
-      return NextResponse.json(
-        { error: "อีเมลนี้ถูกใช้งานแล้ว" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("อีเมลนี้ถูกใช้งานแล้ว");
     }
     
     // Log detailed error for debugging
@@ -72,15 +62,9 @@ export async function POST(request: Request) {
     
     // Check for database connection errors
     if (errorMessage.includes("connect") || errorMessage.includes("ECONNREFUSED") || errorMessage.includes("timeout")) {
-      return NextResponse.json(
-        { error: "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง" },
-        { status: 503 }
-      );
+      return apiResponse.error("ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
     }
     
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง" },
-      { status: 500 }
-    );
+    return apiResponse.error("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
   }
 }

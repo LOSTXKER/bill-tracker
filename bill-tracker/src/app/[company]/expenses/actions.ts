@@ -43,16 +43,30 @@ export async function fetchExpenses(params: FetchExpensesParams) {
   }
 
   // Build where clause
+  // Exclude reimbursements that are not PAID
+  // REJECTED reimbursements should never appear as expenses
+  // PENDING/APPROVED reimbursements are not yet expenses
   const where: any = {
     companyId: company.id,
     deletedAt: null,
+    OR: [
+      // Regular expenses (not reimbursements)
+      { isReimbursement: false },
+      // Reimbursements that have been paid (now part of normal expense flow)
+      { isReimbursement: true, reimbursementStatus: "PAID" as const },
+    ],
   };
 
   if (search) {
-    where.OR = [
-      { description: { contains: search, mode: "insensitive" } },
-      { invoiceNumber: { contains: search, mode: "insensitive" } },
-      { contact: { name: { contains: search, mode: "insensitive" } } },
+    // Need to combine with AND to preserve the reimbursement filter
+    where.AND = [
+      {
+        OR: [
+          { description: { contains: search, mode: "insensitive" } },
+          { invoiceNumber: { contains: search, mode: "insensitive" } },
+          { contact: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      },
     ];
   }
 
