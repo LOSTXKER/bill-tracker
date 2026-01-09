@@ -499,6 +499,21 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
     try {
       const { combined } = aiResult;
 
+      // Get actual description from form (if available)
+      // This will be used as descriptionTemplate for future matches
+      let descriptionTemplate: string | undefined;
+      if (config.fields.descriptionField) {
+        const currentDescription = watch(config.fields.descriptionField.name);
+        if (currentDescription && typeof currentDescription === "string" && currentDescription.trim()) {
+          // Use the actual description user entered
+          descriptionTemplate = currentDescription.trim();
+        } else {
+          // Fallback to template with vendor name
+          const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
+          descriptionTemplate = `${prefix} {vendorName}`;
+        }
+      }
+
       // Call API to create mapping
       const response = await fetch("/api/vendor-mappings", {
         method: "POST",
@@ -512,9 +527,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
           categoryId: selectedCategory,
           defaultVatRate: watchVatRate,
           paymentMethod: watch("paymentMethod"),
-          descriptionTemplate: config.fields.descriptionField
-            ? `${config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก"} {vendorName}`
-            : undefined,
+          descriptionTemplate,
           learnSource: "FEEDBACK",
         }),
       });
