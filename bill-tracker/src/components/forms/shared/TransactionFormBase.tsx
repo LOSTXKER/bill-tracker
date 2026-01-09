@@ -1041,6 +1041,33 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                     </div>
                   )}
 
+                  {/* Invoice Number & Reference No */}
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="invoiceNumber" className="text-sm text-muted-foreground">
+                        เลขที่ใบกำกับ
+                      </Label>
+                      <Input
+                        id="invoiceNumber"
+                        placeholder="เลขที่ใบกำกับภาษี (ถ้ามี)"
+                        className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
+                        {...register("invoiceNumber")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="referenceNo" className="text-sm text-muted-foreground">
+                        เลขอ้างอิง
+                      </Label>
+                      <Input
+                        id="referenceNo"
+                        placeholder="เลขอ้างอิง (ถ้ามี)"
+                        className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
+                        {...register("referenceNo")}
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid sm:grid-cols-2 gap-4">
                     {config.renderAdditionalFields?.({ register, watch, setValue })}
 

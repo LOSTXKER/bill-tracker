@@ -42,6 +42,8 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
       paymentMethod: "BANK_TRANSFER",
       status: "PENDING_PHYSICAL",
       billDate: new Date(),
+      invoiceNumber: "",
+      referenceNo: "",
     },
     
     statusOptions: [

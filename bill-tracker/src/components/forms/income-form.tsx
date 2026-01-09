@@ -43,6 +43,8 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
       paymentMethod: "BANK_TRANSFER",
       status: "PENDING_COPY_SEND",
       receiveDate: new Date(),
+      invoiceNumber: "",
+      referenceNo: "",
     },
     
     statusOptions: [
