@@ -426,12 +426,50 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
       setValue("invoiceNumber", combined.invoiceNumbers.join(", "));
     }
 
-    // Apply description (from template or generated)
-    if (suggested.description && config.fields.descriptionField) {
-      setValue(config.fields.descriptionField.name, suggested.description);
-    } else if (combined.vendorName && config.fields.descriptionField) {
-      const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
-      setValue(config.fields.descriptionField.name, `${prefix} ${combined.vendorName}`);
+    // Apply description - priority: items from OCR > vendor mapping template > vendor name
+    if (config.fields.descriptionField) {
+      let description: string | null = null;
+
+      // 1. Try to extract items/description from OCR files
+      const allItems: string[] = [];
+      for (const file of result.files || []) {
+        // Cast to access items property from ReceiptData
+        const extracted = file.extracted as { items?: Array<{ description: string; quantity?: number; unitPrice?: number; amount: number } | string> };
+        if (extracted?.items && Array.isArray(extracted.items)) {
+          for (const item of extracted.items) {
+            if (typeof item === "string" && item.trim()) {
+              allItems.push(item.trim());
+            } else if (typeof item === "object" && item?.description && item.description.trim()) {
+              allItems.push(item.description.trim());
+            }
+          }
+        }
+      }
+
+      // Use items as description if found
+      if (allItems.length > 0) {
+        // Limit to first 5 items to avoid overly long descriptions
+        const itemsText = allItems.slice(0, 5).join(", ");
+        description = allItems.length > 5 
+          ? `${itemsText} และอื่นๆ (${allItems.length} รายการ)`
+          : itemsText;
+      }
+
+      // 2. Fallback to vendor mapping template
+      if (!description && suggested.description) {
+        description = suggested.description;
+      }
+
+      // 3. Fallback to vendor name
+      if (!description && combined.vendorName) {
+        const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
+        description = `${prefix} ${combined.vendorName}`;
+      }
+
+      // Apply description if we have one
+      if (description) {
+        setValue(config.fields.descriptionField.name, description);
+      }
     }
 
     // Apply contact from mapping
