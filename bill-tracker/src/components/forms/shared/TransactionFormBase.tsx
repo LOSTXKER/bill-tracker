@@ -873,7 +873,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
                     {/* Category Selector with AI Button */}
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <Label className="text-sm font-medium">หมวดหมู่</Label>
                         {/* AI Suggest Category Button - Always visible, compact */}
                         <TooltipProvider>
@@ -881,25 +881,25 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                             <TooltipTrigger asChild>
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-6 px-2 text-xs text-muted-foreground hover:text-primary"
+                                className="h-7 px-2.5 text-xs border-primary/30 hover:bg-primary/10 hover:text-primary hover:border-primary"
                                 onClick={suggestCategory}
                                 disabled={isSuggestingCategory}
                               >
                                 {isSuggestingCategory ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                 ) : (
                                   <>
-                                    <Sparkles className="h-3 w-3 mr-1" />
-                                    AI แนะนำ
+                                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                                    <span className="font-medium">AI แนะนำ</span>
                                   </>
                                 )}
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="left" className="max-w-xs">
                               <p className="font-semibold mb-1">AI แนะนำหมวดหมู่</p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs">
                                 วิเคราะห์ชื่อคู่ค้า รายละเอียด และรายการสินค้า
                                 เพื่อแนะนำหมวดหมู่ที่เหมาะสม พร้อมแสดงความมั่นใจ
                               </p>
@@ -953,12 +953,12 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                                 <TooltipContent>
                                   <div className="text-xs space-y-1">
                                     <p className="font-semibold">ความมั่นใจของ AI</p>
-                                    <p className="text-muted-foreground">
+                                    <p>
                                       {(suggestion.confidence || 0) >= 80 
-                                        ? "สูงมาก - แนะนำให้ใช้" 
+                                        ? "✅ สูงมาก - แนะนำให้ใช้" 
                                         : (suggestion.confidence || 0) >= 60
-                                        ? "ปานกลาง - ควรตรวจสอบ"
-                                        : "ต่ำ - ลองดูอีกครั้ง"}
+                                        ? "⚠️ ปานกลาง - ควรตรวจสอบ"
+                                        : "❌ ต่ำ - ลองดูอีกครั้ง"}
                                     </p>
                                   </div>
                                 </TooltipContent>
@@ -996,8 +996,8 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-xs">
-                            <p className="font-semibold mb-1">การเรียนรู้อัตโนมัติ</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="font-semibold mb-1">🧠 การเรียนรู้อัตโนมัติ</p>
+                            <p className="text-xs">
                               AI จะจดจำความสัมพันธ์ระหว่างคู่ค้ากับหมวดหมู่นี้
                               เมื่อพบคู่ค้าเดียวกันครั้งต่อไป AI จะใส่หมวดหมู่ให้อัตโนมัติ
                             </p>

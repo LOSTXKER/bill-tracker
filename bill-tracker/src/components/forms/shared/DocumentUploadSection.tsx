@@ -503,11 +503,11 @@ export function DocumentUploadSection({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="max-w-sm">
-                  <p className="font-semibold mb-1">AI วิเคราะห์เอกสาร</p>
-                  <p className="text-xs text-muted-foreground mb-2">
+                  <p className="font-semibold mb-1">✨ AI วิเคราะห์เอกสาร</p>
+                  <p className="text-xs mb-2">
                     ระบบจะอ่านและวิเคราะห์เอกสารทั้งหมดพร้อมกัน เพื่อดึงข้อมูล:
                   </p>
-                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                  <ul className="text-xs space-y-0.5 list-disc list-inside">
                     <li>ชื่อร้าน/ผู้ขาย และเลขผู้เสียภาษี</li>
                     <li>ยอดเงิน VAT วันที่ เลขที่เอกสาร</li>
                     <li>รายการสินค้า/บริการที่ซื้อ</li>
