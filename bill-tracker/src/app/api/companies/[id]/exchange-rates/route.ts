@@ -17,7 +17,7 @@ export const GET = withAuth(async (req, { session }, routeContext) => {
     });
 
     if (!company) {
-      return apiResponse.error({ statusCode: 404, message: "ไม่พบบริษัท" });
+      return apiResponse.notFound("ไม่พบบริษัท");
     }
 
     // Check access
@@ -26,7 +26,7 @@ export const GET = withAuth(async (req, { session }, routeContext) => {
     });
 
     if (!access) {
-      return apiResponse.error({ statusCode: 403, message: "ไม่มีสิทธิ์เข้าถึง" });
+      return apiResponse.forbidden("ไม่มีสิทธิ์เข้าถึง");
     }
 
     return apiResponse.success({
@@ -34,10 +34,7 @@ export const GET = withAuth(async (req, { session }, routeContext) => {
     });
   } catch (error) {
     console.error("Error fetching exchange rates:", error);
-    return apiResponse.error({
-      statusCode: 500,
-      message: error instanceof Error ? error.message : "เกิดข้อผิดพลาด",
-    });
+    return apiResponse.error(error instanceof Error ? error : "เกิดข้อผิดพลาด");
   }
 });
 
@@ -50,16 +47,13 @@ export const PUT = withAuth(async (req, { session }, routeContext) => {
     const { exchangeRates } = body;
 
     if (!exchangeRates || typeof exchangeRates !== "object") {
-      return apiResponse.error({ statusCode: 400, message: "ข้อมูลไม่ถูกต้อง" });
+      return apiResponse.badRequest("ข้อมูลไม่ถูกต้อง");
     }
 
     // Validate exchange rates
     for (const [currency, rate] of Object.entries(exchangeRates)) {
       if (typeof rate !== "number" || rate <= 0) {
-        return apiResponse.error({
-          statusCode: 400,
-          message: `อัตราแลกเปลี่ยนสำหรับ ${currency} ไม่ถูกต้อง`,
-        });
+        return apiResponse.badRequest(`อัตราแลกเปลี่ยนสำหรับ ${currency} ไม่ถูกต้อง`);
       }
     }
 
@@ -70,16 +64,13 @@ export const PUT = withAuth(async (req, { session }, routeContext) => {
     });
 
     if (!company) {
-      return apiResponse.error({ statusCode: 404, message: "ไม่พบบริษัท" });
+      return apiResponse.notFound("ไม่พบบริษัท");
     }
 
     // Check permission
     const canManage = await hasPermission(user.id, company.id, "settings:manage");
     if (!canManage) {
-      return apiResponse.error({
-        statusCode: 403,
-        message: "ไม่มีสิทธิ์แก้ไขการตั้งค่า",
-      });
+      return apiResponse.forbidden("ไม่มีสิทธิ์แก้ไขการตั้งค่า");
     }
 
     // Update exchange rates
@@ -108,9 +99,6 @@ export const PUT = withAuth(async (req, { session }, routeContext) => {
     });
   } catch (error) {
     console.error("Error updating exchange rates:", error);
-    return apiResponse.error({
-      statusCode: 500,
-      message: error instanceof Error ? error.message : "เกิดข้อผิดพลาด",
-    });
+    return apiResponse.error(error instanceof Error ? error : "เกิดข้อผิดพลาด");
   }
 });
