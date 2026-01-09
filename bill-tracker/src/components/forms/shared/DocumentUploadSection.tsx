@@ -255,16 +255,22 @@ export function DocumentUploadSection({
 
   // Remove file
   const removeFile = async (url: string, category: DocumentCategory) => {
-    try {
-      await deleteFile(url);
-      const updatedFiles: CategorizedFiles = {
-        ...files,
-        [category]: files[category].filter((f) => f !== url),
-      };
-      setFiles(updatedFiles);
-      onFilesChange(updatedFiles);
-    } catch (err) {
-      console.error("Failed to delete file:", err);
+    // Remove from state first (optimistic update)
+    const updatedFiles: CategorizedFiles = {
+      ...files,
+      [category]: files[category].filter((f) => f !== url),
+    };
+    setFiles(updatedFiles);
+    onFilesChange(updatedFiles);
+
+    // Only attempt to delete from storage if URL is valid
+    if (url && url.startsWith("http")) {
+      try {
+        await deleteFile(url);
+      } catch (err) {
+        console.error("Failed to delete file from storage:", err);
+        // Don't revert state - file is already removed from form
+      }
     }
   };
 
