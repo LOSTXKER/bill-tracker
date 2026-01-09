@@ -865,44 +865,44 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       }}
                     />
 
-                    <CategorySelector
-                      categories={categories}
-                      isLoading={categoriesLoading}
-                      selectedCategory={selectedCategory}
-                      onSelect={setSelectedCategory}
-                      label="หมวดหมู่"
-                      placeholder="เลือกหมวดหมู่"
-                      companyCode={companyCode}
-                      categoryType={config.type.toUpperCase() as "EXPENSE" | "INCOME"}
-                      onCategoryCreated={(newCategory) => {
-                        refetchCategories();
-                        setSelectedCategory(newCategory.id);
-                      }}
-                    />
-                    
-                    {/* AI Category Suggestion Button - Always show when no category selected */}
-                    {!selectedCategory && !categorySuggestion && !(aiResult?.smart && 'aiCategorySuggestion' in aiResult.smart && aiResult.smart.aiCategorySuggestion) && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-2 w-full border-dashed"
-                        onClick={suggestCategory}
-                        disabled={isSuggestingCategory}
-                      >
-                        {isSuggestingCategory ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            กำลังวิเคราะห์...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            AI แนะนำหมวดหมู่
-                          </>
-                        )}
-                      </Button>
-                    )}
+                    {/* Category Selector with AI Button */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">หมวดหมู่</Label>
+                        {/* AI Suggest Category Button - Always visible, compact */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-muted-foreground hover:text-primary"
+                          onClick={suggestCategory}
+                          disabled={isSuggestingCategory}
+                        >
+                          {isSuggestingCategory ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <>
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              AI แนะนำ
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <CategorySelector
+                        categories={categories}
+                        isLoading={categoriesLoading}
+                        selectedCategory={selectedCategory}
+                        onSelect={setSelectedCategory}
+                        label=""
+                        placeholder="เลือกหมวดหมู่"
+                        companyCode={companyCode}
+                        categoryType={config.type.toUpperCase() as "EXPENSE" | "INCOME"}
+                        onCategoryCreated={(newCategory) => {
+                          refetchCategories();
+                          setSelectedCategory(newCategory.id);
+                        }}
+                      />
+                    </div>
 
                     {/* AI Category Suggestion from OCR or Manual */}
                     {(() => {
