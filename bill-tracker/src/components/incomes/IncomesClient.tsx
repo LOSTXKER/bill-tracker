@@ -27,6 +27,7 @@ const incomeListConfig: TransactionListConfig = {
     { key: "receiveDate", label: "วันที่", sortable: true },
     { key: "status", label: "สถานะ", align: "center" },
     { key: "contact", label: "ผู้ติดต่อ", sortable: true },
+    { key: "category", label: "หมวดหมู่" },
     { key: "source", label: "รายละเอียด" },
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },
@@ -34,7 +35,7 @@ const incomeListConfig: TransactionListConfig = {
     { key: "line", label: "LINE", align: "center" },
   ],
   
-  showCategory: false,
+  showCategory: true,
   
   renderRow: (income, companyCode, selected, onToggle) => (
     <IncomeTableRow
