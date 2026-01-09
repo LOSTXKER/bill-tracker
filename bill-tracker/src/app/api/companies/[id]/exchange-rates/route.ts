@@ -87,10 +87,11 @@ export const PUT = withAuth(async (req, { session }, routeContext) => {
       action: "UPDATE",
       entityType: "COMPANY",
       entityId: company.id,
-      details: {
+      changes: {
         field: "exchangeRates",
         newValue: exchangeRates,
       },
+      description: "แก้ไขอัตราแลกเปลี่ยน",
     });
 
     return apiResponse.success({
