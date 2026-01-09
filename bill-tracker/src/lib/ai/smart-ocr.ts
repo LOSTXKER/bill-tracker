@@ -1490,17 +1490,64 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
     }
   }
 
+  // Validate and fix Thai Buddhist Era date conversion errors
+  const validatedDate = validateAndFixThaiDate(earliestDate);
+
   return {
     vendorName,
     vendorTaxId,
     totalAmount,
     vatAmount,
-    date: earliestDate,
+    date: validatedDate,
     invoiceNumbers,
     vatRate,
     paymentMethod,
     amount: amount || null,
   };
+}
+
+/**
+ * Validate and fix common Thai Buddhist Era date conversion errors
+ * Common mistake: AI reads 2569 as 2559, resulting in 2016 instead of 2026
+ */
+function validateAndFixThaiDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  
+  try {
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const currentYear = new Date().getFullYear();
+    
+    // If year is more than 5 years in the past, it might be a conversion error
+    // Common error: 2569 read as 2559 (2026 → 2016, off by 10 years)
+    if (year < currentYear - 5) {
+      const yearsOff = currentYear - year;
+      
+      // Check if adding 10 years makes it reasonable (within 1 year of now)
+      if (yearsOff >= 9 && yearsOff <= 11) {
+        // Likely read 6 as 5 in the Thai year (e.g., 2569 → 2559)
+        const fixedYear = year + 10;
+        const fixedDate = new Date(date);
+        fixedDate.setFullYear(fixedYear);
+        console.log(`[Date Fix] Corrected year from ${year} to ${fixedYear} (likely BE conversion error)`);
+        return fixedDate.toISOString().split('T')[0];
+      }
+    }
+    
+    // If year is in the future by too much (more than 1 year), might be unconverted BE
+    if (year > currentYear + 500) {
+      // Still in Buddhist Era, convert to CE
+      const fixedYear = year - 543;
+      const fixedDate = new Date(date);
+      fixedDate.setFullYear(fixedYear);
+      console.log(`[Date Fix] Converted BE ${year} to CE ${fixedYear}`);
+      return fixedDate.toISOString().split('T')[0];
+    }
+    
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
 }
 
 /**
