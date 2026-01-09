@@ -94,6 +94,7 @@ export function CreateContactDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent bubbling to parent form
     if (!formData.name.trim()) {
       toast.error("กรุณาระบุชื่อ");
       return;
