@@ -73,6 +73,14 @@ export interface MultiDocAnalysisResult {
     date: string | null;
     invoiceNumbers: string[];
   };
+  currencyConversion?: {
+    detected: boolean;
+    currency: "USD" | "AED" | "THB" | null;
+    originalAmount: number | null;
+    convertedAmount: number | null;
+    exchangeRate: number | null;
+    conversionNote: string | null;
+  };
   smart: {
     mapping: {
       id: string;
