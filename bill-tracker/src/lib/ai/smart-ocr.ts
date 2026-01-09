@@ -948,13 +948,31 @@ export async function analyzeAndClassifyMultiple(
   // Detect and convert currency if needed
   let currencyConversion: CurrencyDetectionResult | undefined;
   if (exchangeRates && combined.totalAmount > 0) {
-    // Get full OCR text for currency detection
+    // Get full OCR text for currency detection - include more fields for better detection
     const fullText = extractedDataList
-      .map((d) => [d.vendorName, d.invoiceNumber, d.vendorAddress].filter(Boolean).join(" "))
+      .map((d) => {
+        const parts = [
+          d.vendorName,
+          d.invoiceNumber,
+          d.vendorAddress,
+          // Include amount as string to detect $ symbol
+          d.amount ? `$${d.amount}` : null,
+          d.totalAmount ? `$${d.totalAmount}` : null,
+          // Include items descriptions
+          ...(d.items || []).map((item) => 
+            typeof item === "string" ? item : item.description
+          ),
+        ].filter(Boolean);
+        return parts.join(" ");
+      })
       .join(" ");
     
+    // Also check for common currency indicators
+    const hasUsdIndicator = /\$|USD|US\s*DOLLAR/i.test(fullText) || 
+      extractedDataList.some(d => d.vendorAddress?.includes("United States") || d.vendorName?.includes("Inc."));
+    
     currencyConversion = detectAndConvertAmount(
-      fullText,
+      hasUsdIndicator ? fullText + " USD $" : fullText,
       combined.totalAmount,
       exchangeRates
     );
