@@ -1,10 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Database,
   FileSpreadsheet,
@@ -22,8 +30,10 @@ import {
   TrendingUp,
   Users,
   Package,
+  Loader2,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 interface DataExportPageProps {
   companyId: string;
@@ -32,7 +42,64 @@ interface DataExportPageProps {
   isOwner: boolean;
 }
 
-export function DataExportPage({ companyName }: DataExportPageProps) {
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+];
+
+export function DataExportPage({ companyName, companyCode }: DataExportPageProps) {
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear() + 543); // Buddhist Era
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Generate year options (current year ± 5 years in Buddhist Era)
+  const yearOptions = Array.from({ length: 11 }, (_, i) => {
+    const year = currentDate.getFullYear() + 543 - 5 + i;
+    return year;
+  });
+
+  const handleExportArchive = async () => {
+    setIsExporting(true);
+    try {
+      const url = `/api/${companyCode}/export-archive?month=${selectedMonth}&year=${selectedYear}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error("ไม่สามารถส่งออกข้อมูลได้");
+      }
+
+      // Download the ZIP file
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      
+      // Get filename from Content-Disposition header or generate one
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filenameMatch = contentDisposition?.match(/filename\*?=['"]?(?:UTF-\d+'')?([^;'"]+)['"]?;?/);
+      const filename = filenameMatch 
+        ? decodeURIComponent(filenameMatch[1])
+        : `${companyCode}-${THAI_MONTHS[selectedMonth]}-${selectedYear}.zip`;
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+      
+      toast.success("ส่งออกข้อมูลสำเร็จ", {
+        description: `ดาวน์โหลดไฟล์ ${filename} เรียบร้อยแล้ว`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("เกิดข้อผิดพลาด", {
+        description: "ไม่สามารถส่งออกข้อมูลได้ กรุณาลองใหม่อีกครั้ง",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -43,68 +110,109 @@ export function DataExportPage({ companyName }: DataExportPageProps) {
         </p>
       </div>
 
+      {/* Period Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            เลือกช่วงเวลา
+          </CardTitle>
+          <CardDescription>
+            เลือกเดือนและปีที่ต้องการส่งออกข้อมูล
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 max-w-md">
+            <div className="space-y-2">
+              <Label>เดือน</Label>
+              <Select
+                value={String(selectedMonth)}
+                onValueChange={(value) => setSelectedMonth(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {THAI_MONTHS.map((month, index) => (
+                    <SelectItem key={index} value={String(index)}>
+                      {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>ปี พ.ศ.</Label>
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(value) => setSelectedYear(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Quick Export Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center">
-                <TrendingDown className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="font-semibold">รายจ่าย</p>
-                <p className="text-xs text-muted-foreground mt-1">Excel / CSV</p>
-              </div>
-              <Badge variant="secondary" className="text-xs">เร็วๆ นี้</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <TrendingUp className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="font-semibold">รายรับ</p>
-                <p className="text-xs text-muted-foreground mt-1">Excel / CSV</p>
-              </div>
-              <Badge variant="secondary" className="text-xs">เร็วๆ นี้</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-lg bg-muted text-muted-foreground flex items-center justify-center">
-                <Users className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="font-semibold">ผู้ติดต่อ</p>
-                <p className="text-xs text-muted-foreground mt-1">Excel / CSV</p>
-              </div>
-              <Badge variant="secondary" className="text-xs">เร็วๆ นี้</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="h-12 w-12 rounded-lg bg-muted text-muted-foreground flex items-center justify-center">
+      <Card className="border-primary/50">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                 <Package className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-semibold">ทั้งหมด</p>
-                <p className="text-xs text-muted-foreground mt-1">ZIP Archive</p>
+                <CardTitle>Export Archive - ไฟล์สำหรับบัญชี</CardTitle>
+                <CardDescription>
+                  ดาวน์โหลดไฟล์ ZIP รวมเอกสารและรายงาน Excel สำหรับ {THAI_MONTHS[selectedMonth]} {selectedYear}
+                </CardDescription>
               </div>
-              <Badge variant="secondary" className="text-xs">เร็วๆ นี้</Badge>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Badge>แนะนำ</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg bg-muted/50 p-4 space-y-2">
+            <p className="text-sm font-medium">ไฟล์ ZIP จะประกอบด้วย:</p>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• รายงาน Excel สรุปรายรับ-รายจ่าย, VAT, หัก ณ ที่จ่าย</li>
+              <li>• ใบกำกับภาษีและสลิปโอนเงิน (รายจ่าย)</li>
+              <li>• บิล/ใบกำกับภาษีและสลิปที่ลูกค้าโอน (รายรับ)</li>
+              <li>• หนังสือรับรองหัก ณ ที่จ่าย และใบ 50 ทวิ</li>
+              <li>• จัดเรียงโฟลเดอร์ตามรูปแบบบัญชี</li>
+            </ul>
+          </div>
+          
+          <Button 
+            onClick={handleExportArchive} 
+            disabled={isExporting}
+            size="lg"
+            className="w-full"
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                กำลังสร้างไฟล์...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                ดาวน์โหลด ZIP Archive
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="formats" className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-2">
