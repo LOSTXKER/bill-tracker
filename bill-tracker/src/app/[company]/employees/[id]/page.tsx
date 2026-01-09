@@ -226,40 +226,42 @@ export default function EmployeeDetailPage() {
     fetchCompany();
   }, [companyCode]);
 
-  // Fetch employee data
+  // Fetch employee data - using Promise.all for parallel requests
   const fetchEmployeeData = async () => {
     if (!companyId) return;
 
     setIsLoading(true);
     try {
-      // Fetch employee basic info
-      const membersRes = await fetch(`/api/companies/${companyId}/members`);
-      const membersData = await membersRes.json();
+      // Fetch all data in parallel for faster loading
+      const [membersRes, statsRes, reimbursementsRes, logsRes] = await Promise.all([
+        fetch(`/api/companies/${companyId}/members`),
+        fetch(`/api/companies/${companyId}/members/${userId}/stats`),
+        fetch(`/api/companies/${companyId}/members/${userId}/reimbursements?limit=20`),
+        fetch(`/api/companies/${companyId}/members/${userId}/audit-logs?limit=20`),
+      ]);
+
+      // Parse all responses in parallel
+      const [membersData, statsData, reimbursementsData, logsData] = await Promise.all([
+        membersRes.json(),
+        statsRes.json(),
+        reimbursementsRes.json(),
+        logsRes.json(),
+      ]);
+
+      // Process employee data
       const members = membersData.data?.members || membersData.members || [];
       const employeeData = members.find(
-        (m: any) => m.userId === userId
+        (m: EmployeeData) => m.userId === userId
       );
       setEmployee(employeeData);
 
-      // Fetch stats
-      const statsRes = await fetch(
-        `/api/companies/${companyId}/members/${userId}/stats`
-      );
-      const statsData = await statsRes.json();
+      // Set stats
       setStats(statsData.data?.stats || statsData.stats);
 
-      // Fetch reimbursements
-      const reimbursementsRes = await fetch(
-        `/api/companies/${companyId}/members/${userId}/reimbursements?limit=20`
-      );
-      const reimbursementsData = await reimbursementsRes.json();
+      // Set reimbursements
       setReimbursements(reimbursementsData.data?.reimbursements || reimbursementsData.reimbursements || []);
 
-      // Fetch audit logs
-      const logsRes = await fetch(
-        `/api/companies/${companyId}/members/${userId}/audit-logs?limit=20`
-      );
-      const logsData = await logsRes.json();
+      // Set audit logs
       setAuditLogs(logsData.data?.logs || logsData.logs || []);
     } catch (error) {
       console.error("Error fetching employee data:", error);

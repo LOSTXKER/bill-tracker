@@ -57,17 +57,23 @@ async function handleGet(
     // Get all leaf categories (with parents) for flat list
     const leafCategories = categories.filter((c) => c.parentId && c.isActive);
 
-    return apiResponse.success({
+    // Use cache for categories (rarely change)
+    return apiResponse.successWithCache({
       groups,
       flat: leafCategories,
       all: categories,
-    });
+    }, undefined, { maxAge: 120, staleWhileRevalidate: 600 }); // 2 min cache, 10 min stale
   }
 
   // Return flat list (both groups and children) for form selectors
   // Remove nested children to avoid duplication
   const flatCategories = categories.map(({ children, ...rest }) => rest);
-  return apiResponse.success({ categories: flatCategories });
+  // Use cache for categories (rarely change)
+  return apiResponse.successWithCache(
+    { categories: flatCategories }, 
+    undefined, 
+    { maxAge: 120, staleWhileRevalidate: 600 }
+  );
 }
 
 // POST /api/[company]/categories

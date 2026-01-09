@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import useSWR from "swr";
 import type { ContactSummary } from "@/types";
+import { swrKeys } from "@/lib/swr-config";
+
+interface ApiResponse {
+  success: boolean;
+  data?: {
+    contacts: ContactSummary[];
+  };
+}
 
 interface UseContactsReturn {
   contacts: ContactSummary[];
@@ -12,46 +20,31 @@ interface UseContactsReturn {
 
 /**
  * Custom hook to fetch and manage contacts for a company
+ * Uses SWR for caching, deduplication, and smart revalidation
+ * 
  * @param companyCode - The company code to fetch contacts for
  * @returns Object containing contacts, loading state, error, and refetch function
  */
 export function useContacts(companyCode: string): UseContactsReturn {
-  const [contacts, setContacts] = useState<ContactSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const key = companyCode ? swrKeys.contacts(companyCode) : null;
 
-  const fetchContacts = async () => {
-    if (!companyCode) return;
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(key, {
+    // Keep contacts cached for 5 minutes
+    dedupingInterval: 5 * 60 * 1000,
+    // Don't refetch on window focus (contacts rarely change)
+    revalidateOnFocus: false,
+  });
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/contacts?company=${companyCode.toUpperCase()}`);
-      const data = await res.json();
-      
-      if (data.success) {
-        setContacts(data.data.contacts || []);
-      } else {
-        setError(data.error || "Failed to fetch contacts");
-        setContacts([]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch contacts:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch contacts");
-      setContacts([]);
-    } finally {
-      setIsLoading(false);
-    }
+  const contacts = data?.success ? (data.data?.contacts || []) : [];
+
+  const refetch = async () => {
+    await mutate();
   };
-
-  useEffect(() => {
-    fetchContacts();
-  }, [companyCode]);
 
   return {
     contacts,
     isLoading,
-    error,
-    refetch: fetchContacts,
+    error: error ? (error instanceof Error ? error.message : "Failed to fetch contacts") : null,
+    refetch,
   };
 }

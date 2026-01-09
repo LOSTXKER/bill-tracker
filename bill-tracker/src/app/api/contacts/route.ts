@@ -36,7 +36,8 @@ export const GET = withCompanyAccess(
       prisma.contact.count({ where }),
     ]);
 
-    return apiResponse.success({
+    // Use cache for contacts (rarely change)
+    return apiResponse.successWithCache({
       contacts,
       pagination: {
         page,
@@ -44,7 +45,7 @@ export const GET = withCompanyAccess(
         total,
         totalPages: Math.ceil(total / limit),
       },
-    });
+    }, undefined, { maxAge: 60, staleWhileRevalidate: 300 }); // 1 min cache, 5 min stale
   },
   { permission: "contacts:read" }
 );

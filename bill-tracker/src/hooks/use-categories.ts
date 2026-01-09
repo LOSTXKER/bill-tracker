@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import useSWR from "swr";
 import type { CategorySummary } from "@/types";
+import { swrKeys } from "@/lib/swr-config";
 
 type CategoryType = "EXPENSE" | "INCOME";
+
+interface ApiResponse {
+  success: boolean;
+  data?: {
+    categories: CategorySummary[];
+  };
+  // Fallback for old format
+  [key: string]: unknown;
+}
 
 interface UseCategoriesReturn {
   categories: CategorySummary[];
@@ -14,6 +24,8 @@ interface UseCategoriesReturn {
 
 /**
  * Custom hook to fetch and manage categories for a company
+ * Uses SWR for caching, deduplication, and smart revalidation
+ * 
  * @param companyCode - The company code to fetch categories for
  * @param type - The category type (EXPENSE or INCOME)
  * @returns Object containing categories, loading state, error, and refetch function
@@ -22,46 +34,28 @@ export function useCategories(
   companyCode: string,
   type: CategoryType
 ): UseCategoriesReturn {
-  const [categories, setCategories] = useState<CategorySummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const key = companyCode ? swrKeys.categories(companyCode, type) : null;
 
-  const fetchCategories = async () => {
-    if (!companyCode) return;
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(key, {
+    // Keep categories cached for 5 minutes
+    dedupingInterval: 5 * 60 * 1000,
+    // Don't refetch on window focus (categories rarely change)
+    revalidateOnFocus: false,
+  });
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/${companyCode}/categories?type=${type}`);
-      
-      if (response.ok) {
-        const result = await response.json();
-        // Handle both old format (data array) and new format (data.data.categories)
-        const categoriesData = result.data?.categories || result;
-        // Filter only active categories
-        const activeCategories = categoriesData.filter((cat: CategorySummary) => cat.isActive);
-        setCategories(activeCategories);
-      } else {
-        setError("Failed to fetch categories");
-        setCategories([]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch categories:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch categories");
-      setCategories([]);
-    } finally {
-      setIsLoading(false);
-    }
+  // Handle both old format (data array) and new format (data.data.categories)
+  const categoriesData = data?.data?.categories || (Array.isArray(data) ? data : []);
+  // Filter only active categories
+  const categories = categoriesData.filter((cat: CategorySummary) => cat.isActive);
+
+  const refetch = async () => {
+    await mutate();
   };
-
-  useEffect(() => {
-    fetchCategories();
-  }, [companyCode, type]);
 
   return {
     categories,
     isLoading,
-    error,
-    refetch: fetchCategories,
+    error: error ? (error instanceof Error ? error.message : "Failed to fetch categories") : null,
+    refetch,
   };
 }

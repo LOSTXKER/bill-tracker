@@ -101,39 +101,35 @@ export default function MyProfilePage() {
     fetchCompany();
   }, [companyCode]);
 
-  // Fetch profile data
+  // Fetch profile data - using Promise.all for parallel requests
   const fetchProfileData = async () => {
     if (!companyId || !userId) return;
 
     setIsLoading(true);
     try {
-      // Fetch company access info
-      const membersRes = await fetch(`/api/companies/${companyId}/members`);
-      const membersData = await membersRes.json();
+      // Fetch all data in parallel for faster loading
+      const [membersRes, statsRes, reimbursementsRes, logsRes] = await Promise.all([
+        fetch(`/api/companies/${companyId}/members`),
+        fetch(`/api/companies/${companyId}/members/${userId}/stats`),
+        fetch(`/api/companies/${companyId}/members/${userId}/reimbursements?limit=20`),
+        fetch(`/api/companies/${companyId}/members/${userId}/audit-logs?limit=20`),
+      ]);
+
+      // Parse all responses in parallel
+      const [membersData, statsData, reimbursementsData, logsData] = await Promise.all([
+        membersRes.json(),
+        statsRes.json(),
+        reimbursementsRes.json(),
+        logsRes.json(),
+      ]);
+
+      // Process and set data
       const myAccess = membersData.members?.find(
-        (m: any) => m.userId === userId
+        (m: Record<string, unknown>) => m.userId === userId
       );
       setCompanyAccess(myAccess);
-
-      // Fetch stats
-      const statsRes = await fetch(
-        `/api/companies/${companyId}/members/${userId}/stats`
-      );
-      const statsData = await statsRes.json();
       setStats(statsData.stats);
-
-      // Fetch reimbursements
-      const reimbursementsRes = await fetch(
-        `/api/companies/${companyId}/members/${userId}/reimbursements?limit=20`
-      );
-      const reimbursementsData = await reimbursementsRes.json();
       setReimbursements(reimbursementsData.reimbursements || []);
-
-      // Fetch audit logs
-      const logsRes = await fetch(
-        `/api/companies/${companyId}/members/${userId}/audit-logs?limit=20`
-      );
-      const logsData = await logsRes.json();
       setAuditLogs(logsData.logs || []);
     } catch (error) {
       console.error("Error fetching profile data:", error);

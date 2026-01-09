@@ -31,6 +31,31 @@ export const apiResponse = {
   },
 
   /**
+   * Return a successful response with cache headers
+   * Use for data that doesn't change frequently (categories, contacts, etc.)
+   * @param maxAge - Cache duration in seconds (default: 60 = 1 minute)
+   * @param staleWhileRevalidate - Time to serve stale while revalidating (default: 300 = 5 minutes)
+   */
+  successWithCache<T>(
+    data: T, 
+    message?: string, 
+    options: { maxAge?: number; staleWhileRevalidate?: number } = {}
+  ): NextResponse {
+    const { maxAge = 60, staleWhileRevalidate = 300 } = options;
+    const body: ApiSuccessResponse<T> = {
+      success: true,
+      data,
+      ...(message && { message }),
+    };
+    return NextResponse.json(body, { 
+      status: 200,
+      headers: {
+        "Cache-Control": `private, max-age=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}`,
+      },
+    });
+  },
+
+  /**
    * Return a created response (201)
    */
   created<T>(data: T, message?: string): NextResponse {
