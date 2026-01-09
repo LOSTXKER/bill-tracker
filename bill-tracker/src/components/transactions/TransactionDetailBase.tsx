@@ -504,22 +504,72 @@ export function TransactionDetailBase({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Description/Source */}
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">{config.descriptionLabel}</Label>
+              {/* Row 1: Date & Amount (like Create form) */}
+              <div className="grid sm:grid-cols-2 gap-6">
+                {/* Date */}
                 {isEditing ? (
-                  <Input
-                    value={(editData[config.descriptionField] as string) || ""}
-                    onChange={(e) => setEditData({ ...editData, [config.descriptionField]: e.target.value })}
-                    placeholder={config.descriptionLabel}
-                    className="h-11 bg-muted/30"
+                  <DatePicker
+                    label={config.dateLabel}
+                    value={editData[config.dateField] ? new Date(editData[config.dateField] as string) : undefined}
+                    onChange={(date) => setEditData({ ...editData, [config.dateField]: date?.toISOString() })}
+                    required
                   />
                 ) : (
-                  <p className="text-sm font-medium">{description || <span className="text-muted-foreground">-</span>}</p>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">{config.dateLabel}</Label>
+                    <p className="text-sm font-medium">
+                      {new Date(dateValue).toLocaleDateString("th-TH", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
                 )}
+
+                {/* Amount - read only in detail view */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">จำนวนเงิน (ก่อน VAT)</Label>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      value={editData.amount || ""}
+                      onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || 0 })}
+                      className="h-11 bg-muted/30 text-lg font-semibold"
+                    />
+                  ) : (
+                    <p className="text-lg font-semibold">{formatCurrency(transaction.amount)}</p>
+                  )}
+                </div>
               </div>
 
+              {/* Row 2: Contact & Category (like Create form) */}
               <div className="grid sm:grid-cols-2 gap-6">
+                {/* Contact */}
+                {isEditing ? (
+                  <ContactSelector
+                    contacts={contacts}
+                    isLoading={contactsLoading}
+                    selectedContact={selectedContact}
+                    onSelect={setSelectedContact}
+                    label={config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
+                    placeholder="เลือกผู้ติดต่อ..."
+                    companyCode={companyCode}
+                    onContactCreated={(contact) => {
+                      refetchContacts();
+                      setSelectedContact(contact);
+                    }}
+                    required
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">
+                      {config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
+                    </Label>
+                    <p className="text-sm font-medium">{transaction.contact?.name || <span className="text-muted-foreground">-</span>}</p>
+                  </div>
+                )}
+
                 {/* Category - using new Category model */}
                 {config.showCategory && (
                   <div className="space-y-2">
@@ -548,57 +598,31 @@ export function TransactionDetailBase({
                     )}
                   </div>
                 )}
+              </div>
 
-                {/* Contact */}
+              {/* Row 3: Description (like Create form) */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">{config.descriptionLabel} <span className="text-red-500">*</span></Label>
                 {isEditing ? (
-                  <ContactSelector
-                    contacts={contacts}
-                    isLoading={contactsLoading}
-                    selectedContact={selectedContact}
-                    onSelect={setSelectedContact}
-                    label={config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
-                    placeholder="เลือกผู้ติดต่อ..."
-                    companyCode={companyCode}
-                    onContactCreated={(contact) => {
-                      refetchContacts();
-                      setSelectedContact(contact);
-                    }}
-                  />
-                ) : (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">
-                      {config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
-                    </Label>
-                    <p className="text-sm font-medium">{transaction.contact?.name || <span className="text-muted-foreground">-</span>}</p>
-                  </div>
-                )}
-
-                {/* Date */}
-                {isEditing ? (
-                  <DatePicker
-                    label={config.dateLabel}
-                    value={editData[config.dateField] ? new Date(editData[config.dateField] as string) : undefined}
-                    onChange={(date) => setEditData({ ...editData, [config.dateField]: date?.toISOString() })}
+                  <Input
+                    value={(editData[config.descriptionField] as string) || ""}
+                    onChange={(e) => setEditData({ ...editData, [config.descriptionField]: e.target.value })}
+                    placeholder={config.descriptionLabel}
+                    className="h-11 bg-muted/30"
                     required
                   />
                 ) : (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">{config.dateLabel}</Label>
-                    <p className="text-sm font-medium">
-                      {new Date(dateValue).toLocaleDateString("th-TH", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium">{description || <span className="text-muted-foreground">-</span>}</p>
                 )}
+              </div>
 
+              {/* Row 4: Due Date & Payment Method (like Create form) */}
+              <div className="grid sm:grid-cols-2 gap-6">
                 {/* Due Date (expense only) */}
                 {config.showDueDate && (
                   isEditing ? (
                     <DatePicker
-                      label="วันครบกำหนด"
+                      label="วันครบกำหนด (ถ้ามี)"
                       value={editData.dueDate ? new Date(editData.dueDate as string) : undefined}
                       onChange={(date) => setEditData({ ...editData, dueDate: date?.toISOString() || null })}
                     />
@@ -615,6 +639,37 @@ export function TransactionDetailBase({
                   )
                 )}
 
+                {/* Payment Method */}
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">
+                    {config.type === "expense" ? "วิธีชำระเงิน" : "วิธีรับเงิน"}
+                  </Label>
+                  {isEditing ? (
+                    <Select
+                      value={editData.paymentMethod || "BANK_TRANSFER"}
+                      onValueChange={(v) => setEditData({ ...editData, paymentMethod: v })}
+                    >
+                      <SelectTrigger className="h-11 bg-muted/30">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_METHOD_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {PAYMENT_METHOD_OPTIONS.find(o => o.value === transaction.paymentMethod)?.label}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 5: Invoice Number & Reference No */}
+              <div className="grid sm:grid-cols-2 gap-6">
                 {/* Invoice Number */}
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">เลขที่ใบกำกับ</Label>
@@ -644,40 +699,12 @@ export function TransactionDetailBase({
                     <p className="text-sm font-medium">{transaction.referenceNo || <span className="text-muted-foreground">-</span>}</p>
                   )}
                 </div>
+              </div>
 
-                {/* Payment Method */}
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">
-                    {config.type === "expense" ? "วิธีชำระเงิน" : "วิธีรับเงิน"}
-                  </Label>
-                  {isEditing ? (
-                    <Select
-                      value={editData.paymentMethod || "BANK_TRANSFER"}
-                      onValueChange={(v) => setEditData({ ...editData, paymentMethod: v })}
-                    >
-                      <SelectTrigger className="h-11 bg-muted/30">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_METHOD_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-sm font-medium">
-                      {PAYMENT_METHOD_OPTIONS.find(o => o.value === transaction.paymentMethod)?.label}
-                    </p>
-                  )}
-                </div>
-
-                {/* Status */}
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">สถานะ</Label>
-                  <p className="text-sm font-medium">{statusInfo.label}</p>
-                </div>
+              {/* Row 6: Status */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">สถานะเอกสาร</Label>
+                <p className="text-sm font-medium">{statusInfo.label}</p>
               </div>
 
               {/* Notes */}
