@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
@@ -6,7 +5,7 @@ import { hasPermission } from "@/lib/permissions/checker";
 import { createAuditLog } from "@/lib/audit/logger";
 
 // GET /api/companies/[id]/exchange-rates
-export const GET = withAuth(async (req: NextRequest, { session }, routeContext) => {
+export const GET = withAuth(async (req, { session }, routeContext) => {
   try {
     const { id: companyCode } = await routeContext.params;
     const user = session.user;
@@ -43,7 +42,7 @@ export const GET = withAuth(async (req: NextRequest, { session }, routeContext) 
 });
 
 // PUT /api/companies/[id]/exchange-rates
-export const PUT = withAuth(async (req: NextRequest, { session }, routeContext) => {
+export const PUT = withAuth(async (req, { session }, routeContext) => {
   try {
     const { id: companyCode } = await routeContext.params;
     const user = session.user;
