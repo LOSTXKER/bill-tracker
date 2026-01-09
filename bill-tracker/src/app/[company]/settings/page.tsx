@@ -12,6 +12,15 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      taxId: true,
+      address: true,
+      phone: true,
+      exchangeRates: true,
+    },
   });
 
   if (!company) return null;

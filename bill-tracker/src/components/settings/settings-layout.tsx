@@ -12,6 +12,7 @@ import {
   Palette,
   Settings,
   Brain,
+  DollarSign,
 } from "lucide-react";
 
 // Settings sections
@@ -21,6 +22,7 @@ import { LineBotSection } from "./sections/line-bot-section";
 import { NotificationSection } from "./sections/notification-section";
 import { AppearanceSection } from "./sections/appearance-section";
 import { AiTrainingSection } from "./sections/ai-training-section";
+import { ExchangeRatesSection } from "./sections/exchange-rates";
 
 interface Company {
   id: string;
@@ -29,6 +31,7 @@ interface Company {
   taxId: string | null;
   address: string | null;
   phone: string | null;
+  exchangeRates?: any;
 }
 
 interface CompanyAccess {
@@ -52,6 +55,7 @@ interface SettingsLayoutProps {
 type SettingSection =
   | "company"
   | "user"
+  | "exchange-rates"
   | "line-bot"
   | "notifications"
   | "ai-training"
@@ -76,6 +80,12 @@ const navItems: NavItem[] = [
     label: "บัญชีผู้ใช้",
     icon: <User className="h-4 w-4" />,
     description: "ข้อมูลและสิทธิ์ของคุณ",
+  },
+  {
+    id: "exchange-rates",
+    label: "อัตราแลกเปลี่ยน",
+    icon: <DollarSign className="h-4 w-4" />,
+    description: "ตั้งค่าอัตราสกุลเงินต่างประเทศ",
   },
   {
     id: "line-bot",
@@ -117,6 +127,13 @@ export function SettingsLayout({
         return <CompanyInfoSection company={company} />;
       case "user":
         return <UserInfoSection user={user} companyAccess={companyAccess} />;
+      case "exchange-rates":
+        return (
+          <ExchangeRatesSection
+            companyCode={company.code}
+            initialRates={(company.exchangeRates as Record<string, number>) || {}}
+          />
+        );
       case "line-bot":
         return <LineBotSection companyId={company.id} companyCode={company.code} />;
       case "notifications":

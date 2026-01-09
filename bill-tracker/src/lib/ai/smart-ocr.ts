@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/db";
 import { analyzeReceipt, ReceiptData } from "./receipt-ocr";
 import { analyzeImage } from "./gemini";
+import { detectAndConvertAmount, type CurrencyDetectionResult } from "./currency-converter";
 import type { VendorMapping, Contact, Category, PaymentMethod } from "@prisma/client";
 
 // =============================================================================
@@ -32,6 +33,7 @@ export interface MultiDocAnalysisResult {
     date: string | null;
     invoiceNumbers: string[];
   };
+  currencyConversion?: CurrencyDetectionResult;
   smart: {
     mapping: {
       id: string;
@@ -875,7 +877,8 @@ export async function analyzeAndClassifyMultiple(
   imageUrls: string[],
   companyId: string,
   transactionType: "EXPENSE" | "INCOME",
-  companyName?: string
+  companyName?: string,
+  exchangeRates?: Record<string, number>
 ): Promise<MultiDocAnalysisResult | { error: string }> {
   if (imageUrls.length === 0) {
     return { error: "ไม่มีไฟล์ให้วิเคราะห์" };
@@ -941,6 +944,30 @@ export async function analyzeAndClassifyMultiple(
 
   // Combine data from all successfully extracted documents
   const combined = combineMultipleResults(extractedDataList);
+
+  // Detect and convert currency if needed
+  let currencyConversion: CurrencyDetectionResult | undefined;
+  if (exchangeRates && combined.totalAmount > 0) {
+    // Get full OCR text for currency detection
+    const fullText = extractedDataList
+      .map((d) => [d.vendorName, d.invoiceNumber, d.vendorAddress].filter(Boolean).join(" "))
+      .join(" ");
+    
+    currencyConversion = detectAndConvertAmount(
+      fullText,
+      combined.totalAmount,
+      exchangeRates
+    );
+    
+    // If currency conversion happened, update combined amount
+    if (currencyConversion.convertedAmount !== null && currencyConversion.currency !== "THB") {
+      combined.totalAmount = currencyConversion.convertedAmount;
+      // Also update VAT amount proportionally
+      if (combined.vatAmount > 0 && currencyConversion.exchangeRate) {
+        combined.vatAmount = combined.vatAmount * currencyConversion.exchangeRate;
+      }
+    }
+  }
 
   // Detect transaction type if we have company name
   const txTypeDetection = detectTransactionTypeFromDocs(
@@ -1038,6 +1065,7 @@ export async function analyzeAndClassifyMultiple(
     transactionTypeConfidence: txTypeDetection.confidence,
     transactionTypeReason: txTypeDetection.reason,
     combined,
+    currencyConversion,
     smart: smartResult,
     fileAssignments,
   };

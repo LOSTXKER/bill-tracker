@@ -32,9 +32,14 @@ export async function POST(request: Request) {
       return apiResponse.badRequest("companyCode is required");
     }
 
-    // Find company
+    // Find company with exchange rates
     const company = await prisma.company.findUnique({
       where: { code: companyCode.toUpperCase() },
+      select: {
+        id: true,
+        name: true,
+        exchangeRates: true,
+      },
     });
 
     if (!company) {
@@ -43,12 +48,16 @@ export async function POST(request: Request) {
 
     const startTime = Date.now();
 
+    // Get exchange rates for currency conversion
+    const exchangeRates = (company.exchangeRates as Record<string, number> | null) || {};
+
     // Analyze all documents
     const result = await analyzeAndClassifyMultiple(
       imageUrls,
       company.id,
       transactionType.toUpperCase() as "EXPENSE" | "INCOME",
-      company.name
+      company.name,
+      exchangeRates
     );
 
     const processingTime = Date.now() - startTime;

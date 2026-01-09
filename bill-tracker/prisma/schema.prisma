@@ -32,6 +32,10 @@ model Company {
   // AI Configuration
   aiConfig Json? // AI preferences and settings
 
+  // Exchange Rates Configuration (currency code to THB rate)
+  // Example: { "USD": 35.50, "AED": 9.65 }
+  exchangeRates Json @default("{}") // Currency exchange rates to THB
+
   // Relations
   expenses              Expense[]
   incomes               Income[]

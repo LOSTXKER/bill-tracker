@@ -45,6 +45,7 @@ import { HierarchicalCategorySelector as CategorySelector } from "./Hierarchical
 import { DatePicker } from "./DatePicker";
 import { MergeOptionsDialog, MergeData, MergeDecision } from "./MergeOptionsDialog";
 import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } from "./ConflictDialog";
+import { CurrencyConversionNote } from "./CurrencyConversionNote";
 import type { ContactSummary } from "@/types";
 // =============================================================================
 // Auto-Learn Types & Logic (Client-safe - no Prisma imports)
@@ -870,6 +871,11 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
                     <AmountInput register={register} name="amount" />
                   </div>
+
+                  {/* Currency Conversion Note */}
+                  {aiResult?.currencyConversion && (
+                    <CurrencyConversionNote currencyConversion={aiResult.currencyConversion} />
+                  )}
 
                   <div className="grid sm:grid-cols-2 gap-4">
                     <ContactSelector
