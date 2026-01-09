@@ -1002,10 +1002,9 @@ export async function analyzeAndClassifyMultiple(
         }
       );
 
-      // Apply AI suggestion to suggested values if confident enough
-      if (aiCategorySuggestion.categoryId && aiCategorySuggestion.confidence >= 60) {
-        suggested.categoryId = aiCategorySuggestion.categoryId;
-      }
+      // NOTE: Do NOT auto-apply AI category suggestion to suggested.categoryId
+      // User must explicitly click "ใช้หมวดหมู่นี้" button to apply
+      // Only vendor mappings should auto-apply categoryId
     }
 
     smartResult = {
