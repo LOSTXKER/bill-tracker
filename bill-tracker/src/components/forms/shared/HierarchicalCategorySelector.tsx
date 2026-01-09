@@ -28,6 +28,7 @@ interface HierarchicalCategorySelectorProps {
   categoryType?: "EXPENSE" | "INCOME";
   onCategoryCreated?: (category: CategorySummary) => void;
   allowCreate?: boolean;
+  required?: boolean;
 }
 
 // สร้าง tree structure จาก flat list
@@ -90,6 +91,7 @@ export function HierarchicalCategorySelector({
   categoryType,
   onCategoryCreated,
   allowCreate = true,
+  required = false,
 }: HierarchicalCategorySelectorProps) {
   const tree = useMemo(() => buildCategoryTree(categories), [categories]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -111,7 +113,11 @@ export function HierarchicalCategorySelector({
     const activeCategories = categories.filter((c) => c.isActive);
     return (
       <div className="space-y-2">
-        <Label className="text-foreground font-medium">{label}</Label>
+        {label && (
+          <Label className="text-foreground font-medium">
+            {label} {required && <span className="text-red-500">*</span>}
+          </Label>
+        )}
         <Select
           value={selectedCategory || undefined}
           onValueChange={onSelect}
@@ -144,7 +150,11 @@ export function HierarchicalCategorySelector({
 
   return (
     <div className="space-y-2">
-      <Label className="text-foreground font-medium">{label}</Label>
+      {label && (
+        <Label className="text-foreground font-medium">
+          {label} {required && <span className="text-red-500">*</span>}
+        </Label>
+      )}
       <Select
         value={selectedCategory || undefined}
         onValueChange={handleValueChange}
