@@ -239,6 +239,44 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
   // Contact and category state
   const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [oneTimeContactName, setOneTimeContactName] = useState("");
+  
+  // Pending contact ID (for when contacts haven't loaded yet)
+  const [pendingContactId, setPendingContactId] = useState<string | null>(null);
+  // Pending category ID (for when categories haven't loaded yet)
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
+
+  // Effect to apply pending contact when contacts are loaded
+  useEffect(() => {
+    if (pendingContactId && contacts.length > 0 && !selectedContact) {
+      const contact = contacts.find((c) => c.id === pendingContactId);
+      if (contact) {
+        setSelectedContact(contact);
+        setPendingContactId(null);
+        console.log("Applied pending contact:", contact.name);
+      }
+    }
+  }, [pendingContactId, contacts, selectedContact]);
+
+  // Effect to apply pending category when categories are loaded
+  useEffect(() => {
+    if (pendingCategoryId && categories.length > 0 && !selectedCategory) {
+      // Find the category in the flat list (categories might be hierarchical)
+      const findCategory = (cats: typeof categories, id: string): boolean => {
+        for (const cat of cats) {
+          if (cat.id === id) return true;
+          if (cat.children && findCategory(cat.children, id)) return true;
+        }
+        return false;
+      };
+      
+      if (findCategory(categories, pendingCategoryId)) {
+        setSelectedCategory(pendingCategoryId);
+        setPendingCategoryId(null);
+        console.log("Applied pending category:", pendingCategoryId);
+      }
+    }
+  }, [pendingCategoryId, categories, selectedCategory]);
   
   // AI Category Suggestion (standalone - without OCR)
   const [categorySuggestion, setCategorySuggestion] = useState<{
@@ -486,17 +524,29 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
       }
     }
 
-    // Apply contact from mapping
-    if (suggested.contactId) {
-      const contact = contacts.find((c) => c.id === suggested.contactId);
+    // Apply contact from mapping or from foundContact (taxId/name lookup)
+    const contactIdToUse = suggested.contactId || result.smart?.foundContact?.id;
+    if (contactIdToUse) {
+      const contact = contacts.find((c) => c.id === contactIdToUse);
       if (contact) {
         setSelectedContact(contact);
+        console.log("Auto-filled contact:", contact.name);
+      } else {
+        // Store pending contact ID to apply when contacts are loaded
+        setPendingContactId(contactIdToUse);
+        console.log("Stored pending contact ID (contacts not loaded yet):", contactIdToUse);
       }
     }
 
-    // Apply category from mapping
+    // Apply category from AI suggestion or mapping
     if (suggested.categoryId) {
       setSelectedCategory(suggested.categoryId);
+      console.log("Auto-filled category:", suggested.categoryId);
+    } else if (result.smart?.aiCategorySuggestion?.categoryId && result.smart.aiCategorySuggestion.confidence >= 70) {
+      // Fallback: use AI suggestion if confidence is high
+      setSelectedCategory(result.smart.aiCategorySuggestion.categoryId);
+      setPendingCategoryId(result.smart.aiCategorySuggestion.categoryId);
+      console.log("Auto-filled category from AI:", result.smart.aiCategorySuggestion.categoryName);
     }
 
     setAiApplied(true);
@@ -528,7 +578,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
         }
       }
 
-      // Call API to create mapping (ไม่ส่ง categoryId - AI ไม่จำหมวดหมู่)
+      // Call API to create mapping (รวม categoryId ด้วย)
       const response = await fetch("/api/vendor-mappings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -538,7 +588,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
           vendorName: combined.vendorName,
           vendorTaxId: combined.vendorTaxId,
           contactId: selectedContact?.id,
-          // ไม่ส่ง categoryId - ให้ user เลือกหมวดหมู่เองทุกครั้ง
+          categoryId: selectedCategory, // บันทึกหมวดหมู่ที่เลือกด้วย
           defaultVatRate: watchVatRate,
           paymentMethod: watch("paymentMethod"),
           descriptionTemplate,
@@ -553,7 +603,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
       }
 
       toast.success("สอน AI สำเร็จ!", {
-        description: `AI จะจดจำผู้ติดต่อ VAT และวิธีชำระเงิน (ไม่รวมหมวดหมู่)`,
+        description: `AI จะจดจำผู้ติดต่อ หมวดหมู่ VAT และวิธีชำระเงิน`,
       });
 
       setShowTrainDialog(false);
@@ -567,17 +617,25 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
     } finally {
       setIsTraining(false);
     }
-  }, [aiResult, companyCode, selectedContact, watchVatRate, watch, config, router]);
+  }, [aiResult, companyCode, selectedContact, selectedCategory, watchVatRate, watch, config, router]);
 
-  // AI Category Suggestion (without OCR)
+  // AI Category Suggestion (with optional image analysis)
   const suggestCategory = useCallback(async () => {
     const vendorName = selectedContact?.name || null;
     // Get current description value directly from the form
     const descFieldName = config.fields.descriptionField?.name || "description";
     const description = watch(descFieldName) || null;
     
-    if (!vendorName && !description) {
-      toast.error("กรุณาเลือกผู้ติดต่อหรือกรอกรายละเอียดก่อน");
+    // Get all uploaded file URLs
+    const allFileUrls = [
+      ...categorizedFiles.invoice,
+      ...categorizedFiles.slip,
+      ...categorizedFiles.whtCert,
+      ...categorizedFiles.uncategorized,
+    ].filter(Boolean);
+    
+    if (!vendorName && !description && allFileUrls.length === 0) {
+      toast.error("กรุณาเลือกผู้ติดต่อ กรอกรายละเอียด หรือแนบไฟล์ก่อน");
       return;
     }
 
@@ -592,6 +650,8 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
           transactionType: config.type.toUpperCase(),
           vendorName,
           description,
+          // ส่งรูปภาพแรกให้ AI วิเคราะห์ด้วย
+          imageUrls: allFileUrls.slice(0, 1),
         }),
       });
 
@@ -625,18 +685,24 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
     } finally {
       setIsSuggestingCategory(false);
     }
-  }, [selectedContact, config, companyCode, watch]);
+  }, [selectedContact, config, companyCode, watch, categorizedFiles]);
 
   const onSubmit = async (data: any) => {
     // Validate required fields before submit
     const validationErrors: string[] = [];
     
-    if (!selectedContact?.id) {
-      validationErrors.push("กรุณาเลือกผู้ติดต่อ");
+    // Allow submission if contact is selected OR one-time name is provided
+    const hasValidContact = selectedContact?.id || oneTimeContactName.trim();
+    if (!hasValidContact) {
+      validationErrors.push("กรุณาระบุผู้ติดต่อ");
     }
     
     if (!selectedCategory) {
       validationErrors.push("กรุณาเลือกหมวดหมู่");
+    }
+    
+    if (!data.status) {
+      validationErrors.push("กรุณาเลือกสถานะเอกสาร");
     }
     
     const descriptionValue = config.fields.descriptionField 
@@ -671,6 +737,10 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
           ...data,
           companyCode: companyCode.toUpperCase(),
           contactId: selectedContact?.id || null,
+          // Use one-time contact name if no contact selected (and not unknown)
+          contactName: !selectedContact?.id && oneTimeContactName.trim() 
+            ? oneTimeContactName.trim() 
+            : null,
           categoryId: selectedCategory,
           category: undefined, // Remove old enum field
           vatAmount: calculation.vatAmount,
@@ -708,7 +778,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
               vendorName,
               vendorTaxId,
               contactId: selectedContact.id,
-              // ไม่ส่ง categoryId - AI ไม่จำหมวดหมู่
+              categoryId: selectedCategory, // บันทึกหมวดหมู่ที่เลือกด้วย
               defaultVatRate: watchVatRate,
               paymentMethod: watch("paymentMethod"),
               learnSource: "AUTO",
@@ -717,7 +787,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
 
           if (learnResponse.ok) {
             toast.success(`บันทึก${config.title}สำเร็จ`, {
-              description: `AI จดจำ "${vendorName}" แล้ว (ไม่รวมหมวดหมู่)`,
+              description: `AI จดจำ "${vendorName}" แล้ว`,
             });
           } else {
             toast.success(`บันทึก${config.title}สำเร็จ`);
@@ -891,13 +961,15 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                       selectedContact={selectedContact}
                       onSelect={setSelectedContact}
                       label="ผู้ติดต่อ"
-                      placeholder="เลือกผู้ติดต่อ..."
+                      placeholder="พิมพ์ชื่อหรือเลือกจากรายชื่อ..."
                       companyCode={companyCode}
                       onContactCreated={(newContact) => {
                         refetchContacts();
                         setSelectedContact(newContact);
                       }}
                       required
+                      contactName={oneTimeContactName}
+                      onContactNameChange={setOneTimeContactName}
                     />
 
                     {/* Category Selector with AI Button */}
@@ -1023,13 +1095,13 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                           <TooltipTrigger asChild>
                             <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground cursor-help">
                               <Brain className="h-3 w-3" />
-                              <span>AI จะจดจำ: &quot;{selectedContact.name}&quot; (ผู้ติดต่อ, VAT, วิธีชำระเงิน)</span>
+                              <span>AI จะจดจำ: &quot;{selectedContact.name}&quot; (ผู้ติดต่อ, หมวดหมู่, VAT, วิธีชำระเงิน)</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-xs">
                             <p className="font-semibold mb-1">🧠 การเรียนรู้อัตโนมัติ</p>
                             <p className="text-xs">
-                              AI จะจดจำ: ผู้ติดต่อ, VAT, วิธีชำระเงิน
+                              AI จะจดจำ: ผู้ติดต่อ, หมวดหมู่, VAT, วิธีชำระเงิน
                               <br />
                               <strong>หมวดหมู่</strong>: ต้องเลือกเองทุกครั้ง (เพราะร้านเดียวกันอาจมีหลายหมวดหมู่)
                             </p>
@@ -1091,13 +1163,15 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                     />
 
                     <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">สถานะเอกสาร</Label>
+                      <Label className="text-sm text-muted-foreground">
+                        สถานะเอกสาร {!watch("status") && <span className="text-red-500">*</span>}
+                      </Label>
                       <Select
-                        value={watch("status")}
+                        value={watch("status") || ""}
                         onValueChange={(value) => setValue("status", value)}
                       >
                         <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-                          <SelectValue placeholder="เลือกสถานะ" />
+                          <SelectValue placeholder="เลือกสถานะ..." />
                         </SelectTrigger>
                         <SelectContent>
                           {config.statusOptions.map((option) => {
@@ -1209,9 +1283,9 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
             <DialogDescription>
               {aiResult?.combined?.vendorName && (
                 <span className="block mt-2">
-                  AI จะจดจำ <strong>&ldquo;{aiResult.combined.vendorName}&rdquo;</strong> เพื่อกรอกผู้ติดต่อ VAT วิธีชำระเงินอัตโนมัติ
+                  AI จะจดจำ <strong>&ldquo;{aiResult.combined.vendorName}&rdquo;</strong> เพื่อกรอกข้อมูลอัตโนมัติ
                   <br />
-                  <span className="text-xs text-muted-foreground">(หมวดหมู่ต้องเลือกเองทุกครั้ง)</span>
+                  <span className="text-xs text-muted-foreground">(ผู้ติดต่อ, หมวดหมู่, VAT, วิธีชำระเงิน)</span>
                 </span>
               )}
             </DialogDescription>
@@ -1228,13 +1302,14 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                   <li>• เลขผู้เสียภาษี: {aiResult.combined.vendorTaxId}</li>
                 )}
                 {selectedContact && <li>• ผู้ติดต่อ: {selectedContact.name}</li>}
+                {selectedCategory && <li>• หมวดหมู่: {categories.flatMap(c => c.children || [c]).find(c => c.id === selectedCategory)?.name || selectedCategory}</li>}
                 {watchVatRate !== undefined && <li>• VAT: {watchVatRate}%</li>}
                 {watch("paymentMethod") && (
                   <li>• วิธีชำระเงิน: {watch("paymentMethod")}</li>
                 )}
               </ul>
-              <p className="text-xs text-amber-600 mt-2">
-                ⚠️ หมวดหมู่: ไม่จำ (ต้องเลือกเองทุกครั้งเพราะร้านเดียวกันอาจมีหลายหมวดหมู่)
+              <p className="text-xs text-green-600 mt-2">
+                ✅ ครั้งหน้าจะกรอกข้อมูลนี้ให้อัตโนมัติ
               </p>
             </div>
           </div>

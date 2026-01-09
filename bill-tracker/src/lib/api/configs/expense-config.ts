@@ -31,6 +31,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     const { vatAmount, whtAmount, netPaid, ...data } = body;
     return {
       contactId: data.contactId || null,
+      contactName: data.contactName || null, // One-time contact name (not saved)
       amount: data.amount,
       vatRate: data.vatRate || 0,
       vatAmount: vatAmount || null,
@@ -60,6 +61,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     
     // Only update fields that are explicitly provided
     if (data.contactId !== undefined) updateData.contactId = data.contactId || null;
+    if (data.contactName !== undefined) updateData.contactName = data.contactName || null;
     if (data.amount !== undefined) updateData.amount = data.amount;
     if (data.vatRate !== undefined) updateData.vatRate = data.vatRate;
     if (vatAmount !== undefined) updateData.vatAmount = vatAmount;

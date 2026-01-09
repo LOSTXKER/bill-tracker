@@ -40,7 +40,7 @@ export function ExpenseForm({ companyCode }: ExpenseFormProps) {
       vatRate: 7,
       isWht: false,
       paymentMethod: "BANK_TRANSFER",
-      status: "PENDING_PHYSICAL",
+      status: "", // ว่างไว้ให้ผู้ใช้เลือกเอง
       billDate: new Date(),
       invoiceNumber: "",
       referenceNo: "",

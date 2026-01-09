@@ -51,6 +51,11 @@ export interface MultiDocAnalysisResult {
     suggested: SuggestedValues;
     isNewVendor: boolean;
     suggestTraining: boolean;
+    // Contact found by taxId/name lookup (not from mapping)
+    foundContact?: {
+      id: string;
+      name: string;
+    } | null;
     // AI category suggestion when no mapping found
     aiCategorySuggestion?: {
       categoryId: string | null;
@@ -286,9 +291,11 @@ function buildSuggestedValues(
       suggested.contactId = mapping.contactId;
     }
     
-    // ไม่ใช้ categoryId จาก mapping
-    // เพราะร้านเดียวกันอาจมีหลายหมวดหมู่ ให้ user เลือกเอง
-    // Category suggestion จะใช้ AI แนะนำแทน
+    // Category - ใช้จาก mapping ที่สอนไว้เลย
+    // ถ้าร้านเดียวกันมีหลายหมวดหมู่ ให้ผู้ใช้สอนเพิ่มได้
+    if (mapping.categoryId) {
+      suggested.categoryId = mapping.categoryId;
+    }
     
     // VAT Rate (use mapping if OCR is uncertain)
     if (mapping.defaultVatRate !== null && mapping.defaultVatRate !== undefined) {
@@ -338,14 +345,18 @@ function processDescriptionTemplate(
 
 /**
  * Normalize vendor name for comparison
- */
-/**
- * Normalize vendor name for comparison
  * Removes common prefixes/suffixes and normalizes whitespace
  */
 function normalizeVendorName(name: string): string {
   return name
     .toLowerCase()
+    // Normalize Thai person prefixes (น.ส., นาย, นาง, นางสาว, ดร., etc.)
+    // Convert variations like "น.ส. " or "น.ส." to standardized form
+    .replace(/น\.?\s*ส\.?\s*/gi, "นส")
+    .replace(/นางสาว\s*/gi, "นส")
+    .replace(/นาย\s*/gi, "นาย")
+    .replace(/นาง\s*/gi, "นาง")
+    .replace(/ดร\.?\s*/gi, "ดร")
     // Remove Thai company suffixes
     .replace(/บริษัท|ห้างหุ้นส่วน|จำกัด|มหาชน|หจก\.|บจก\./gi, "")
     // Remove English company suffixes
@@ -666,6 +677,85 @@ interface CategoryForAI {
 }
 
 /**
+ * Find category from VendorMapping (user-taught data)
+ * This is called by the AI suggest-category button to check user-taught mappings first
+ */
+export async function findCategoryFromMapping(
+  companyId: string,
+  vendorName: string,
+  transactionType: "EXPENSE" | "INCOME"
+): Promise<{
+  categoryId: string;
+  categoryName: string;
+  confidence: number;
+  reason: string;
+} | null> {
+  try {
+    // Get all vendor mappings for this company
+    const mappings = await prisma.vendorMapping.findMany({
+      where: { companyId },
+      include: {
+        category: true,
+      },
+    });
+
+    if (mappings.length === 0) {
+      return null;
+    }
+
+    const normalizedInput = normalizeVendorName(vendorName);
+
+    // Find best matching mapping
+    let bestMatch: (typeof mappings)[0] | null = null;
+    let bestScore = 0;
+
+    for (const mapping of mappings) {
+      if (!mapping.vendorName) continue;
+      
+      const normalizedMapping = normalizeVendorName(mapping.vendorName);
+
+      // Exact match after normalization
+      if (normalizedInput === normalizedMapping) {
+        bestMatch = mapping;
+        bestScore = 100;
+        break;
+      }
+
+      // Contains match
+      if (
+        normalizedInput.includes(normalizedMapping) ||
+        normalizedMapping.includes(normalizedInput)
+      ) {
+        const score = 85;
+        if (score > bestScore) {
+          bestMatch = mapping;
+          bestScore = score;
+        }
+      }
+    }
+
+    // Return category if mapping found and has categoryId
+    if (bestMatch && bestMatch.categoryId && bestMatch.category) {
+      // Check if category matches transaction type
+      if (bestMatch.category.type === transactionType) {
+        console.log(`[findCategoryFromMapping] Found: ${bestMatch.vendorName} → ${bestMatch.category.name}`);
+        return {
+          categoryId: bestMatch.categoryId,
+          categoryName: bestMatch.category.name,
+          confidence: 100,
+          reason: `จากการเรียนรู้: "${bestMatch.vendorName}" ใช้หมวดหมู่นี้`,
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error("[findCategoryFromMapping] Error:", error);
+    return null;
+  }
+}
+
+/**
  * AI-based category suggestion from document content or description
  * Uses Gemini to analyze content and suggest the best matching category
  */
@@ -731,25 +821,41 @@ export async function suggestCategoryFromContent(
       return { categoryId: null, categoryName: null, confidence: 0, reason: "ไม่มีข้อมูลเนื้อหา" };
     }
 
-    const prompt = `คุณเป็น AI ผู้เชี่ยวชาญด้านบัญชีไทย ช่วยแนะนำหมวดหมู่ที่เหมาะสมที่สุดสำหรับธุรกรรมนี้
+    const prompt = `คุณเป็น AI ผู้เชี่ยวชาญด้านบัญชีไทยและรู้จักธุรกิจ/ร้านค้าในประเทศไทยเป็นอย่างดี
 
-ประเภทธุรกรรม: ${transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
+**ขั้นตอนการวิเคราะห์:**
+1. วิเคราะห์ว่าร้านค้า/บริษัทนี้คือใคร ทำธุรกิจอะไร
+2. วิเคราะห์ว่าสินค้า/บริการที่ซื้อคืออะไร
+3. เลือกหมวดหมู่ที่เหมาะสมที่สุด
 
-ข้อมูลธุรกรรม:
+**ตัวอย่างการวิเคราะห์:**
+- "แม็คโคร" → ร้านค้าส่ง → ซื้อของ → ต้นทุนขาย/ซื้อสินค้า
+- "7-Eleven" → ร้านสะดวกซื้อ → อาหาร/เครื่องดื่ม → ค่าอาหาร
+- "Shopee" → แพลตฟอร์มขายของ → ขึ้นอยู่กับสินค้า
+- "TOT/TRUE" → ผู้ให้บริการโทรคมนาคม → ค่าโทรศัพท์/อินเทอร์เน็ต
+- "การไฟฟ้า/PEA" → สาธารณูปโภค → ค่าน้ำ-ไฟ
+- "น.ส./นาย [ชื่อคน]" → บุคคลธรรมดา → อาจเป็นซื้อสินค้า/จ้างงาน
+
+**ประเภทธุรกรรม:** ${transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
+
+**ข้อมูลธุรกรรม:**
 ${contentDescription}
 
-หมวดหมู่ที่มี:
+**หมวดหมู่ที่มี:**
 ${categoryListText}
 
-กรุณาเลือกหมวดหมู่ที่เหมาะสมที่สุด ตอบเป็น JSON:
+**คำแนะนำ:**
+- ถ้าเป็นชื่อบุคคล (น.ส., นาย, นาง) + ไม่มีรายละเอียดเพิ่ม → มักเป็น "ซื้อสินค้า" หรือ "จ้างงาน"
+- ถ้าไม่รู้จักร้าน แต่มีรายการสินค้า → วิเคราะห์จากสินค้า
+- ถ้าไม่แน่ใจจริงๆ → ตั้ง confidence ต่ำ (<50)
+
+**ตอบเป็น JSON:**
 {
   "categoryId": "ID ของหมวดหมู่ที่เลือก หรือ null ถ้าไม่แน่ใจ",
   "categoryName": "ชื่อหมวดหมู่ที่เลือก หรือ null",
   "confidence": 0-100,
-  "reason": "เหตุผลสั้นๆ ที่เลือกหมวดหมู่นี้"
-}
-
-ถ้าไม่แน่ใจ ให้ตั้ง confidence ต่ำ (< 50) และอธิบายเหตุผล`;
+  "reason": "เหตุผลสั้นๆ (เช่น: 'น.ส.xxx น่าจะเป็นซื้อสินค้าจากบุคคล')"
+}`;
 
     // If we have images, use image analysis
     let response;
@@ -948,17 +1054,15 @@ export async function analyzeAndClassifyMultiple(
   // Detect and convert currency if needed
   let currencyConversion: CurrencyDetectionResult | undefined;
   if (exchangeRates && combined.totalAmount > 0) {
-    // Get full OCR text for currency detection - include more fields for better detection
+    // Get full OCR text for currency detection
+    // Only include text fields - NOT amount values (to avoid false $ detection)
     const fullText = extractedDataList
       .map((d) => {
         const parts = [
           d.vendorName,
           d.invoiceNumber,
           d.vendorAddress,
-          // Include amount as string to detect $ symbol
-          d.amount ? `$${d.amount}` : null,
-          d.totalAmount ? `$${d.totalAmount}` : null,
-          // Include items descriptions
+          // Include items descriptions only (not amounts)
           ...(d.items || []).map((item) => 
             typeof item === "string" ? item : item.description
           ),
@@ -967,22 +1071,29 @@ export async function analyzeAndClassifyMultiple(
       })
       .join(" ");
     
-    // Also check for common currency indicators
-    const hasUsdIndicator = /\$|USD|US\s*DOLLAR/i.test(fullText) || 
-      extractedDataList.some(d => d.vendorAddress?.includes("United States") || d.vendorName?.includes("Inc."));
-    
-    currencyConversion = detectAndConvertAmount(
-      hasUsdIndicator ? fullText + " USD $" : fullText,
-      combined.totalAmount,
-      exchangeRates
+    // Check for foreign currency indicators (must be explicit, not just any $)
+    // For Thai slips/invoices, default to THB
+    const hasThaiIndicator = /ธนาคาร|บาท|THB|สลิป|โอนเงิน|พร้อมเพย์|บจก\.|หจก\.|นาย|นาง|นางสาว/i.test(fullText);
+    const hasUsdIndicator = !hasThaiIndicator && (
+      /USD|US\s*DOLLAR|\$\s*\d/i.test(fullText) || 
+      extractedDataList.some(d => d.vendorAddress?.includes("United States"))
     );
     
-    // If currency conversion happened, update combined amount
-    if (currencyConversion.convertedAmount !== null && currencyConversion.currency !== "THB") {
-      combined.totalAmount = currencyConversion.convertedAmount;
-      // Also update VAT amount proportionally
-      if (combined.vatAmount > 0 && currencyConversion.exchangeRate) {
-        combined.vatAmount = combined.vatAmount * currencyConversion.exchangeRate;
+    // Only run currency conversion if there's a clear foreign currency indicator
+    if (hasUsdIndicator) {
+      currencyConversion = detectAndConvertAmount(
+        fullText,
+        combined.totalAmount,
+        exchangeRates
+      );
+      
+      // If currency conversion happened, update combined amount
+      if (currencyConversion.convertedAmount !== null && currencyConversion.currency !== "THB") {
+        combined.totalAmount = currencyConversion.convertedAmount;
+        // Also update VAT amount proportionally
+        if (combined.vatAmount > 0 && currencyConversion.exchangeRate) {
+          combined.vatAmount = combined.vatAmount * currencyConversion.exchangeRate;
+        }
       }
     }
   }
@@ -1019,9 +1130,90 @@ export async function analyzeAndClassifyMultiple(
       transactionType
     );
 
-    const suggested = buildSuggestedValues(pseudoData, matchResult.mapping);
+    // Debug: Log mapping details
+    if (matchResult.mapping) {
+      console.log("Mapping found:", {
+        id: matchResult.mapping.id,
+        vendorName: matchResult.mapping.vendorName,
+        contactId: matchResult.mapping.contactId,
+        contactName: matchResult.mapping.contact?.name,
+        confidence: matchResult.confidence,
+      });
+    } else {
+      console.log("No mapping found for vendor:", combined.vendorName);
+    }
 
-    // If no mapping found, use AI to suggest category from content
+    const suggested = buildSuggestedValues(pseudoData, matchResult.mapping);
+    
+    // Debug: Log suggested values
+    console.log("Suggested values after buildSuggestedValues:", {
+      contactId: suggested.contactId,
+      categoryId: suggested.categoryId,
+      vendorName: suggested.vendorName,
+    });
+
+    // Track found contact for returning contact info
+    let foundContact: { id: string; name: string } | null = null;
+
+    // If no contactId from mapping, try to find Contact by vendorTaxId
+    if (!suggested.contactId && combined.vendorTaxId) {
+      const contactByTaxId = await prisma.contact.findFirst({
+        where: {
+          companyId,
+          taxId: combined.vendorTaxId,
+        },
+        select: { id: true, name: true },
+      });
+      if (contactByTaxId) {
+        suggested.contactId = contactByTaxId.id;
+        foundContact = contactByTaxId;
+        console.log(`Found contact by taxId: ${contactByTaxId.name} (${combined.vendorTaxId})`);
+      }
+    }
+
+    // If still no contactId, try to find Contact by vendorName (fuzzy match)
+    if (!suggested.contactId && combined.vendorName) {
+      // First try exact contains match
+      let contactByName = await prisma.contact.findFirst({
+        where: {
+          companyId,
+          name: {
+            contains: combined.vendorName,
+            mode: "insensitive",
+          },
+        },
+        select: { id: true, name: true },
+      });
+
+      // If not found, try normalized name matching
+      if (!contactByName) {
+        const normalizedVendor = normalizeVendorName(combined.vendorName);
+        const allContacts = await prisma.contact.findMany({
+          where: { companyId },
+          select: { id: true, name: true },
+        });
+
+        // Find best match using normalized names
+        for (const contact of allContacts) {
+          const normalizedContact = normalizeVendorName(contact.name);
+          const similarity = calculateStringSimilarity(normalizedVendor, normalizedContact);
+          
+          if (similarity >= 0.7) {
+            contactByName = contact;
+            console.log(`Found contact by normalized name: ${contact.name} (similarity: ${Math.round(similarity * 100)}%)`);
+            break;
+          }
+        }
+      }
+
+      if (contactByName) {
+        suggested.contactId = contactByName.id;
+        foundContact = contactByName;
+        console.log(`Found contact by name: ${contactByName.name} (matched "${combined.vendorName}")`);
+      }
+    }
+
+    // Use AI to suggest category only when mapping doesn't have categoryId
     let aiCategorySuggestion: {
       categoryId: string | null;
       categoryName: string | null;
@@ -1029,7 +1221,8 @@ export async function analyzeAndClassifyMultiple(
       reason: string;
     } | null = null;
 
-    if (!matchResult.mapping) {
+    // Only run AI category suggestion if no category from mapping
+    if (!suggested.categoryId) {
       // Extract items from OCR for better category suggestion
       const items = extractedDataList.flatMap((d) => 
         (d.items || []).map((item) => typeof item === "string" ? item : item.description || "")
@@ -1046,9 +1239,11 @@ export async function analyzeAndClassifyMultiple(
         }
       );
 
-      // NOTE: Do NOT auto-apply AI category suggestion to suggested.categoryId
-      // User must explicitly click "ใช้หมวดหมู่นี้" button to apply
-      // Only vendor mappings should auto-apply categoryId
+      // Auto-apply AI category suggestion if confidence is high enough
+      if (aiCategorySuggestion?.categoryId && aiCategorySuggestion.confidence >= 70) {
+        suggested.categoryId = aiCategorySuggestion.categoryId;
+        console.log(`Auto-applied AI category: ${aiCategorySuggestion.categoryName} (${aiCategorySuggestion.confidence}%)`);
+      }
     }
 
     smartResult = {
@@ -1068,6 +1263,8 @@ export async function analyzeAndClassifyMultiple(
       matchConfidence: matchResult.confidence,
       matchReason: matchResult.reason,
       suggested,
+      // Include found contact info (from taxId/name lookup, not from mapping)
+      foundContact: foundContact || null,
       isNewVendor: !matchResult.mapping,
       suggestTraining:
         !matchResult.mapping &&

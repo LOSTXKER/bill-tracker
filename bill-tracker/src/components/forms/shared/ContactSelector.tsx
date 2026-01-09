@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Command,
   CommandEmpty,
@@ -17,7 +17,14 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ChevronsUpDown, Check, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { BookUser, Check, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreateContactDialog, Contact } from "./CreateContactDialog";
 import type { ContactSummary } from "@/types";
@@ -33,6 +40,9 @@ interface ContactSelectorProps {
   onContactCreated?: (contact: ContactSummary) => void;
   allowCreate?: boolean;
   required?: boolean;
+  // One-time contact name (typed manually, not saved)
+  contactName?: string;
+  onContactNameChange?: (name: string) => void;
 }
 
 export function ContactSelector({
@@ -41,24 +51,52 @@ export function ContactSelector({
   selectedContact,
   onSelect,
   label = "ผู้ติดต่อ",
-  placeholder = "เลือกผู้ติดต่อ...",
+  placeholder = "พิมพ์ชื่อหรือเลือกจากรายชื่อ...",
   companyCode,
   onContactCreated,
   allowCreate = true,
   required = false,
+  contactName = "",
+  onContactNameChange,
 }: ContactSelectorProps) {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Display value: selected contact name OR typed name
+  const displayValue = selectedContact?.name || contactName;
+  const hasValue = displayValue.trim() !== "";
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // When typing, clear selected contact and use typed name
+    if (selectedContact) {
+      onSelect(null);
+    }
+    onContactNameChange?.(value);
+  };
+
+  const handleSelectContact = (contact: ContactSummary | null) => {
+    onSelect(contact);
+    // Clear typed name when selecting a contact
+    onContactNameChange?.("");
+    setOpen(false);
+  };
+
+  const handleClear = () => {
+    onSelect(null);
+    onContactNameChange?.("");
+    inputRef.current?.focus();
+  };
 
   const handleContactCreated = (contact: Contact) => {
-    // Select the newly created contact
     const contactSummary: ContactSummary = {
       id: contact.id,
       name: contact.name,
       taxId: contact.taxId || undefined,
     };
-
     onSelect(contactSummary);
+    onContactNameChange?.("");
     onContactCreated?.(contactSummary);
     setOpen(false);
   };
@@ -67,93 +105,133 @@ export function ContactSelector({
     <div className="space-y-2">
       {label && (
         <Label className="text-foreground font-medium">
-          {label} {required && <span className="text-red-500">*</span>}
+          {label} {required && !hasValue && <span className="text-red-500">*</span>}
         </Label>
       )}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full h-11 justify-between bg-muted/30 border-border hover:bg-background"
-          >
-            {selectedContact ? selectedContact.name : placeholder}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
-          <Command>
-            <CommandInput placeholder="ค้นหาผู้ติดต่อ..." />
-            <CommandList>
-              <CommandEmpty>
-                {isLoading ? "กำลังโหลด..." : "ไม่พบผู้ติดต่อ"}
-              </CommandEmpty>
-              
-              {/* Create new contact option - at top */}
-              {allowCreate && companyCode && (
-                <>
-                  <CommandGroup>
-                    <CommandItem
-                      onSelect={() => {
-                        setShowCreateDialog(true);
-                      }}
-                      className="text-primary font-medium"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>สร้างผู้ติดต่อใหม่...</span>
-                    </CommandItem>
-                  </CommandGroup>
-                  <CommandSeparator />
-                </>
-              )}
-              
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => {
-                    onSelect(null);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      !selectedContact ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  ไม่ระบุผู้ติดต่อ
-                </CommandItem>
-                {contacts.map((contact) => (
-                  <CommandItem
-                    key={contact.id}
-                    onSelect={() => {
-                      onSelect(contact);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedContact?.id === contact.id ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <div className="flex flex-col">
-                      <span>{contact.name}</span>
-                      {contact.taxId && (
-                        <span className="text-xs text-muted-foreground">
-                          {contact.taxId}
-                        </span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
 
-      {/* Create Contact Dialog - uses shared component */}
+      <div className="relative flex gap-1">
+        {/* Text Input */}
+        <div className="relative flex-1">
+          <Input
+            ref={inputRef}
+            value={displayValue}
+            onChange={handleInputChange}
+            placeholder={placeholder}
+            className={cn(
+              "h-11 pr-8 bg-muted/30 border-border",
+              selectedContact && "text-foreground"
+            )}
+          />
+          {/* Clear button */}
+          {hasValue && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-sm"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          {/* Indicator when using saved contact */}
+          {selectedContact && (
+            <div className="absolute left-2 top-1/2 -translate-y-1/2">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+            </div>
+          )}
+        </div>
+
+        {/* Contacts Book Button */}
+        <Popover open={open} onOpenChange={setOpen}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 shrink-0 bg-muted/30 border-border hover:bg-background"
+                  >
+                    <BookUser className="h-5 w-5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>เลือกจากรายชื่อที่บันทึกไว้</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <PopoverContent className="w-72 p-0" align="end">
+            <Command>
+              <CommandInput placeholder="ค้นหาผู้ติดต่อ..." />
+              <CommandList>
+                <CommandEmpty>
+                  {isLoading ? "กำลังโหลด..." : "ไม่พบผู้ติดต่อ"}
+                </CommandEmpty>
+
+                {/* Create new contact option */}
+                {allowCreate && companyCode && (
+                  <>
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => {
+                          setShowCreateDialog(true);
+                          setOpen(false);
+                        }}
+                        className="text-primary font-medium"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        <span>สร้างผู้ติดต่อใหม่...</span>
+                      </CommandItem>
+                    </CommandGroup>
+                    <CommandSeparator />
+                  </>
+                )}
+
+                <CommandGroup heading="รายชื่อที่บันทึกไว้">
+                  {contacts.length === 0 && !isLoading && (
+                    <div className="py-6 text-center text-sm text-muted-foreground">
+                      ยังไม่มีผู้ติดต่อ
+                    </div>
+                  )}
+                  {contacts.map((contact) => (
+                    <CommandItem
+                      key={contact.id}
+                      onSelect={() => handleSelectContact(contact)}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedContact?.id === contact.id ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <div className="flex flex-col">
+                        <span>{contact.name}</span>
+                        {contact.taxId && (
+                          <span className="text-xs text-muted-foreground">
+                            {contact.taxId}
+                          </span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Helper text */}
+      {selectedContact && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+          ผู้ติดต่อที่บันทึกไว้
+        </p>
+      )}
+
+      {/* Create Contact Dialog */}
       {companyCode && (
         <CreateContactDialog
           open={showCreateDialog}

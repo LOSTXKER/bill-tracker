@@ -108,6 +108,11 @@ export interface MultiDocAnalysisResult {
     };
     isNewVendor: boolean;
     suggestTraining: boolean;
+    // Contact found by taxId/name lookup (not from mapping)
+    foundContact?: {
+      id: string;
+      name: string;
+    } | null;
   } | null;
   fileAssignments: Record<string, DocumentCategory>;
 }

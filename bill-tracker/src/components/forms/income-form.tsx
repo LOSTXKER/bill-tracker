@@ -41,7 +41,7 @@ export function IncomeForm({ companyCode }: IncomeFormProps) {
       vatRate: 0,
       isWhtDeducted: false,
       paymentMethod: "BANK_TRANSFER",
-      status: "PENDING_COPY_SEND",
+      status: "", // ว่างไว้ให้ผู้ใช้เลือกเอง
       receiveDate: new Date(),
       invoiceNumber: "",
       referenceNo: "",
