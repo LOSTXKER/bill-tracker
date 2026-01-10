@@ -111,37 +111,37 @@ export async function ExpenseCategoryChartData({ companyCode }: { companyCode: s
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const expenseByCategory = await prisma.expense.groupBy({
-    by: ["categoryId"],
+  const expenseByAccount = await prisma.expense.groupBy({
+    by: ["accountId"],
     where: {
       companyId: company.id,
       billDate: { gte: startOfMonth, lte: endOfMonth },
-      categoryId: { not: null },
+      accountId: { not: null },
       deletedAt: null,
     },
     _sum: { netPaid: true },
   });
 
-  // Fetch category names
-  const categoryIds = expenseByCategory.map((item) => item.categoryId).filter(Boolean) as string[];
-  const categories = await prisma.category.findMany({
-    where: { id: { in: categoryIds } },
-    select: { id: true, name: true },
+  // Fetch account names
+  const accountIds = expenseByAccount.map((item) => item.accountId).filter(Boolean) as string[];
+  const accounts = await prisma.account.findMany({
+    where: { id: { in: accountIds } },
+    select: { id: true, code: true, name: true },
   });
 
-  const categoryMap = new Map(categories.map((cat) => [cat.id, cat.name]));
+  const accountMap = new Map(accounts.map((acc) => [acc.id, `${acc.code} ${acc.name}`]));
 
   let total = 0;
-  for (const item of expenseByCategory) {
+  for (const item of expenseByAccount) {
     total += Number(item._sum.netPaid || 0);
   }
 
-  const chartData = expenseByCategory
-    .filter((item) => item.categoryId)
+  const chartData = expenseByAccount
+    .filter((item) => item.accountId)
     .map((item) => {
       const value = Number(item._sum.netPaid) || 0;
       return {
-        name: categoryMap.get(item.categoryId!) || "ไม่ระบุ",
+        name: accountMap.get(item.accountId!) || "ไม่ระบุ",
         value,
         percentage: total > 0 ? (value / total) * 100 : 0,
       };

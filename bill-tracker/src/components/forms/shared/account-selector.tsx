@@ -1,0 +1,315 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Check, ChevronsUpDown, Sparkles, Search, Plus, Lightbulb } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
+
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  class: string;
+  keywords?: string[];
+  isSystem: boolean;
+}
+
+export interface SuggestNewAccount {
+  code: string;
+  name: string;
+  class: string;
+  description: string;
+  keywords: string[];
+  reason: string;
+}
+
+interface AccountSelectorProps {
+  value?: string | null;
+  onValueChange: (value: string | null) => void;
+  companyCode: string;
+  className?: string;
+  placeholder?: string;
+  suggestedAccountId?: string; // From AI - existing account
+  suggestNewAccount?: SuggestNewAccount; // From AI - suggest creating new
+  disabled?: boolean;
+  label?: string;
+}
+
+const ACCOUNT_CLASS_LABELS: Record<string, string> = {
+  ASSET: "สินทรัพย์",
+  LIABILITY: "หนี้สิน",
+  EQUITY: "ส่วนของเจ้าของ",
+  REVENUE: "รายได้",
+  COST_OF_SALES: "ต้นทุนขาย",
+  EXPENSE: "ค่าใช้จ่าย",
+  OTHER_INCOME: "รายได้อื่น",
+  OTHER_EXPENSE: "ค่าใช้จ่ายอื่น",
+};
+
+export function AccountSelector({
+  value,
+  onValueChange,
+  companyCode,
+  className,
+  placeholder = "เลือกบัญชี...",
+  suggestedAccountId,
+  suggestNewAccount,
+  disabled = false,
+  label,
+}: AccountSelectorProps) {
+  const [open, setOpen] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  // Fetch accounts
+  const fetchAccounts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/${companyCode.toLowerCase()}/accounts?activeOnly=true`);
+      if (res.ok) {
+        const json = await res.json();
+        // Handle both old format (array) and new format ({ success, data: { accounts } })
+        const accountsData = json.success ? (json.data?.accounts || []) : (Array.isArray(json) ? json : []);
+        setAccounts(accountsData);
+      }
+    } catch (error) {
+      console.error("Failed to fetch accounts:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyCode]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  // Handle new account created
+  const handleAccountCreated = useCallback((newAccount: Account) => {
+    setAccounts((prev) => [...prev, newAccount].sort((a, b) => a.code.localeCompare(b.code)));
+    onValueChange(newAccount.id);
+    setOpen(false);
+  }, [onValueChange]);
+
+  // Group accounts by class
+  const groupedAccounts = accounts.reduce((acc, account) => {
+    const classLabel = ACCOUNT_CLASS_LABELS[account.class] || account.class;
+    if (!acc[classLabel]) {
+      acc[classLabel] = [];
+    }
+    acc[classLabel].push(account);
+    return acc;
+  }, {} as Record<string, Account[]>);
+
+  // Filter accounts based on search
+  const filteredGroups = Object.entries(groupedAccounts).reduce((acc, [classLabel, accs]) => {
+    const filtered = accs.filter(
+      (account) =>
+        account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        account.code.includes(searchQuery) ||
+        (account.keywords || []).some((keyword) =>
+          keyword.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    );
+    if (filtered.length > 0) {
+      acc[classLabel] = filtered;
+    }
+    return acc;
+  }, {} as Record<string, Account[]>);
+
+  const selectedAccount = accounts.find((a) => a.id === value);
+  const suggestedAccount = accounts.find((a) => a.id === suggestedAccountId);
+
+  return (
+    <div className="space-y-2">
+      {label && (
+        <label className="text-sm font-medium text-foreground">{label}</label>
+      )}
+      
+      {/* AI Suggest New Account Banner */}
+      {suggestNewAccount && !value && !suggestedAccountId && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-900 dark:text-amber-100">
+                AI แนะนำสร้างบัญชีใหม่
+              </p>
+              <p className="text-amber-700 dark:text-amber-300 mt-1">
+                <span className="font-mono">{suggestNewAccount.code}</span> - {suggestNewAccount.name}
+              </p>
+              <p className="text-amber-600 dark:text-amber-400 text-xs mt-1">
+                {suggestNewAccount.reason}
+              </p>
+              <CreateAccountDialog
+                companyCode={companyCode}
+                onAccountCreated={handleAccountCreated}
+                aiSuggestion={suggestNewAccount}
+                trigger={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 gap-1 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900"
+                  >
+                    <Plus className="h-3 w-3" />
+                    สร้างบัญชีนี้
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn("w-full justify-between", className)}
+            disabled={disabled || loading}
+          >
+            <div className="flex items-center gap-2 flex-1 truncate">
+              {selectedAccount ? (
+                <>
+                  <span className="font-mono text-xs">{selectedAccount.code}</span>
+                  <span className="truncate">{selectedAccount.name}</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">{placeholder}</span>
+              )}
+            </div>
+            {suggestedAccountId && !value && (
+              <Badge variant="secondary" className="ml-2 gap-1">
+                <Sparkles className="h-3 w-3" />
+                AI
+              </Badge>
+            )}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px] p-0" align="start">
+          <Command>
+            <div className="flex items-center border-b px-3">
+              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <input
+                placeholder="ค้นหาด้วยรหัส ชื่อ หรือคีย์เวิร์ด..."
+                className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <CommandList>
+              <CommandEmpty>
+                <div className="py-4 text-center">
+                  <p className="text-muted-foreground mb-2">ไม่พบบัญชีที่ตรงกัน</p>
+                  <CreateAccountDialog
+                    companyCode={companyCode}
+                    onAccountCreated={handleAccountCreated}
+                    trigger={
+                      <Button type="button" variant="outline" size="sm" className="gap-1">
+                        <Plus className="h-3 w-3" />
+                        สร้างบัญชีใหม่
+                      </Button>
+                    }
+                  />
+                </div>
+              </CommandEmpty>
+              
+              {/* AI Suggestion (if available and no selection) */}
+              {suggestedAccount && !value && (
+                <CommandGroup heading="✨ AI แนะนำ">
+                  <CommandItem
+                    key={suggestedAccount.id}
+                    value={`${suggestedAccount.code}-${suggestedAccount.name}`}
+                    onSelect={() => {
+                      onValueChange(suggestedAccount.id);
+                      setOpen(false);
+                    }}
+                    className="bg-primary/5 border-l-2 border-primary"
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="font-mono text-xs font-semibold">
+                        {suggestedAccount.code}
+                      </span>
+                      <span className="flex-1">{suggestedAccount.name}</span>
+                      <Badge variant="secondary" className="gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        แนะนำ
+                      </Badge>
+                    </div>
+                    {value === suggestedAccount.id && (
+                      <Check className="ml-2 h-4 w-4" />
+                    )}
+                  </CommandItem>
+                </CommandGroup>
+              )}
+
+              {/* Grouped Accounts */}
+              {Object.entries(filteredGroups).map(([classLabel, accs]) => (
+                <CommandGroup key={classLabel} heading={classLabel}>
+                  {accs.map((account) => (
+                    <CommandItem
+                      key={account.id}
+                      value={`${account.code}-${account.name}`}
+                      onSelect={() => {
+                        onValueChange(account.id === value ? null : account.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="font-mono text-xs text-muted-foreground w-16">
+                          {account.code}
+                        </span>
+                        <span className="flex-1">{account.name}</span>
+                      </div>
+                      {value === account.id && (
+                        <Check className="ml-2 h-4 w-4 text-primary" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
+
+              {/* Create New Account Button */}
+              <div className="p-2 border-t">
+                <CreateAccountDialog
+                  companyCode={companyCode}
+                  onAccountCreated={handleAccountCreated}
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full gap-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <Plus className="h-4 w-4" />
+                      สร้างบัญชีใหม่
+                    </Button>
+                  }
+                />
+              </div>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}

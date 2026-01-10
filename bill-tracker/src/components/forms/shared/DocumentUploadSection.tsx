@@ -105,6 +105,7 @@ export interface MultiDocAnalysisResult {
       paymentMethod: string | null;
       description: string | null;
       categoryId: string | null;
+      accountId: string | null;
     };
     isNewVendor: boolean;
     suggestTraining: boolean;
@@ -113,11 +114,28 @@ export interface MultiDocAnalysisResult {
       id: string;
       name: string;
     } | null;
-    // AI category suggestion when no mapping found
+    // AI category suggestion when no mapping found (legacy)
     aiCategorySuggestion?: {
       categoryId: string | null;
       categoryName: string | null;
       confidence: number;
+      reason: string;
+    };
+    // AI account suggestion (Chart of Accounts)
+    aiAccountSuggestion?: {
+      accountId: string | null;
+      accountCode: string | null;
+      accountName: string | null;
+      confidence: number;
+      reason: string;
+    };
+    // Suggest creating a new account
+    suggestNewAccount?: {
+      code: string;
+      name: string;
+      class: string;
+      description: string;
+      keywords: string[];
       reason: string;
     };
   } | null;
@@ -157,6 +175,7 @@ interface DocumentUploadSectionProps {
   onFilesChange: (files: CategorizedFiles) => void;
   onAiResult?: (result: MultiDocAnalysisResult) => void;
   showWhtCert?: boolean;
+  initialFiles?: CategorizedFiles;
 }
 
 // =============================================================================
@@ -210,17 +229,24 @@ export function DocumentUploadSection({
   onFilesChange,
   onAiResult,
   showWhtCert = false,
+  initialFiles,
 }: DocumentUploadSectionProps) {
-  // State
-  const [files, setFiles] = useState<CategorizedFiles>({
-    invoice: [],
-    slip: [],
-    whtCert: [],
-    uncategorized: [],
+  // State - initialize with initialFiles if provided
+  const [files, setFiles] = useState<CategorizedFiles>(() => {
+    if (initialFiles) {
+      console.log("DocumentUploadSection initializing with files:", initialFiles);
+      return initialFiles;
+    }
+    return {
+      invoice: [],
+      slip: [],
+      whtCert: [],
+      uncategorized: [],
+    };
   });
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isAnalyzed, setIsAnalyzed] = useState(false);
+  const [isAnalyzed, setIsAnalyzed] = useState(!!initialFiles?.slip?.length || !!initialFiles?.invoice?.length);
   const [error, setError] = useState<string | null>(null);
 
   // Get all files as flat array (filter out null/undefined)

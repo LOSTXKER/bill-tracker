@@ -71,7 +71,7 @@ interface Reimbursement {
   netAmount: number;
   billDate: string;
   status: string;
-  categoryRef?: { name: string; color: string | null };
+  account?: { code: string; name: string };
   approver?: { name: string };
   payer?: { name: string };
   rejectedReason?: string;
@@ -103,7 +103,7 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   Expense: "รายจ่าย",
   Income: "รายรับ",
   Contact: "ผู้ติดต่อ",
-  Category: "หมวดหมู่",
+  Account: "บัญชี",
   ReimbursementRequest: "คำขอเบิกจ่าย",
 };
 
@@ -129,7 +129,7 @@ const FIELD_LABELS: Record<string, string> = {
   description: "รายละเอียด",
   billDate: "วันที่",
   status: "สถานะ",
-  categoryId: "หมวดหมู่",
+  accountId: "บัญชี",
   contactId: "ผู้ติดต่อ",
   notes: "หมายเหตุ",
   invoiceNumber: "เลขที่ใบกำกับ",
@@ -574,9 +574,9 @@ export default function EmployeeDetailPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             {getStatusBadge(item.status)}
-                            {item.categoryRef && (
+                            {item.account && (
                               <span className="text-sm text-muted-foreground">
-                                {item.categoryRef.name}
+                                {item.account.code} {item.account.name}
                               </span>
                             )}
                           </div>

@@ -165,7 +165,7 @@ async function handlePost(
       billDate: e.billDate,
       contact: e.contact,
       description: e.description,
-      category: e.category,
+      accountId: e.accountId,
       amount: Number(e.amount),
       vatRate: e.vatRate,
       vatAmount: e.vatAmount ? Number(e.vatAmount) : null,

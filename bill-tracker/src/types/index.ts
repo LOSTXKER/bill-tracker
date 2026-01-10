@@ -153,11 +153,16 @@ export interface CashFlowData {
   net: number;
 }
 
-// Contact and Category types for forms
+// Contact summary type for listings and forms
 export interface ContactSummary {
   id: string;
   name: string;
   taxId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  creditLimit?: number | null;
+  paymentTerms?: number | null;
 }
 
 export interface CategorySummary {

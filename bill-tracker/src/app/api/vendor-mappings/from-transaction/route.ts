@@ -2,7 +2,7 @@ import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { logCreate } from "@/lib/audit/logger";
 import { prisma } from "@/lib/db";
-import { createMappingFromTransaction } from "@/lib/ai/smart-ocr";
+import { createMapping } from "@/lib/ai/vendor-mapping";
 
 /**
  * POST /api/vendor-mappings/from-transaction
@@ -19,7 +19,7 @@ export const POST = withCompanyAccess(
       vendorName,
       vendorTaxId,
       namePattern,
-      categoryId,
+      accountId,
       defaultVatRate,
       paymentMethod,
       descriptionTemplate,
@@ -36,35 +36,35 @@ export const POST = withCompanyAccess(
     let contactId: string | null = null;
     let extractedVendorName: string | null = vendorName || null;
     let extractedTaxId: string | null = vendorTaxId || null;
-    let extractedCategoryId: string | null = categoryId || null;
+    let extractedAccountId: string | null = accountId || null;
     let extractedVatRate: number | null = defaultVatRate ?? null;
     let extractedPaymentMethod: string | null = paymentMethod || null;
 
     if (transactionType === "expense") {
       transaction = await prisma.expense.findFirst({
         where: { id: transactionId, companyId: company.id },
-        include: { contact: true, categoryRef: true },
+        include: { contact: true, account: true },
       });
 
       if (transaction) {
         contactId = transaction.contactId;
         extractedVendorName = vendorName || transaction.contact?.name || null;
         extractedTaxId = vendorTaxId || transaction.contact?.taxId || null;
-        extractedCategoryId = categoryId || transaction.categoryId;
+        extractedAccountId = accountId || transaction.accountId;
         extractedVatRate = defaultVatRate ?? transaction.vatRate;
         extractedPaymentMethod = paymentMethod || transaction.paymentMethod;
       }
     } else if (transactionType === "income") {
       transaction = await prisma.income.findFirst({
         where: { id: transactionId, companyId: company.id },
-        include: { contact: true, categoryRef: true },
+        include: { contact: true, account: true },
       });
 
       if (transaction) {
         contactId = transaction.contactId;
         extractedVendorName = vendorName || transaction.contact?.name || null;
         extractedTaxId = vendorTaxId || transaction.contact?.taxId || null;
-        extractedCategoryId = categoryId || transaction.categoryId;
+        extractedAccountId = accountId || transaction.accountId;
         extractedVatRate = defaultVatRate ?? transaction.vatRate;
         extractedPaymentMethod = paymentMethod || transaction.paymentMethod;
       }
@@ -84,7 +84,7 @@ export const POST = withCompanyAccess(
     }
 
     // Create the mapping
-    const mapping = await createMappingFromTransaction(
+    const mapping = await createMapping(
       company.id,
       transactionType.toUpperCase() as "EXPENSE" | "INCOME",
       {
@@ -92,10 +92,12 @@ export const POST = withCompanyAccess(
         vendorTaxId: extractedTaxId || undefined,
         namePattern: namePattern || undefined,
         contactId: contactId || undefined,
-        categoryId: extractedCategoryId || undefined,
+        accountId: extractedAccountId || undefined,
         defaultVatRate: extractedVatRate ?? undefined,
         paymentMethod: extractedPaymentMethod as any,
         descriptionTemplate: descriptionTemplate || undefined,
+        learnSource: "AUTO",
+        originalTxId: transactionId,
       }
     );
 
@@ -109,7 +111,7 @@ export const POST = withCompanyAccess(
         vendorTaxId: mapping.vendorTaxId,
         namePattern: mapping.namePattern,
         contactId: mapping.contactId,
-        categoryId: mapping.categoryId,
+        accountId: mapping.accountId,
         defaultVatRate: mapping.defaultVatRate,
         paymentMethod: mapping.paymentMethod,
         descriptionTemplate: mapping.descriptionTemplate,

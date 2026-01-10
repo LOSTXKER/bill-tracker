@@ -145,10 +145,10 @@ export function TransactionFilters({
             onValueChange={(value) => updateFilter("category", value === "__all__" ? "" : value)}
           >
             <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder="หมวดหมู่" />
+              <SelectValue placeholder="บัญชี" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">ทุกหมวดหมู่</SelectItem>
+              <SelectItem value="__all__">ทุกบัญชี</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.value} value={category.value}>
                   {category.label}

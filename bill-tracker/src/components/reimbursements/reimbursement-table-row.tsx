@@ -17,7 +17,7 @@ interface ReimbursementTableRowProps {
     netPaid: number | bigint | { toNumber?: () => number };
     reimbursementStatus: string;
     fraudScore: number | null;
-    categoryRef: { name: string } | null;
+    account: { code: string; name: string } | null;
     requester?: {
       id: string;
       name: string;
@@ -79,14 +79,14 @@ export function ReimbursementTableRow({
       {showRequester && (
         <TableCell onClick={(e) => e.stopPropagation()}>
           {reimbursement.requester ? (
-            <UserBadge user={reimbursement.requester} />
+            <span className="text-sm font-medium">{reimbursement.requester.name}</span>
           ) : (
             <span className="text-xs text-muted-foreground">-</span>
           )}
         </TableCell>
       )}
       <TableCell className="text-muted-foreground">
-        {reimbursement.categoryRef?.name || "-"}
+        {reimbursement.account ? `${reimbursement.account.code} ${reimbursement.account.name}` : "-"}
       </TableCell>
       <TableCell>
         {reimbursement.description ? (

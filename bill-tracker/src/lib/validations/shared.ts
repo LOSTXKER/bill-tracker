@@ -50,11 +50,11 @@ export const contactReferenceSchema = z.object({
 });
 
 /**
- * Category reference
- * REQUIRED: All transactions must have a category
+ * Account reference (Chart of Accounts)
+ * OPTIONAL: Transactions can have an account
  */
-export const categoryReferenceSchema = z.object({
-  categoryId: z.string().min(1, "กรุณาเลือกหมวดหมู่"),
+export const accountReferenceSchema = z.object({
+  accountId: z.string().optional(),
 });
 
 /**
@@ -73,7 +73,7 @@ export const baseTransactionSchema = z.object({
   companyId: z.string().min(1, "กรุณาเลือกบริษัท"),
   ...contactReferenceSchema.shape,
   ...financialFieldsSchema.shape,
-  ...categoryReferenceSchema.shape,
+  ...accountReferenceSchema.shape,
   ...documentFieldsSchema.shape,
   paymentMethod: paymentMethodSchema.default("BANK_TRANSFER"),
 });

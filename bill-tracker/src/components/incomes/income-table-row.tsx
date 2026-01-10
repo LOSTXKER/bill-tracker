@@ -21,7 +21,7 @@ interface IncomeTableRowProps {
     whtRate: number | null;
     status: string;
     contact: { name: string } | null;
-    categoryRef?: { id: string; name: string } | null;
+    account?: { id: string; code: string; name: string } | null;
     creator?: {
       id: string;
       name: string;
@@ -72,7 +72,7 @@ export function IncomeTableRow({
         </p>
       </TableCell>
       <TableCell className="text-muted-foreground">
-        {income.categoryRef?.name || "-"}
+        {income.account ? `${income.account.code} ${income.account.name}` : "-"}
       </TableCell>
       <TableCell>
         {income.source ? (

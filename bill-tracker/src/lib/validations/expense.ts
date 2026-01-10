@@ -66,7 +66,7 @@ export type ExpenseUpdateInput = z.infer<typeof expenseUpdateSchema>;
 
 /**
  * DEPRECATED: Category labels for old enum-based categories
- * Use Category model with categoryId instead
+ * Use Account model with accountId instead
  * Kept for backward compatibility only
  */
 export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {

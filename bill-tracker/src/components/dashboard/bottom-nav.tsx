@@ -103,8 +103,8 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
       permission: "contacts:read",
     },
     {
-      name: "หมวดหมู่",
-      href: `/${companyCode}/categories`,
+      name: "ผังบัญชี",
+      href: `/${companyCode}/accounts`,
       icon: Tags,
       permission: "settings:read",
     },

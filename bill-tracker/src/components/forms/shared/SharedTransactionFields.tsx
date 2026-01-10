@@ -11,11 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ContactSelector } from "./ContactSelector";
-import { HierarchicalCategorySelector as CategorySelector } from "./HierarchicalCategorySelector";
+import { AccountSelector } from "./account-selector";
 import { DatePicker } from "./DatePicker";
 import { PaymentMethodSelect } from "./PaymentMethodSelect";
 import { AmountInput } from "./AmountInput";
-import type { ContactSummary, CategorySummary } from "@/types";
+import type { ContactSummary } from "@/types";
 
 // =============================================================================
 // Types
@@ -53,12 +53,10 @@ export interface SharedTransactionFieldsProps {
   onContactCreated?: (contact: ContactSummary) => void;
   companyCode: string;
 
-  // Category
-  categories: CategorySummary[];
-  categoriesLoading: boolean;
-  selectedCategory: string | null;
-  onCategorySelect: (categoryId: string | null) => void;
-  onCategoryCreated?: (category: CategorySummary) => void;
+  // Account
+  selectedAccount: string | null;
+  onAccountSelect: (accountId: string | null) => void;
+  suggestedAccountId?: string;
 
   // Optional configs
   showDueDate?: boolean;
@@ -87,11 +85,9 @@ export function SharedTransactionFields({
   onContactSelect,
   onContactCreated,
   companyCode,
-  categories,
-  categoriesLoading,
-  selectedCategory,
-  onCategorySelect,
-  onCategoryCreated,
+  selectedAccount,
+  onAccountSelect,
+  suggestedAccountId,
   showDueDate = true,
   showInvoiceNumber = true,
   showReferenceNo = true,
@@ -188,27 +184,26 @@ export function SharedTransactionFields({
           </div>
         )}
 
-        {isEditable ? (
-          <CategorySelector
-            categories={categories}
-            isLoading={categoriesLoading}
-            selectedCategory={selectedCategory}
-            onSelect={onCategorySelect}
-            label="หมวดหมู่"
-            placeholder="เลือกหมวดหมู่"
-            companyCode={companyCode}
-            categoryType={transactionType.toUpperCase() as "EXPENSE" | "INCOME"}
-            onCategoryCreated={onCategoryCreated}
-            required
-          />
-        ) : (
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">หมวดหมู่</Label>
-            <p className="text-sm font-medium">
-              {categories.find((c) => c.id === selectedCategory)?.name || "-"}
-            </p>
-          </div>
-        )}
+        <div className="space-y-2">
+          {isEditable ? (
+            <>
+              <Label>บัญชี</Label>
+              <AccountSelector
+                value={selectedAccount}
+                onValueChange={onAccountSelect}
+                companyCode={companyCode}
+                suggestedAccountId={suggestedAccountId}
+              />
+            </>
+          ) : (
+            <>
+              <Label className="text-sm text-muted-foreground">บัญชี</Label>
+              <p className="text-sm font-medium">
+                {selectedAccount || "-"}
+              </p>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Row 3: Description */}

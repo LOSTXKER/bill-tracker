@@ -35,7 +35,7 @@ interface ExpenseWithFiles {
   status: string;
   invoiceNumber: string | null;
   description: string | null;
-  category: string | null;
+  accountId: string | null;
   slipUrls: any;
   taxInvoiceUrls: any;
   whtCertUrls: any;
@@ -150,7 +150,7 @@ export async function GET(
           vendorName: e.contact?.name,
           vendorTaxId: null,
           description: e.description,
-          category: e.category,
+          accountId: e.accountId,
           amount: Number(e.amount),
           vatRate: e.vatRate,
           vatAmount: e.vatAmount ? Number(e.vatAmount) : null,
@@ -191,7 +191,7 @@ export async function GET(
           vendorName: e.contact?.name,
           vendorTaxId: null,
           description: e.description,
-          category: e.category,
+          accountId: e.accountId,
           amount: Number(e.amount),
           vatRate: e.vatRate,
           vatAmount: e.vatAmount ? Number(e.vatAmount) : null,
@@ -227,7 +227,7 @@ export async function GET(
           vendorName: e.contact?.name,
           vendorTaxId: null,
           description: e.description,
-          category: e.category,
+          accountId: e.accountId,
           amount: Number(e.amount),
           vatRate: e.vatRate,
           vatAmount: e.vatAmount ? Number(e.vatAmount) : null,
@@ -263,7 +263,7 @@ export async function GET(
           vendorName: e.contact?.name,
           vendorTaxId: null,
           description: e.description,
-          category: e.category,
+          accountId: e.accountId,
           amount: Number(e.amount),
           vatRate: e.vatRate,
           vatAmount: e.vatAmount ? Number(e.vatAmount) : null,

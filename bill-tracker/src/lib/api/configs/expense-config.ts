@@ -41,7 +41,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       whtType: data.whtType || null,
       netPaid: netPaid,
       description: data.description,
-      categoryId: data.categoryId || null,
+      accountId: data.accountId || null,
       invoiceNumber: data.invoiceNumber,
       referenceNo: data.referenceNo,
       paymentMethod: data.paymentMethod,
@@ -71,7 +71,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.whtType !== undefined) updateData.whtType = data.whtType;
     if (netPaid !== undefined) updateData.netPaid = netPaid;
     if (data.description !== undefined) updateData.description = data.description;
-    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
+    if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;

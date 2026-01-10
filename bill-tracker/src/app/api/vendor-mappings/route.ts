@@ -2,11 +2,11 @@ import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit/logger";
 import {
-  getVendorMappings,
-  createMappingFromTransaction,
-  updateVendorMapping,
-  deleteVendorMapping,
-} from "@/lib/ai/smart-ocr";
+  getMappings,
+  createMapping,
+  updateMapping,
+  deleteMapping,
+} from "@/lib/ai/vendor-mapping";
 
 /**
  * GET /api/vendor-mappings?company=ABC&search=...&type=EXPENSE
@@ -20,7 +20,7 @@ export const GET = withCompanyAccess(
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    const { mappings, total } = await getVendorMappings(company.id, {
+    const { mappings, total } = await getMappings(company.id, {
       search,
       transactionType: transactionType || undefined,
       limit,
@@ -36,8 +36,8 @@ export const GET = withCompanyAccess(
         namePattern: m.namePattern,
         contactId: m.contactId,
         contactName: m.contact?.name,
-        categoryId: m.categoryId,
-        categoryName: m.category?.name,
+        accountId: m.accountId,
+        accountName: m.account?.name,
         defaultVatRate: m.defaultVatRate,
         paymentMethod: m.paymentMethod,
         descriptionTemplate: m.descriptionTemplate,
@@ -72,7 +72,7 @@ export const POST = withCompanyAccess(
       vendorTaxId,
       namePattern,
       contactId,
-      categoryId,
+      accountId,
       defaultVatRate,
       paymentMethod,
       descriptionTemplate,
@@ -93,7 +93,7 @@ export const POST = withCompanyAccess(
       );
     }
 
-    const mapping = await createMappingFromTransaction(
+    const mapping = await createMapping(
       company.id,
       transactionType as "EXPENSE" | "INCOME",
       {
@@ -101,7 +101,7 @@ export const POST = withCompanyAccess(
         vendorTaxId,
         namePattern,
         contactId,
-        categoryId,
+        accountId,
         defaultVatRate,
         paymentMethod,
         descriptionTemplate,
@@ -120,7 +120,7 @@ export const POST = withCompanyAccess(
         vendorTaxId: mapping.vendorTaxId,
         namePattern: mapping.namePattern,
         contactId: mapping.contactId,
-        categoryId: mapping.categoryId,
+        accountId: mapping.accountId,
         defaultVatRate: mapping.defaultVatRate,
         paymentMethod: mapping.paymentMethod,
         descriptionTemplate: mapping.descriptionTemplate,
@@ -152,7 +152,7 @@ export const PATCH = withCompanyAccess(
       vendorTaxId: body.vendorTaxId,
       namePattern: body.namePattern,
       contactId: body.contactId,
-      categoryId: body.categoryId,
+      accountId: body.accountId,
       defaultVatRate: body.defaultVatRate,
       paymentMethod: body.paymentMethod,
       descriptionTemplate: body.descriptionTemplate,
@@ -163,7 +163,7 @@ export const PATCH = withCompanyAccess(
       Object.entries(allowedFields).filter(([, v]) => v !== undefined)
     );
 
-    const updated = await updateVendorMapping(id, company.id, data);
+    const updated = await updateMapping(id, company.id, data);
 
     if (!updated) {
       return apiResponse.error(new Error("Mapping not found"));
@@ -180,7 +180,7 @@ export const PATCH = withCompanyAccess(
         vendorTaxId: updated.vendorTaxId,
         namePattern: updated.namePattern,
         contactId: updated.contactId,
-        categoryId: updated.categoryId,
+        accountId: updated.accountId,
         defaultVatRate: updated.defaultVatRate,
         paymentMethod: updated.paymentMethod,
         descriptionTemplate: updated.descriptionTemplate,
@@ -203,7 +203,7 @@ export const DELETE = withCompanyAccess(
       return apiResponse.error(new Error("Mapping ID is required"));
     }
 
-    const deleted = await deleteVendorMapping(id, company.id);
+    const deleted = await deleteMapping(id, company.id);
 
     if (!deleted) {
       return apiResponse.error(new Error("Mapping not found"));

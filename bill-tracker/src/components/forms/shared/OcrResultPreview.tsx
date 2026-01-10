@@ -104,7 +104,6 @@ export function OcrResultPreview({
           {smart.mapping.contactName && (
             <p className="text-xs text-muted-foreground mt-1 ml-6">
               ผู้ติดต่อ: {smart.mapping.contactName}
-              {smart.mapping.categoryName && ` • หมวดหมู่: ${smart.mapping.categoryName}`}
             </p>
           )}
         </div>

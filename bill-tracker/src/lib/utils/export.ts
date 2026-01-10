@@ -6,7 +6,7 @@ export function exportToCSV(data: any[], filename: string, type: "expense" | "in
   // Define headers based on type
   const headers =
     type === "expense"
-      ? ["วันที่", "ผู้ขาย", "รายละเอียด", "หมวดหมู่", "จำนวนเงิน", "สถานะ", "ผู้สร้าง"]
+      ? ["วันที่", "ผู้ขาย", "รายละเอียด", "บัญชี", "จำนวนเงิน", "สถานะ", "ผู้สร้าง"]
       : ["วันที่", "ลูกค้า", "แหล่งที่มา", "จำนวนเงิน", "WHT", "สถานะ", "ผู้สร้าง"];
 
   // Map data to CSV rows

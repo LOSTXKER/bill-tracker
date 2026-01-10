@@ -109,8 +109,12 @@ export function DataExportPage({
   const [isLoadingBackupStats, setIsLoadingBackupStats] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
+  const [isDownloadingPEAK, setIsDownloadingPEAK] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
+  const [peakError, setPeakError] = useState<string | null>(null);
+  const [peakStats, setPeakStats] = useState<any | null>(null);
+  const [isLoadingPeakStats, setIsLoadingPeakStats] = useState(false);
 
   // Generate year options (current year and 2 years back)
   const yearOptions = Array.from(
@@ -141,6 +145,31 @@ export function DataExportPage({
     };
 
     fetchStats();
+  }, [companyCode, selectedMonth, selectedYear]);
+
+  // Fetch PEAK stats when month/year changes
+  useEffect(() => {
+    const fetchPeakStats = async () => {
+      setIsLoadingPeakStats(true);
+      setPeakError(null);
+      try {
+        const res = await fetch(
+          `/api/${companyCode}/export-peak?month=${selectedMonth}&year=${selectedYear}&preview=true`
+        );
+        if (!res.ok) {
+          throw new Error("ไม่สามารถโหลดข้อมูลได้");
+        }
+        const data = await res.json();
+        setPeakStats(data);
+      } catch (err) {
+        setPeakError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+        setPeakStats(null);
+      } finally {
+        setIsLoadingPeakStats(false);
+      }
+    };
+
+    fetchPeakStats();
   }, [companyCode, selectedMonth, selectedYear]);
 
   // Fetch backup stats on mount (only for owners)
@@ -242,6 +271,48 @@ export function DataExportPage({
       setBackupError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
       setIsDownloadingBackup(false);
+    }
+  };
+
+  // Handle PEAK export download
+  const handleDownloadPEAK = async () => {
+    setIsDownloadingPEAK(true);
+    setPeakError(null);
+    try {
+      const res = await fetch(`/api/${companyCode}/export-peak`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          month: selectedMonth,
+          year: selectedYear,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "ไม่สามารถสร้างไฟล์ได้");
+      }
+
+      // Get the blob and download
+      const blob = await res.blob();
+      const monthStr = String(selectedMonth).padStart(2, "0");
+      const filename = `PEAK_${companyCode}_${selectedYear}${monthStr}.xlsx`;
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setPeakError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setIsDownloadingPEAK(false);
     }
   };
 
@@ -468,6 +539,141 @@ export function DataExportPage({
         </CardContent>
       </Card>
 
+      {/* PEAK Export Section */}
+      <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 flex items-center justify-center">
+                <FileSpreadsheet className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">ส่งออกสำหรับ PEAK</CardTitle>
+                <CardDescription>
+                  Excel ที่พร้อม Import เข้าโปรแกรม PEAK Accounting
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="outline" className="border-blue-500 text-blue-600">
+              PEAK Format
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingPeakStats ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground text-sm">
+                กำลังโหลด...
+              </span>
+            </div>
+          ) : peakError ? (
+            <div className="rounded-lg bg-destructive/10 p-4 text-destructive text-sm">
+              {peakError}
+            </div>
+          ) : peakStats ? (
+            <>
+              {/* Stats Cards */}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <FileCheck className="h-4 w-4" />
+                    รายจ่ายทั้งหมด
+                  </div>
+                  <p className="text-2xl font-bold mt-1">{peakStats.total}</p>
+                </div>
+
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="flex items-center gap-2 text-primary text-sm">
+                    <CheckCircle2 className="h-4 w-4" />
+                    มีรหัสบัญชีแล้ว
+                  </div>
+                  <p className="text-2xl font-bold mt-1">
+                    {peakStats.withAccount}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="flex items-center gap-2 text-amber-600 text-sm">
+                    <Info className="h-4 w-4" />
+                    ยังไม่มีรหัสบัญชี
+                  </div>
+                  <p className="text-2xl font-bold mt-1">
+                    {peakStats.withoutAccount}
+                  </p>
+                </div>
+              </div>
+
+              {/* Info Box */}
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 space-y-2">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  📋 รูปแบบไฟล์ PEAK
+                </p>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 pl-4">
+                  <li>• รวมรหัสบัญชี, เลขประจำตัวผู้เสียภาษี, เลขสาขา</li>
+                  <li>• คำนวณ ภ.ง.ด. อัตโนมัติ (3 หรือ 53)</li>
+                  <li>• รองรับภาษีซื้อและหัก ณ ที่จ่าย</li>
+                  <li>• พร้อม Import เข้า PEAK ได้ทันที</li>
+                </ul>
+              </div>
+
+              {/* Warnings */}
+              {peakStats.warnings && peakStats.warnings.length > 0 && (
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                  {peakStats.warnings.map((warning: string, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400"
+                    >
+                      <Info className="h-4 w-4" />
+                      {warning}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Download Button */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {THAI_MONTHS[selectedMonth - 1]} {selectedYear}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {peakStats.total} รายการ • {peakStats.withWHT} รายการมีหัก ณ ที่จ่าย
+                  </p>
+                </div>
+                <Button
+                  onClick={handleDownloadPEAK}
+                  disabled={isDownloadingPEAK || peakStats.total === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isDownloadingPEAK ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      กำลังสร้างไฟล์...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      ดาวน์โหลด Excel
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {peakStats.total === 0 && (
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                  <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                    <Info className="h-4 w-4" />
+                    ไม่มีข้อมูลในเดือนที่เลือก
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
+
       {/* Data Export Section */}
       <Card>
         <CardHeader>
@@ -586,7 +792,7 @@ export function DataExportPage({
                     <p className="text-xl font-bold mt-1">
                       {backupStats.stats.categories}
                     </p>
-                    <p className="text-xs text-muted-foreground">หมวดหมู่</p>
+                    <p className="text-xs text-muted-foreground">บัญชี</p>
                   </div>
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <Users className="h-4 w-4 mx-auto text-muted-foreground" />
@@ -614,7 +820,7 @@ export function DataExportPage({
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                      <span>ผู้ติดต่อ และหมวดหมู่</span>
+                      <span>ผู้ติดต่อ และบัญชี</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-primary" />

@@ -76,7 +76,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const where: any = {
         companyId: company.id,
         ...(status && { [config.fields.statusField]: status as any }),
-        ...(category && { categoryId: category }),
+        ...(category && { accountId: category }),
         ...(contact && { contactId: contact }),
         // Soft delete filter - exclude deleted items unless explicitly requested
         ...(!includeDeleted && { deletedAt: null }),
@@ -118,7 +118,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
           where,
           include: {
             contact: true,
-            categoryRef: true,
+            account: true,
             creator: {
               select: { id: true, name: true, email: true },
             },
@@ -160,7 +160,7 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
           companyId: company.id,
           createdBy: session.user.id,
         },
-        include: { contact: true, categoryRef: true },
+        include: { contact: true, account: true },
       });
 
       // Create audit log
@@ -204,7 +204,7 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
       where: { id },
       include: {
         contact: true,
-        categoryRef: true,
+        account: true,
         company: true,
         creator: {
           select: { id: true, name: true, email: true },
@@ -271,7 +271,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       data: updateData,
       include: {
         contact: true,
-        categoryRef: true,
+        account: true,
         company: true,
         creator: {
           select: { id: true, name: true, email: true },

@@ -586,7 +586,7 @@ async function MonthlySummary({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
-  const [expenseSum, incomeSum, expenseByCategory] = await Promise.all([
+  const [expenseSum, incomeSum, expenseByAccount, accounts] = await Promise.all([
     prisma.expense.aggregate({
       where: {
         companyId: company.id,
@@ -606,7 +606,7 @@ async function MonthlySummary({
       _count: true,
     }),
     prisma.expense.groupBy({
-      by: ["category"],
+      by: ["accountId"],
       where: {
         companyId: company.id,
         billDate: { gte: startDate, lte: endDate },
@@ -615,22 +615,24 @@ async function MonthlySummary({
       _sum: { netPaid: true },
       _count: true,
     }),
+    prisma.account.findMany({
+      where: { companyId: company.id },
+      select: { id: true, code: true, name: true },
+    }),
   ]);
+  
+  // Create account lookup map
+  const accountMap = new Map(accounts.map(a => [a.id, a]));
 
   const totalExpense = Number(expenseSum._sum.netPaid) || 0;
   const totalIncome = Number(incomeSum._sum.netReceived) || 0;
   const netCashFlow = totalIncome - totalExpense;
 
-  const categoryLabels: Record<string, string> = {
-    MATERIAL: "วัตถุดิบ",
-    UTILITY: "สาธารณูปโภค",
-    MARKETING: "การตลาด",
-    SALARY: "เงินเดือน",
-    FREELANCE: "ค่าจ้างฟรีแลนซ์",
-    TRANSPORT: "ค่าขนส่ง",
-    RENT: "ค่าเช่า",
-    OFFICE: "สำนักงาน",
-    OTHER: "อื่นๆ",
+  // Helper function to get account name
+  const getAccountName = (accountId: string | null) => {
+    if (!accountId) return "ไม่ระบุบัญชี";
+    const account = accountMap.get(accountId);
+    return account ? `${account.code} - ${account.name}` : "ไม่ระบุบัญชี";
   };
 
   return (
@@ -701,28 +703,28 @@ async function MonthlySummary({
         </Button>
       </div>
 
-      {/* Expense by Category */}
+      {/* Expense by Account */}
       <Card>
         <CardHeader>
-          <CardTitle>รายจ่ายแยกตามหมวดหมู่</CardTitle>
+          <CardTitle>รายจ่ายแยกตามบัญชี</CardTitle>
         </CardHeader>
         <CardContent>
-          {expenseByCategory.length === 0 ? (
+          {expenseByAccount.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการในเดือนนี้
             </p>
           ) : (
             <div className="space-y-4">
-              {expenseByCategory
-                .sort((a: typeof expenseByCategory[number], b: typeof expenseByCategory[number]) => (Number(b._sum.netPaid) || 0) - (Number(a._sum.netPaid) || 0))
-                .map((item: typeof expenseByCategory[number]) => {
-                  const amount = Number(item._sum.netPaid) || 0;
+              {expenseByAccount
+                .sort((a, b) => (Number(b._sum?.netPaid) || 0) - (Number(a._sum?.netPaid) || 0))
+                .map((item) => {
+                  const amount = Number(item._sum?.netPaid) || 0;
                   const percentage = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
                   return (
-                    <div key={item.category || "null"} className="space-y-2">
+                    <div key={item.accountId || "null"} className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">
-                          {item.category ? categoryLabels[item.category] || item.category : "ไม่ระบุ"}
+                          {getAccountName(item.accountId)}
                         </span>
                         <span>{formatCurrency(amount)}</span>
                       </div>

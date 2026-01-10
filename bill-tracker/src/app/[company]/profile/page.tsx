@@ -52,7 +52,7 @@ interface Reimbursement {
   netAmount: number;
   billDate: string;
   status: string;
-  categoryRef?: { name: string; color: string | null };
+  account?: { code: string; name: string };
   approver?: { name: string };
   payer?: { name: string };
   rejectedReason?: string;
@@ -385,9 +385,9 @@ export default function MyProfilePage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             {getStatusBadge(item.status)}
-                            {item.categoryRef && (
+                            {item.account && (
                               <span className="text-sm text-muted-foreground">
-                                {item.categoryRef.name}
+                                {item.account.code} {item.account.name}
                               </span>
                             )}
                           </div>

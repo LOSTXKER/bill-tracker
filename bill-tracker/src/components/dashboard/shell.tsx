@@ -104,8 +104,8 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       permission: "settings:manage-team",
     },
     {
-      name: "หมวดหมู่",
-      href: `/${companyCode}/categories`,
+      name: "ผังบัญชี",
+      href: `/${companyCode}/accounts`,
       icon: Tags,
       permission: "settings:read",
     },

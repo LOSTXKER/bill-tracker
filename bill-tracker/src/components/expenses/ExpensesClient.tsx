@@ -27,7 +27,7 @@ const expenseListConfig: TransactionListConfig = {
     { key: "billDate", label: "วันที่", sortable: true },
     { key: "status", label: "สถานะ", align: "center" },
     { key: "contact", label: "ผู้ติดต่อ", sortable: true },
-    { key: "category", label: "หมวดหมู่" },
+    { key: "category", label: "บัญชี" },
     { key: "description", label: "รายละเอียด" },
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },

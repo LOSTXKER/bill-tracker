@@ -19,7 +19,7 @@ async function handleGet(
     expenseCount,
     incomeCount,
     contactCount,
-    categoryCount,
+    accountCount,
     userCount,
   ] = await Promise.all([
     prisma.expense.count({
@@ -31,7 +31,7 @@ async function handleGet(
     prisma.contact.count({
       where: { companyId: context.company.id },
     }),
-    prisma.category.count({
+    prisma.account.count({
       where: { companyId: context.company.id },
     }),
     prisma.companyAccess.count({
@@ -46,7 +46,7 @@ async function handleGet(
       expenses: expenseCount,
       incomes: incomeCount,
       contacts: contactCount,
-      categories: categoryCount,
+      accounts: accountCount,
       users: userCount,
     },
     estimatedSize: `~${Math.ceil((expenseCount + incomeCount) * 2)} KB`,
@@ -66,7 +66,7 @@ async function handlePost(
       expenses,
       incomes,
       contacts,
-      categories,
+      accounts,
       companyAccess,
       vendorMappings,
       auditLogs,
@@ -95,7 +95,7 @@ async function handlePost(
         where: { companyId: context.company.id, deletedAt: null },
         include: {
           contact: { select: { id: true, name: true, taxId: true } },
-          categoryRef: { select: { id: true, name: true } },
+          account: { select: { id: true, code: true, name: true } },
           creator: { select: { id: true, name: true, email: true } },
         },
         orderBy: { billDate: "desc" },
@@ -106,7 +106,7 @@ async function handlePost(
         where: { companyId: context.company.id, deletedAt: null },
         include: {
           contact: { select: { id: true, name: true, taxId: true } },
-          categoryRef: { select: { id: true, name: true } },
+          account: { select: { id: true, code: true, name: true } },
           creator: { select: { id: true, name: true, email: true } },
         },
         orderBy: { receiveDate: "desc" },
@@ -118,10 +118,10 @@ async function handlePost(
         orderBy: { name: "asc" },
       }),
 
-      // All categories
-      prisma.category.findMany({
+      // All accounts
+      prisma.account.findMany({
         where: { companyId: context.company.id },
-        orderBy: [{ type: "asc" }, { order: "asc" }],
+        orderBy: { code: "asc" },
       }),
 
       // Company access (users)
@@ -180,7 +180,7 @@ async function handlePost(
           ...c,
           creditLimit: c.creditLimit ? Number(c.creditLimit) : null,
         })),
-        categories,
+        accounts,
         users: companyAccess.map((ca) => ({
           userId: ca.user.id,
           name: ca.user.name,
@@ -199,7 +199,7 @@ async function handlePost(
         expenses: expenses.length,
         incomes: incomes.length,
         contacts: contacts.length,
-        categories: categories.length,
+        accounts: accounts.length,
         users: companyAccess.length,
         vendorMappings: vendorMappings.length,
         auditLogs: auditLogs.length,

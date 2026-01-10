@@ -36,12 +36,15 @@ model Company {
   // Example: { "USD": 35.50, "AED": 9.65 }
   exchangeRates Json @default("{}") // Currency exchange rates to THB
 
+  // Reimbursement Settings
+  reimbursementSpendingLimit Decimal? @db.Decimal(12, 2) // วงเงินสูงสุดต่อครั้ง (null = ไม่จำกัด)
+
   // Relations
   expenses              Expense[]
   incomes               Income[]
   users                 CompanyAccess[]
   contacts              Contact[]
-  categories            Category[]
+  accounts              Account[]
   integrations          Integration[]
   recurringExpenses     RecurringExpense[]
   vendorMappings        VendorMapping[]
@@ -78,8 +81,7 @@ model User {
   reimbursementApprovals Expense[] @relation("ReimbursementApprover")
   reimbursementPayments  Expense[] @relation("ReimbursementPayer")
 
-  // New ReimbursementRequest Relations
-  myReimbursementRequests       ReimbursementRequest[] @relation("ReimbursementRequests")
+  // New ReimbursementRequest Relations (Admin only - no requester)
   myReimbursementApprovals      ReimbursementRequest[] @relation("ReimbursementApprovals")
   myReimbursementPayments       ReimbursementRequest[] @relation("ReimbursementPayments")
 
@@ -115,62 +117,114 @@ model CompanyAccess {
   @@index([companyId])
 }
 
+
 // =============================================================================
-// Category (หมวดหมู่ - สำหรับรายจ่ายและรายรับ)
+// Account (ผังบัญชี - Chart of Accounts)
 // =============================================================================
 
-model Category {
-  id        String  @id @default(cuid())
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  name      String // "วัตถุดิบ", "Custom Category"
-  type      CategoryType // EXPENSE or INCOME
-  isDefault Boolean      @default(false) // Is this a system default?
-  isActive  Boolean      @default(true) // Can be toggled on/off
-  color     String? // Optional hex color for UI
-  icon      String? // Optional icon name
-  order     Int          @default(0) // Display order
-
-  // Hierarchy (2-level: Group → Sub-category)
-  parentId  String? // If null, this is a top-level group
-  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children  Category[] @relation("CategoryHierarchy")
-
-  // Relations
-  expenses              Expense[]
-  incomes               Income[]
-  vendorMappings        VendorMapping[]
-  reimbursementRequests ReimbursementRequest[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([companyId, name, type])
-  @@index([companyId, type])
-  @@index([isActive])
-  @@index([parentId])
+enum AccountClass {
+  ASSET           // 1 - สินทรัพย์
+  LIABILITY       // 2 - หนี้สิน
+  EQUITY          // 3 - ส่วนของเจ้าของ
+  REVENUE         // 4 - รายได้
+  COST_OF_SALES   // 5 - ต้นทุนขาย
+  EXPENSE         // 6 - ค่าใช้จ่าย (หรือ 5x ใน PEAK)
+  OTHER_INCOME    // 7 - รายได้อื่น
+  OTHER_EXPENSE   // 8 - ค่าใช้จ่ายอื่น
 }
 
-enum CategoryType {
-  EXPENSE
-  INCOME
+model Account {
+  id          String       @id @default(cuid())
+  companyId   String
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  code        String       // "530306" - รหัสบัญชี PEAK
+  name        String       // "ค่าใช้จ่ายเบ็ดเตล็ด"
+  nameTh      String?      // ชื่อภาษาไทย (ถ้าต่างจาก name)
+  
+  class       AccountClass // ประเภทหลัก
+  parentId    String?      // สำหรับ sub-account
+  parent      Account?     @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Account[]    @relation("AccountHierarchy")
+  
+  description String?      // คำอธิบายเพิ่มเติม
+  keywords    String[]     // คำค้นหาสำหรับ AI เช่น ["เบ็ดเตล็ด", "ของใช้", "อุปกรณ์"]
+  
+  isActive    Boolean      @default(true)
+  isSystem    Boolean      @default(false)  // บัญชีที่ระบบสร้างให้
+  
+  // Relations
+  expenses       Expense[]
+  incomes        Income[]
+  vendorMappings VendorMapping[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  @@unique([companyId, code])
+  @@index([companyId, class])
+  @@index([companyId, isActive])
 }
 
 // =============================================================================
 // Contact (ผู้ติดต่อ - รวม Vendor และ Customer)
 // =============================================================================
 
+enum ContactType {
+  INDIVIDUAL  // บุคคลธรรมดา -> ภ.ง.ด.3
+  COMPANY     // นิติบุคคล -> ภ.ง.ด.53
+}
+
+enum ContactCategory {
+  CUSTOMER  // ลูกค้า
+  VENDOR    // ผู้จำหน่าย/ร้านค้า
+  BOTH      // ทั้งลูกค้าและผู้จำหน่าย
+  OTHER     // อื่นๆ
+}
+
+enum EntityType {
+  INDIVIDUAL  // บุคคลธรรมดา
+  COMPANY     // นิติบุคคล
+}
+
 model Contact {
   id        String  @id @default(cuid())
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  name    String
-  taxId   String?
-  address String?
-  phone   String?
-  email   String?
+  // Peak sync
+  peakCode      String?   @unique // รหัสผู้ติดต่อ Peak (C00001, C00002...)
+  
+  // ข้อมูลพื้นฐาน
+  contactCategory ContactCategory @default(VENDOR) // ลูกค้า/ผู้จำหน่าย/อื่นๆ
+  entityType      EntityType @default(COMPANY) // บุคคลธรรมดา/นิติบุคคล
+  businessType    String? // ประเภทกิจการ (บริษัทจำกัด, ห้างหุ้นส่วน...)
+  nationality     String? @default("ไทย") // สัญชาติ
+  
+  // ชื่อแยก fields
+  prefix        String? // คำนำหน้า (นาย, นาง, บริษัท)
+  firstName     String? // ชื่อ (สำหรับบุคคลธรรมดา)
+  lastName      String? // นามสกุล
+  name          String  // ชื่อเต็ม/ชื่อบริษัท (required)
+  
+  // Keep old field for backward compatibility (deprecated)
+  type       ContactType @default(COMPANY) // บุคคลธรรมดา หรือ นิติบุคคล (deprecated, use entityType)
+  
+  taxId      String?
+  branchCode String?     @default("00000") // เลขสาขา 5 หลัก
+  
+  // ที่อยู่แยก fields
+  address       String? // ที่อยู่ (บ้านเลขที่ ซอย ถนน)
+  subDistrict   String? // แขวง/ตำบล
+  district      String? // เขต/อำเภอ
+  province      String? // จังหวัด
+  postalCode    String? // รหัสไปรษณีย์
+  country       String? @default("Thailand")
+  
+  // ผู้ติดต่อ
+  contactPerson String? // ชื่อผู้ติดต่อ
+  phone         String?
+  email         String?
 
   // Banking
   bankAccount String?
@@ -194,6 +248,7 @@ model Contact {
   @@index([companyId])
   @@index([name])
   @@index([taxId])
+  @@index([peakCode])
 }
 
 // =============================================================================
@@ -224,9 +279,8 @@ model Expense {
 
   // Document Details
   description   String?
-  category      ExpenseCategory? // Legacy - use categoryId instead
-  categoryId    String?
-  categoryRef   Category?        @relation(fields: [categoryId], references: [id])
+  accountId     String?          // Chart of Accounts
+  account       Account?         @relation(fields: [accountId], references: [id])
   invoiceNumber String? // เลขที่ใบกำกับภาษี
   referenceNo   String? // เลขอ้างอิง transaction
   paymentMethod PaymentMethod    @default(BANK_TRANSFER)
@@ -290,8 +344,7 @@ model Expense {
 
   @@index([companyId, billDate])
   @@index([status])
-  @@index([category])
-  @@index([categoryId])
+  @@index([accountId])
   @@index([contactId])
   @@index([createdAt])
   @@index([deletedAt])
@@ -299,17 +352,6 @@ model Expense {
   @@index([requesterId])
 }
 
-enum ExpenseCategory {
-  MATERIAL // วัตถุดิบ
-  UTILITY // สาธารณูปโภค
-  MARKETING // การตลาด
-  SALARY // เงินเดือน
-  FREELANCE // ค่าจ้างฟรีแลนซ์
-  TRANSPORT // ค่าขนส่ง
-  RENT // ค่าเช่า
-  OFFICE // สำนักงาน
-  OTHER // อื่นๆ
-}
 
 enum ExpenseDocStatus {
   WAITING_FOR_DOC // 🟠 จ่ายเงินแล้ว แต่ร้านยังไม่ส่งใบเสร็จมา
@@ -340,9 +382,16 @@ model ReimbursementRequest {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  // ผู้ขอเบิก
-  requesterId String
-  requester   User   @relation("ReimbursementRequests", fields: [requesterId], references: [id])
+  // Anonymous Requester Info
+  requesterName   String  @default("") // ชื่อผู้ขอ
+  requesterPhone  String? // เบอร์โทร (optional)
+  requesterEmail  String? // Email (optional)
+  bankName        String  @default("") // ชื่อธนาคาร
+  bankAccountNo   String  @default("") // เลขบัญชี
+  bankAccountName String  @default("") // ชื่อบัญชี
+
+  // Tracking Code (for public status check)
+  trackingCode String? @unique
 
   // Financial Data
   amount    Decimal  @db.Decimal(12, 2) // ยอดก่อน VAT
@@ -352,8 +401,6 @@ model ReimbursementRequest {
 
   // Details
   description   String?
-  categoryId    String?
-  categoryRef   Category?     @relation(fields: [categoryId], references: [id])
   contactId     String?
   contact       Contact?      @relation(fields: [contactId], references: [id])
   invoiceNumber String?
@@ -392,7 +439,7 @@ model ReimbursementRequest {
   updatedAt DateTime @updatedAt
 
   @@index([companyId, status])
-  @@index([requesterId])
+  @@index([trackingCode])
   @@index([createdAt])
 }
 
@@ -424,8 +471,8 @@ model Income {
 
   // Document Details
   source        String? // แหล่งที่มา
-  categoryId    String?
-  categoryRef   Category?     @relation(fields: [categoryId], references: [id])
+  accountId     String?       // Chart of Accounts
+  account       Account?      @relation(fields: [accountId], references: [id])
   invoiceNumber String? // เลขที่ใบกำกับภาษีที่เราออกให้
   referenceNo   String?
   paymentMethod PaymentMethod @default(BANK_TRANSFER)
@@ -457,7 +504,7 @@ model Income {
 
   @@index([companyId, receiveDate])
   @@index([status])
-  @@index([categoryId])
+  @@index([accountId])
   @@index([contactId])
   @@index([createdAt])
   @@index([deletedAt])
@@ -600,7 +647,7 @@ model VendorMapping {
 
   // Transaction Type - แยกการเทรนตามประเภทธุรกรรม
   // ผู้ติดต่อเดียวกันสามารถมี mapping แยกสำหรับรายรับ vs รายจ่าย
-  transactionType CategoryType // EXPENSE หรือ INCOME
+  transactionType String // "EXPENSE" หรือ "INCOME"
 
   // Matching Criteria
   vendorName  String? // ชื่อที่ OCR อ่านได้
@@ -610,8 +657,8 @@ model VendorMapping {
   // Mapped Values
   contactId           String?
   contact             Contact?       @relation(fields: [contactId], references: [id])
-  categoryId          String?
-  category            Category?      @relation(fields: [categoryId], references: [id])
+  accountId           String?        // Chart of Accounts
+  account             Account?       @relation(fields: [accountId], references: [id])
   defaultVatRate      Int? // 0 หรือ 7
   paymentMethod       PaymentMethod?
   descriptionTemplate String? // เช่น "ค่าวัตถุดิบจาก {vendorName}"

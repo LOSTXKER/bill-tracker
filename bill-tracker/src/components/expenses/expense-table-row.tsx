@@ -17,7 +17,7 @@ interface ExpenseTableRowProps {
     billDate: Date;
     description: string | null;
     category: string | null; // deprecated
-    categoryRef?: { id: string; name: string } | null; // new
+    account?: { id: string; code: string; name: string } | null;
     netPaid: number | bigint | { toNumber?: () => number };
     status: string;
     contact: { name: string } | null;
@@ -74,7 +74,7 @@ export function ExpenseTableRow({
         </p>
       </TableCell>
       <TableCell className="text-muted-foreground">
-        {expense.categoryRef?.name || "-"}
+        {expense.account ? `${expense.account.code} ${expense.account.name}` : "-"}
       </TableCell>
       <TableCell>
         {expense.description ? (

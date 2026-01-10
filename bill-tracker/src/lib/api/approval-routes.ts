@@ -31,7 +31,7 @@ export interface ApprovalRouteConfig {
   // Fields to use for workflow
   fields: {
     statusField: string;          // e.g., "status"
-    requesterIdField: string;     // e.g., "requesterId"
+    requesterIdField: string | null; // e.g., "requesterId" or null for anonymous
     companyIdField: string;       // e.g., "companyId"
     approvedByField: string;      // e.g., "approvedBy"
     approvedAtField: string;      // e.g., "approvedAt"
@@ -83,7 +83,9 @@ export function createApproveHandler(config: ApprovalRouteConfig) {
       
       const currentStatus = entity[config.fields.statusField] as string;
       const companyId = entity[config.fields.companyIdField] as string;
-      const requesterId = entity[config.fields.requesterIdField] as string;
+      const requesterId = config.fields.requesterIdField 
+        ? (entity[config.fields.requesterIdField] as string | null)
+        : null;
       
       // Check if status allows approval
       if (!config.approval.pendingStatuses.includes(currentStatus)) {
@@ -103,8 +105,8 @@ export function createApproveHandler(config: ApprovalRouteConfig) {
         return apiResponse.forbidden(`คุณไม่มีสิทธิ์อนุมัติ${config.entityDisplayName}`);
       }
       
-      // Prevent self-approval if configured
-      if (config.approval.preventSelfApproval && requesterId === session.user.id) {
+      // Prevent self-approval if configured (only when requester is tracked)
+      if (config.approval.preventSelfApproval && requesterId && requesterId === session.user.id) {
         return apiResponse.badRequest("ไม่สามารถอนุมัติคำขอของตัวเองได้");
       }
       

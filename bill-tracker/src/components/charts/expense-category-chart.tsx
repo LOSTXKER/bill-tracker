@@ -63,7 +63,7 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
             <div className="p-1.5 rounded-lg bg-muted">
               <PieChartIcon className="h-4 w-4 text-muted-foreground" />
             </div>
-            รายจ่ายตามหมวดหมู่
+            รายจ่ายตามบัญชี
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -82,7 +82,7 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
           <div className="p-1.5 rounded-lg bg-red-500/10">
             <PieChartIcon className="h-4 w-4 text-red-500" />
           </div>
-          รายจ่ายตามหมวดหมู่
+          รายจ่ายตามบัญชี
         </CardTitle>
       </CardHeader>
       <CardContent>

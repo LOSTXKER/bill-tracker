@@ -7,18 +7,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 
 export interface ContactFormData {
+  peakCode: string;
+  contactCategory: string;
+  entityType: string;
+  businessType: string;
+  nationality: string;
+  prefix: string;
+  firstName: string;
+  lastName: string;
   name: string;
   taxId: string;
+  branchCode: string;
   address: string;
+  subDistrict: string;
+  district: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  contactPerson: string;
   phone: string;
   email: string;
   bankAccount: string;
@@ -51,9 +74,24 @@ interface CreateContactDialogProps {
 }
 
 const defaultFormData: ContactFormData = {
+  peakCode: "",
+  contactCategory: "VENDOR",
+  entityType: "COMPANY",
+  businessType: "",
+  nationality: "ไทย",
+  prefix: "",
+  firstName: "",
+  lastName: "",
   name: "",
   taxId: "",
+  branchCode: "00000",
   address: "",
+  subDistrict: "",
+  district: "",
+  province: "",
+  postalCode: "",
+  country: "Thailand",
+  contactPerson: "",
   phone: "",
   email: "",
   bankAccount: "",
@@ -74,9 +112,24 @@ export function CreateContactDialog({
   const [formData, setFormData] = useState<ContactFormData>(
     editingContact
       ? {
+          peakCode: (editingContact as any).peakCode || "",
+          contactCategory: (editingContact as any).contactCategory || "VENDOR",
+          entityType: (editingContact as any).entityType || "COMPANY",
+          businessType: (editingContact as any).businessType || "",
+          nationality: (editingContact as any).nationality || "ไทย",
+          prefix: (editingContact as any).prefix || "",
+          firstName: (editingContact as any).firstName || "",
+          lastName: (editingContact as any).lastName || "",
           name: editingContact.name || "",
           taxId: editingContact.taxId || "",
+          branchCode: (editingContact as any).branchCode || "00000",
           address: editingContact.address || "",
+          subDistrict: (editingContact as any).subDistrict || "",
+          district: (editingContact as any).district || "",
+          province: (editingContact as any).province || "",
+          postalCode: (editingContact as any).postalCode || "",
+          country: (editingContact as any).country || "Thailand",
+          contactPerson: (editingContact as any).contactPerson || "",
           phone: editingContact.phone || "",
           email: editingContact.email || "",
           bankAccount: editingContact.bankAccount || "",
@@ -137,9 +190,24 @@ export function CreateContactDialog({
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && editingContact) {
       setFormData({
+        peakCode: (editingContact as any).peakCode || "",
+        contactCategory: (editingContact as any).contactCategory || "VENDOR",
+        entityType: (editingContact as any).entityType || "COMPANY",
+        businessType: (editingContact as any).businessType || "",
+        nationality: (editingContact as any).nationality || "ไทย",
+        prefix: (editingContact as any).prefix || "",
+        firstName: (editingContact as any).firstName || "",
+        lastName: (editingContact as any).lastName || "",
         name: editingContact.name || "",
         taxId: editingContact.taxId || "",
+        branchCode: (editingContact as any).branchCode || "00000",
         address: editingContact.address || "",
+        subDistrict: (editingContact as any).subDistrict || "",
+        district: (editingContact as any).district || "",
+        province: (editingContact as any).province || "",
+        postalCode: (editingContact as any).postalCode || "",
+        country: (editingContact as any).country || "Thailand",
+        contactPerson: (editingContact as any).contactPerson || "",
         phone: editingContact.phone || "",
         email: editingContact.email || "",
         bankAccount: editingContact.bankAccount || "",
@@ -156,119 +224,296 @@ export function CreateContactDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingContact ? "แก้ไขผู้ติดต่อ" : "เพิ่มผู้ติดต่อใหม่"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="contact-name">ชื่อ *</Label>
-            <Input
-              id="contact-name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="ชื่อบุคคลหรือบริษัท"
-              className="h-11"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Peak Sync */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">Peak Integration</h3>
             <div className="space-y-2">
-              <Label htmlFor="contact-phone">เบอร์โทร</Label>
+              <Label htmlFor="contact-peakCode">รหัสผู้ติดต่อ Peak</Label>
               <Input
-                id="contact-phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="08x-xxx-xxxx"
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact-email">อีเมล</Label>
-              <Input
-                id="contact-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@example.com"
-                className="h-11"
+                id="contact-peakCode"
+                value={formData.peakCode}
+                onChange={(e) => setFormData({ ...formData, peakCode: e.target.value })}
+                placeholder="C00001"
+                className="h-10"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contact-taxId">เลขประจำตัวผู้เสียภาษี</Label>
-            <Input
-              id="contact-taxId"
-              value={formData.taxId}
-              onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-              placeholder="13 หลัก"
-              className="h-11"
-              maxLength={13}
-            />
-          </div>
+          <Separator />
 
-          <div className="space-y-2">
-            <Label htmlFor="contact-address">ที่อยู่</Label>
-            <Textarea
-              id="contact-address"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="ที่อยู่เต็ม"
-              rows={2}
-            />
-          </div>
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">ข้อมูลพื้นฐาน</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-category">ประเภทผู้ติดต่อ</Label>
+                <Select
+                  value={formData.contactCategory}
+                  onValueChange={(value) => setFormData({ ...formData, contactCategory: value })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CUSTOMER">ลูกค้า</SelectItem>
+                    <SelectItem value="VENDOR">ผู้จำหน่าย</SelectItem>
+                    <SelectItem value="BOTH">ทั้งสองอย่าง</SelectItem>
+                    <SelectItem value="OTHER">อื่นๆ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-entityType">ประเภทกิจการ</Label>
+                <Select
+                  value={formData.entityType}
+                  onValueChange={(value) => setFormData({ ...formData, entityType: value })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INDIVIDUAL">บุคคลธรรมดา</SelectItem>
+                    <SelectItem value="COMPANY">นิติบุคคล</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-prefix">คำนำหน้า</Label>
+                <Input
+                  id="contact-prefix"
+                  value={formData.prefix}
+                  onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
+                  placeholder="นาย, นาง, บริษัท"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-firstName">ชื่อ</Label>
+                <Input
+                  id="contact-firstName"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  placeholder="ชื่อ"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-lastName">นามสกุล</Label>
+                <Input
+                  id="contact-lastName"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  placeholder="นามสกุล"
+                  className="h-10"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="contact-bankName">ธนาคาร</Label>
+              <Label htmlFor="contact-name">ชื่อเต็ม/ชื่อบริษัท *</Label>
               <Input
-                id="contact-bankName"
-                value={formData.bankName}
-                onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                placeholder="เช่น กสิกรไทย"
-                className="h-11"
+                id="contact-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="ชื่อเต็ม"
+                className="h-10"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact-bankAccount">เลขบัญชี</Label>
-              <Input
-                id="contact-bankAccount"
-                value={formData.bankAccount}
-                onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
-                placeholder="xxx-x-xxxxx-x"
-                className="h-11"
-              />
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="contact-taxId">เลขประจำตัวผู้เสียภาษี</Label>
+                <Input
+                  id="contact-taxId"
+                  value={formData.taxId}
+                  onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                  placeholder="13 หลัก"
+                  className="h-10"
+                  maxLength={13}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-branchCode">รหัสสาขา</Label>
+                <Input
+                  id="contact-branchCode"
+                  value={formData.branchCode}
+                  onChange={(e) => setFormData({ ...formData, branchCode: e.target.value })}
+                  placeholder="00000"
+                  className="h-10"
+                  maxLength={5}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <Separator />
+
+          {/* Address */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">ที่อยู่</h3>
             <div className="space-y-2">
-              <Label htmlFor="contact-creditLimit">วงเงินเครดิต</Label>
+              <Label htmlFor="contact-address">ที่อยู่</Label>
               <Input
-                id="contact-creditLimit"
-                type="number"
-                value={formData.creditLimit}
-                onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
-                placeholder="0"
-                className="h-11"
+                id="contact-address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="บ้านเลขที่ ซอย ถนน"
+                className="h-10"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact-paymentTerms">เครดิต (วัน)</Label>
-              <Input
-                id="contact-paymentTerms"
-                type="number"
-                value={formData.paymentTerms}
-                onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                placeholder="30"
-                className="h-11"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-subDistrict">แขวง/ตำบล</Label>
+                <Input
+                  id="contact-subDistrict"
+                  value={formData.subDistrict}
+                  onChange={(e) => setFormData({ ...formData, subDistrict: e.target.value })}
+                  placeholder="แขวง/ตำบล"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-district">เขต/อำเภอ</Label>
+                <Input
+                  id="contact-district"
+                  value={formData.district}
+                  onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                  placeholder="เขต/อำเภอ"
+                  className="h-10"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="contact-province">จังหวัด</Label>
+                <Input
+                  id="contact-province"
+                  value={formData.province}
+                  onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                  placeholder="จังหวัด"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-postalCode">รหัสไปรษณีย์</Label>
+                <Input
+                  id="contact-postalCode"
+                  value={formData.postalCode}
+                  onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                  placeholder="10100"
+                  className="h-10"
+                  maxLength={5}
+                />
+              </div>
             </div>
           </div>
 
+          <Separator />
+
+          {/* Contact Information */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">การติดต่อ</h3>
+            <div className="space-y-2">
+              <Label htmlFor="contact-contactPerson">ชื่อผู้ติดต่อ</Label>
+              <Input
+                id="contact-contactPerson"
+                value={formData.contactPerson}
+                onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                placeholder="ชื่อผู้ติดต่อ"
+                className="h-10"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-phone">เบอร์โทร</Label>
+                <Input
+                  id="contact-phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="08x-xxx-xxxx"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-email">อีเมล</Label>
+                <Input
+                  id="contact-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="email@example.com"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Banking & Credit */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">ข้อมูลการเงิน</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-bankName">ธนาคาร</Label>
+                <Input
+                  id="contact-bankName"
+                  value={formData.bankName}
+                  onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                  placeholder="เช่น กสิกรไทย"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-bankAccount">เลขบัญชี</Label>
+                <Input
+                  id="contact-bankAccount"
+                  value={formData.bankAccount}
+                  onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
+                  placeholder="xxx-x-xxxxx-x"
+                  className="h-10"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-creditLimit">วงเงินเครดิต</Label>
+                <Input
+                  id="contact-creditLimit"
+                  type="number"
+                  value={formData.creditLimit}
+                  onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
+                  placeholder="0"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-paymentTerms">เครดิต (วัน)</Label>
+                <Input
+                  id="contact-paymentTerms"
+                  type="number"
+                  value={formData.paymentTerms}
+                  onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                  placeholder="30"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="contact-notes">หมายเหตุ</Label>
             <Textarea

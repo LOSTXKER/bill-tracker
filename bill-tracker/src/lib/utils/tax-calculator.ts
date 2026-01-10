@@ -23,13 +23,18 @@ export function calculateTransactionTotals(
   vatRate: number,
   whtRate: number = 0
 ): TaxCalculation {
-  const vatAmount = calculateVAT(baseAmount, vatRate);
-  const whtAmount = calculateWHT(baseAmount, whtRate);
-  const totalWithVat = baseAmount + vatAmount;
+  // Ensure all values are numbers (handles string inputs from form fields)
+  const base = Number(baseAmount) || 0;
+  const vat = Number(vatRate) || 0;
+  const wht = Number(whtRate) || 0;
+  
+  const vatAmount = calculateVAT(base, vat);
+  const whtAmount = calculateWHT(base, wht);
+  const totalWithVat = base + vatAmount;
   const netAmount = totalWithVat - whtAmount;
 
   return {
-    baseAmount,
+    baseAmount: base,
     vatAmount,
     whtAmount,
     totalWithVat,

@@ -7,7 +7,9 @@ import { prisma } from "@/lib/db";
 import { analyzeReceipt, ReceiptData } from "./receipt-ocr";
 import { analyzeImage } from "./gemini";
 import { detectAndConvertAmount, type CurrencyDetectionResult } from "./currency-converter";
-import type { VendorMapping, Contact, Category, PaymentMethod } from "@prisma/client";
+import { suggestAccount } from "./account-suggestion";
+import { findMapping } from "./vendor-mapping";
+import type { VendorMapping, Contact, PaymentMethod } from "@prisma/client";
 
 // =============================================================================
 // Types
@@ -40,8 +42,9 @@ export interface MultiDocAnalysisResult {
       vendorName: string | null;
       contactId: string | null;
       contactName: string | null;
-      categoryId: string | null;
-      categoryName: string | null;
+      accountId: string | null;
+      accountCode: string | null;
+      accountName: string | null;
       defaultVatRate: number | null;
       paymentMethod: string | null;
       descriptionTemplate: string | null;
@@ -56,11 +59,21 @@ export interface MultiDocAnalysisResult {
       id: string;
       name: string;
     } | null;
-    // AI category suggestion when no mapping found
-    aiCategorySuggestion?: {
-      categoryId: string | null;
-      categoryName: string | null;
+    // AI account suggestion when no mapping found
+    aiAccountSuggestion?: {
+      accountId: string | null;
+      accountCode: string | null;
+      accountName: string | null;
       confidence: number;
+      reason: string;
+    };
+    // AI suggests creating a new account
+    suggestNewAccount?: {
+      code: string;
+      name: string;
+      class: string;
+      description: string;
+      keywords: string[];
       reason: string;
     };
   } | null;
@@ -101,12 +114,12 @@ export interface SuggestedValues {
   date: string | null;
   paymentMethod: PaymentMethod | null;
   description: string | null;
-  categoryId: string | null;
+  accountId: string | null;
 }
 
 export interface VendorMappingWithRelations extends VendorMapping {
   contact: Contact | null;
-  category: Category | null;
+  account: { id: string; code: string; name: string } | null;
 }
 
 // =============================================================================
@@ -161,7 +174,7 @@ export async function findBestMatch(
     where: { companyId },
     include: {
       contact: true,
-      category: true,
+      account: true,
     },
   });
   
@@ -281,7 +294,7 @@ function buildSuggestedValues(
     date: ocrResult.date,
     paymentMethod: normalizePaymentMethod(ocrResult.paymentMethod),
     description: null,
-    categoryId: null,
+    accountId: null,
   };
   
   // Override/enhance with mapping values
@@ -291,10 +304,10 @@ function buildSuggestedValues(
       suggested.contactId = mapping.contactId;
     }
     
-    // Category - ใช้จาก mapping ที่สอนไว้เลย
-    // ถ้าร้านเดียวกันมีหลายหมวดหมู่ ให้ผู้ใช้สอนเพิ่มได้
-    if (mapping.categoryId) {
-      suggested.categoryId = mapping.categoryId;
+    // Account - ใช้จาก mapping ที่สอนไว้เลย
+    // ถ้าร้านเดียวกันมีหลายบัญชี ให้ผู้ใช้สอนเพิ่มได้
+    if (mapping.accountId) {
+      suggested.accountId = mapping.accountId;
     }
     
     // VAT Rate (use mapping if OCR is uncertain)
@@ -494,417 +507,10 @@ function normalizePaymentMethod(method: string | null): PaymentMethod | null {
   return null;
 }
 
-// =============================================================================
-// Training Functions
-// =============================================================================
+// NOTE: Training Functions moved to vendor-mapping.ts
+// NOTE: AI Account Suggestion Functions moved to account-suggestion.ts
+// Import from those files if needed
 
-/**
- * Create a new vendor mapping from transaction data
- */
-export async function createMappingFromTransaction(
-  companyId: string,
-  transactionType: "EXPENSE" | "INCOME",
-  data: {
-    vendorName?: string;
-    vendorTaxId?: string;
-    contactId?: string;
-    categoryId?: string;
-    defaultVatRate?: number;
-    paymentMethod?: PaymentMethod;
-    descriptionTemplate?: string;
-    namePattern?: string;
-    learnSource?: string; // "MANUAL" | "AUTO" | "FEEDBACK"
-    originalTxId?: string;
-  }
-): Promise<VendorMapping> {
-  // Check if mapping with same tax ID and transaction type exists
-  if (data.vendorTaxId) {
-    const existing = await prisma.vendorMapping.findFirst({
-      where: {
-        companyId,
-        vendorTaxId: data.vendorTaxId,
-        transactionType,
-      },
-    });
-    
-    if (existing) {
-      // Update existing mapping
-      return prisma.vendorMapping.update({
-        where: { id: existing.id },
-        data: {
-          vendorName: data.vendorName || existing.vendorName,
-          contactId: data.contactId || existing.contactId,
-          categoryId: data.categoryId || existing.categoryId,
-          defaultVatRate: data.defaultVatRate ?? existing.defaultVatRate,
-          paymentMethod: data.paymentMethod || existing.paymentMethod,
-          descriptionTemplate: data.descriptionTemplate || existing.descriptionTemplate,
-          namePattern: data.namePattern || existing.namePattern,
-          learnSource: data.learnSource || existing.learnSource,
-          useCount: { increment: 1 },
-          lastUsedAt: new Date(),
-        },
-      });
-    }
-  }
-  
-  // Create new mapping
-  return prisma.vendorMapping.create({
-    data: {
-      companyId,
-      transactionType,
-      vendorName: data.vendorName,
-      vendorTaxId: data.vendorTaxId,
-      contactId: data.contactId,
-      categoryId: data.categoryId,
-      defaultVatRate: data.defaultVatRate,
-      paymentMethod: data.paymentMethod,
-      descriptionTemplate: data.descriptionTemplate,
-      namePattern: data.namePattern,
-      learnSource: data.learnSource || "MANUAL",
-      originalTxId: data.originalTxId,
-      useCount: 1,
-      lastUsedAt: new Date(),
-    },
-  });
-}
-
-/**
- * Get all vendor mappings for a company with stats
- */
-export async function getVendorMappings(
-  companyId: string,
-  options?: {
-    search?: string;
-    transactionType?: "EXPENSE" | "INCOME";
-    limit?: number;
-    offset?: number;
-  }
-): Promise<{
-  mappings: VendorMappingWithRelations[];
-  total: number;
-}> {
-  const where = {
-    companyId,
-    ...(options?.transactionType && { transactionType: options.transactionType }),
-    ...(options?.search && {
-      OR: [
-        { vendorName: { contains: options.search, mode: "insensitive" as const } },
-        { vendorTaxId: { contains: options.search } },
-        { contact: { name: { contains: options.search, mode: "insensitive" as const } } },
-      ],
-    }),
-  };
-  
-  const [mappings, total] = await Promise.all([
-    prisma.vendorMapping.findMany({
-      where,
-      include: {
-        contact: true,
-        category: true,
-      },
-      orderBy: [
-        { useCount: "desc" },
-        { lastUsedAt: "desc" },
-        { createdAt: "desc" },
-      ],
-      take: options?.limit || 50,
-      skip: options?.offset || 0,
-    }),
-    prisma.vendorMapping.count({ where }),
-  ]);
-  
-  return { mappings, total };
-}
-
-/**
- * Delete a vendor mapping
- */
-export async function deleteVendorMapping(
-  mappingId: string,
-  companyId: string
-): Promise<boolean> {
-  const result = await prisma.vendorMapping.deleteMany({
-    where: {
-      id: mappingId,
-      companyId, // Ensure company access
-    },
-  });
-  
-  return result.count > 0;
-}
-
-/**
- * Update a vendor mapping
- */
-export async function updateVendorMapping(
-  mappingId: string,
-  companyId: string,
-  data: Partial<{
-    vendorName: string;
-    vendorTaxId: string;
-    namePattern: string;
-    contactId: string;
-    categoryId: string;
-    defaultVatRate: number;
-    paymentMethod: PaymentMethod;
-    descriptionTemplate: string;
-  }>
-): Promise<VendorMapping | null> {
-  // Verify ownership
-  const existing = await prisma.vendorMapping.findFirst({
-    where: { id: mappingId, companyId },
-  });
-  
-  if (!existing) {
-    return null;
-  }
-  
-  return prisma.vendorMapping.update({
-    where: { id: mappingId },
-    data,
-  });
-}
-
-// =============================================================================
-// AI Category Suggestion Functions
-// =============================================================================
-
-interface CategoryForAI {
-  id: string;
-  name: string;
-  parentName: string | null;
-  type: "EXPENSE" | "INCOME";
-}
-
-/**
- * Find category from VendorMapping (user-taught data)
- * This is called by the AI suggest-category button to check user-taught mappings first
- */
-export async function findCategoryFromMapping(
-  companyId: string,
-  vendorName: string,
-  transactionType: "EXPENSE" | "INCOME"
-): Promise<{
-  categoryId: string;
-  categoryName: string;
-  confidence: number;
-  reason: string;
-} | null> {
-  try {
-    // Get all vendor mappings for this company
-    const mappings = await prisma.vendorMapping.findMany({
-      where: { companyId },
-      include: {
-        category: true,
-      },
-    });
-
-    if (mappings.length === 0) {
-      return null;
-    }
-
-    const normalizedInput = normalizeVendorName(vendorName);
-
-    // Find best matching mapping
-    let bestMatch: (typeof mappings)[0] | null = null;
-    let bestScore = 0;
-
-    for (const mapping of mappings) {
-      if (!mapping.vendorName) continue;
-      
-      const normalizedMapping = normalizeVendorName(mapping.vendorName);
-
-      // Exact match after normalization
-      if (normalizedInput === normalizedMapping) {
-        bestMatch = mapping;
-        bestScore = 100;
-        break;
-      }
-
-      // Contains match
-      if (
-        normalizedInput.includes(normalizedMapping) ||
-        normalizedMapping.includes(normalizedInput)
-      ) {
-        const score = 85;
-        if (score > bestScore) {
-          bestMatch = mapping;
-          bestScore = score;
-        }
-      }
-    }
-
-    // Return category if mapping found and has categoryId
-    if (bestMatch && bestMatch.categoryId && bestMatch.category) {
-      // Check if category matches transaction type
-      if (bestMatch.category.type === transactionType) {
-        console.log(`[findCategoryFromMapping] Found: ${bestMatch.vendorName} → ${bestMatch.category.name}`);
-        return {
-          categoryId: bestMatch.categoryId,
-          categoryName: bestMatch.category.name,
-          confidence: 100,
-          reason: `จากการเรียนรู้: "${bestMatch.vendorName}" ใช้หมวดหมู่นี้`,
-        };
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error("[findCategoryFromMapping] Error:", error);
-    return null;
-  }
-}
-
-/**
- * AI-based category suggestion from document content or description
- * Uses Gemini to analyze content and suggest the best matching category
- */
-export async function suggestCategoryFromContent(
-  companyId: string,
-  transactionType: "EXPENSE" | "INCOME",
-  content: {
-    vendorName?: string | null;
-    description?: string | null;
-    items?: string[];
-    imageUrls?: string[];
-  }
-): Promise<{
-  categoryId: string | null;
-  categoryName: string | null;
-  confidence: number;
-  reason: string;
-}> {
-  try {
-    // Get all categories for this company and type
-    const categories = await prisma.category.findMany({
-      where: {
-        companyId,
-        type: transactionType,
-        isActive: true,
-        parentId: { not: null }, // Only sub-categories (not groups)
-      },
-      include: {
-        parent: true,
-      },
-      orderBy: { order: "asc" },
-    });
-
-    if (categories.length === 0) {
-      return { categoryId: null, categoryName: null, confidence: 0, reason: "ไม่มีหมวดหมู่" };
-    }
-
-    // Build category list for AI
-    const categoryList: CategoryForAI[] = categories.map((c) => ({
-      id: c.id,
-      name: c.name,
-      parentName: c.parent?.name || null,
-      type: c.type,
-    }));
-
-    const categoryListText = categoryList
-      .map((c, i) => `${i + 1}. ${c.parentName ? `[${c.parentName}] ` : ""}${c.name} (ID: ${c.id})`)
-      .join("\n");
-
-    // Build content description
-    let contentDescription = "";
-    if (content.vendorName) {
-      contentDescription += `ร้านค้า/บริษัท: ${content.vendorName}\n`;
-    }
-    if (content.description) {
-      contentDescription += `รายละเอียด: ${content.description}\n`;
-    }
-    if (content.items && content.items.length > 0) {
-      contentDescription += `รายการสินค้า/บริการ: ${content.items.join(", ")}\n`;
-    }
-
-    if (!contentDescription.trim()) {
-      return { categoryId: null, categoryName: null, confidence: 0, reason: "ไม่มีข้อมูลเนื้อหา" };
-    }
-
-    const prompt = `คุณเป็น AI ผู้เชี่ยวชาญด้านบัญชีไทยและรู้จักธุรกิจ/ร้านค้าในประเทศไทยเป็นอย่างดี
-
-**ขั้นตอนการวิเคราะห์:**
-1. วิเคราะห์ว่าร้านค้า/บริษัทนี้คือใคร ทำธุรกิจอะไร
-2. วิเคราะห์ว่าสินค้า/บริการที่ซื้อคืออะไร
-3. เลือกหมวดหมู่ที่เหมาะสมที่สุด
-
-**ตัวอย่างการวิเคราะห์:**
-- "แม็คโคร" → ร้านค้าส่ง → ซื้อของ → ต้นทุนขาย/ซื้อสินค้า
-- "7-Eleven" → ร้านสะดวกซื้อ → อาหาร/เครื่องดื่ม → ค่าอาหาร
-- "Shopee" → แพลตฟอร์มขายของ → ขึ้นอยู่กับสินค้า
-- "TOT/TRUE" → ผู้ให้บริการโทรคมนาคม → ค่าโทรศัพท์/อินเทอร์เน็ต
-- "การไฟฟ้า/PEA" → สาธารณูปโภค → ค่าน้ำ-ไฟ
-- "น.ส./นาย [ชื่อคน]" → บุคคลธรรมดา → อาจเป็นซื้อสินค้า/จ้างงาน
-
-**ประเภทธุรกรรม:** ${transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
-
-**ข้อมูลธุรกรรม:**
-${contentDescription}
-
-**หมวดหมู่ที่มี:**
-${categoryListText}
-
-**คำแนะนำ:**
-- ถ้าเป็นชื่อบุคคล (น.ส., นาย, นาง) + ไม่มีรายละเอียดเพิ่ม → มักเป็น "ซื้อสินค้า" หรือ "จ้างงาน"
-- ถ้าไม่รู้จักร้าน แต่มีรายการสินค้า → วิเคราะห์จากสินค้า
-- ถ้าไม่แน่ใจจริงๆ → ตั้ง confidence ต่ำ (<50)
-
-**ตอบเป็น JSON:**
-{
-  "categoryId": "ID ของหมวดหมู่ที่เลือก หรือ null ถ้าไม่แน่ใจ",
-  "categoryName": "ชื่อหมวดหมู่ที่เลือก หรือ null",
-  "confidence": 0-100,
-  "reason": "เหตุผลสั้นๆ (เช่น: 'น.ส.xxx น่าจะเป็นซื้อสินค้าจากบุคคล')"
-}`;
-
-    // If we have images, use image analysis
-    let response;
-    if (content.imageUrls && content.imageUrls.length > 0) {
-      response = await analyzeImage(content.imageUrls[0], prompt, {
-        temperature: 0.3,
-        maxTokens: 512,
-      });
-    } else {
-      // Text-only analysis using Gemini
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      const result = await model.generateContent(prompt);
-      response = { data: result.response.text(), error: null };
-    }
-
-    if (response.error) {
-      console.error("AI category suggestion error:", response.error);
-      return { categoryId: null, categoryName: null, confidence: 0, reason: "AI error" };
-    }
-
-    // Parse response
-    let jsonText = response.data.trim();
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
-    }
-
-    try {
-      const result = JSON.parse(jsonText);
-      
-      // Validate categoryId exists
-      const matchedCategory = categoryList.find((c) => c.id === result.categoryId);
-      
-      return {
-        categoryId: matchedCategory ? result.categoryId : null,
-        categoryName: matchedCategory ? matchedCategory.name : null,
-        confidence: Math.max(0, Math.min(100, result.confidence || 0)),
-        reason: result.reason || "",
-      };
-    } catch {
-      console.error("Failed to parse AI category response:", jsonText);
-      return { categoryId: null, categoryName: null, confidence: 0, reason: "Parse error" };
-    }
-  } catch (error) {
-    console.error("Category suggestion error:", error);
-    return { categoryId: null, categoryName: null, confidence: 0, reason: "Error" };
-  }
-}
 
 // =============================================================================
 // Multi-Document Analysis Functions
@@ -991,7 +597,6 @@ export async function analyzeAndClassifyMultiple(
   }
 
   // Step 1: Classify all images with AI first (parallel)
-  console.log(`Classifying ${imageUrls.length} documents with AI...`);
   const classificationPromises = imageUrls.map(async (url) => {
     const classification = await classifyDocumentWithAI(url);
     return { url, classification };
@@ -999,7 +604,6 @@ export async function analyzeAndClassifyMultiple(
   const classifications = await Promise.all(classificationPromises);
 
   // Step 2: Run OCR on documents (especially invoices) in parallel
-  console.log(`Running OCR on documents...`);
   const ocrPromises = imageUrls.map(async (url) => {
     const result = await analyzeReceipt(url, getMimeTypeFromUrl(url));
     return { url, result };
@@ -1032,10 +636,8 @@ export async function analyzeAndClassifyMultiple(
     let docType: { type: DocumentCategory; confidence: number };
     if (aiClassification && aiClassification.confidence >= 50) {
       docType = aiClassification;
-      console.log(`AI classified ${url.substring(url.length - 30)}: ${docType.type} (${docType.confidence}%) - ${aiClassification.reason}`);
     } else {
       docType = classifyDocumentType(result);
-      console.log(`Keyword classified ${url.substring(url.length - 30)}: ${docType.type} (${docType.confidence}%)`);
     }
 
     fileResults.push({
@@ -1130,27 +732,8 @@ export async function analyzeAndClassifyMultiple(
       transactionType
     );
 
-    // Debug: Log mapping details
-    if (matchResult.mapping) {
-      console.log("Mapping found:", {
-        id: matchResult.mapping.id,
-        vendorName: matchResult.mapping.vendorName,
-        contactId: matchResult.mapping.contactId,
-        contactName: matchResult.mapping.contact?.name,
-        confidence: matchResult.confidence,
-      });
-    } else {
-      console.log("No mapping found for vendor:", combined.vendorName);
-    }
-
+    // Build suggested values from mapping
     const suggested = buildSuggestedValues(pseudoData, matchResult.mapping);
-    
-    // Debug: Log suggested values
-    console.log("Suggested values after buildSuggestedValues:", {
-      contactId: suggested.contactId,
-      categoryId: suggested.categoryId,
-      vendorName: suggested.vendorName,
-    });
 
     // Track found contact for returning contact info
     let foundContact: { id: string; name: string } | null = null;
@@ -1167,7 +750,6 @@ export async function analyzeAndClassifyMultiple(
       if (contactByTaxId) {
         suggested.contactId = contactByTaxId.id;
         foundContact = contactByTaxId;
-        console.log(`Found contact by taxId: ${contactByTaxId.name} (${combined.vendorTaxId})`);
       }
     }
 
@@ -1200,7 +782,6 @@ export async function analyzeAndClassifyMultiple(
           
           if (similarity >= 0.7) {
             contactByName = contact;
-            console.log(`Found contact by normalized name: ${contact.name} (similarity: ${Math.round(similarity * 100)}%)`);
             break;
           }
         }
@@ -1209,26 +790,34 @@ export async function analyzeAndClassifyMultiple(
       if (contactByName) {
         suggested.contactId = contactByName.id;
         foundContact = contactByName;
-        console.log(`Found contact by name: ${contactByName.name} (matched "${combined.vendorName}")`);
       }
     }
 
-    // Use AI to suggest category only when mapping doesn't have categoryId
-    let aiCategorySuggestion: {
-      categoryId: string | null;
-      categoryName: string | null;
+    // Use AI to suggest account only when mapping doesn't have accountId
+    let aiAccountSuggestion: {
+      accountId: string | null;
+      accountCode: string | null;
+      accountName: string | null;
       confidence: number;
       reason: string;
+      suggestNewAccount?: {
+        code: string;
+        name: string;
+        class: string;
+        description: string;
+        keywords: string[];
+        reason: string;
+      };
     } | null = null;
 
-    // Only run AI category suggestion if no category from mapping
-    if (!suggested.categoryId) {
-      // Extract items from OCR for better category suggestion
+    // Only run AI account suggestion if no account from mapping
+    if (!suggested.accountId) {
+      // Extract items from OCR for better account suggestion
       const items = extractedDataList.flatMap((d) => 
         (d.items || []).map((item) => typeof item === "string" ? item : item.description || "")
       ).filter(Boolean);
 
-      aiCategorySuggestion = await suggestCategoryFromContent(
+      const aiResult = await suggestAccount(
         companyId,
         transactionType,
         {
@@ -1238,11 +827,19 @@ export async function analyzeAndClassifyMultiple(
           imageUrls: imageUrls.slice(0, 1), // Use first image for context
         }
       );
+      
+      aiAccountSuggestion = {
+        accountId: aiResult.accountId,
+        accountCode: aiResult.accountCode,
+        accountName: aiResult.accountName,
+        confidence: aiResult.confidence,
+        reason: aiResult.reason,
+        suggestNewAccount: aiResult.suggestNewAccount,
+      };
 
-      // Auto-apply AI category suggestion if confidence is high enough
-      if (aiCategorySuggestion?.categoryId && aiCategorySuggestion.confidence >= 70) {
-        suggested.categoryId = aiCategorySuggestion.categoryId;
-        console.log(`Auto-applied AI category: ${aiCategorySuggestion.categoryName} (${aiCategorySuggestion.confidence}%)`);
+      // Auto-apply AI account suggestion if confidence is high enough
+      if (aiAccountSuggestion?.accountId && aiAccountSuggestion.confidence >= 70) {
+        suggested.accountId = aiAccountSuggestion.accountId;
       }
     }
 
@@ -1253,8 +850,9 @@ export async function analyzeAndClassifyMultiple(
             vendorName: matchResult.mapping.vendorName,
             contactId: matchResult.mapping.contactId,
             contactName: matchResult.mapping.contact?.name || null,
-            categoryId: matchResult.mapping.categoryId,
-            categoryName: matchResult.mapping.category?.name || null,
+            accountId: matchResult.mapping.accountId,
+            accountCode: matchResult.mapping.account?.code || null,
+            accountName: matchResult.mapping.account?.name || null,
             defaultVatRate: matchResult.mapping.defaultVatRate,
             paymentMethod: matchResult.mapping.paymentMethod,
             descriptionTemplate: matchResult.mapping.descriptionTemplate,
@@ -1269,8 +867,10 @@ export async function analyzeAndClassifyMultiple(
       suggestTraining:
         !matchResult.mapping &&
         (combined.vendorName !== null || combined.vendorTaxId !== null),
-      // Include AI category suggestion for UI to show confidence
-      aiCategorySuggestion: aiCategorySuggestion || undefined,
+      // Include AI account suggestion for UI to show confidence
+      aiAccountSuggestion: aiAccountSuggestion || undefined,
+      // Include suggestion to create new account
+      suggestNewAccount: aiAccountSuggestion?.suggestNewAccount || undefined,
     };
   }
 
@@ -1529,7 +1129,6 @@ function validateAndFixThaiDate(dateStr: string | null): string | null {
         const fixedYear = year + 10;
         const fixedDate = new Date(date);
         fixedDate.setFullYear(fixedYear);
-        console.log(`[Date Fix] Corrected year from ${year} to ${fixedYear} (likely BE conversion error)`);
         return fixedDate.toISOString().split('T')[0];
       }
     }
@@ -1540,7 +1139,6 @@ function validateAndFixThaiDate(dateStr: string | null): string | null {
       const fixedYear = year - 543;
       const fixedDate = new Date(date);
       fixedDate.setFullYear(fixedYear);
-      console.log(`[Date Fix] Converted BE ${year} to CE ${fixedYear}`);
       return fixedDate.toISOString().split('T')[0];
     }
     
@@ -1612,7 +1210,7 @@ async function findBestMatchByType(
     },
     include: {
       contact: true,
-      category: true,
+      account: true,
     },
   });
 

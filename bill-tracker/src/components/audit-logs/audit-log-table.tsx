@@ -18,6 +18,17 @@ import { ChevronLeft, ChevronRight, Search, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import {
+  FIELD_LABELS,
+  STATUS_LABELS,
+  ENTITY_TYPE_LABELS,
+  ACTION_LABELS,
+  ACTION_COLORS,
+  getFieldLabel,
+  getStatusLabel,
+  getEntityTypeLabel,
+  getActionColor,
+} from "@/lib/constants/audit-labels";
 
 interface AuditLog {
   id: string;
@@ -36,89 +47,7 @@ interface AuditLogTableProps {
   companyId: string;
 }
 
-const ACTION_COLORS = {
-  CREATE: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  UPDATE: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  DELETE: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-  STATUS_CHANGE: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  APPROVE: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-  EXPORT: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
-};
-
-const ACTION_LABELS = {
-  CREATE: "สร้าง",
-  UPDATE: "แก้ไข",
-  DELETE: "ลบ",
-  STATUS_CHANGE: "เปลี่ยนสถานะ",
-  APPROVE: "อนุมัติ",
-  EXPORT: "ส่งออก",
-};
-
-// Status labels for translation
-const STATUS_LABELS: Record<string, string> = {
-  // Expense statuses
-  PENDING_PHYSICAL: "ร้านส่งบิลตามมา",
-  WAITING_FOR_DOC: "ได้บิลครบแล้ว",
-  READY_TO_SEND: "พร้อมส่ง",
-  SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
-  // Income statuses
-  PENDING_INVOICE: "รอออกบิล",
-  INVOICE_ISSUED: "ออกบิลแล้ว",
-  COPY_SENT: "ส่งสำเนาแล้ว",
-  COMPLETED: "เสร็จสิ้น",
-};
-
-// Entity type labels
-const ENTITY_TYPE_LABELS: Record<string, string> = {
-  Expense: "รายจ่าย",
-  Income: "รายรับ",
-  Contact: "ผู้ติดต่อ",
-  Category: "หมวดหมู่",
-};
-
-// Field labels for translation
-const FIELD_LABELS: Record<string, string> = {
-  amount: "จำนวนเงิน",
-  description: "รายละเอียด",
-  billDate: "วันที่",
-  dueDate: "วันครบกำหนด",
-  status: "สถานะ",
-  category: "หมวดหมู่",
-  categoryId: "หมวดหมู่",
-  contactId: "ผู้ติดต่อ",
-  notes: "หมายเหตุ",
-  invoiceNumber: "เลขที่ใบกำกับ",
-  referenceNo: "เลขอ้างอิง",
-  paymentMethod: "วิธีชำระเงิน",
-  vatRate: "อัตรา VAT",
-  whtRate: "อัตราหัก ณ ที่จ่าย",
-  slipUrls: "สลิปโอนเงิน",
-  taxInvoiceUrls: "ใบกำกับภาษี",
-  whtCertUrls: "หนังสือรับรองหัก ณ ที่จ่าย",
-  customerSlipUrls: "สลิปลูกค้า",
-  myBillCopyUrls: "สำเนาบิล",
-};
-
-/**
- * Translate status code to Thai label
- */
-function getStatusLabel(status: string): string {
-  return STATUS_LABELS[status] || status;
-}
-
-/**
- * Translate entity type to Thai label
- */
-function getEntityTypeLabel(entityType: string): string {
-  return ENTITY_TYPE_LABELS[entityType] || entityType;
-}
-
-/**
- * Translate field name to Thai label
- */
-function getFieldLabel(field: string): string {
-  return FIELD_LABELS[field] || field;
-}
+// All constants and helper functions are now imported from @/lib/constants/audit-labels
 
 /**
  * Format a user-friendly description for an audit log

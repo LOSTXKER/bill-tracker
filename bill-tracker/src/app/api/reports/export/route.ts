@@ -54,7 +54,7 @@ export const GET = withCompanyAccess(
       vendorName: e.contact?.name || null,
       vendorTaxId: e.contact?.taxId || null,
       description: e.description,
-      category: e.category,
+      accountId: e.accountId,
       amount: e.amount,
       vatRate: e.vatRate,
       vatAmount: e.vatAmount,

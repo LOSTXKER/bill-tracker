@@ -37,23 +37,16 @@ export const GET = withCompanyAccess(
       }),
     ]);
 
-    // Get pending payouts grouped by user
+    // Get pending payouts grouped by requester name (anonymous system)
     const pendingPayouts = await prisma.reimbursementRequest.groupBy({
-      by: ["requesterId"],
+      by: ["requesterName"],
       where: { companyId: company.id, status: "APPROVED" },
       _sum: { netAmount: true },
       _count: true,
     });
 
-    // Get requester info
-    const requesterIds = pendingPayouts.map((p) => p.requesterId);
-    const requesters = await prisma.user.findMany({
-      where: { id: { in: requesterIds } },
-      select: { id: true, name: true, email: true, avatarUrl: true },
-    });
-
-    const payoutsByUser = pendingPayouts.map((p) => ({
-      requester: requesters.find((r) => r.id === p.requesterId),
+    const payoutsByRequester = pendingPayouts.map((p) => ({
+      requesterName: p.requesterName,
       count: p._count,
       amount: p._sum.netAmount?.toNumber() || 0,
     }));
@@ -81,7 +74,7 @@ export const GET = withCompanyAccess(
           amount: paid._sum.netAmount?.toNumber() || 0,
         },
       },
-      payoutsByUser,
+      payoutsByRequester,
     });
   },
   { permission: "reimbursements:read" }

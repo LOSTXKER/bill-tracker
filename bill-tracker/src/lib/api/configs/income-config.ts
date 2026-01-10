@@ -41,7 +41,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       whtType: data.whtType || null,
       netReceived: netReceived,
       source: data.source,
-      categoryId: data.categoryId || null,
+      accountId: data.accountId || null,
       invoiceNumber: data.invoiceNumber,
       referenceNo: data.referenceNo,
       paymentMethod: data.paymentMethod,
@@ -70,7 +70,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     if (data.whtType !== undefined) updateData.whtType = data.whtType;
     if (netReceived !== undefined) updateData.netReceived = netReceived;
     if (data.source !== undefined) updateData.source = data.source;
-    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
+    if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;

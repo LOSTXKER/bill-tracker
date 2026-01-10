@@ -43,7 +43,8 @@ export interface MergeData {
   date: string | null;
   invoiceNumber: string | null;
   description: string | null;
-  categoryId: string | null;
+  categoryId?: string | null;  // Legacy - use accountId instead
+  accountId: string | null;    // Chart of Accounts
   paymentMethod: string | null;
 }
 
@@ -145,6 +146,7 @@ export function MergeOptionsDialog({
       invoiceNumber: existingData.invoiceNumber || newData.invoiceNumber,
       description: existingData.description || newData.description,
       categoryId: existingData.categoryId || newData.categoryId,
+      accountId: existingData.accountId || newData.accountId,
       paymentMethod: existingData.paymentMethod || newData.paymentMethod,
     };
 

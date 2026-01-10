@@ -41,7 +41,7 @@ export async function analyzeForFraud(
     requesterId: string;
     invoiceNumber?: string;
     billDate: Date;
-    categoryId?: string;
+    accountId?: string;
   }
 ): Promise<FraudAnalysisResult> {
   const flags: FraudFlag[] = [];
@@ -420,7 +420,7 @@ export async function analyzeAndUpdateExpense(
         requesterId: true,
         invoiceNumber: true,
         billDate: true,
-        categoryId: true,
+        accountId: true,
         isReimbursement: true,
       },
     });
@@ -440,7 +440,7 @@ export async function analyzeAndUpdateExpense(
       requesterId: expense.requesterId || "",
       invoiceNumber: expense.invoiceNumber || undefined,
       billDate: expense.billDate,
-      categoryId: expense.categoryId || undefined,
+      accountId: expense.accountId || undefined,
     });
 
     // Update expense with fraud analysis

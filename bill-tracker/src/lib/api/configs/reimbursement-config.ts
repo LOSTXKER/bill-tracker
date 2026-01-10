@@ -14,7 +14,7 @@ export const reimbursementApprovalConfig: ApprovalRouteConfig = {
   
   fields: {
     statusField: "status",
-    requesterIdField: "requesterId",
+    requesterIdField: null, // Anonymous system - no requester user relation
     companyIdField: "companyId",
     approvedByField: "approvedBy",
     approvedAtField: "approvedAt",
@@ -28,22 +28,18 @@ export const reimbursementApprovalConfig: ApprovalRouteConfig = {
     pendingStatuses: ["PENDING", "FLAGGED"],
     approvedStatus: "APPROVED",
     rejectedStatus: "REJECTED",
-    preventSelfApproval: true,
+    preventSelfApproval: false, // Anonymous system - no self-approval check needed
   },
   
   findInclude: {
-    requester: true,
     company: true,
+    contact: true,
   },
   
   updateInclude: {
-    requester: {
-      select: { id: true, name: true, email: true },
-    },
     approver: {
       select: { id: true, name: true },
     },
-    categoryRef: true,
     contact: true,
   },
   

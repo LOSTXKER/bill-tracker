@@ -209,7 +209,6 @@ export async function analyzeImage(
     } else if (typeof imageData === "string") {
       if (isUrl(imageData)) {
         // Fetch image from URL
-        console.log("Fetching image from URL:", imageData.substring(0, 100) + "...");
         const fetched = await fetchImageAsBase64(imageData);
         imageBase64 = fetched.data;
         imageMimeType = options?.mimeType || fetched.mimeType;

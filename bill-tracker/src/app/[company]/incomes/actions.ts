@@ -104,7 +104,7 @@ export async function fetchIncomes(params: FetchIncomesParams) {
       take: limit,
       include: {
         contact: true,
-        categoryRef: true,
+        account: true,
         creator: {
           select: {
             id: true,

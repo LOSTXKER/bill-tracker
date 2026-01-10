@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, use } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,9 +30,14 @@ import {
   Mail,
   Building2,
   Loader2,
+  Upload,
+  Download,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { CreateContactDialog, Contact } from "@/components/forms/shared/CreateContactDialog";
+import { useContacts } from "@/hooks/use-contacts";
+import { mutate } from "swr";
+import { swrKeys } from "@/lib/swr-config";
 
 interface ContactsPageProps {
   params: Promise<{ company: string }>;
@@ -40,32 +45,24 @@ interface ContactsPageProps {
 
 export default function ContactsPage({ params }: ContactsPageProps) {
   const { company: companyCode } = use(params);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
-  const fetchContacts = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(
-        `/api/contacts?company=${companyCode.toUpperCase()}&search=${encodeURIComponent(search)}`
-      );
-      const data = await res.json();
-      if (data.success) {
-        setContacts(data.data.contacts);
-      }
-    } catch (error) {
-      toast.error("ไม่สามารถโหลดรายชื่อผู้ติดต่อได้");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Use SWR hook for data fetching and caching
+  const { contacts, isLoading, refetch } = useContacts(companyCode);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [companyCode, search]);
+  // Filter contacts based on search
+  const filteredContacts = contacts.filter((contact) => {
+    if (!search) return true;
+    const searchLower = search.toLowerCase();
+    return (
+      contact.name?.toLowerCase().includes(searchLower) ||
+      contact.taxId?.toLowerCase().includes(searchLower) ||
+      contact.phone?.toLowerCase().includes(searchLower) ||
+      contact.email?.toLowerCase().includes(searchLower)
+    );
+  });
 
   const handleOpenDialog = (contact?: Contact) => {
     setEditingContact(contact || null);
@@ -79,8 +76,10 @@ export default function ContactsPage({ params }: ContactsPageProps) {
     }
   };
 
-  const handleContactSuccess = () => {
-    fetchContacts();
+  const handleContactSuccess = async () => {
+    // Revalidate cache after successful mutation
+    await mutate(swrKeys.contacts(companyCode));
+    refetch();
   };
 
   const handleDelete = async (id: string) => {
@@ -89,12 +88,17 @@ export default function ContactsPage({ params }: ContactsPageProps) {
     try {
       const res = await fetch(
         `/api/contacts?id=${id}&company=${companyCode.toUpperCase()}`,
-        { method: "DELETE" }
+        { 
+          method: "DELETE",
+          cache: "no-store" // Prevent caching DELETE requests
+        }
       );
       const data = await res.json();
       if (data.success) {
         toast.success("ลบสำเร็จ");
-        fetchContacts();
+        // Immediately revalidate cache
+        await mutate(swrKeys.contacts(companyCode));
+        refetch();
       } else {
         throw new Error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -113,10 +117,26 @@ export default function ContactsPage({ params }: ContactsPageProps) {
             จัดการรายชื่อลูกค้าและผู้ขาย
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="h-4 w-4 mr-2" />
-          เพิ่มผู้ติดต่อ
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = `/api/contacts/export?company=${companyCode.toUpperCase()}&format=peak`}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Peak
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = `/${companyCode}/contacts/import`}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import จาก Peak
+          </Button>
+          <Button onClick={() => handleOpenDialog()}>
+            <Plus className="h-4 w-4 mr-2" />
+            เพิ่มผู้ติดต่อ
+          </Button>
+        </div>
       </div>
 
       {/* Create/Edit Contact Dialog */}
@@ -148,7 +168,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            รายชื่อผู้ติดต่อ ({contacts.length})
+            รายชื่อผู้ติดต่อ ({filteredContacts.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -156,7 +176,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : contacts.length === 0 ? (
+          ) : filteredContacts.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">
@@ -178,6 +198,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>รหัส Peak</TableHead>
                     <TableHead>ชื่อ</TableHead>
                     <TableHead>เลขภาษี</TableHead>
                     <TableHead>ติดต่อ</TableHead>
@@ -186,8 +207,11 @@ export default function ContactsPage({ params }: ContactsPageProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contacts.map((contact) => (
+                  {filteredContacts.map((contact) => (
                     <TableRow key={contact.id}>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {(contact as any).peakCode || "-"}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">

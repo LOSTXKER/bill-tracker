@@ -36,8 +36,8 @@ export const GET = withCompanyAccess(
       prisma.contact.count({ where }),
     ]);
 
-    // Use cache for contacts (rarely change)
-    return apiResponse.successWithCache({
+    // Don't cache - let SWR handle caching on client side
+    return apiResponse.success({
       contacts,
       pagination: {
         page,
@@ -45,7 +45,7 @@ export const GET = withCompanyAccess(
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }, undefined, { maxAge: 60, staleWhileRevalidate: 300 }); // 1 min cache, 5 min stale
+    });
   },
   { permission: "contacts:read" }
 );
@@ -61,16 +61,31 @@ export const POST = withCompanyAccess(
     const contact = await prisma.contact.create({
       data: {
         companyId: company.id,
+        peakCode: body.peakCode || null,
+        contactCategory: body.contactCategory || "VENDOR",
+        entityType: body.entityType || "COMPANY",
+        businessType: body.businessType || null,
+        nationality: body.nationality || "ไทย",
+        prefix: body.prefix || null,
+        firstName: body.firstName || null,
+        lastName: body.lastName || null,
         name: body.name,
-        taxId: body.taxId,
-        address: body.address,
-        phone: body.phone,
-        email: body.email,
-        bankAccount: body.bankAccount,
-        bankName: body.bankName,
+        taxId: body.taxId || null,
+        branchCode: body.branchCode || "00000",
+        address: body.address || null,
+        subDistrict: body.subDistrict || null,
+        district: body.district || null,
+        province: body.province || null,
+        postalCode: body.postalCode || null,
+        country: body.country || "Thailand",
+        contactPerson: body.contactPerson || null,
+        phone: body.phone || null,
+        email: body.email || null,
+        bankAccount: body.bankAccount || null,
+        bankName: body.bankName || null,
         creditLimit: body.creditLimit,
         paymentTerms: body.paymentTerms,
-        notes: body.notes,
+        notes: body.notes || null,
       },
     });
 
@@ -110,16 +125,31 @@ export const PATCH = withCompanyAccess(
     const contact = await prisma.contact.update({
       where: { id },
       data: {
-        name: data.name,
-        taxId: data.taxId,
-        address: data.address,
-        phone: data.phone,
-        email: data.email,
-        bankAccount: data.bankAccount,
-        bankName: data.bankName,
-        creditLimit: data.creditLimit,
-        paymentTerms: data.paymentTerms,
-        notes: data.notes,
+        peakCode: data.peakCode ?? existing.peakCode,
+        contactCategory: data.contactCategory ?? existing.contactCategory,
+        entityType: data.entityType ?? existing.entityType,
+        businessType: data.businessType ?? existing.businessType,
+        nationality: data.nationality ?? existing.nationality,
+        prefix: data.prefix ?? existing.prefix,
+        firstName: data.firstName ?? existing.firstName,
+        lastName: data.lastName ?? existing.lastName,
+        name: data.name ?? existing.name,
+        taxId: data.taxId ?? existing.taxId,
+        branchCode: data.branchCode ?? existing.branchCode,
+        address: data.address ?? existing.address,
+        subDistrict: data.subDistrict ?? existing.subDistrict,
+        district: data.district ?? existing.district,
+        province: data.province ?? existing.province,
+        postalCode: data.postalCode ?? existing.postalCode,
+        country: data.country ?? existing.country,
+        contactPerson: data.contactPerson ?? existing.contactPerson,
+        phone: data.phone ?? existing.phone,
+        email: data.email ?? existing.email,
+        bankAccount: data.bankAccount ?? existing.bankAccount,
+        bankName: data.bankName ?? existing.bankName,
+        creditLimit: data.creditLimit ?? existing.creditLimit,
+        paymentTerms: data.paymentTerms ?? existing.paymentTerms,
+        notes: data.notes ?? existing.notes,
       },
     });
 
@@ -144,10 +174,10 @@ export const DELETE = withCompanyAccess(
       return apiResponse.error(new Error("Contact ID is required"));
     }
 
-    // Check if used in transactions
+    // Check if used in transactions (only count non-deleted items)
     const [expenseCount, incomeCount] = await Promise.all([
-      prisma.expense.count({ where: { contactId: id } }),
-      prisma.income.count({ where: { contactId: id } }),
+      prisma.expense.count({ where: { contactId: id, deletedAt: null } }),
+      prisma.income.count({ where: { contactId: id, deletedAt: null } }),
     ]);
 
     if (expenseCount + incomeCount > 0) {
