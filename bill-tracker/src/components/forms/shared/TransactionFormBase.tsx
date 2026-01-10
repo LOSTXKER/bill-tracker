@@ -1296,7 +1296,7 @@ export function TransactionFormBase({ companyCode, config }: TransactionFormBase
                   <li>• เลขผู้เสียภาษี: {aiResult.combined.vendorTaxId}</li>
                 )}
                 {selectedContact && <li>• ผู้ติดต่อ: {selectedContact.name}</li>}
-                {selectedCategory && <li>• หมวดหมู่: {categories.flatMap(c => c.children || [c]).find(c => c.id === selectedCategory)?.name || selectedCategory}</li>}
+                {selectedCategory && <li>• หมวดหมู่: {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}</li>}
                 {watchVatRate !== undefined && <li>• VAT: {watchVatRate}%</li>}
                 {watch("paymentMethod") && (
                   <li>• วิธีชำระเงิน: {watch("paymentMethod")}</li>
