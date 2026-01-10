@@ -113,6 +113,13 @@ export interface MultiDocAnalysisResult {
       id: string;
       name: string;
     } | null;
+    // AI category suggestion when no mapping found
+    aiCategorySuggestion?: {
+      categoryId: string | null;
+      categoryName: string | null;
+      confidence: number;
+      reason: string;
+    };
   } | null;
   fileAssignments: Record<string, DocumentCategory>;
 }
