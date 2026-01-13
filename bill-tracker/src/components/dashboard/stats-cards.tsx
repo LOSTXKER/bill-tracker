@@ -37,10 +37,13 @@ export async function StatsCards({ companyCode }: { companyCode: string }) {
       },
       _sum: { netPaid: true },
     }),
+    // Count pending documents using new workflow statuses
     prisma.expense.count({
       where: {
         companyId: company.id,
-        status: { in: ["WAITING_FOR_DOC", "PENDING_PHYSICAL"] },
+        workflowStatus: { 
+          in: ["WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE", "READY_FOR_ACCOUNTING"] 
+        },
         deletedAt: null,
       },
     }),

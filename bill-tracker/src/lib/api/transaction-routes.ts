@@ -40,7 +40,7 @@ export interface TransactionRouteConfig<TModel, TCreateData, TUpdateData> {
   
   // Data transformation
   transformCreateData: (body: any) => TCreateData;
-  transformUpdateData: (body: any) => TUpdateData;
+  transformUpdateData: (body: any, existingData?: any) => TUpdateData;
   
   // Notification handler (optional)
   notifyCreate?: (companyId: string, data: any, baseUrl: string) => Promise<void>;
@@ -263,7 +263,8 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     }
 
     const body = await request.json();
-    const updateData = config.transformUpdateData(body);
+    // Pass existingItem to transformUpdateData for conditional logic (e.g., WHT workflow adjustment)
+    const updateData = config.transformUpdateData(body, existingItem);
 
     // Update item
     const item = await config.prismaModel.update({

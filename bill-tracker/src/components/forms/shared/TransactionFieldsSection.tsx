@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "./DatePicker";
-import { ContactSelector } from "./ContactSelector";
+import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
 import { AccountSelector, SuggestNewAccount } from "./account-selector";
 import { PaymentMethodSelect } from "./PaymentMethodSelect";
 import type { ContactSummary } from "@/types";
@@ -75,6 +75,9 @@ export interface TransactionFieldsSectionProps {
   isSuggestingAccount?: boolean;
   accountSuggestionSource?: "learned" | "ai" | "none";
   
+  // AI-detected new vendor suggestion
+  aiVendorSuggestion?: AiVendorSuggestion | null;
+  
   // Additional fields renderer (e.g., due date for expenses)
   renderAdditionalFields?: () => React.ReactNode;
 }
@@ -104,6 +107,7 @@ export function TransactionFieldsSection({
   onSuggestAccount,
   isSuggestingAccount,
   accountSuggestionSource,
+  aiVendorSuggestion,
   renderAdditionalFields,
 }: TransactionFieldsSectionProps) {
   const isEditable = mode === "create" || mode === "edit";
@@ -203,6 +207,7 @@ export function TransactionFieldsSection({
             required
             contactName={oneTimeContactName}
             onContactNameChange={onOneTimeContactNameChange}
+            aiVendorSuggestion={aiVendorSuggestion}
           />
         ) : (
           <div className="space-y-2">
@@ -219,7 +224,7 @@ export function TransactionFieldsSection({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              บัญชี <span className="text-red-500">*</span>
+              บัญชี {isEditable && <span className="text-red-500">*</span>}
               {accountSuggestionSource === "learned" && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                   🤖 AI จำได้
@@ -273,7 +278,7 @@ export function TransactionFieldsSection({
       {config.descriptionField && (
         <div className="space-y-2">
           <Label htmlFor={config.descriptionField.name} className="text-sm text-muted-foreground">
-            {config.descriptionField.label} <span className="text-red-500">*</span>
+            {config.descriptionField.label} {isEditable && <span className="text-red-500">*</span>}
           </Label>
           {isEditable ? (
             <Input
@@ -340,18 +345,18 @@ export function TransactionFieldsSection({
           label={config.type === "income" ? "วิธีรับเงิน" : undefined}
         />
 
-        {/* Status Selector */}
-        <div className="space-y-2">
-          <Label className="text-sm text-muted-foreground">
-            สถานะเอกสาร {!watchStatus && <span className="text-red-500">*</span>}
-          </Label>
-          {isEditable ? (
+        {/* Status Selector - Only in create mode (edit/view uses WorkflowCard) */}
+        {mode === "create" && config.statusOptions.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">
+              สถานะเริ่มต้น
+            </Label>
             <Select
               value={watchStatus || ""}
               onValueChange={(value) => setValue("status", value)}
             >
               <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-                <SelectValue placeholder="เลือกสถานะ..." />
+                <SelectValue placeholder="อัตโนมัติ" />
               </SelectTrigger>
               <SelectContent>
                 {config.statusOptions.map((option) => {
@@ -366,12 +371,11 @@ export function TransactionFieldsSection({
                 })}
               </SelectContent>
             </Select>
-          ) : (
-            <p className="text-sm font-medium">
-              {config.statusOptions.find(o => o.value === watchStatus)?.label || watchStatus || "-"}
+            <p className="text-xs text-muted-foreground">
+              ปกติระบบจะเลือกให้อัตโนมัติตามเอกสารที่แนบ
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

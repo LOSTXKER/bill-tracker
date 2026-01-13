@@ -163,7 +163,7 @@ async function analyzeWithAI(
     let response;
     if (context.imageUrls && context.imageUrls.length > 0) {
       response = await analyzeImage(context.imageUrls[0], prompt, {
-        temperature: 0.3,
+        temperature: 0.2, // Lower temperature for more consistent results
         maxTokens: 1024,
       });
     } else {
@@ -228,46 +228,47 @@ function buildAIPrompt(
     return null;
   }
 
-  // Build account list
+  // Build account list with clear formatting
   const accountListText = accounts
-    .map((a) => `${a.code} - ${a.name}${a.description ? ` (${a.description})` : ""} [ID: ${a.id}]`)
+    .map((a) => `• ${a.code} - ${a.name}${a.description ? ` (${a.description})` : ""} [ID: ${a.id}]`)
     .join("\n");
 
-  return `คุณเป็น AI นักบัญชีผู้เชี่ยวชาญ มีความรู้เกี่ยวกับธุรกิจ บริษัท และแบรนด์ทั่วโลก
+  return `คุณเป็นนักบัญชีผู้เชี่ยวชาญ มีความรู้กว้างขวางเกี่ยวกับธุรกิจและแบรนด์ทั่วโลก
 
-**หน้าที่:** วิเคราะห์และเลือกบัญชีที่เหมาะสมที่สุด
+## งานของคุณ
+ดูข้อมูลร้านค้า/รายการ แล้วเลือกบัญชีที่เหมาะสมที่สุดจากรายการด้านล่าง
 
-**ความรู้ที่มี:**
-- SaaS: Cursor, GitHub, Notion, Slack, Figma, Adobe, Microsoft 365, Google Workspace
-- Cloud: AWS, Azure, GCP, Vercel, Railway, Heroku, DigitalOcean, Cloudflare
-- โฆษณา: Facebook Ads, Google Ads, LINE Ads, TikTok Ads
-- สาธารณูปโภค: การไฟฟ้า (MEA/PEA), การประปา, TRUE, AIS, DTAC
-- ขนส่ง: Grab, Bolt, Lalamove, Kerry, Flash Express
-- อาหาร: 7-Eleven, Makro, Lotus's, Big C, ร้านอาหารทั่วไป
-- น้ำมัน: PTT, Shell, Esso, Bangchak, Caltex
-
-**ประเภท:** ${transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
-
-**ข้อมูล:**
+## ข้อมูลที่ต้องวิเคราะห์
 ${contentDescription}
 
-**บัญชีที่มี:**
+## บัญชี${transactionType === "EXPENSE" ? "ค่าใช้จ่าย" : "รายได้"}ที่มี (เลือก 1 รายการ)
 ${accountListText}
 
-**กฎ:**
-1. ถ้ารู้จักแบรนด์ → เลือกเลย (confidence 90-95%)
-2. ถ้าวิเคราะห์จากบริบทได้ → เลือก (confidence 75-89%)
-3. ถ้าไม่แน่ใจ → confidence 50-74%
-4. ถ้าไม่มีบัญชีที่เหมาะสม → แนะนำสร้างใหม่
+## วิธีเลือก
+1. **อ่านชื่อบัญชีทุกตัว** - ดูว่าตัวไหนตรงกับประเภทร้านค้า/รายการมากที่สุด
+2. **ใช้ความรู้ทั่วไป** - คุณรู้จักแบรนด์และบริษัทต่างๆ ทั่วโลก
+3. **เลือกบัญชีที่ใกล้เคียงที่สุด** - ถ้าไม่มีตรง 100% ให้เลือกที่ใกล้เคียง
 
-**ตอบ JSON:**
+## ตัวอย่างการตัดสินใจ
+- "Cursor" → ค่าซอฟต์แวร์/ค่าบริการ (confidence 95%)
+- "7-Eleven" → ค่าอาหาร/เครื่องดื่ม/วัสดุสิ้นเปลือง (confidence 90%)
+- "การไฟฟ้า" → ค่าสาธารณูปโภค/ค่าไฟฟ้า (confidence 98%)
+- "บริษัท XXX จำกัด" → ดูจากบริบท ถ้าไม่ชัดเลือก "ค่าบริการ" (confidence 80%)
+
+## กฎสำคัญ
+- **ต้องเลือกบัญชีเสมอ** ถ้ามีบัญชีที่พอจะใช้ได้
+- **Confidence 85-98%** ถ้าเลือกได้ตรงหรือใกล้เคียง
+- **Confidence 70-84%** เฉพาะเมื่อไม่มีบัญชีที่ตรงเลย แต่พอจะใส่ได้
+- **suggestNewAccount** ใช้เฉพาะเมื่อไม่มีบัญชีที่เหมาะสมเลยจริงๆ
+
+## ตอบ JSON
 {
-  "accountId": "ID จากรายการ หรือ null",
-  "accountCode": "รหัส 6 หลัก หรือ null",
-  "accountName": "ชื่อบัญชี หรือ null",
-  "confidence": 0-100,
+  "accountId": "ID ของบัญชีที่เลือก",
+  "accountCode": "รหัสบัญชี 6 หลัก",
+  "accountName": "ชื่อบัญชี",
+  "confidence": 85,
   "reason": "เหตุผลสั้นๆ ภาษาไทย",
-  "suggestNewAccount": null หรือ { "code": "...", "name": "...", "class": "EXPENSE", "description": "...", "keywords": [...], "reason": "..." }
+  "suggestNewAccount": null
 }`;
 }
 

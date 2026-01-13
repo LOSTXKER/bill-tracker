@@ -11,18 +11,19 @@ export async function ReadyToSend({ companyCode }: { companyCode: string }) {
 
   if (!company) return null;
 
+  // Use new workflow statuses
   const [pendingExpenses, pendingIncomes] = await Promise.all([
     prisma.expense.count({
       where: {
         companyId: company.id,
-        status: { in: ["PENDING_PHYSICAL", "READY_TO_SEND"] },
+        workflowStatus: "READY_FOR_ACCOUNTING",
         deletedAt: null,
       },
     }),
     prisma.income.count({
       where: {
         companyId: company.id,
-        status: "PENDING_COPY_SEND",
+        workflowStatus: "READY_FOR_ACCOUNTING",
         deletedAt: null,
       },
     }),

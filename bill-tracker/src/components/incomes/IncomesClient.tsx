@@ -4,7 +4,7 @@ import { ArrowDownCircle } from "lucide-react";
 import { IncomeTableRow } from "@/components/incomes/income-table-row";
 import { TransactionListClient, type TransactionListConfig } from "@/components/transactions";
 import { fetchIncomes } from "@/app/[company]/incomes/actions";
-import { INCOME_STATUS_INFO } from "@/lib/constants/transaction";
+import { INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 interface IncomesClientProps {
   companyCode: string;
@@ -21,7 +21,7 @@ const incomeListConfig: TransactionListConfig = {
   apiEndpoint: "/api/incomes",
   captureUrl: "capture",
   dateField: "receiveDate",
-  statusInfo: INCOME_STATUS_INFO,
+  statusInfo: INCOME_WORKFLOW_INFO,
   
   tableHeaders: [
     { key: "receiveDate", label: "วันที่", sortable: true },

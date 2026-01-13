@@ -4,7 +4,7 @@ import { ArrowUpCircle } from "lucide-react";
 import { ExpenseTableRow } from "@/components/expenses/expense-table-row";
 import { TransactionListClient, type TransactionListConfig } from "@/components/transactions";
 import { fetchExpenses } from "@/app/[company]/expenses/actions";
-import { EXPENSE_STATUS_INFO } from "@/lib/constants/transaction";
+import { EXPENSE_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 interface ExpensesClientProps {
   companyCode: string;
@@ -21,7 +21,7 @@ const expenseListConfig: TransactionListConfig = {
   apiEndpoint: "/api/expenses",
   captureUrl: "capture",
   dateField: "billDate",
-  statusInfo: EXPENSE_STATUS_INFO,
+  statusInfo: EXPENSE_WORKFLOW_INFO,
   
   tableHeaders: [
     { key: "billDate", label: "วันที่", sortable: true },

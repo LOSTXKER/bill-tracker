@@ -39,6 +39,19 @@ model Company {
   // Reimbursement Settings
   reimbursementSpendingLimit Decimal? @db.Decimal(12, 2) // วงเงินสูงสุดต่อครั้ง (null = ไม่จำกัด)
 
+  // Chart of Accounts Sync
+  lastAccountImportAt DateTime? // วันที่ import ผังบัญชีล่าสุด
+  
+  // Contacts Sync
+  lastContactImportAt DateTime? // วันที่ import ผู้ติดต่อล่าสุดจาก Peak
+
+  // WHT Settings
+  whtDeadlineDay      Int     @default(7)   // วันที่ต้องนำส่ง WHT (1-28)
+  whtReminderDays     Int     @default(3)   // แจ้งเตือนกี่วันก่อน deadline
+  docReminderDays     Int     @default(7)   // แจ้งเตือนเอกสารค้างนานกี่วัน
+  whtReminderEnabled  Boolean @default(true) // เปิด/ปิดการแจ้งเตือน WHT
+  docReminderEnabled  Boolean @default(true) // เปิด/ปิดการแจ้งเตือนเอกสารค้าง
+
   // Relations
   expenses              Expense[]
   incomes               Income[]
@@ -84,6 +97,9 @@ model User {
   // New ReimbursementRequest Relations (Admin only - no requester)
   myReimbursementApprovals      ReimbursementRequest[] @relation("ReimbursementApprovals")
   myReimbursementPayments       ReimbursementRequest[] @relation("ReimbursementPayments")
+  
+  // Document Events
+  documentEvents                DocumentEvent[] @relation("DocumentEventCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -119,6 +135,15 @@ model CompanyAccess {
 
 
 // =============================================================================
+// Data Source (แหล่งที่มาของข้อมูล)
+// =============================================================================
+
+enum DataSource {
+  MANUAL    // สร้างเองในระบบ
+  PEAK      // Import จาก Peak
+}
+
+// =============================================================================
 // Account (ผังบัญชี - Chart of Accounts)
 // =============================================================================
 
@@ -152,6 +177,7 @@ model Account {
   
   isActive    Boolean      @default(true)
   isSystem    Boolean      @default(false)  // บัญชีที่ระบบสร้างให้
+  source      DataSource   @default(MANUAL) // แหล่งที่มา: MANUAL = สร้างเอง, PEAK = import จาก Peak
   
   // Relations
   expenses       Expense[]
@@ -194,6 +220,7 @@ model Contact {
 
   // Peak sync
   peakCode      String?   @unique // รหัสผู้ติดต่อ Peak (C00001, C00002...)
+  source        DataSource @default(MANUAL) // แหล่งที่มา: MANUAL = สร้างเอง, PEAK = import จาก Peak
   
   // ข้อมูลพื้นฐาน
   contactCategory ContactCategory @default(VENDOR) // ลูกค้า/ผู้จำหน่าย/อื่นๆ
@@ -294,9 +321,25 @@ model Expense {
   billDate DateTime  @default(now()) // วันที่จ่ายเงิน
   dueDate  DateTime? // วันครบกำหนด (กรณีเครดิต)
 
-  // Status & Workflow
+  // Status & Workflow (Legacy)
   status ExpenseDocStatus @default(PENDING_PHYSICAL)
   notes  String?          @db.Text
+
+  // NEW: Workflow Status (Timeline-based)
+  workflowStatus    ExpenseWorkflowStatus @default(PAID)
+  
+  // NEW: Document Checklist
+  hasTaxInvoice     Boolean   @default(false)  // มีใบกำกับภาษี
+  taxInvoiceAt      DateTime?                   // วันที่ได้รับใบกำกับ
+  
+  hasWhtCert        Boolean   @default(false)  // มีใบ 50 ทวิ (สำเนาเรา)
+  whtCertIssuedAt   DateTime?                   // วันที่ออกใบ 50 ทวิ
+  whtCertSentAt     DateTime?                   // วันที่ส่งใบ 50 ทวิให้ vendor
+  
+  sentToAccountAt   DateTime?                   // วันที่ส่งบัญชี
+  
+  // NEW: Timeline Events
+  documentEvents    DocumentEvent[]
 
   // Approval (สำหรับรายจ่ายสูง)
   approvedBy String?
@@ -344,6 +387,7 @@ model Expense {
 
   @@index([companyId, billDate])
   @@index([status])
+  @@index([workflowStatus])
   @@index([accountId])
   @@index([contactId])
   @@index([createdAt])
@@ -353,11 +397,119 @@ model Expense {
 }
 
 
+// Legacy status (keeping for backward compatibility)
 enum ExpenseDocStatus {
   WAITING_FOR_DOC // 🟠 จ่ายเงินแล้ว แต่ร้านยังไม่ส่งใบเสร็จมา
   PENDING_PHYSICAL // 🔴 ได้ใบเสร็จแล้ว แต่ตัวจริงยังอยู่ที่ตัว
   READY_TO_SEND // 🟡 รวบรวมใส่ซองแล้ว รอส่งบัญชี
   SENT_TO_ACCOUNT // 🟢 ส่งให้บัญชีเรียบร้อยแล้ว
+}
+
+// =============================================================================
+// NEW: Document Workflow Status (Timeline-based)
+// =============================================================================
+
+enum ExpenseWorkflowStatus {
+  // Phase 1: Payment & Tax Invoice
+  PAID                     // จ่ายเงินแล้ว
+  WAITING_TAX_INVOICE      // รอใบกำกับภาษีจากร้าน
+  TAX_INVOICE_RECEIVED     // ได้รับใบกำกับแล้ว
+  
+  // Phase 2: WHT (ถ้ามี isWht = true)
+  WHT_PENDING_ISSUE        // รอออกใบ 50 ทวิให้ vendor
+  WHT_ISSUED               // ออกใบ 50 ทวิแล้ว
+  WHT_SENT_TO_VENDOR       // ส่งใบ 50 ทวิให้ vendor แล้ว
+  
+  // Phase 3: Accounting
+  READY_FOR_ACCOUNTING     // เอกสารครบ รอส่งบัญชี
+  SENT_TO_ACCOUNTANT       // ส่งบัญชีแล้ว
+  COMPLETED                // เสร็จสมบูรณ์
+}
+
+enum IncomeWorkflowStatus {
+  // Phase 1: Payment Received
+  RECEIVED                 // รับเงินแล้ว
+  
+  // Phase 2: Invoice
+  NO_INVOICE_NEEDED        // ไม่ต้องออกบิล
+  WAITING_INVOICE_ISSUE    // รอออกใบกำกับภาษี/ใบเสร็จ
+  INVOICE_ISSUED           // ออกบิลแล้ว
+  INVOICE_SENT             // ส่งบิลให้ลูกค้าแล้ว
+  
+  // Phase 3: WHT (ถ้ามี isWhtDeducted = true)
+  WHT_PENDING_CERT         // รอใบ 50 ทวิจากลูกค้า
+  WHT_CERT_RECEIVED        // ได้รับใบ 50 ทวิแล้ว
+  
+  // Phase 4: Accounting
+  READY_FOR_ACCOUNTING     // เอกสารครบ รอส่งบัญชี
+  SENT_TO_ACCOUNTANT       // ส่งบัญชีแล้ว
+  COMPLETED                // เสร็จสมบูรณ์
+}
+
+// =============================================================================
+// NEW: Document Event Types (Timeline events)
+// =============================================================================
+
+enum DocumentEventType {
+  // Common
+  CREATED                  // สร้างรายการ
+  UPDATED                  // แก้ไขรายการ
+  STATUS_CHANGED           // เปลี่ยนสถานะ
+  FILE_UPLOADED            // อัปโหลดไฟล์
+  FILE_REMOVED             // ลบไฟล์
+  NOTE_ADDED               // เพิ่มหมายเหตุ
+  
+  // Tax Invoice
+  TAX_INVOICE_REQUESTED    // ขอใบกำกับจากร้าน
+  TAX_INVOICE_RECEIVED     // ได้รับใบกำกับ
+  INVOICE_ISSUED           // ออกใบกำกับให้ลูกค้า
+  INVOICE_SENT             // ส่งใบกำกับให้ลูกค้า
+  
+  // WHT
+  WHT_CERT_ISSUED          // ออกใบ 50 ทวิ
+  WHT_CERT_SENT            // ส่งใบ 50 ทวิให้ vendor
+  WHT_CERT_RECEIVED        // ได้รับใบ 50 ทวิ
+  WHT_REMINDER_SENT        // ส่งแจ้งเตือนทวงใบ 50 ทวิ
+  
+  // Accounting
+  SENT_TO_ACCOUNTANT       // ส่งบัญชี
+  ACCOUNTANT_CONFIRMED     // บัญชียืนยันรับ
+}
+
+// =============================================================================
+// NEW: Document Event (Timeline)
+// =============================================================================
+
+model DocumentEvent {
+  id          String            @id @default(cuid())
+  
+  // Link to transaction (one of these)
+  expenseId   String?
+  expense     Expense?          @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  incomeId    String?
+  income      Income?           @relation(fields: [incomeId], references: [id], onDelete: Cascade)
+  
+  // Event details
+  eventType   DocumentEventType
+  eventDate   DateTime          @default(now())
+  
+  // Status change tracking
+  fromStatus  String?           // สถานะก่อนเปลี่ยน
+  toStatus    String?           // สถานะหลังเปลี่ยน
+  
+  // Additional data
+  notes       String?           @db.Text
+  metadata    Json?             // ข้อมูลเพิ่มเติม (ไฟล์ที่อัปโหลด, เหตุผล, etc.)
+  
+  // Tracking
+  createdBy   String
+  creator     User              @relation("DocumentEventCreator", fields: [createdBy], references: [id])
+  createdAt   DateTime          @default(now())
+  
+  @@index([expenseId])
+  @@index([incomeId])
+  @@index([eventType])
+  @@index([eventDate])
 }
 
 // =============================================================================
@@ -485,9 +637,27 @@ model Income {
   // Dates
   receiveDate DateTime @default(now())
 
-  // Status & Workflow
+  // Status & Workflow (Legacy)
   status IncomeDocStatus @default(PENDING_COPY_SEND)
   notes  String?         @db.Text
+
+  // NEW: Workflow Status (Timeline-based)
+  workflowStatus    IncomeWorkflowStatus @default(RECEIVED)
+  
+  // NEW: Document Checklist
+  hasInvoice        Boolean   @default(false)  // ออกบิลแล้ว
+  invoiceIssuedAt   DateTime?                   // วันที่ออกบิล
+  invoiceSentAt     DateTime?                   // วันที่ส่งบิลลูกค้า
+  
+  hasWhtCert        Boolean   @default(false)  // ได้รับใบ 50 ทวิ
+  whtCertReceivedAt DateTime?                   // วันที่ได้รับใบ 50 ทวิ
+  whtCertRemindedAt DateTime?                   // วันที่ทวงล่าสุด
+  whtCertRemindCount Int      @default(0)       // จำนวนครั้งที่ทวง
+  
+  sentToAccountAt   DateTime?                   // วันที่ส่งบัญชี
+  
+  // NEW: Timeline Events
+  documentEvents    DocumentEvent[]
 
   // Job Order (สำหรับ Phase 5 - Anajak)
   jobOrderId String?
@@ -504,6 +674,7 @@ model Income {
 
   @@index([companyId, receiveDate])
   @@index([status])
+  @@index([workflowStatus])
   @@index([accountId])
   @@index([contactId])
   @@index([createdAt])
@@ -660,6 +831,8 @@ model VendorMapping {
   accountId           String?        // Chart of Accounts
   account             Account?       @relation(fields: [accountId], references: [id])
   defaultVatRate      Int? // 0 หรือ 7
+  defaultWhtRate      Int? // อัตราหัก ณ ที่จ่ายเริ่มต้น: 1, 2, 3, 5, 10, 15
+  defaultWhtType      String? // ประเภทเงินได้: ค่าบริการ, ค่าเช่า, ค่าจ้างทำของ, ค่าขนส่ง, ค่านายหน้า
   paymentMethod       PaymentMethod?
   descriptionTemplate String? // เช่น "ค่าวัตถุดิบจาก {vendorName}"
 

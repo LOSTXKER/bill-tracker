@@ -71,12 +71,13 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
     ],
   };
 
+  // Use new workflow statuses
   const [
     monthlyTotal,
     lastMonthTotal,
-    waitingDocs,
-    pendingPhysical,
-    sentToAccount,
+    waitingTaxInvoice,
+    readyForAccounting,
+    sentToAccountant,
     totalExpenses
   ] = await Promise.all([
     prisma.expense.aggregate({
@@ -95,13 +96,13 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
       _sum: { netPaid: true },
     }),
     prisma.expense.count({
-      where: { ...expenseFilter, status: "WAITING_FOR_DOC" },
+      where: { ...expenseFilter, workflowStatus: "WAITING_TAX_INVOICE" },
     }),
     prisma.expense.count({
-      where: { ...expenseFilter, status: "PENDING_PHYSICAL" },
+      where: { ...expenseFilter, workflowStatus: "READY_FOR_ACCOUNTING" },
     }),
     prisma.expense.count({
-      where: { ...expenseFilter, status: "SENT_TO_ACCOUNT" },
+      where: { ...expenseFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },
     }),
     prisma.expense.count({
       where: expenseFilter,
@@ -116,10 +117,10 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
     : 0;
 
   // Calculate progress percentages
-  const totalPending = waitingDocs + pendingPhysical;
-  const waitingDocsProgress = totalPending > 0 ? (waitingDocs / totalPending) * 100 : 0;
-  const pendingPhysicalProgress = totalPending > 0 ? (pendingPhysical / totalPending) * 100 : 0;
-  const sentProgress = totalExpenses > 0 ? (sentToAccount / totalExpenses) * 100 : 0;
+  const totalPending = waitingTaxInvoice + readyForAccounting;
+  const waitingDocsProgress = totalPending > 0 ? (waitingTaxInvoice / totalPending) * 100 : 0;
+  const readyProgress = totalPending > 0 ? (readyForAccounting / totalPending) * 100 : 0;
+  const sentProgress = totalExpenses > 0 ? (sentToAccountant / totalExpenses) * 100 : 0;
 
   return (
     <StatsGrid
@@ -137,24 +138,24 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
           } : undefined,
         },
         {
-          title: "รอใบเสร็จ",
-          value: waitingDocs.toString(),
+          title: "รอใบกำกับ",
+          value: waitingTaxInvoice.toString(),
           subtitle: "รายการ",
           icon: "clock",
           iconColor: "text-amber-500",
           progress: waitingDocsProgress,
         },
         {
-          title: "รอส่งบัญชี",
-          value: pendingPhysical.toString(),
+          title: "พร้อมส่งบัญชี",
+          value: readyForAccounting.toString(),
           subtitle: "รายการ",
           icon: "file-text",
-          iconColor: "text-amber-500",
-          progress: pendingPhysicalProgress,
+          iconColor: "text-blue-500",
+          progress: readyProgress,
         },
         {
-          title: "ส่งแล้ว",
-          value: sentToAccount.toString(),
+          title: "ส่งบัญชีแล้ว",
+          value: sentToAccountant.toString(),
           subtitle: "รายการ",
           icon: "check-circle",
           iconColor: "text-primary",

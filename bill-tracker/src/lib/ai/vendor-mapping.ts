@@ -23,6 +23,8 @@ export interface MappingCreateData {
   contactId?: string;
   accountId?: string;
   defaultVatRate?: number;
+  defaultWhtRate?: number; // หัก ณ ที่จ่าย: 1, 2, 3, 5, 10, 15
+  defaultWhtType?: string; // ค่าบริการ, ค่าเช่า, ค่าจ้างทำของ, ค่าขนส่ง
   paymentMethod?: PaymentMethod;
   descriptionTemplate?: string;
   namePattern?: string;
@@ -37,6 +39,8 @@ export interface MappingUpdateData {
   contactId?: string;
   accountId?: string;
   defaultVatRate?: number;
+  defaultWhtRate?: number;
+  defaultWhtType?: string;
   paymentMethod?: PaymentMethod;
   descriptionTemplate?: string;
 }
@@ -86,6 +90,8 @@ export async function createMapping(
           contactId: data.contactId || existing.contactId,
           accountId: data.accountId || existing.accountId,
           defaultVatRate: data.defaultVatRate ?? existing.defaultVatRate,
+          defaultWhtRate: data.defaultWhtRate ?? existing.defaultWhtRate,
+          defaultWhtType: data.defaultWhtType || existing.defaultWhtType,
           paymentMethod: data.paymentMethod || existing.paymentMethod,
           descriptionTemplate: data.descriptionTemplate || existing.descriptionTemplate,
           namePattern: data.namePattern || existing.namePattern,
@@ -111,6 +117,8 @@ export async function createMapping(
           contactId: data.contactId || existingByName.contactId,
           accountId: data.accountId || existingByName.accountId,
           defaultVatRate: data.defaultVatRate ?? existingByName.defaultVatRate,
+          defaultWhtRate: data.defaultWhtRate ?? existingByName.defaultWhtRate,
+          defaultWhtType: data.defaultWhtType || existingByName.defaultWhtType,
           paymentMethod: data.paymentMethod || existingByName.paymentMethod,
           descriptionTemplate: data.descriptionTemplate || existingByName.descriptionTemplate,
           learnSource: data.learnSource || existingByName.learnSource,
@@ -131,6 +139,8 @@ export async function createMapping(
       contactId: data.contactId,
       accountId: data.accountId,
       defaultVatRate: data.defaultVatRate,
+      defaultWhtRate: data.defaultWhtRate,
+      defaultWhtType: data.defaultWhtType,
       paymentMethod: data.paymentMethod,
       descriptionTemplate: data.descriptionTemplate,
       namePattern: data.namePattern,

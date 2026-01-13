@@ -6,6 +6,8 @@ import { calculateIncomeTotals } from "@/lib/utils/tax-calculator";
 import {
   INCOME_STATUS_FLOW,
   INCOME_STATUS_INFO,
+  INCOME_WORKFLOW_FLOW,
+  INCOME_WORKFLOW_INFO,
 } from "@/lib/constants/transaction";
 
 interface IncomeFormProps {
@@ -28,11 +30,11 @@ export function getIncomeConfig(companyCode: string): UnifiedTransactionConfig {
     listUrl: "incomes",
     entityType: "Income",
 
-    // Status configuration
-    statusFlow: INCOME_STATUS_FLOW,
-    statusInfo: INCOME_STATUS_INFO,
-    completedStatus: "SENT_COPY",
-    defaultStatus: "PENDING_COPY_SEND",
+    // Status configuration - using new workflow
+    statusFlow: INCOME_WORKFLOW_FLOW,
+    statusInfo: INCOME_WORKFLOW_INFO,
+    completedStatus: "SENT_TO_ACCOUNTANT",
+    defaultStatus: "WAITING_INVOICE_ISSUE",
 
     // Field configurations
     fields: {
@@ -66,35 +68,45 @@ export function getIncomeConfig(companyCode: string): UnifiedTransactionConfig {
       referenceNo: "",
     },
 
-    // Status options (all statuses for display, condition controls visibility in create mode)
+    // Status options - NEW Workflow statuses
     statusOptions: [
       {
-        value: "NO_DOC_REQUIRED",
-        label: "ไม่ต้องทำเอกสาร",
+        value: "NO_INVOICE_NEEDED",
+        label: "ไม่ต้องออกบิล",
         color: "gray",
       },
       {
-        value: "WAITING_ISSUE",
-        label: "รอออกบิลให้ลูกค้า",
+        value: "WAITING_INVOICE_ISSUE",
+        label: "รอออกบิล",
         color: "orange",
       },
       {
-        value: "WAITING_WHT_CERT",
+        value: "INVOICE_ISSUED",
+        label: "ออกบิลแล้ว",
+        color: "green",
+      },
+      {
+        value: "WHT_PENDING_CERT",
         label: "รอใบ 50 ทวิ จากลูกค้า",
-        color: "orange",
+        color: "amber",
         condition: (formData) => formData.isWhtDeducted as boolean,
       },
       {
-        value: "PENDING_COPY_SEND",
-        label: "เอกสารครบ (รอส่งบัญชี)",
-        color: "red",
+        value: "WHT_CERT_RECEIVED",
+        label: "ได้ใบ 50 ทวิแล้ว",
+        color: "purple",
+        condition: (formData) => formData.isWhtDeducted as boolean,
       },
       {
-        value: "SENT_COPY",
-        label: "ส่งสำเนาให้บัญชีแล้ว",
+        value: "READY_FOR_ACCOUNTING",
+        label: "พร้อมส่งบัญชี",
+        color: "blue",
+      },
+      {
+        value: "SENT_TO_ACCOUNTANT",
+        label: "ส่งบัญชีแล้ว",
         color: "green",
-        // Only show in edit mode or when already at this status
-        condition: (data: Record<string, unknown>) => data.status === "SENT_COPY",
+        condition: (data: Record<string, unknown>) => data.status === "SENT_TO_ACCOUNTANT",
       },
     ],
 

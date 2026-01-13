@@ -57,7 +57,8 @@ export async function fetchIncomes(params: FetchIncomesParams) {
   }
 
   if (status) {
-    where.status = status;
+    // Use workflowStatus for new workflow system
+    where.workflowStatus = status;
   }
 
   if (category) {

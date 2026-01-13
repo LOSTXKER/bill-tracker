@@ -19,7 +19,8 @@ interface IncomeTableRowProps {
     netReceived: number;
     isWhtDeducted: boolean;
     whtRate: number | null;
-    status: string;
+    status: string; // legacy
+    workflowStatus?: string; // new workflow status
     contact: { name: string } | null;
     account?: { id: string; code: string; name: string } | null;
     creator?: {
@@ -64,7 +65,7 @@ export function IncomeTableRow({
         {formatThaiDate(income.receiveDate)}
       </TableCell>
       <TableCell className="text-center">
-        <StatusBadge status={income.status} type="income" />
+        <StatusBadge status={income.workflowStatus || income.status} type="income" />
       </TableCell>
       <TableCell>
         <p className="font-medium">

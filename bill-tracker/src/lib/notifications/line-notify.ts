@@ -26,16 +26,22 @@ export interface IncomeNotification {
   status: string;
 }
 
+// Status labels using new workflow statuses
 const STATUS_LABELS: Record<string, string> = {
-  WAITING_FOR_DOC: "รอใบเสร็จ",
-  PENDING_PHYSICAL: "รอส่งบัญชี",
-  READY_TO_SEND: "พร้อมส่ง",
-  SENT_TO_ACCOUNT: "ส่งแล้ว",
-  NO_DOC_REQUIRED: "ไม่ต้องทำเอกสาร",
-  WAITING_ISSUE: "รอออกบิล",
-  WAITING_WHT_CERT: "รอใบ 50 ทวิ",
-  PENDING_COPY_SEND: "รอส่งสำเนา",
-  SENT_COPY: "ส่งแล้ว",
+  // Expense workflow statuses
+  PAID: "จ่ายแล้ว",
+  WAITING_TAX_INVOICE: "รอใบกำกับภาษี",
+  RECEIVED_TAX_INVOICE: "ได้ใบกำกับแล้ว",
+  WHT_PENDING_ISSUE: "รอออก 50 ทวิ",
+  WHT_ISSUED: "ออก 50 ทวิแล้ว",
+  READY_FOR_ACCOUNTING: "พร้อมส่งบัญชี",
+  SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
+  // Income workflow statuses
+  RECEIVED: "รับเงินแล้ว",
+  WAITING_INVOICE_ISSUE: "รอออกบิล",
+  INVOICE_ISSUED: "ออกบิลแล้ว",
+  WHT_PENDING_CERT: "รอใบ 50 ทวิ",
+  WHT_RECEIVED: "ได้ใบ 50 ทวิแล้ว",
 };
 
 function formatCurrency(amount: number): string {
@@ -96,8 +102,8 @@ export function formatExpenseNotification(data: ExpenseNotification): string {
     `สถานะ: ${STATUS_LABELS[data.status] || data.status}`
   );
 
-  if (data.status === "WAITING_FOR_DOC") {
-    lines.push(`⚠️ อย่าลืมขอใบเสร็จ!`);
+  if (data.status === "WAITING_TAX_INVOICE") {
+    lines.push(`⚠️ อย่าลืมขอใบกำกับภาษี!`);
   }
 
   if (data.whtAmount && data.whtAmount > 0) {

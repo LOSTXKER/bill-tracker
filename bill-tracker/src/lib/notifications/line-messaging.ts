@@ -231,11 +231,15 @@ export function createExpenseFlexMessage(expense: {
     showWhtInfo: true,
     ...formatOptions,
   };
+  // Expense workflow status configuration
   const statusConfig: Record<string, { emoji: string; text: string; color: string; bgColor: string }> = {
-    WAITING_FOR_DOC: { emoji: "📋", text: "รอใบเสร็จ", color: "#F59E0B", bgColor: "#FEF3C7" },
-    PENDING_PHYSICAL: { emoji: "📄", text: "รอส่งบัญชี", color: "#EF4444", bgColor: "#FEE2E2" },
-    READY_TO_SEND: { emoji: "📦", text: "พร้อมส่ง", color: "#8B5CF6", bgColor: "#EDE9FE" },
-    SENT_TO_ACCOUNT: { emoji: "✅", text: "ส่งแล้ว", color: "#10B981", bgColor: "#D1FAE5" },
+    PAID: { emoji: "💳", text: "จ่ายแล้ว", color: "#6B7280", bgColor: "#F3F4F6" },
+    WAITING_TAX_INVOICE: { emoji: "📋", text: "รอใบกำกับ", color: "#F59E0B", bgColor: "#FEF3C7" },
+    RECEIVED_TAX_INVOICE: { emoji: "📄", text: "ได้ใบกำกับแล้ว", color: "#3B82F6", bgColor: "#DBEAFE" },
+    WHT_PENDING_ISSUE: { emoji: "📝", text: "รอออก 50 ทวิ", color: "#F97316", bgColor: "#FED7AA" },
+    WHT_ISSUED: { emoji: "✍️", text: "ออก 50 ทวิแล้ว", color: "#8B5CF6", bgColor: "#EDE9FE" },
+    READY_FOR_ACCOUNTING: { emoji: "📦", text: "พร้อมส่งบัญชี", color: "#10B981", bgColor: "#D1FAE5" },
+    SENT_TO_ACCOUNTANT: { emoji: "✅", text: "ส่งบัญชีแล้ว", color: "#059669", bgColor: "#A7F3D0" },
   };
 
   const status = statusConfig[expense.status] || { emoji: "⚪", text: expense.status, color: "#6B7280", bgColor: "#F3F4F6" };
@@ -497,12 +501,15 @@ export function createIncomeFlexMessage(income: {
     showWhtInfo: true,
     ...formatOptions,
   };
+  // Income workflow status configuration
   const statusConfig: Record<string, { emoji: string; text: string; color: string; bgColor: string }> = {
-    NO_DOC_REQUIRED: { emoji: "⚪", text: "ไม่ต้องทำเอกสาร", color: "#6B7280", bgColor: "#F3F4F6" },
-    WAITING_ISSUE: { emoji: "📝", text: "รอออกบิล", color: "#F59E0B", bgColor: "#FEF3C7" },
-    WAITING_WHT_CERT: { emoji: "📋", text: "รอใบ 50 ทวิ", color: "#F59E0B", bgColor: "#FEF3C7" },
-    PENDING_COPY_SEND: { emoji: "📄", text: "รอส่งสำเนา", color: "#EF4444", bgColor: "#FEE2E2" },
-    SENT_COPY: { emoji: "✅", text: "ส่งแล้ว", color: "#10B981", bgColor: "#D1FAE5" },
+    RECEIVED: { emoji: "💵", text: "รับเงินแล้ว", color: "#6B7280", bgColor: "#F3F4F6" },
+    WAITING_INVOICE_ISSUE: { emoji: "📝", text: "รอออกบิล", color: "#F59E0B", bgColor: "#FEF3C7" },
+    INVOICE_ISSUED: { emoji: "📄", text: "ออกบิลแล้ว", color: "#3B82F6", bgColor: "#DBEAFE" },
+    WHT_PENDING_CERT: { emoji: "📋", text: "รอใบ 50 ทวิ", color: "#F97316", bgColor: "#FED7AA" },
+    WHT_RECEIVED: { emoji: "✍️", text: "ได้ใบ 50 ทวิแล้ว", color: "#8B5CF6", bgColor: "#EDE9FE" },
+    READY_FOR_ACCOUNTING: { emoji: "📦", text: "พร้อมส่งบัญชี", color: "#10B981", bgColor: "#D1FAE5" },
+    SENT_TO_ACCOUNTANT: { emoji: "✅", text: "ส่งบัญชีแล้ว", color: "#059669", bgColor: "#A7F3D0" },
   };
 
   const status = statusConfig[income.status] || { emoji: "⚪", text: income.status, color: "#6B7280", bgColor: "#F3F4F6" };
@@ -651,8 +658,8 @@ export function createIncomeFlexMessage(income: {
     margin: "lg",
   });
 
-  // Add WHT reminder if applicable
-  if (income.status === "WAITING_WHT_CERT") {
+  // Add WHT reminder if applicable (using new workflow status)
+  if (income.status === "WHT_PENDING_CERT") {
     bodyContents.push({
       type: "box",
       layout: "horizontal",

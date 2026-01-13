@@ -24,10 +24,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { BookUser, Check, Plus, X } from "lucide-react";
+import { BookUser, Check, Lightbulb, Plus, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreateContactDialog, Contact } from "./CreateContactDialog";
 import type { ContactSummary } from "@/types";
+
+// AI-detected new vendor suggestion
+export interface AiVendorSuggestion {
+  name: string;
+  taxId?: string | null;
+  branchNumber?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
 
 interface ContactSelectorProps {
   contacts: ContactSummary[];
@@ -43,6 +53,10 @@ interface ContactSelectorProps {
   // One-time contact name (typed manually, not saved)
   contactName?: string;
   onContactNameChange?: (name: string) => void;
+  // AI-detected new vendor suggestion
+  aiVendorSuggestion?: AiVendorSuggestion | null;
+  // Mode for showing/hiding required indicator
+  mode?: "create" | "edit" | "view";
 }
 
 export function ContactSelector({
@@ -58,6 +72,8 @@ export function ContactSelector({
   required = false,
   contactName = "",
   onContactNameChange,
+  aiVendorSuggestion,
+  mode = "create",
 }: ContactSelectorProps) {
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -101,12 +117,55 @@ export function ContactSelector({
     setOpen(false);
   };
 
+  // State for AI suggestion dialog
+  const [showAiSuggestionDialog, setShowAiSuggestionDialog] = useState(false);
+
+  // Convert AI suggestion to Contact format for dialog
+  const aiSuggestionContact: Contact | null = aiVendorSuggestion ? {
+    id: "",
+    name: aiVendorSuggestion.name,
+    taxId: aiVendorSuggestion.taxId,
+    address: aiVendorSuggestion.address,
+    phone: aiVendorSuggestion.phone,
+    email: aiVendorSuggestion.email,
+  } : null;
+
   return (
     <div className="space-y-2">
       {label && (
         <Label className="text-foreground font-medium">
-          {label} {required && !hasValue && <span className="text-red-500">*</span>}
+          {label} {mode !== "view" && required && !hasValue && <span className="text-red-500">*</span>}
         </Label>
+      )}
+
+      {/* AI Vendor Suggestion Banner */}
+      {aiVendorSuggestion && !selectedContact && companyCode && (
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-blue-900 dark:text-blue-100">
+                AI ตรวจพบผู้ติดต่อใหม่
+              </p>
+              <p className="text-blue-700 dark:text-blue-300 mt-1">
+                <span className="font-medium">{aiVendorSuggestion.name}</span>
+                {aiVendorSuggestion.taxId && (
+                  <span className="text-xs ml-2 font-mono">({aiVendorSuggestion.taxId})</span>
+                )}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2 gap-1 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
+                onClick={() => setShowAiSuggestionDialog(true)}
+              >
+                <Plus className="h-3 w-3" />
+                บันทึกผู้ติดต่อนี้
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="relative flex gap-1">
@@ -237,6 +296,17 @@ export function ContactSelector({
           open={showCreateDialog}
           onOpenChange={setShowCreateDialog}
           companyCode={companyCode}
+          onSuccess={handleContactCreated}
+        />
+      )}
+
+      {/* AI Suggestion Contact Dialog - pre-filled with AI data */}
+      {companyCode && aiSuggestionContact && (
+        <CreateContactDialog
+          open={showAiSuggestionDialog}
+          onOpenChange={setShowAiSuggestionDialog}
+          companyCode={companyCode}
+          editingContact={aiSuggestionContact}
           onSuccess={handleContactCreated}
         />
       )}

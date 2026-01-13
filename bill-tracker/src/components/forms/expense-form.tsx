@@ -7,6 +7,8 @@ import { DatePicker } from "./shared/DatePicker";
 import {
   EXPENSE_STATUS_FLOW,
   EXPENSE_STATUS_INFO,
+  EXPENSE_WORKFLOW_FLOW,
+  EXPENSE_WORKFLOW_INFO,
 } from "@/lib/constants/transaction";
 
 interface ExpenseFormProps {
@@ -30,11 +32,11 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
     listUrl: "expenses",
     entityType: "Expense",
 
-    // Status configuration
-    statusFlow: EXPENSE_STATUS_FLOW,
-    statusInfo: EXPENSE_STATUS_INFO,
-    completedStatus: "SENT_TO_ACCOUNT",
-    defaultStatus: "PENDING_PHYSICAL",
+    // Status configuration - using new workflow
+    statusFlow: EXPENSE_WORKFLOW_FLOW,
+    statusInfo: EXPENSE_WORKFLOW_INFO,
+    completedStatus: "SENT_TO_ACCOUNTANT",
+    defaultStatus: "WAITING_TAX_INVOICE",
 
     // Field configurations
     fields: {
@@ -68,31 +70,41 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
       referenceNo: "",
     },
 
-    // Status options (all statuses for display, condition controls visibility in create mode)
+    // Status options - NEW Workflow statuses
     statusOptions: [
       {
-        value: "WAITING_FOR_DOC",
-        label: "ร้านส่งบิลตามมา",
+        value: "WAITING_TAX_INVOICE",
+        label: "รอใบกำกับภาษี",
         color: "orange",
       },
       {
-        value: "PENDING_PHYSICAL",
-        label: "ได้บิลครบแล้ว (รอส่งบัญชี)",
-        color: "red",
+        value: "TAX_INVOICE_RECEIVED",
+        label: "ได้ใบกำกับแล้ว",
+        color: "green",
       },
       {
-        value: "READY_TO_SEND",
-        label: "พร้อมส่ง",
-        color: "yellow",
-        // Only show in edit mode or when already at this status
-        condition: (data: Record<string, unknown>) => data.status === "READY_TO_SEND",
+        value: "WHT_PENDING_ISSUE",
+        label: "รอออกใบ 50 ทวิ",
+        color: "amber",
+        // Only show when WHT is enabled
+        condition: (data: Record<string, unknown>) => data.isWht === true,
       },
       {
-        value: "SENT_TO_ACCOUNT",
+        value: "WHT_ISSUED",
+        label: "ออกใบ 50 ทวิแล้ว",
+        color: "purple",
+        condition: (data: Record<string, unknown>) => data.isWht === true,
+      },
+      {
+        value: "READY_FOR_ACCOUNTING",
+        label: "พร้อมส่งบัญชี",
+        color: "blue",
+      },
+      {
+        value: "SENT_TO_ACCOUNTANT",
         label: "ส่งบัญชีแล้ว",
         color: "green",
-        // Only show in edit mode or when already at this status
-        condition: (data: Record<string, unknown>) => data.status === "SENT_TO_ACCOUNT",
+        condition: (data: Record<string, unknown>) => data.status === "SENT_TO_ACCOUNTANT",
       },
     ],
 

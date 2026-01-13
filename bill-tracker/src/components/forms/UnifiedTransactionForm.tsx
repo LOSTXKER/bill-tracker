@@ -73,12 +73,12 @@ import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { DatePicker } from "./shared/DatePicker";
 
 // Transaction components
-import { StatusProgressBar, DocumentSection, TransactionDetailSkeleton } from "@/components/transactions";
-import { AuditHistorySection } from "@/components/audit-logs/audit-history-section";
+import { StatusProgressBar, WorkflowProgressBar, WorkflowCard, DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions } from "@/components/transactions";
+// AuditHistorySection is now part of CombinedHistorySection
 
 // Types & Constants
 import type { ContactSummary } from "@/types";
-import { StatusInfo } from "@/lib/constants/transaction";
+import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 // =============================================================================
 // Types
@@ -205,6 +205,13 @@ interface BaseTransaction {
   updatedAt: string;
   deletedAt?: string | null;
   deletedByUser?: { name: string } | null;
+  // Workflow fields
+  workflowStatus?: string;
+  hasTaxInvoice?: boolean;
+  hasWhtCert?: boolean;
+  hasInvoice?: boolean;
+  isWht?: boolean;
+  isWhtDeducted?: boolean;
   [key: string]: unknown;
 }
 
@@ -294,6 +301,16 @@ export function UnifiedTransactionForm({
   const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
   const [oneTimeContactName, setOneTimeContactName] = useState("");
   const [pendingContactId, setPendingContactId] = useState<string | null>(null);
+
+  // AI Vendor Suggestion (for auto-creating contact)
+  const [aiVendorSuggestion, setAiVendorSuggestion] = useState<{
+    name: string;
+    taxId?: string | null;
+    branchNumber?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  } | null>(null);
 
   // Account
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
@@ -614,6 +631,15 @@ export function UnifiedTransactionForm({
         vatRate?: number | null;
         paymentMethod?: string | null;
         amount?: number | null;
+        whtRate?: number | null;
+        whtAmount?: number | null;
+        whtType?: string | null;
+        documentType?: string | null;
+        vendorBranchNumber?: string | null;
+        vendorEmail?: string | null;
+        description?: string | null;
+        invoiceNumber?: string | null;
+        items?: string[];
       };
 
       // Apply amount
@@ -655,40 +681,53 @@ export function UnifiedTransactionForm({
         setValue("paymentMethod", paymentMethod);
       }
 
-      // Apply invoice number
-      if (combined.invoiceNumbers && combined.invoiceNumbers.length > 0) {
-        setValue("invoiceNumber", combined.invoiceNumbers.join(", "));
+      // Apply invoice number (รองรับ invoiceNumbers จาก AI)
+      const invoiceNum = combined.invoiceNumbers && combined.invoiceNumbers.length > 0 
+        ? combined.invoiceNumbers.join(", ") 
+        : null;
+      if (invoiceNum) {
+        setValue("invoiceNumber", invoiceNum);
       }
 
-      // Apply description
+      // Apply description - ใช้ AI สรุปมาก่อน
       if (config.fields.descriptionField) {
         let description: string | null = null;
-        const allItems: string[] = [];
-        for (const file of result.files || []) {
-          const extracted = file.extracted as {
-            items?: Array<{ description: string } | string>;
-          };
-          if (extracted?.items && Array.isArray(extracted.items)) {
-            for (const item of extracted.items) {
-              if (typeof item === "string" && item.trim()) {
-                allItems.push(item.trim());
-              } else if (typeof item === "object" && item?.description && item.description.trim()) {
-                allItems.push(item.description.trim());
+        
+        // 1. ใช้ description จาก AI (สรุปค่าใช้จ่าย)
+        if (extendedCombined.description && typeof extendedCombined.description === "string") {
+          description = extendedCombined.description;
+        }
+        
+        // 2. ถ้าไม่มี ลองรวม items จาก OCR
+        if (!description) {
+          const allItems: string[] = [];
+          for (const file of result.files || []) {
+            const extracted = file.extracted as {
+              items?: Array<{ description: string } | string>;
+            };
+            if (extracted?.items && Array.isArray(extracted.items)) {
+              for (const item of extracted.items) {
+                if (typeof item === "string" && item.trim()) {
+                  allItems.push(item.trim());
+                } else if (typeof item === "object" && item?.description && item.description.trim()) {
+                  allItems.push(item.description.trim());
+                }
               }
             }
           }
+          if (allItems.length > 0) {
+            const itemsText = allItems.slice(0, 5).join(", ");
+            description =
+              allItems.length > 5 ? `${itemsText} และอื่นๆ (${allItems.length} รายการ)` : itemsText;
+          }
         }
 
-        if (allItems.length > 0) {
-          const itemsText = allItems.slice(0, 5).join(", ");
-          description =
-            allItems.length > 5 ? `${itemsText} และอื่นๆ (${allItems.length} รายการ)` : itemsText;
-        }
-
+        // 3. ถ้ายังไม่มี ลอง suggested
         if (!description && suggested.description) {
           description = suggested.description as string;
         }
 
+        // 4. Fallback เป็นชื่อร้าน
         if (!description && combined.vendorName) {
           const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
           description = `${prefix} ${combined.vendorName}`;
@@ -705,9 +744,20 @@ export function UnifiedTransactionForm({
         const contact = contacts.find((c) => c.id === contactIdToUse);
         if (contact) {
           setSelectedContact(contact);
+          setAiVendorSuggestion(null); // Clear suggestion when contact is found
         } else {
           setPendingContactId(contactIdToUse);
         }
+      } else if (result.smart?.isNewVendor && (combined.vendorName || combined.vendorTaxId)) {
+        // AI detected a new vendor - show suggestion to create contact
+        setAiVendorSuggestion({
+          name: combined.vendorName || "",
+          taxId: combined.vendorTaxId,
+          branchNumber: extendedCombined.vendorBranchNumber ?? null,
+          address: null, // Could be extracted from vendorAddress if available
+          phone: null,
+          email: extendedCombined.vendorEmail ?? null,
+        });
       }
 
       // Apply account
@@ -721,9 +771,35 @@ export function UnifiedTransactionForm({
         setPendingAccountId(result.smart.aiAccountSuggestion.accountId);
       }
 
+      // Apply WHT (Withholding Tax) from AI
+      const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
+      const whtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
+      if (whtRate !== null && whtRate !== undefined && whtRate > 0) {
+        // Enable WHT toggle
+        setValue(config.fields.whtField.name, true);
+        setValue("whtRate", whtRate);
+        if (whtType) {
+          setValue("whtType", whtType);
+        }
+      }
+
       setAiApplied(true);
+      
+      // Build success message with document type info
+      const documentType = (suggested.documentType as string | null | undefined) || extendedCombined.documentType;
+      const docTypeNames: Record<string, string> = {
+        TAX_INVOICE: "ใบกำกับภาษี",
+        RECEIPT: "ใบเสร็จรับเงิน",
+        INVOICE: "ใบแจ้งหนี้",
+        BANK_SLIP: "สลิปโอนเงิน",
+        WHT_CERT: "ใบหัก ณ ที่จ่าย",
+      };
+      const docTypeName = documentType ? docTypeNames[documentType] : null;
+      
       toast.success("กรอกข้อมูลจาก AI แล้ว", {
-        description: "โปรดตรวจสอบความถูกต้องก่อนบันทึก",
+        description: docTypeName 
+          ? `ตรวจพบ${docTypeName} - โปรดตรวจสอบความถูกต้องก่อนบันทึก`
+          : "โปรดตรวจสอบความถูกต้องก่อนบันทึก",
       });
     },
     [setValue, config, contacts]
@@ -1157,8 +1233,12 @@ export function UnifiedTransactionForm({
     );
   }
 
+  // Use workflowStatus for badge if available, fallback to legacy status
+  const workflowInfo = config.type === "expense" ? EXPENSE_WORKFLOW_INFO : INCOME_WORKFLOW_INFO;
   const statusInfo = transaction
-    ? config.statusInfo[transaction.status] || config.statusInfo[config.defaultStatus]
+    ? (transaction.workflowStatus 
+        ? workflowInfo[transaction.workflowStatus] 
+        : config.statusInfo[transaction.status]) || config.statusInfo[config.defaultStatus]
     : null;
   const isDeleted = transaction?.deletedAt ? true : false;
   const nextStatusInfo = getNextStatusInfo();
@@ -1289,13 +1369,15 @@ export function UnifiedTransactionForm({
             </div>
           </div>
 
-          {/* Status Progress */}
-          <StatusProgressBar
-            statusFlow={config.statusFlow}
-            statusInfo={config.statusInfo}
-            currentStatus={transaction.status}
-            className="mb-6"
-          />
+          {/* Status Progress - Show only for legacy status (no workflowStatus) */}
+          {!transaction.workflowStatus && transaction.status && (
+            <StatusProgressBar
+              statusFlow={config.statusFlow}
+              statusInfo={config.statusInfo}
+              currentStatus={transaction.status}
+              className="mb-6"
+            />
+          )}
         </div>
       )}
 
@@ -1329,10 +1411,16 @@ export function UnifiedTransactionForm({
                     contacts={contacts}
                     contactsLoading={contactsLoading}
                     selectedContact={selectedContact}
-                    onContactSelect={setSelectedContact}
+                    onContactSelect={(contact) => {
+                      setSelectedContact(contact);
+                      if (contact) {
+                        setAiVendorSuggestion(null); // Clear suggestion when contact is selected
+                      }
+                    }}
                     onContactCreated={(contact) => {
                       refetchContacts();
                       setSelectedContact(contact);
+                      setAiVendorSuggestion(null); // Clear suggestion when contact is created
                     }}
                     oneTimeContactName={oneTimeContactName}
                     onOneTimeContactNameChange={setOneTimeContactName}
@@ -1347,6 +1435,7 @@ export function UnifiedTransactionForm({
                     onSuggestAccount={suggestAccount}
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}
+                    aiVendorSuggestion={aiVendorSuggestion}
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }
@@ -1430,6 +1519,21 @@ export function UnifiedTransactionForm({
                   {/* View/Edit mode: Document display with upload capability */}
                   {(mode === "view" || mode === "edit") && transaction && (
                     <>
+                      {/* Workflow Status & Actions - New UI */}
+                      {transaction.workflowStatus && (
+                        <WorkflowCard
+                          companyCode={companyCode}
+                          type={config.type}
+                          transactionId={transaction.id}
+                          currentStatus={transaction.workflowStatus}
+                          isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
+                          onActionComplete={() => {
+                            fetchTransaction();
+                            setAuditRefreshKey((k) => k + 1);
+                          }}
+                        />
+                      )}
+
                       <Card>
                         <CardHeader className="pb-4">
                           <CardTitle className="text-base flex items-center gap-2">
@@ -1489,11 +1593,14 @@ export function UnifiedTransactionForm({
                         </div>
                       </Card>
 
-                      {/* Audit History */}
-                      <AuditHistorySection
+                      {/* Combined History (Document Events + Audit Logs) */}
+                      <CombinedHistorySection
+                        companyCode={companyCode}
                         companyId={transaction.companyId}
                         entityType={config.entityType}
                         entityId={transaction.id}
+                        expenseId={config.type === "expense" ? transaction.id : undefined}
+                        incomeId={config.type === "income" ? transaction.id : undefined}
                         refreshKey={auditRefreshKey}
                       />
                     </>
@@ -1715,5 +1822,103 @@ export function UnifiedTransactionForm({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+// =============================================================================
+// Workflow Status Display Component
+// =============================================================================
+
+const EXPENSE_WORKFLOW_LABELS: Record<string, { label: string; color: string; step: number }> = {
+  PAID: { label: "จ่ายเงินแล้ว", color: "bg-blue-500", step: 1 },
+  WAITING_TAX_INVOICE: { label: "รอใบกำกับ", color: "bg-orange-500", step: 1 },
+  TAX_INVOICE_RECEIVED: { label: "ได้ใบกำกับแล้ว", color: "bg-green-500", step: 2 },
+  WHT_PENDING_ISSUE: { label: "รอออกใบ 50 ทวิ", color: "bg-amber-500", step: 3 },
+  WHT_ISSUED: { label: "ออกใบ 50 ทวิแล้ว", color: "bg-green-500", step: 3 },
+  WHT_SENT_TO_VENDOR: { label: "ส่ง 50 ทวิแล้ว", color: "bg-green-500", step: 3 },
+  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "bg-purple-500", step: 4 },
+  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "bg-green-500", step: 5 },
+  COMPLETED: { label: "เสร็จสิ้น", color: "bg-green-600", step: 5 },
+};
+
+const INCOME_WORKFLOW_LABELS: Record<string, { label: string; color: string; step: number }> = {
+  RECEIVED: { label: "รับเงินแล้ว", color: "bg-blue-500", step: 1 },
+  NO_INVOICE_NEEDED: { label: "ไม่ต้องออกบิล", color: "bg-gray-500", step: 2 },
+  WAITING_INVOICE_ISSUE: { label: "รอออกบิล", color: "bg-orange-500", step: 2 },
+  INVOICE_ISSUED: { label: "ออกบิลแล้ว", color: "bg-green-500", step: 2 },
+  INVOICE_SENT: { label: "ส่งบิลแล้ว", color: "bg-green-500", step: 2 },
+  WHT_PENDING_CERT: { label: "รอใบ 50 ทวิ", color: "bg-amber-500", step: 3 },
+  WHT_CERT_RECEIVED: { label: "ได้ใบ 50 ทวิแล้ว", color: "bg-green-500", step: 3 },
+  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "bg-purple-500", step: 4 },
+  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "bg-green-500", step: 5 },
+  COMPLETED: { label: "เสร็จสิ้น", color: "bg-green-600", step: 5 },
+};
+
+interface WorkflowStatusDisplayProps {
+  type: "expense" | "income";
+  status: string;
+  hasTaxInvoice?: boolean;
+  hasWhtCert?: boolean;
+  hasInvoice?: boolean;
+  isWht?: boolean;
+}
+
+function WorkflowStatusDisplay({
+  type,
+  status,
+  hasTaxInvoice,
+  hasWhtCert,
+  hasInvoice,
+  isWht,
+}: WorkflowStatusDisplayProps) {
+  const labels = type === "expense" ? EXPENSE_WORKFLOW_LABELS : INCOME_WORKFLOW_LABELS;
+  const current = labels[status] || { label: status, color: "bg-gray-500", step: 0 };
+
+  // Build checklist based on type
+  const checklist = type === "expense" ? [
+    { label: "ใบกำกับภาษี", checked: hasTaxInvoice },
+    ...(isWht ? [{ label: "ใบ 50 ทวิ (ออกให้ vendor)", checked: hasWhtCert }] : []),
+  ] : [
+    { label: "ใบกำกับภาษี (ออกให้ลูกค้า)", checked: hasInvoice },
+    ...(isWht ? [{ label: "ใบ 50 ทวิ (จากลูกค้า)", checked: hasWhtCert }] : []),
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Current Status Badge */}
+      <div className="flex items-center gap-3">
+        <Badge className={`${current.color} text-white`}>
+          {current.label}
+        </Badge>
+        {current.step < 5 && (
+          <span className="text-sm text-muted-foreground">
+            ขั้นตอนที่ {current.step} / 5
+          </span>
+        )}
+      </div>
+
+      {/* Document Checklist */}
+      {checklist.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">เอกสาร:</p>
+          <div className="flex flex-wrap gap-2">
+            {checklist.map((item, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm",
+                  item.checked 
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                    : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                )}
+              >
+                {item.checked ? "✓" : "○"}
+                {item.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

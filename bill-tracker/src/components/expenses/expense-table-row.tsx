@@ -19,7 +19,8 @@ interface ExpenseTableRowProps {
     category: string | null; // deprecated
     account?: { id: string; code: string; name: string } | null;
     netPaid: number | bigint | { toNumber?: () => number };
-    status: string;
+    status: string; // legacy
+    workflowStatus?: string; // new workflow status
     contact: { name: string } | null;
     creator?: {
       id: string;
@@ -66,7 +67,7 @@ export function ExpenseTableRow({
         {formatThaiDate(expense.billDate)}
       </TableCell>
       <TableCell className="text-center">
-        <StatusBadge status={expense.status} type="expense" />
+        <StatusBadge status={expense.workflowStatus || expense.status} type="expense" />
       </TableCell>
       <TableCell>
         <p className="font-medium text-foreground">

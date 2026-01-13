@@ -26,10 +26,36 @@ import {
   XCircle,
   Shield,
   Sparkles,
-  Plus,
   RefreshCw,
+  AlertTriangle,
+  CalendarDays,
+  Cloud,
+  PenTool,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Filter,
+  X,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CreateAccountDialog } from "./create-account-dialog";
+import { ImportAccountsDialog } from "./import-accounts-dialog";
 
 interface Account {
   id: string;
@@ -40,6 +66,7 @@ interface Account {
   isActive: boolean;
   keywords?: string[];
   description?: string | null;
+  source?: "PEAK" | "MANUAL";
 }
 
 interface AccountsPageClientProps {
@@ -47,6 +74,23 @@ interface AccountsPageClientProps {
   companyName: string;
   accounts: Account[];
   canEdit: boolean;
+  lastAccountImportAt: string | null;
+}
+
+// Helper to format relative date
+function formatRelativeDate(dateString: string | null): { text: string; daysAgo: number } {
+  if (!dateString) return { text: "ยังไม่เคย import", daysAgo: Infinity };
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const daysAgo = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (daysAgo === 0) return { text: "วันนี้", daysAgo };
+  if (daysAgo === 1) return { text: "เมื่อวาน", daysAgo };
+  if (daysAgo < 7) return { text: `${daysAgo} วันที่แล้ว`, daysAgo };
+  if (daysAgo < 30) return { text: `${Math.floor(daysAgo / 7)} สัปดาห์ที่แล้ว`, daysAgo };
+  return { text: `${Math.floor(daysAgo / 30)} เดือนที่แล้ว`, daysAgo };
 }
 
 const ACCOUNT_CLASS_LABELS: Record<string, { label: string; color: string }> = {
@@ -60,17 +104,51 @@ const ACCOUNT_CLASS_LABELS: Record<string, { label: string; color: string }> = {
   OTHER_EXPENSE: { label: "ค่าใช้จ่ายอื่น", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300" },
 };
 
+type SortField = "code" | "name";
+type SortOrder = "asc" | "desc";
+
 export function AccountsPageClient({
   companyCode,
   companyName,
   accounts: initialAccounts,
   canEdit,
+  lastAccountImportAt,
 }: AccountsPageClientProps) {
   const router = useRouter();
   const [accounts, setAccounts] = useState(initialAccounts);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>("code"); // คอลัมน์แรก = รหัส
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Calculate import status
+  const importStatus = formatRelativeDate(lastAccountImportAt);
+  const needsUpdate = importStatus.daysAgo >= 30;
+
+  // Handle sort toggle
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  // Sort icon component
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortOrder === "asc" ? (
+      <ArrowUp className="h-4 w-4 ml-1" />
+    ) : (
+      <ArrowDown className="h-4 w-4 ml-1" />
+    );
+  };
 
   // Refresh accounts list
   const handleRefresh = useCallback(async () => {
@@ -95,6 +173,34 @@ export function AccountsPageClient({
     setAccounts((prev) => [...prev, newAccount].sort((a, b) => a.code.localeCompare(b.code)));
   }, []);
 
+  // Handle delete account
+  const handleDelete = useCallback(async (account: Account) => {
+    if (account.isSystem) {
+      toast.error("ไม่สามารถลบบัญชีระบบได้");
+      return;
+    }
+
+    if (!confirm(`ต้องการลบบัญชี "${account.code} - ${account.name}" ใช่หรือไม่?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/${companyCode.toLowerCase()}/accounts/${account.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success("ลบบัญชีสำเร็จ");
+        setAccounts((prev) => prev.filter((a) => a.id !== account.id));
+      } else {
+        toast.error(data.error || "เกิดข้อผิดพลาดในการลบบัญชี");
+      }
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการลบบัญชี");
+    }
+  }, [companyCode]);
+
   // Filter accounts
   const filteredAccounts = accounts.filter((account) => {
     const matchesSearch =
@@ -105,8 +211,25 @@ export function AccountsPageClient({
       );
 
     const matchesClass = !selectedClass || account.class === selectedClass;
+    
+    const matchesSource = !selectedSource || 
+      (selectedSource === "PEAK" ? account.source === "PEAK" : account.source !== "PEAK");
+    
+    const matchesStatus = !selectedStatus ||
+      (selectedStatus === "active" ? account.isActive : !account.isActive);
 
-    return matchesSearch && matchesClass;
+    return matchesSearch && matchesClass && matchesSource && matchesStatus;
+  });
+
+  // Sort accounts
+  const sortedAccounts = [...filteredAccounts].sort((a, b) => {
+    let comparison = 0;
+    if (sortField === "code") {
+      comparison = a.code.localeCompare(b.code);
+    } else if (sortField === "name") {
+      comparison = a.name.localeCompare(b.name, "th");
+    }
+    return sortOrder === "asc" ? comparison : -comparison;
   });
 
   // Group by class
@@ -122,12 +245,39 @@ export function AccountsPageClient({
   const stats = {
     total: accounts.length,
     active: accounts.filter((a) => a.isActive).length,
-    custom: accounts.filter((a) => !a.isSystem).length,
-    system: accounts.filter((a) => a.isSystem).length,
+    fromPeak: accounts.filter((a) => a.source === "PEAK").length,
+    manual: accounts.filter((a) => a.source === "MANUAL" || !a.source).length,
   };
 
   return (
     <div className="space-y-6">
+      {/* Update Reminder Alert */}
+      {needsUpdate && canEdit && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-medium text-amber-900 dark:text-amber-100">
+                ควรอัปเดตผังบัญชีจาก Peak
+              </h4>
+              <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                Import ล่าสุด: {importStatus.text}
+                {lastAccountImportAt && (
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {" "}({new Date(lastAccountImportAt).toLocaleDateString("th-TH", { 
+                      year: "numeric", 
+                      month: "short", 
+                      day: "numeric" 
+                    })})
+                  </span>
+                )}
+                {" "}- ถ้า Peak มีการเปลี่ยนแปลงผังบัญชี ควร Import ใหม่เพื่อให้ข้อมูลตรงกัน
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -135,6 +285,16 @@ export function AccountsPageClient({
           <p className="text-muted-foreground mt-2">
             จัดการผังบัญชี (Chart of Accounts) สำหรับ {companyName}
           </p>
+          {/* Last Import Info */}
+          <div className="flex items-center gap-2 mt-2 text-sm">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              Import จาก Peak ล่าสุด:{" "}
+              <span className={needsUpdate ? "text-amber-600 font-medium" : "text-foreground"}>
+                {importStatus.text}
+              </span>
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -147,10 +307,20 @@ export function AccountsPageClient({
             รีเฟรช
           </Button>
           {canEdit && (
-            <CreateAccountDialog
-              companyCode={companyCode}
-              onAccountCreated={handleAccountCreated}
-            />
+            <>
+              <ImportAccountsDialog
+                companyCode={companyCode}
+                onImportComplete={() => {
+                  handleRefresh();
+                  // Refresh page to get updated lastAccountImportAt
+                  router.refresh();
+                }}
+              />
+              <CreateAccountDialog
+                companyCode={companyCode}
+                onAccountCreated={handleAccountCreated}
+              />
+            </>
           )}
         </div>
       </div>
@@ -183,24 +353,24 @@ export function AccountsPageClient({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              บัญชีระบบ
+              <Cloud className="h-4 w-4" />
+              Import จาก Peak
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.system}</div>
+            <div className="text-2xl font-bold">{stats.fromPeak}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              บัญชีกำหนดเอง
+              <PenTool className="h-4 w-4" />
+              สร้างเอง
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.custom}</div>
+            <div className="text-2xl font-bold">{stats.manual}</div>
           </CardContent>
         </Card>
       </div>
@@ -252,27 +422,115 @@ export function AccountsPageClient({
             })}
           </div>
 
+          {/* Additional Filters & Sort */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">กรอง:</span>
+            </div>
+            
+            {/* Source Filter */}
+            <Select
+              value={selectedSource || "all"}
+              onValueChange={(value) => setSelectedSource(value === "all" ? null : value)}
+            >
+              <SelectTrigger className="w-[140px] h-8">
+                <SelectValue placeholder="แหล่งที่มา" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกแหล่งที่มา</SelectItem>
+                <SelectItem value="PEAK">
+                  <span className="flex items-center gap-1">
+                    <Cloud className="h-3 w-3" /> Peak
+                  </span>
+                </SelectItem>
+                <SelectItem value="MANUAL">
+                  <span className="flex items-center gap-1">
+                    <PenTool className="h-3 w-3" /> สร้างเอง
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Status Filter */}
+            <Select
+              value={selectedStatus || "all"}
+              onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
+            >
+              <SelectTrigger className="w-[130px] h-8">
+                <SelectValue placeholder="สถานะ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกสถานะ</SelectItem>
+                <SelectItem value="active">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> ใช้งาน
+                  </span>
+                </SelectItem>
+                <SelectItem value="inactive">
+                  <span className="flex items-center gap-1">
+                    <XCircle className="h-3 w-3" /> ปิดใช้งาน
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Clear Filters */}
+            {(selectedSource || selectedStatus || selectedClass) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground"
+                onClick={() => {
+                  setSelectedClass(null);
+                  setSelectedSource(null);
+                  setSelectedStatus(null);
+                }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                ล้างตัวกรอง
+              </Button>
+            )}
+          </div>
+
           {/* Accounts Table */}
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">รหัส</TableHead>
-                  <TableHead>ชื่อบัญชี</TableHead>
+                  <TableHead 
+                    className="w-[120px] cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("code")}
+                  >
+                    <div className="flex items-center">
+                      รหัส
+                      <SortIcon field="code" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      ชื่อบัญชี
+                      <SortIcon field="name" />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-[150px]">ประเภท</TableHead>
                   <TableHead className="w-[100px]">สถานะ</TableHead>
-                  <TableHead className="w-[80px]">ประเภทบัญชี</TableHead>
+                  <TableHead className="w-[80px]">แหล่งที่มา</TableHead>
+                  {canEdit && <TableHead className="w-[50px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAccounts.length === 0 ? (
+                {sortedAccounts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={canEdit ? 6 : 5} className="text-center py-8 text-muted-foreground">
                       ไม่พบบัญชีที่ตรงกับเงื่อนไข
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAccounts.map((account) => {
+                  sortedAccounts.map((account) => {
                     const classInfo = ACCOUNT_CLASS_LABELS[account.class];
                     return (
                       <TableRow key={account.id}>
@@ -310,18 +568,39 @@ export function AccountsPageClient({
                           )}
                         </TableCell>
                         <TableCell>
-                          {account.isSystem ? (
-                            <Badge variant="secondary" className="gap-1">
-                              <Shield className="h-3 w-3" />
-                              ระบบ
+                          {account.source === "PEAK" ? (
+                            <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                              <Cloud className="h-3 w-3" />
+                              Peak
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="gap-1">
-                              <Sparkles className="h-3 w-3" />
-                              กำหนดเอง
+                              <PenTool className="h-3 w-3" />
+                              สร้างเอง
                             </Badge>
                           )}
                         </TableCell>
+                        {canEdit && (
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => handleDelete(account)}
+                                  disabled={account.isSystem}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  ลบ
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })

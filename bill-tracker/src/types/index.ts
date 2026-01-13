@@ -163,6 +163,8 @@ export interface ContactSummary {
   address?: string | null;
   creditLimit?: number | null;
   paymentTerms?: number | null;
+  peakCode?: string | null;
+  source?: "PEAK" | "MANUAL";
 }
 
 export interface CategorySummary {

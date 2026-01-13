@@ -53,8 +53,10 @@ export default async function AccountsPage({ params }: PageProps) {
         isActive: a.isActive,
         keywords: a.keywords as string[],
         description: a.description,
+        source: a.source,
       }))}
       canEdit={canEdit}
+      lastAccountImportAt={company.lastAccountImportAt?.toISOString() || null}
     />
   );
 }

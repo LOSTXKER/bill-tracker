@@ -58,7 +58,7 @@ export interface StatusInfo {
 }
 
 // =============================================================================
-// Expense Status Configuration
+// Expense Status Configuration (Legacy - for backward compatibility)
 // =============================================================================
 
 export const EXPENSE_STATUS_FLOW = [
@@ -100,7 +100,92 @@ export const EXPENSE_STATUS_INFO: Record<string, StatusInfo> = {
 };
 
 // =============================================================================
-// Income Status Configuration
+// NEW: Expense Workflow Status Configuration
+// =============================================================================
+
+export const EXPENSE_WORKFLOW_FLOW = [
+  "PAID",
+  "TAX_INVOICE_RECEIVED",
+  "WHT_ISSUED",  // ถ้ามี WHT
+  "READY_FOR_ACCOUNTING",
+  "SENT_TO_ACCOUNTANT",
+] as const;
+
+export const EXPENSE_WORKFLOW_FLOW_NO_WHT = [
+  "PAID",
+  "TAX_INVOICE_RECEIVED",
+  "READY_FOR_ACCOUNTING",
+  "SENT_TO_ACCOUNTANT",
+] as const;
+
+export const EXPENSE_WORKFLOW_INFO: Record<string, StatusInfo> = {
+  PAID: {
+    label: "จ่ายเงินแล้ว",
+    description: "จ่ายเงินแล้ว รอใบกำกับภาษี",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
+    dotColor: "bg-blue-500",
+  },
+  WAITING_TAX_INVOICE: {
+    label: "รอใบกำกับ",
+    description: "รอใบกำกับภาษีจากร้านค้า",
+    color: "text-orange-600",
+    bgColor: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900",
+    dotColor: "bg-orange-500",
+  },
+  TAX_INVOICE_RECEIVED: {
+    label: "ได้ใบกำกับแล้ว",
+    description: "ได้รับใบกำกับภาษีแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  WHT_PENDING_ISSUE: {
+    label: "รอออก 50 ทวิ",
+    description: "รอออกใบหัก ณ ที่จ่ายให้ vendor",
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
+    dotColor: "bg-amber-500",
+  },
+  WHT_ISSUED: {
+    label: "ออก 50 ทวิแล้ว",
+    description: "ออกใบหัก ณ ที่จ่ายแล้ว",
+    color: "text-purple-600",
+    bgColor: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-900",
+    dotColor: "bg-purple-500",
+  },
+  WHT_SENT_TO_VENDOR: {
+    label: "ส่ง 50 ทวิแล้ว",
+    description: "ส่งใบหัก ณ ที่จ่ายให้ vendor แล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  READY_FOR_ACCOUNTING: {
+    label: "รอส่งบัญชี",
+    description: "เอกสารครบ รอส่งบัญชี",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-900",
+    dotColor: "bg-indigo-500",
+  },
+  SENT_TO_ACCOUNTANT: {
+    label: "ส่งบัญชีแล้ว",
+    description: "ส่งให้บัญชีแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  COMPLETED: {
+    label: "เสร็จสิ้น",
+    description: "ดำเนินการเสร็จสิ้น",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-100 border-emerald-300 dark:bg-emerald-950/50 dark:border-emerald-800",
+    dotColor: "bg-emerald-600",
+  },
+};
+
+// =============================================================================
+// Income Status Configuration (Legacy - for backward compatibility)
 // =============================================================================
 
 export const INCOME_STATUS_FLOW = [
@@ -146,6 +231,98 @@ export const INCOME_STATUS_INFO: Record<string, StatusInfo> = {
     color: "text-emerald-600",
     bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
     dotColor: "bg-emerald-500",
+  },
+};
+
+// =============================================================================
+// NEW: Income Workflow Status Configuration
+// =============================================================================
+
+export const INCOME_WORKFLOW_FLOW = [
+  "RECEIVED",
+  "INVOICE_ISSUED",
+  "WHT_CERT_RECEIVED",  // ถ้าลูกค้าหักภาษี
+  "READY_FOR_ACCOUNTING",
+  "SENT_TO_ACCOUNTANT",
+] as const;
+
+export const INCOME_WORKFLOW_FLOW_NO_WHT = [
+  "RECEIVED",
+  "INVOICE_ISSUED",
+  "READY_FOR_ACCOUNTING",
+  "SENT_TO_ACCOUNTANT",
+] as const;
+
+export const INCOME_WORKFLOW_INFO: Record<string, StatusInfo> = {
+  RECEIVED: {
+    label: "รับเงินแล้ว",
+    description: "รับเงินจากลูกค้าแล้ว",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
+    dotColor: "bg-blue-500",
+  },
+  NO_INVOICE_NEEDED: {
+    label: "ไม่ต้องออกบิล",
+    description: "ไม่ต้องออกใบกำกับภาษี",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
+    dotColor: "bg-slate-400",
+  },
+  WAITING_INVOICE_ISSUE: {
+    label: "รอออกบิล",
+    description: "รอออกใบกำกับภาษีให้ลูกค้า",
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
+    dotColor: "bg-amber-500",
+  },
+  INVOICE_ISSUED: {
+    label: "ออกบิลแล้ว",
+    description: "ออกใบกำกับภาษีให้ลูกค้าแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  INVOICE_SENT: {
+    label: "ส่งบิลแล้ว",
+    description: "ส่งใบกำกับภาษีให้ลูกค้าแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  WHT_PENDING_CERT: {
+    label: "รอใบ 50 ทวิ",
+    description: "รอใบหัก ณ ที่จ่ายจากลูกค้า",
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
+    dotColor: "bg-amber-500",
+  },
+  WHT_CERT_RECEIVED: {
+    label: "ได้ใบ 50 ทวิ",
+    description: "ได้รับใบหัก ณ ที่จ่ายจากลูกค้าแล้ว",
+    color: "text-purple-600",
+    bgColor: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-900",
+    dotColor: "bg-purple-500",
+  },
+  READY_FOR_ACCOUNTING: {
+    label: "รอส่งบัญชี",
+    description: "เอกสารครบ รอส่งบัญชี",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-900",
+    dotColor: "bg-indigo-500",
+  },
+  SENT_TO_ACCOUNTANT: {
+    label: "ส่งบัญชีแล้ว",
+    description: "ส่งให้บัญชีแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  COMPLETED: {
+    label: "เสร็จสิ้น",
+    description: "ดำเนินการเสร็จสิ้น",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-100 border-emerald-300 dark:bg-emerald-950/50 dark:border-emerald-800",
+    dotColor: "bg-emerald-600",
   },
 };
 

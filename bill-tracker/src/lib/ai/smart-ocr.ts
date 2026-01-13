@@ -30,10 +30,25 @@ export interface MultiDocAnalysisResult {
   combined: {
     vendorName: string | null;
     vendorTaxId: string | null;
+    vendorBranchNumber: string | null;
+    vendorEmail: string | null;
+    vendorAddress?: string | null;
+    vendorPhone?: string | null;
     totalAmount: number;
+    amount?: number | null;
     vatAmount: number;
+    vatRate?: number | null;
+    whtRate: number | null;
+    whtAmount: number | null;
+    whtType: string | null;
+    netAmount: number | null;
     date: string | null;
+    dueDate: string | null;
     invoiceNumbers: string[];
+    invoiceNumber?: string | null;
+    documentType: string | null;
+    description?: string | null;
+    items?: string[];
   };
   currencyConversion?: CurrencyDetectionResult;
   smart: {
@@ -46,6 +61,8 @@ export interface MultiDocAnalysisResult {
       accountCode: string | null;
       accountName: string | null;
       defaultVatRate: number | null;
+      defaultWhtRate: number | null;
+      defaultWhtType: string | null;
       paymentMethod: string | null;
       descriptionTemplate: string | null;
     } | null;
@@ -101,6 +118,8 @@ export interface SuggestedValues {
   // Contact/Vendor
   vendorName: string | null;
   vendorTaxId: string | null;
+  vendorBranchNumber: string | null;
+  vendorEmail: string | null;
   contactId: string | null;
   
   // Financial
@@ -109,9 +128,17 @@ export interface SuggestedValues {
   vatAmount: number | null;
   totalAmount: number | null;
   
+  // Withholding Tax
+  whtRate: number | null;
+  whtAmount: number | null;
+  whtType: string | null;
+  netAmount: number | null;
+  
   // Document
+  documentType: string | null;
   invoiceNumber: string | null;
   date: string | null;
+  dueDate: string | null;
   paymentMethod: PaymentMethod | null;
   description: string | null;
   accountId: string | null;
@@ -285,13 +312,21 @@ function buildSuggestedValues(
   const suggested: SuggestedValues = {
     vendorName: ocrResult.vendorName,
     vendorTaxId: ocrResult.vendorTaxId,
+    vendorBranchNumber: ocrResult.vendorBranchNumber,
+    vendorEmail: ocrResult.vendorEmail,
     contactId: null,
     amount: ocrResult.amount,
     vatRate: ocrResult.vatRate,
     vatAmount: ocrResult.vatAmount,
     totalAmount: ocrResult.totalAmount,
+    whtRate: ocrResult.whtRate,
+    whtAmount: ocrResult.whtAmount,
+    whtType: ocrResult.whtType,
+    netAmount: ocrResult.netAmount,
+    documentType: ocrResult.documentType,
     invoiceNumber: ocrResult.invoiceNumber,
     date: ocrResult.date,
+    dueDate: ocrResult.dueDate,
     paymentMethod: normalizePaymentMethod(ocrResult.paymentMethod),
     description: null,
     accountId: null,
@@ -316,6 +351,21 @@ function buildSuggestedValues(
       if (!ocrResult.vatRate || ocrResult.confidence.amount < 70) {
         suggested.vatRate = mapping.defaultVatRate;
       }
+    }
+    
+    // WHT Rate (use mapping if no OCR result or mapping has default)
+    const extendedMapping = mapping as typeof mapping & {
+      defaultWhtRate?: number | null;
+      defaultWhtType?: string | null;
+    };
+    if (extendedMapping.defaultWhtRate !== null && extendedMapping.defaultWhtRate !== undefined) {
+      // Use mapping WHT if OCR didn't detect it or has low confidence
+      if (!ocrResult.whtRate || (ocrResult.confidence.wht && ocrResult.confidence.wht < 70)) {
+        suggested.whtRate = extendedMapping.defaultWhtRate;
+      }
+    }
+    if (extendedMapping.defaultWhtType && !ocrResult.whtType) {
+      suggested.whtType = extendedMapping.defaultWhtType;
     }
     
     // Payment Method (prefer mapping)
@@ -711,19 +761,28 @@ export async function analyzeAndClassifyMultiple(
   if (combined.vendorName || combined.vendorTaxId) {
     // Create a pseudo ReceiptData for matching
     const pseudoData: ReceiptData = {
+      documentType: combined.documentType as ReceiptData["documentType"],
+      documentTypeConfidence: 80,
       vendorName: combined.vendorName,
       vendorTaxId: combined.vendorTaxId,
+      vendorBranchNumber: combined.vendorBranchNumber,
       vendorAddress: null,
       vendorPhone: null,
+      vendorEmail: combined.vendorEmail,
       amount: combined.amount || combined.totalAmount || null,
       vatRate: combined.vatRate,
       vatAmount: combined.vatAmount || null,
       totalAmount: combined.totalAmount || null,
+      whtRate: combined.whtRate,
+      whtAmount: combined.whtAmount,
+      whtType: combined.whtType,
+      netAmount: combined.netAmount,
       invoiceNumber: combined.invoiceNumbers[0] || null,
       date: combined.date,
+      dueDate: combined.dueDate,
       paymentMethod: combined.paymentMethod,
       items: [],
-      confidence: { overall: 80, amount: 80, vendor: 80, date: 70 },
+      confidence: { overall: 80, amount: 80, vendor: 80, date: 70, wht: 70 },
     };
 
     const matchResult = await findBestMatchByType(
@@ -854,6 +913,8 @@ export async function analyzeAndClassifyMultiple(
             accountCode: matchResult.mapping.account?.code || null,
             accountName: matchResult.mapping.account?.name || null,
             defaultVatRate: matchResult.mapping.defaultVatRate,
+            defaultWhtRate: (matchResult.mapping as any).defaultWhtRate || null,
+            defaultWhtType: (matchResult.mapping as any).defaultWhtType || null,
             paymentMethod: matchResult.mapping.paymentMethod,
             descriptionTemplate: matchResult.mapping.descriptionTemplate,
           }
@@ -1010,10 +1071,18 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
     return {
       vendorName: null,
       vendorTaxId: null,
+      vendorBranchNumber: null,
+      vendorEmail: null,
       totalAmount: 0,
       vatAmount: 0,
+      whtRate: null,
+      whtAmount: null,
+      whtType: null,
+      netAmount: null,
       date: null,
+      dueDate: null,
       invoiceNumbers: [],
+      documentType: null,
       vatRate: null,
       paymentMethod: null,
       amount: null,
@@ -1023,22 +1092,41 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
   // Find the most confident vendor info
   let vendorName: string | null = null;
   let vendorTaxId: string | null = null;
+  let vendorBranchNumber: string | null = null;
+  let vendorEmail: string | null = null;
   let bestVendorConfidence = 0;
 
   // Sum up amounts
   let totalAmount = 0;
   let vatAmount = 0;
   let amount = 0;
+  let whtAmount = 0;
+
+  // WHT info (use from WHT cert or first document with valid value)
+  let whtRate: number | null = null;
+  let whtType: string | null = null;
 
   // Collect invoice numbers
   const invoiceNumbers: string[] = [];
 
   // Use earliest date
   let earliestDate: string | null = null;
+  let dueDate: string | null = null;
 
   // Track VAT rate and payment method (use from first document with valid value)
   let vatRate: number | null = null;
   let paymentMethod: string | null = null;
+
+  // Document type (prefer TAX_INVOICE > RECEIPT > others)
+  let documentType: string | null = null;
+  const docTypePriority: Record<string, number> = {
+    TAX_INVOICE: 5,
+    RECEIPT: 4,
+    INVOICE: 3,
+    BANK_SLIP: 2,
+    WHT_CERT: 1,
+    OTHER: 0,
+  };
 
   for (const result of results) {
     // Vendor info (use highest confidence)
@@ -1050,6 +1138,12 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
     }
     if (result.vendorTaxId && !vendorTaxId) {
       vendorTaxId = result.vendorTaxId;
+    }
+    if (result.vendorBranchNumber && !vendorBranchNumber) {
+      vendorBranchNumber = result.vendorBranchNumber;
+    }
+    if (result.vendorEmail && !vendorEmail) {
+      vendorEmail = result.vendorEmail;
     }
 
     // Sum amounts
@@ -1067,6 +1161,17 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
       vatAmount += result.vatAmount;
     }
 
+    // WHT - sum amounts, use first rate/type
+    if (result.whtAmount) {
+      whtAmount += result.whtAmount;
+    }
+    if (whtRate === null && result.whtRate !== null) {
+      whtRate = result.whtRate;
+    }
+    if (!whtType && result.whtType) {
+      whtType = result.whtType;
+    }
+
     // Collect invoice numbers
     if (result.invoiceNumber && !invoiceNumbers.includes(result.invoiceNumber)) {
       invoiceNumbers.push(result.invoiceNumber);
@@ -1079,6 +1184,11 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
       }
     }
 
+    // Due date (use first found)
+    if (result.dueDate && !dueDate) {
+      dueDate = result.dueDate;
+    }
+
     // VAT rate (use first found)
     if (vatRate === null && result.vatRate !== null && result.vatRate !== undefined) {
       vatRate = result.vatRate;
@@ -1088,18 +1198,39 @@ function combineMultipleResults(results: ReceiptData[]): MultiDocAnalysisResult[
     if (!paymentMethod && result.paymentMethod) {
       paymentMethod = result.paymentMethod;
     }
+
+    // Document type (use highest priority)
+    if (result.documentType) {
+      const currentPriority = documentType ? (docTypePriority[documentType] || 0) : -1;
+      const newPriority = docTypePriority[result.documentType] || 0;
+      if (newPriority > currentPriority) {
+        documentType = result.documentType;
+      }
+    }
   }
 
   // Validate and fix Thai Buddhist Era date conversion errors
   const validatedDate = validateAndFixThaiDate(earliestDate);
+  const validatedDueDate = validateAndFixThaiDate(dueDate);
+
+  // Calculate net amount
+  const netAmount = totalAmount > 0 && whtAmount > 0 ? totalAmount - whtAmount : null;
 
   return {
     vendorName,
     vendorTaxId,
+    vendorBranchNumber,
+    vendorEmail,
     totalAmount,
     vatAmount,
+    whtRate,
+    whtAmount: whtAmount || null,
+    whtType,
+    netAmount,
     date: validatedDate,
+    dueDate: validatedDueDate,
     invoiceNumbers,
+    documentType,
     vatRate,
     paymentMethod,
     amount: amount || null,
@@ -1270,18 +1401,27 @@ function getMimeTypeFromUrl(url: string): string {
  */
 function createEmptyReceiptData(): ReceiptData {
   return {
+    documentType: null,
+    documentTypeConfidence: 0,
     vendorName: null,
     vendorTaxId: null,
+    vendorBranchNumber: null,
     vendorAddress: null,
     vendorPhone: null,
+    vendorEmail: null,
     amount: null,
     vatRate: null,
     vatAmount: null,
     totalAmount: null,
+    whtRate: null,
+    whtAmount: null,
+    whtType: null,
+    netAmount: null,
     invoiceNumber: null,
     date: null,
+    dueDate: null,
     paymentMethod: null,
     items: [],
-    confidence: { overall: 0, amount: 0, vendor: 0, date: 0 },
+    confidence: { overall: 0, amount: 0, vendor: 0, date: 0, wht: 0 },
   };
 }

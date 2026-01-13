@@ -209,7 +209,7 @@ export function SharedTransactionFields({
       {/* Row 3: Description */}
       <div className="space-y-2">
         <Label className="text-sm text-muted-foreground">
-          {descriptionLabel} <span className="text-red-500">*</span>
+          {descriptionLabel} {isEditable && <span className="text-red-500">*</span>}
         </Label>
         {isEditable ? (
           register ? (

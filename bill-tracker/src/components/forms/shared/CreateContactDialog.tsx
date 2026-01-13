@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,6 +144,41 @@ export function CreateContactDialog({
   const resetForm = () => {
     setFormData(defaultFormData);
   };
+
+  // Watch for editingContact changes when dialog opens
+  useEffect(() => {
+    if (open && editingContact) {
+      setFormData({
+        peakCode: (editingContact as any).peakCode || "",
+        contactCategory: (editingContact as any).contactCategory || "VENDOR",
+        entityType: (editingContact as any).entityType || "COMPANY",
+        businessType: (editingContact as any).businessType || "",
+        nationality: (editingContact as any).nationality || "ไทย",
+        prefix: (editingContact as any).prefix || "",
+        firstName: (editingContact as any).firstName || "",
+        lastName: (editingContact as any).lastName || "",
+        name: editingContact.name || "",
+        taxId: editingContact.taxId || "",
+        branchCode: (editingContact as any).branchCode || "00000",
+        address: editingContact.address || "",
+        subDistrict: (editingContact as any).subDistrict || "",
+        district: (editingContact as any).district || "",
+        province: (editingContact as any).province || "",
+        postalCode: (editingContact as any).postalCode || "",
+        country: (editingContact as any).country || "Thailand",
+        contactPerson: (editingContact as any).contactPerson || "",
+        phone: editingContact.phone || "",
+        email: editingContact.email || "",
+        bankAccount: editingContact.bankAccount || "",
+        bankName: editingContact.bankName || "",
+        creditLimit: editingContact.creditLimit?.toString() || "",
+        paymentTerms: editingContact.paymentTerms?.toString() || "",
+        notes: editingContact.notes || "",
+      });
+    } else if (open && !editingContact) {
+      resetForm();
+    }
+  }, [open, editingContact]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -29,13 +29,29 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
   
   transformCreateData: (body) => {
     const { vatAmount, whtAmount, netReceived, ...data } = body;
+    
+    // Use status selected by user as workflowStatus (new workflow)
+    // If not selected, auto-determine based on document state
+    const isWhtDeducted = data.isWhtDeducted || false;
+    const hasInvoice = (data.myBillCopyUrls?.length || 0) > 0;
+    let workflowStatus = data.status; // Use user's selection
+    
+    // If no status selected, auto-determine
+    if (!workflowStatus) {
+      if (hasInvoice) {
+        workflowStatus = isWhtDeducted ? "WHT_PENDING_CERT" : "READY_FOR_ACCOUNTING";
+      } else {
+        workflowStatus = "WAITING_INVOICE_ISSUE";
+      }
+    }
+    
     return {
       contactId: data.contactId || null,
       contactName: data.contactName || null, // One-time contact name (not saved)
       amount: data.amount,
       vatRate: data.vatRate || 0,
       vatAmount: vatAmount || null,
-      isWhtDeducted: data.isWhtDeducted || false,
+      isWhtDeducted: isWhtDeducted,
       whtRate: data.whtRate || null,
       whtAmount: whtAmount || null,
       whtType: data.whtType || null,
@@ -47,6 +63,9 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       paymentMethod: data.paymentMethod,
       receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
       status: data.status,
+      workflowStatus: workflowStatus,
+      hasInvoice: hasInvoice,
+      hasWhtCert: (data.whtCertUrls?.length || 0) > 0,
       notes: data.notes,
       customerSlipUrls: data.customerSlipUrls || [],
       myBillCopyUrls: data.myBillCopyUrls || [],
@@ -54,7 +73,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     };
   },
   
-  transformUpdateData: (body) => {
+  transformUpdateData: (body, existingData?: any) => {
     const { vatAmount, whtAmount, netReceived, ...data } = body;
     const updateData: any = {};
     
@@ -76,12 +95,56 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.receiveDate !== undefined) updateData.receiveDate = data.receiveDate ? new Date(data.receiveDate) : undefined;
     if (data.status !== undefined) updateData.status = data.status;
+    if (data.workflowStatus !== undefined) updateData.workflowStatus = data.workflowStatus;
     if (data.notes !== undefined) updateData.notes = data.notes;
     
     // Handle multiple file URLs
     if (data.customerSlipUrls !== undefined) updateData.customerSlipUrls = data.customerSlipUrls;
-    if (data.myBillCopyUrls !== undefined) updateData.myBillCopyUrls = data.myBillCopyUrls;
-    if (data.whtCertUrls !== undefined) updateData.whtCertUrls = data.whtCertUrls;
+    if (data.myBillCopyUrls !== undefined) {
+      updateData.myBillCopyUrls = data.myBillCopyUrls;
+      updateData.hasInvoice = data.myBillCopyUrls.length > 0;
+      if (data.myBillCopyUrls.length > 0 && !updateData.invoiceIssuedAt) {
+        updateData.invoiceIssuedAt = new Date();
+      }
+    }
+    if (data.whtCertUrls !== undefined) {
+      updateData.whtCertUrls = data.whtCertUrls;
+      updateData.hasWhtCert = data.whtCertUrls.length > 0;
+      if (data.whtCertUrls.length > 0 && !updateData.whtCertReceivedAt) {
+        updateData.whtCertReceivedAt = new Date();
+      }
+    }
+    
+    // ==========================================================================
+    // Auto-adjust workflow status when WHT changes
+    // ==========================================================================
+    if (existingData && data.isWhtDeducted !== undefined) {
+      const wasWht = existingData.isWhtDeducted;
+      const nowWht = data.isWhtDeducted;
+      const currentStatus = existingData.workflowStatus;
+      const hasInvoice = updateData.hasInvoice ?? existingData.hasInvoice;
+      const hasWhtCert = updateData.hasWhtCert ?? existingData.hasWhtCert;
+      
+      // Case 1: Changed from non-WHT to WHT (ลูกค้าจะหักเรา)
+      if (!wasWht && nowWht) {
+        // If was ready for accounting but now needs WHT cert from customer
+        if (currentStatus === "READY_FOR_ACCOUNTING" || currentStatus === "INVOICE_ISSUED") {
+          if (!hasWhtCert) {
+            updateData.workflowStatus = "WHT_PENDING_CERT";
+          }
+        }
+      }
+      
+      // Case 2: Changed from WHT to non-WHT
+      if (wasWht && !nowWht) {
+        // If was waiting for WHT cert, can move to ready
+        if (currentStatus === "WHT_PENDING_CERT") {
+          if (hasInvoice) {
+            updateData.workflowStatus = "READY_FOR_ACCOUNTING";
+          }
+        }
+      }
+    }
     
     return updateData;
   },

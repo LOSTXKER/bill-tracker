@@ -16,6 +16,8 @@ import {
   FileText,
   Brain,
   GraduationCap,
+  Receipt,
+  Scissors,
 } from "lucide-react";
 import type { OcrAnalysisResult } from "./DocumentUploadSection";
 
@@ -25,6 +27,24 @@ interface OcrResultPreviewProps {
   onDismiss: () => void;
   onTrain?: () => void;
   isApplied?: boolean;
+}
+
+// Small confidence indicator component
+function ConfidenceIndicator({ label, value }: { label: string; value: number }) {
+  const getColor = (v: number) => {
+    if (v >= 80) return "text-green-600 bg-green-100 dark:bg-green-900/50";
+    if (v >= 60) return "text-amber-600 bg-amber-100 dark:bg-amber-900/50";
+    return "text-red-600 bg-red-100 dark:bg-red-900/50";
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-muted-foreground">{label}:</span>
+      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getColor(value)}`}>
+        {value}%
+      </span>
+    </div>
+  );
 }
 
 export function OcrResultPreview({
@@ -45,8 +65,8 @@ export function OcrResultPreview({
   };
 
   // Format currency
-  const formatCurrency = (value: number | null) => {
-    if (value === null) return "-";
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return "-";
     return new Intl.NumberFormat("th-TH", {
       style: "currency",
       currency: "THB",
@@ -74,6 +94,30 @@ export function OcrResultPreview({
     CREDIT_CARD: "บัตรเครดิต",
     PROMPTPAY: "พร้อมเพย์",
     CHEQUE: "เช็ค",
+  };
+
+  // Document type names
+  const documentTypeNames: Record<string, string> = {
+    TAX_INVOICE: "ใบกำกับภาษี",
+    RECEIPT: "ใบเสร็จรับเงิน",
+    INVOICE: "ใบแจ้งหนี้",
+    BANK_SLIP: "สลิปโอนเงิน",
+    WHT_CERT: "ใบหัก ณ ที่จ่าย",
+    QUOTATION: "ใบเสนอราคา",
+    PURCHASE_ORDER: "ใบสั่งซื้อ",
+    DELIVERY_NOTE: "ใบส่งของ",
+    OTHER: "เอกสารอื่นๆ",
+  };
+
+  // Get extended data with new fields
+  const extendedData = data as typeof data & {
+    documentType?: string | null;
+    documentTypeConfidence?: number;
+    whtRate?: number | null;
+    whtAmount?: number | null;
+    whtType?: string | null;
+    netAmount?: number | null;
+    vendorBranchNumber?: string | null;
   };
 
   return (
@@ -119,25 +163,52 @@ export function OcrResultPreview({
         </div>
       )}
 
+      {/* Document Type Banner */}
+      {extendedData.documentType && (
+        <div className="px-4 py-2 bg-slate-100 dark:bg-slate-800/50 border-b border-primary/20">
+          <div className="flex items-center gap-2 text-sm">
+            <Receipt className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {documentTypeNames[extendedData.documentType] || extendedData.documentType}
+            </span>
+            {extendedData.documentTypeConfidence && (
+              <Badge variant="outline" className="ml-auto text-xs">
+                {extendedData.documentTypeConfidence}%
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Data Grid */}
       <div className="p-4 space-y-3">
         <div className="grid grid-cols-2 gap-3 text-sm">
-          {/* Vendor Name */}
+          {/* Vendor Name with confidence indicator */}
           <div className="flex items-start gap-2">
             <Building2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div>
-              <p className="text-muted-foreground text-xs">ชื่อร้าน/บริษัท</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <p className="text-muted-foreground text-xs">ชื่อร้าน/บริษัท</p>
+                {data.confidence.vendor < 70 && (
+                  <span className="text-amber-500 text-xs" title={`ความมั่นใจ ${data.confidence.vendor}%`}>⚠</span>
+                )}
+              </div>
               <p className="font-medium truncate">{data.vendorName || "-"}</p>
             </div>
           </div>
 
-          {/* Tax ID */}
+          {/* Tax ID with Branch Number */}
           <div className="flex items-start gap-2">
             <Hash className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
               <p className="text-muted-foreground text-xs">เลขผู้เสียภาษี</p>
               <p className="font-medium font-mono text-xs">
                 {data.vendorTaxId || "-"}
+                {extendedData.vendorBranchNumber && (
+                  <span className="text-muted-foreground ml-1">
+                    (สาขา {extendedData.vendorBranchNumber === "00000" ? "ใหญ่" : extendedData.vendorBranchNumber})
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -211,6 +282,51 @@ export function OcrResultPreview({
             </div>
           </div>
         </div>
+
+        {/* WHT Section - shown when WHT is detected */}
+        {extendedData.whtRate !== null && extendedData.whtRate !== undefined && extendedData.whtRate > 0 && (
+          <div className="mt-3 p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Scissors className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              <span className="font-medium text-sm text-violet-700 dark:text-violet-300">
+                หัก ณ ที่จ่าย
+              </span>
+              {extendedData.whtType && (
+                <Badge variant="outline" className="text-xs border-violet-300 text-violet-600">
+                  {extendedData.whtType}
+                </Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">อัตรา</p>
+                <p className="font-medium">{extendedData.whtRate}%</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">จำนวน</p>
+                <p className="font-medium text-violet-600 dark:text-violet-400">
+                  -{formatCurrency(extendedData.whtAmount)}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">ยอดสุทธิ</p>
+                <p className="font-semibold">{formatCurrency(extendedData.netAmount)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confidence Breakdown - shown when overall confidence is < 80 */}
+        {confidence < 80 && (
+          <div className="mt-3 p-2 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+            <p className="text-xs text-muted-foreground mb-2">ความมั่นใจแยกตามหมวด:</p>
+            <div className="flex gap-3 text-xs">
+              <ConfidenceIndicator label="ยอดเงิน" value={data.confidence.amount} />
+              <ConfidenceIndicator label="ผู้ขาย" value={data.confidence.vendor} />
+              <ConfidenceIndicator label="วันที่" value={data.confidence.date} />
+            </div>
+          </div>
+        )}
 
         {/* Validation Warnings */}
         {validation.warnings.length > 0 && (

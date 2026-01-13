@@ -12,26 +12,36 @@ export async function ActionRequired({ companyCode }: { companyCode: string }) {
 
   if (!company) return null;
 
-  const [waitingDocs, waitingWht, waitingIssue] = await Promise.all([
+  // Use new workflow statuses
+  const [waitingDocs, waitingWht, waitingIssue, whtPendingIssue] = await Promise.all([
+    // Expenses waiting for tax invoice
     prisma.expense.findMany({
-      where: { companyId: company.id, status: "WAITING_FOR_DOC", deletedAt: null },
+      where: { companyId: company.id, workflowStatus: "WAITING_TAX_INVOICE", deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),
+    // Incomes waiting for WHT cert from customer
     prisma.income.findMany({
-      where: { companyId: company.id, status: "WAITING_WHT_CERT", deletedAt: null },
+      where: { companyId: company.id, workflowStatus: "WHT_PENDING_CERT", deletedAt: null },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
+    // Incomes waiting to issue invoice
     prisma.income.findMany({
-      where: { companyId: company.id, status: "WAITING_ISSUE", deletedAt: null },
+      where: { companyId: company.id, workflowStatus: "WAITING_INVOICE_ISSUE", deletedAt: null },
       orderBy: { receiveDate: "asc" },
+      take: 5,
+    }),
+    // Expenses needing to issue WHT cert to vendor
+    prisma.expense.findMany({
+      where: { companyId: company.id, workflowStatus: "WHT_PENDING_ISSUE", deletedAt: null },
+      orderBy: { billDate: "asc" },
       take: 5,
     }),
   ]);
 
   const hasItems =
-    waitingDocs.length > 0 || waitingWht.length > 0 || waitingIssue.length > 0;
+    waitingDocs.length > 0 || waitingWht.length > 0 || waitingIssue.length > 0 || whtPendingIssue.length > 0;
 
   return (
     <Card className="border-border/50 shadow-card">
@@ -53,7 +63,7 @@ export async function ActionRequired({ companyCode }: { companyCode: string }) {
             {waitingDocs.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-foreground mb-2">
-                  รอใบเสร็จจากร้านค้า ({waitingDocs.length})
+                  รอใบกำกับภาษีจากร้านค้า ({waitingDocs.length})
                 </p>
                 <div className="space-y-2">
                   {waitingDocs.map((expense) => (
@@ -127,6 +137,34 @@ export async function ActionRequired({ companyCode }: { companyCode: string }) {
                       </div>
                       <Badge variant="outline" className="text-amber-600 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50">
                         รอออกบิล
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {whtPendingIssue.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-foreground mb-2">
+                  รอออกใบ 50 ทวิให้ vendor ({whtPendingIssue.length})
+                </p>
+                <div className="space-y-2">
+                  {whtPendingIssue.map((expense) => (
+                    <div
+                      key={expense.id}
+                      className="flex items-center justify-between rounded-xl bg-muted/50 p-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {expense.description || "ไม่ระบุ"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCurrency(Number(expense.netPaid))}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-purple-600 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/50">
+                        รอออก 50 ทวิ
                       </Badge>
                     </div>
                   ))}

@@ -62,30 +62,48 @@ export const FIELD_LABELS: Record<string, string> = {
 
 // Status labels for translation
 export const STATUS_LABELS: Record<string, string> = {
-  // Expense document statuses
+  // Expense document statuses (Legacy)
   WAITING_FOR_DOC: "ร้านส่งบิลตามมา",
   PENDING_PHYSICAL: "ได้บิลครบแล้ว (รอส่งบัญชี)",
   READY_TO_SEND: "พร้อมส่ง",
   SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
   
-  // Income document statuses
+  // Expense Workflow statuses (New)
+  PAID: "จ่ายเงินแล้ว",
+  WAITING_TAX_INVOICE: "รอใบกำกับภาษี",
+  TAX_INVOICE_RECEIVED: "ได้รับใบกำกับแล้ว",
+  WHT_PENDING_ISSUE: "รอออกใบ 50 ทวิ",
+  WHT_ISSUED: "ออกใบ 50 ทวิแล้ว",
+  WHT_SENT_TO_VENDOR: "ส่งใบ 50 ทวิให้ vendor แล้ว",
+  READY_FOR_ACCOUNTING: "รอส่งบัญชี",
+  SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
+  COMPLETED: "เสร็จสิ้น",
+  
+  // Income document statuses (Legacy)
   NO_DOC_REQUIRED: "ไม่ต้องทำเอกสาร",
   WAITING_ISSUE: "รอออกบิลให้ลูกค้า",
   WAITING_WHT_CERT: "รอใบ 50 ทวิ จากลูกค้า",
   PENDING_COPY_SEND: "เอกสารครบ (รอส่งบัญชี)",
   SENT_COPY: "ส่งสำเนาให้บัญชีแล้ว",
   
+  // Income Workflow statuses (New)
+  RECEIVED: "รับเงินแล้ว",
+  NO_INVOICE_NEEDED: "ไม่ต้องออกบิล",
+  WAITING_INVOICE_ISSUE: "รอออกใบกำกับ",
+  INVOICE_ISSUED: "ออกใบกำกับแล้ว",
+  INVOICE_SENT: "ส่งใบกำกับให้ลูกค้าแล้ว",
+  WHT_PENDING_CERT: "รอใบ 50 ทวิจากลูกค้า",
+  WHT_CERT_RECEIVED: "ได้รับใบ 50 ทวิแล้ว",
+  
   // Reimbursement statuses
   PENDING: "รออนุมัติ",
   APPROVED: "อนุมัติแล้ว",
   REJECTED: "ปฏิเสธ",
-  PAID: "จ่ายแล้ว",
+  // PAID is already defined above
   
   // Legacy statuses (if any)
   PENDING_INVOICE: "รอออกบิล",
-  INVOICE_ISSUED: "ออกบิลแล้ว",
   COPY_SENT: "ส่งสำเนาแล้ว",
-  COMPLETED: "เสร็จสิ้น",
 };
 
 // Entity type labels

@@ -32,12 +32,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -79,6 +73,8 @@ interface VendorMapping {
   accountId: string | null;
   accountName: string | null;
   defaultVatRate: number | null;
+  defaultWhtRate: number | null;
+  defaultWhtType: string | null;
   paymentMethod: string | null;
   descriptionTemplate: string | null;
   useCount: number;
@@ -129,6 +125,26 @@ const paymentMethodOptions = [
   { value: "CHEQUE", label: "เช็ค" },
 ];
 
+const whtRateOptions = [
+  { value: "0", label: "ไม่มี" },
+  { value: "1", label: "1% (ค่าขนส่ง, ค่าโฆษณา)" },
+  { value: "2", label: "2% (ค่าจ้างทำของ บุคคลธรรมดา)" },
+  { value: "3", label: "3% (ค่าบริการ, ค่าจ้างทำของ นิติบุคคล)" },
+  { value: "5", label: "5% (ค่าเช่า, ค่านายหน้า)" },
+  { value: "10", label: "10% (ค่าวิชาชีพอิสระ)" },
+  { value: "15", label: "15% (ค่าลิขสิทธิ์)" },
+];
+
+const whtTypeOptions = [
+  { value: "ค่าบริการ", label: "ค่าบริการ (3%)" },
+  { value: "ค่าจ้างทำของ", label: "ค่าจ้างทำของ (2-3%)" },
+  { value: "ค่าเช่า", label: "ค่าเช่า (5%)" },
+  { value: "ค่าขนส่ง", label: "ค่าขนส่ง (1%)" },
+  { value: "ค่าโฆษณา", label: "ค่าโฆษณา (1%)" },
+  { value: "ค่านายหน้า", label: "ค่านายหน้า (5%)" },
+  { value: "ค่าวิชาชีพอิสระ", label: "ค่าวิชาชีพอิสระ (10%)" },
+];
+
 const sourceLabels: Record<string, string> = {
   MANUAL: "สอนเอง",
   AUTO: "อัตโนมัติ",
@@ -171,6 +187,8 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
     contactId: "",
     accountId: "",
     defaultVatRate: "",
+    defaultWhtRate: "",
+    defaultWhtType: "",
     paymentMethod: "",
     descriptionTemplate: "",
   });
@@ -251,6 +269,8 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
       contactId: "",
       accountId: "",
       defaultVatRate: "",
+      defaultWhtRate: "",
+      defaultWhtType: "",
       paymentMethod: "",
       descriptionTemplate: "",
     });
@@ -266,6 +286,8 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
       contactId: mapping.contactId || "",
       accountId: mapping.accountId || "",
       defaultVatRate: mapping.defaultVatRate?.toString() || "",
+      defaultWhtRate: mapping.defaultWhtRate?.toString() || "",
+      defaultWhtType: mapping.defaultWhtType || "",
       paymentMethod: mapping.paymentMethod || "",
       descriptionTemplate: mapping.descriptionTemplate || "",
     });
@@ -283,6 +305,8 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
         contactId: formData.contactId || undefined,
         accountId: formData.accountId || undefined,
         defaultVatRate: formData.defaultVatRate ? parseInt(formData.defaultVatRate) : undefined,
+        defaultWhtRate: formData.defaultWhtRate ? parseInt(formData.defaultWhtRate) : undefined,
+        defaultWhtType: formData.defaultWhtType || undefined,
         paymentMethod: formData.paymentMethod || undefined,
         descriptionTemplate: formData.descriptionTemplate || undefined,
       };
@@ -442,33 +466,60 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
         </Card>
       </div>
 
-      {/* Main Tabs */}
-      <Tabs defaultValue="known" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="known" className="gap-2">
-            <Brain className="h-4 w-4" />
-            ร้านที่รู้จัก
-            {mappings.length > 0 && (
-              <Badge variant="secondary" className="ml-1">{mappings.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="suggestions" className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            แนะนำให้สอน
-            {suggestions.length > 0 && (
-              <Badge variant="secondary" className="ml-1">{suggestions.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="add" className="gap-2">
-            <Plus className="h-4 w-4" />
-            เพิ่มเอง
-          </TabsTrigger>
-        </TabsList>
+      {/* Suggestions Banner (if any) */}
+      {suggestions.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                  <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">
+                    พบร้านค้าที่ใช้บ่อยแต่ยังไม่ได้สอน AI
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    {suggestions.slice(0, 3).map(s => s.contactName).join(", ")}
+                    {suggestions.length > 3 && ` และอีก ${suggestions.length - 3} ร้าน`}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300"
+                onClick={() => {
+                  quickAddFromSuggestion(suggestions[0]);
+                }}
+              >
+                สอนเลย
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Tab 1: Known Vendors */}
-        <TabsContent value="known" className="space-y-4">
+      {/* Main Content */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">ร้านค้าที่ AI รู้จัก</CardTitle>
+              <CardDescription>
+                AI จะกรอกข้อมูลอัตโนมัติเมื่อพบร้านค้าเหล่านี้
+              </CardDescription>
+            </div>
+            <Button onClick={() => { resetForm(); setShowAddDialog(true); }} className="gap-2">
+              <Plus className="h-4 w-4" />
+              เพิ่มร้านค้า
+            </Button>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -480,7 +531,7 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
             </div>
             <div className="flex gap-2">
               <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TransactionTypeFilter)}>
-                <SelectTrigger className="w-[120px]">
+                <SelectTrigger className="w-[110px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -490,7 +541,7 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
                 </SelectContent>
               </Select>
               <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as LearnSourceFilter)}>
-                <SelectTrigger className="w-[120px]">
+                <SelectTrigger className="w-[110px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -500,11 +551,6 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
                   <SelectItem value="FEEDBACK">แก้ไข</SelectItem>
                 </SelectContent>
               </Select>
-              {mappings.length > 0 && (
-                <Button variant="outline" size="icon" onClick={() => setShowResetDialog(true)}>
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              )}
             </div>
           </div>
 
@@ -514,58 +560,73 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : mappings.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">ยังไม่มีการสอน AI</p>
+            <div className="text-center py-12 border rounded-lg bg-muted/30">
+              <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground font-medium">ยังไม่มีร้านค้าที่ AI รู้จัก</p>
               <p className="text-sm text-muted-foreground mt-1">
-                AI จะเรียนรู้อัตโนมัติเมื่อคุณบันทึกรายการ
+                AI จะเรียนรู้อัตโนมัติเมื่อคุณบันทึกรายการ หรือกดปุ่มเพิ่มร้านค้าด้านบน
               </p>
             </div>
           ) : (
             <div className="border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/30">
                     <TableHead>ร้านค้า</TableHead>
                     <TableHead>บัญชี</TableHead>
-                    <TableHead className="text-center">ใช้งาน</TableHead>
-                    <TableHead className="text-center">ที่มา</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
+                    <TableHead className="text-center">VAT/WHT</TableHead>
+                    <TableHead className="text-center w-[80px]">ใช้งาน</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {mappings.map((mapping) => (
-                    <TableRow key={mapping.id}>
+                    <TableRow key={mapping.id} className="group">
                       <TableCell>
                         <div>
                           <p className="font-medium">{mapping.vendorName || mapping.contactName || "-"}</p>
-                          {mapping.vendorTaxId && (
-                            <p className="text-xs text-muted-foreground">{mapping.vendorTaxId}</p>
-                          )}
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {mapping.vendorTaxId && (
+                              <span className="text-xs text-muted-foreground font-mono">{mapping.vendorTaxId}</span>
+                            )}
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {mapping.transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
+                            </Badge>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         {mapping.accountName ? (
-                          <Badge variant="outline">{mapping.accountName}</Badge>
+                          <Badge variant="secondary" className="text-xs font-normal">{mapping.accountName}</Badge>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground text-sm">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{mapping.useCount}x</Badge>
+                      <TableCell>
+                        <div className="flex gap-1.5 justify-center flex-wrap">
+                          {mapping.defaultVatRate !== null && (
+                            <Badge variant="outline" className="text-xs font-normal">VAT {mapping.defaultVatRate}%</Badge>
+                          )}
+                          {mapping.defaultWhtRate !== null && mapping.defaultWhtRate > 0 && (
+                            <Badge variant="outline" className="text-xs font-normal text-violet-600 border-violet-300">
+                              WHT {mapping.defaultWhtRate}%
+                            </Badge>
+                          )}
+                          {mapping.defaultVatRate === null && (!mapping.defaultWhtRate || mapping.defaultWhtRate === 0) && (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant={mapping.learnSource === "MANUAL" ? "default" : "secondary"}>
-                          {sourceLabels[mapping.learnSource || "UNKNOWN"]}
-                        </Badge>
+                        <span className="text-sm text-muted-foreground">{mapping.useCount}x</span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => startEdit(mapping)}>
-                            <Pencil className="h-4 w-4" />
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(mapping)}>
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => deleteMapping(mapping.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMapping(mapping.id)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
@@ -575,66 +636,8 @@ export function AiTrainingSection({ companyId, companyCode }: AiTrainingSectionP
               </Table>
             </div>
           )}
-        </TabsContent>
-
-        {/* Tab 2: Suggestions */}
-        <TabsContent value="suggestions" className="space-y-4">
-          {suggestions.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-              <p className="text-muted-foreground">ไม่มีร้านค้าที่แนะนำให้สอน</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                ร้านค้าที่ใช้บ่อยได้รับการสอน AI แล้วทั้งหมด
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {suggestions.map((s) => (
-                <Card key={s.contactId} className="cursor-pointer hover:border-primary transition-colors" onClick={() => quickAddFromSuggestion(s)}>
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{s.contactName}</p>
-                        {s.taxId && (
-                          <p className="text-xs text-muted-foreground">{s.taxId}</p>
-                        )}
-                      </div>
-                      <Badge variant="secondary">{s.transactionCount}x</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Tab 3: Add New */}
-        <TabsContent value="add" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">สอน AI ร้านค้าใหม่</CardTitle>
-              <CardDescription>
-                เพิ่มร้านค้าที่ต้องการให้ AI จดจำและกรอกข้อมูลให้อัตโนมัติ
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <MappingForm
-                formData={formData}
-                setFormData={setFormData}
-                contacts={contacts}
-                contactsLoading={contactsLoading}
-                companyCode={companyCode}
-              />
-              <div className="flex justify-end">
-                <Button onClick={saveMapping} disabled={isSaving}>
-                  {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  บันทึก
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
 
       {/* AI Explanation (Collapsible) */}
       <Collapsible>
@@ -746,6 +749,8 @@ interface MappingFormProps {
     contactId: string;
     accountId: string;
     defaultVatRate: string;
+    defaultWhtRate: string;
+    defaultWhtType: string;
     paymentMethod: string;
     descriptionTemplate: string;
   };
@@ -757,83 +762,139 @@ interface MappingFormProps {
 
 function MappingForm({ formData, setFormData, contacts, contactsLoading, companyCode }: MappingFormProps) {
   return (
-    <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>ประเภท</Label>
-          <Select
-            value={formData.transactionType}
-            onValueChange={(v) => setFormData((prev) => ({ ...prev, transactionType: v as "EXPENSE" | "INCOME" }))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EXPENSE">รายจ่าย</SelectItem>
-              <SelectItem value="INCOME">รายรับ</SelectItem>
-            </SelectContent>
-          </Select>
+    <div className="space-y-6">
+      {/* Section 1: ข้อมูลหลัก */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-muted-foreground border-b pb-2">ข้อมูลร้านค้า</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>ประเภทธุรกรรม</Label>
+            <Select
+              value={formData.transactionType}
+              onValueChange={(v) => setFormData((prev) => ({ ...prev, transactionType: v as "EXPENSE" | "INCOME" }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EXPENSE">รายจ่าย</SelectItem>
+                <SelectItem value="INCOME">รายรับ</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>เลขผู้เสียภาษี</Label>
+            <Input
+              value={formData.vendorTaxId}
+              onChange={(e) => setFormData((prev) => ({ ...prev, vendorTaxId: e.target.value }))}
+              placeholder="13 หลัก"
+              className="font-mono"
+            />
+          </div>
         </div>
+
         <div className="space-y-2">
-          <Label>VAT</Label>
-          <Select
-            value={formData.defaultVatRate}
-            onValueChange={(v) => setFormData((prev) => ({ ...prev, defaultVatRate: v }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="เลือก VAT" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">7%</SelectItem>
-              <SelectItem value="0">0%</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label>ชื่อร้านค้า (จาก OCR)</Label>
+          <Input
+            value={formData.vendorName}
+            onChange={(e) => setFormData((prev) => ({ ...prev, vendorName: e.target.value }))}
+            placeholder="เช่น บริษัท ABC จำกัด"
+          />
+          <p className="text-xs text-muted-foreground">AI จะจดจำชื่อนี้เพื่อกรอกข้อมูลอัตโนมัติ</p>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>ชื่อร้านค้า (จาก OCR)</Label>
-        <Input
-          value={formData.vendorName}
-          onChange={(e) => setFormData((prev) => ({ ...prev, vendorName: e.target.value }))}
-          placeholder="เช่น บริษัท ABC จำกัด"
-        />
+      {/* Section 2: บัญชีและการชำระเงิน */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-muted-foreground border-b pb-2">ค่าเริ่มต้น</h4>
+
+        <div className="space-y-2">
+          <Label>บัญชี</Label>
+          <AccountSelector
+            value={formData.accountId}
+            onValueChange={(v) => setFormData((prev) => ({ ...prev, accountId: v || "" }))}
+            companyCode={companyCode}
+            placeholder="เลือกบัญชี..."
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>VAT</Label>
+            <Select
+              value={formData.defaultVatRate}
+              onValueChange={(v) => setFormData((prev) => ({ ...prev, defaultVatRate: v }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="เลือก VAT" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">7%</SelectItem>
+                <SelectItem value="0">0% (ไม่มี VAT)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>วิธีชำระเงิน</Label>
+            <Select
+              value={formData.paymentMethod}
+              onValueChange={(v) => setFormData((prev) => ({ ...prev, paymentMethod: v }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="เลือกวิธีชำระเงิน" />
+              </SelectTrigger>
+              <SelectContent>
+                {paymentMethodOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>เลขผู้เสียภาษี</Label>
-        <Input
-          value={formData.vendorTaxId}
-          onChange={(e) => setFormData((prev) => ({ ...prev, vendorTaxId: e.target.value }))}
-          placeholder="13 หลัก"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>บัญชี</Label>
-        <AccountSelector
-          value={formData.accountId}
-          onValueChange={(v) => setFormData((prev) => ({ ...prev, accountId: v || "" }))}
-          companyCode={companyCode}
-          placeholder="เลือกบัญชี..."
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>วิธีชำระเงิน</Label>
-        <Select
-          value={formData.paymentMethod}
-          onValueChange={(v) => setFormData((prev) => ({ ...prev, paymentMethod: v }))}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="เลือกวิธีชำระเงิน" />
-          </SelectTrigger>
-          <SelectContent>
-            {paymentMethodOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Section 3: หัก ณ ที่จ่าย */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-muted-foreground border-b pb-2">หัก ณ ที่จ่าย (WHT)</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>อัตราหัก ณ ที่จ่าย</Label>
+            <Select
+              value={formData.defaultWhtRate}
+              onValueChange={(v) => setFormData((prev) => ({ ...prev, defaultWhtRate: v }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="เลือกอัตรา" />
+              </SelectTrigger>
+              <SelectContent>
+                {whtRateOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>ประเภทเงินได้</Label>
+            <Select
+              value={formData.defaultWhtType}
+              onValueChange={(v) => setFormData((prev) => ({ ...prev, defaultWhtType: v }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="เลือกประเภท" />
+              </SelectTrigger>
+              <SelectContent>
+                {whtTypeOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          กำหนดอัตราหัก ณ ที่จ่ายเริ่มต้นสำหรับร้านค้านี้ AI จะกรอกให้อัตโนมัติ
+        </p>
       </div>
     </div>
   );

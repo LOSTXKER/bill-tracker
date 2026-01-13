@@ -1,13 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { EXPENSE_STATUS_LABELS } from "@/lib/validations/expense";
 import { INCOME_STATUS_LABELS } from "@/lib/validations/income";
-import { REIMBURSEMENT_STATUS_LABELS } from "@/lib/constants/transaction";
+import { 
+  REIMBURSEMENT_STATUS_LABELS, 
+  EXPENSE_WORKFLOW_INFO,
+  INCOME_WORKFLOW_INFO 
+} from "@/lib/constants/transaction";
+import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
   status: string;
   type: "expense" | "income" | "reimbursement";
 }
 
+// Legacy color map for backward compatibility
 const colorMap: Record<string, string> = {
   gray: "bg-muted text-muted-foreground border-border",
   orange:
@@ -21,28 +27,84 @@ const colorMap: Record<string, string> = {
 
 /**
  * Reusable status badge component for transactions
- * @param status - The status string
+ * @param status - The status string (workflowStatus or legacy status)
  * @param type - The transaction type (expense, income, or reimbursement)
  */
 export function StatusBadge({ status, type }: StatusBadgeProps) {
-  const labelsMap = {
-    expense: EXPENSE_STATUS_LABELS,
-    income: INCOME_STATUS_LABELS,
-    reimbursement: REIMBURSEMENT_STATUS_LABELS,
-  };
+  // First try new workflow statuses (uses full Tailwind classes)
+  if (type === "expense") {
+    const workflowInfo = EXPENSE_WORKFLOW_INFO[status];
+    if (workflowInfo) {
+      return (
+        <Badge
+          variant="outline"
+          className={cn(workflowInfo.bgColor, workflowInfo.color)}
+        >
+          {workflowInfo.label}
+        </Badge>
+      );
+    }
+    // Fallback to legacy
+    const legacyInfo = EXPENSE_STATUS_LABELS[status];
+    if (legacyInfo) {
+      return (
+        <Badge
+          variant="outline"
+          className={colorMap[legacyInfo.color] || colorMap.gray}
+        >
+          {legacyInfo.label}
+        </Badge>
+      );
+    }
+  }
   
-  const labels = labelsMap[type];
-  const statusInfo = labels[status as keyof typeof labels] || {
-    label: status,
-    color: "gray",
-  };
+  if (type === "income") {
+    const workflowInfo = INCOME_WORKFLOW_INFO[status];
+    if (workflowInfo) {
+      return (
+        <Badge
+          variant="outline"
+          className={cn(workflowInfo.bgColor, workflowInfo.color)}
+        >
+          {workflowInfo.label}
+        </Badge>
+      );
+    }
+    // Fallback to legacy
+    const legacyInfo = INCOME_STATUS_LABELS[status];
+    if (legacyInfo) {
+      return (
+        <Badge
+          variant="outline"
+          className={colorMap[legacyInfo.color] || colorMap.gray}
+        >
+          {legacyInfo.label}
+        </Badge>
+      );
+    }
+  }
+  
+  if (type === "reimbursement") {
+    const reimbInfo = REIMBURSEMENT_STATUS_LABELS[status];
+    if (reimbInfo) {
+      return (
+        <Badge
+          variant="outline"
+          className={colorMap[reimbInfo.color] || colorMap.gray}
+        >
+          {reimbInfo.label}
+        </Badge>
+      );
+    }
+  }
 
+  // Default fallback
   return (
     <Badge
       variant="outline"
-      className={colorMap[statusInfo.color] || colorMap.gray}
+      className={colorMap.gray}
     >
-      {statusInfo.label}
+      {status}
     </Badge>
   );
 }

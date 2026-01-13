@@ -61,12 +61,13 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+  // Use new workflow statuses
   const [
     monthlyTotal,
     lastMonthTotal,
-    waitingIssue,
-    waitingWht,
-    sentCopy,
+    waitingInvoice,
+    waitingWhtCert,
+    sentToAccountant,
     totalIncomes
   ] = await Promise.all([
     prisma.income.aggregate({
@@ -87,13 +88,13 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
       _sum: { netReceived: true },
     }),
     prisma.income.count({
-      where: { companyId: company.id, status: "WAITING_ISSUE", deletedAt: null },
+      where: { companyId: company.id, workflowStatus: "WAITING_INVOICE_ISSUE", deletedAt: null },
     }),
     prisma.income.count({
-      where: { companyId: company.id, status: "WAITING_WHT_CERT", deletedAt: null },
+      where: { companyId: company.id, workflowStatus: "WHT_PENDING_CERT", deletedAt: null },
     }),
     prisma.income.count({
-      where: { companyId: company.id, status: "SENT_COPY", deletedAt: null },
+      where: { companyId: company.id, workflowStatus: "SENT_TO_ACCOUNTANT", deletedAt: null },
     }),
     prisma.income.count({
       where: { companyId: company.id, deletedAt: null },
@@ -108,10 +109,10 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
     : 0;
 
   // Calculate progress percentages
-  const totalPending = waitingIssue + waitingWht;
-  const waitingIssueProgress = totalPending > 0 ? (waitingIssue / totalPending) * 100 : 0;
-  const waitingWhtProgress = totalPending > 0 ? (waitingWht / totalPending) * 100 : 0;
-  const sentProgress = totalIncomes > 0 ? (sentCopy / totalIncomes) * 100 : 0;
+  const totalPending = waitingInvoice + waitingWhtCert;
+  const waitingInvoiceProgress = totalPending > 0 ? (waitingInvoice / totalPending) * 100 : 0;
+  const waitingWhtProgress = totalPending > 0 ? (waitingWhtCert / totalPending) * 100 : 0;
+  const sentProgress = totalIncomes > 0 ? (sentToAccountant / totalIncomes) * 100 : 0;
 
   return (
     <StatsGrid
@@ -130,23 +131,23 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "รอออกบิล",
-          value: waitingIssue.toString(),
+          value: waitingInvoice.toString(),
           subtitle: "รายการ",
           icon: "clock",
           iconColor: "text-amber-500",
-          progress: waitingIssueProgress,
+          progress: waitingInvoiceProgress,
         },
         {
           title: "รอใบ 50 ทวิ",
-          value: waitingWht.toString(),
+          value: waitingWhtCert.toString(),
           subtitle: "รายการ",
           icon: "file-text",
           iconColor: "text-amber-500",
           progress: waitingWhtProgress,
         },
         {
-          title: "ส่งแล้ว",
-          value: sentCopy.toString(),
+          title: "ส่งบัญชีแล้ว",
+          value: sentToAccountant.toString(),
           subtitle: "รายการ",
           icon: "check-circle",
           iconColor: "text-primary",
