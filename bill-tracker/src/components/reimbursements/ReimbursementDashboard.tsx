@@ -112,7 +112,7 @@ export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardPr
             </Button>
             <Button
               variant="outline"
-              onClick={() => router.push(`/${companyCode.toLowerCase()}/reimburse`)}
+              onClick={() => router.push(`/reimburse/${companyCode.toLowerCase()}`)}
             >
               <LinkIcon className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">ลิงก์ส่งคำขอ</span>

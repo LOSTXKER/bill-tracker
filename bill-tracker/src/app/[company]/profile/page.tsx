@@ -230,7 +230,7 @@ export default function MyProfilePage() {
         </div>
         <Button
           onClick={() =>
-            router.push(`/${companyCode.toLowerCase()}/reimbursements/new`)
+            router.push(`/reimburse/${companyCode.toLowerCase()}`)
           }
         >
           <Plus className="mr-2 h-4 w-4" />
