@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -24,7 +24,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Receipt, Send, CheckCircle2, AlertTriangle } from "lucide-react";
+import { 
+  Loader2, 
+  Receipt, 
+  Send, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Sparkles,
+  Wand2,
+} from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import { THAI_BANKS } from "@/lib/constants/banks";
 import Image from "next/image";
@@ -47,6 +55,23 @@ interface Company {
   reimbursementSpendingLimit?: number;
 }
 
+interface AiResult {
+  combined: {
+    totalAmount?: number;
+    amount?: number;
+    date?: string;
+    vendorName?: string;
+    description?: string;
+    items?: string[];
+  };
+  confidence?: {
+    overall: number;
+    amount: number;
+    vendor: number;
+    date: number;
+  };
+}
+
 export default function PublicReimbursePage() {
   const params = useParams();
   const router = useRouter();
@@ -58,6 +83,11 @@ export default function PublicReimbursePage() {
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [spendingLimitWarning, setSpendingLimitWarning] = useState<string | null>(null);
+  
+  // AI states
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<AiResult | null>(null);
+  const [aiApplied, setAiApplied] = useState(false);
 
   const {
     register,
@@ -90,6 +120,96 @@ export default function PublicReimbursePage() {
     };
     fetchCompany();
   }, [companyCode]);
+
+  // AI Analyze when files are uploaded
+  const analyzeReceipts = useCallback(async (urls: string[]) => {
+    if (urls.length === 0 || !company) return;
+    
+    setIsAnalyzing(true);
+    setAiResult(null);
+    setAiApplied(false);
+    
+    try {
+      const response = await fetch("/api/ai/analyze-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrls: urls,
+          companyId: company.id,
+          transactionType: "EXPENSE",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("AI analyze failed");
+      }
+
+      const result = await response.json();
+      if (result.data) {
+        setAiResult(result.data);
+        toast.success("AI วิเคราะห์ใบเสร็จสำเร็จ", {
+          description: "กดปุ่ม 'ใช้ข้อมูล AI' เพื่อกรอกอัตโนมัติ",
+        });
+      }
+    } catch (error) {
+      console.error("AI analyze error:", error);
+      // Don't show error toast - AI is optional
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [company]);
+
+  // Trigger AI analyze when files change
+  useEffect(() => {
+    if (receiptUrls.length > 0 && company && !aiApplied) {
+      const timeoutId = setTimeout(() => {
+        analyzeReceipts(receiptUrls);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [receiptUrls, company, aiApplied, analyzeReceipts]);
+
+  // Apply AI result to form
+  const applyAiResult = useCallback(() => {
+    if (!aiResult?.combined) return;
+
+    const combined = aiResult.combined;
+    
+    // Apply amount
+    const amount = combined.totalAmount || combined.amount;
+    if (amount && amount > 0) {
+      setValue("amount", amount);
+    }
+
+    // Apply date
+    if (combined.date) {
+      try {
+        const date = new Date(combined.date);
+        if (!isNaN(date.getTime())) {
+          setValue("billDate", date.toISOString().split("T")[0]);
+        }
+      } catch {
+        // Ignore invalid date
+      }
+    }
+
+    // Apply description
+    let description = "";
+    if (combined.description) {
+      description = combined.description;
+    } else if (combined.vendorName) {
+      description = `ค่าใช้จ่ายจาก ${combined.vendorName}`;
+    } else if (combined.items && combined.items.length > 0) {
+      description = combined.items.slice(0, 3).join(", ");
+    }
+    
+    if (description) {
+      setValue("description", description);
+    }
+
+    setAiApplied(true);
+    toast.success("กรอกข้อมูลจาก AI แล้ว");
+  }, [aiResult, setValue]);
 
   // Check spending limit
   useEffect(() => {
@@ -212,6 +332,15 @@ export default function PublicReimbursePage() {
     }
   };
 
+  // Handle file change
+  const handleFilesChange = (urls: string[]) => {
+    setReceiptUrls(urls);
+    if (urls.length === 0) {
+      setAiResult(null);
+      setAiApplied(false);
+    }
+  };
+
   // Success page
   if (trackingCode) {
     return (
@@ -304,21 +433,96 @@ export default function PublicReimbursePage() {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              {/* Receipt Upload */}
+              {/* Receipt Upload with AI */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   รูปใบเสร็จ <span className="text-destructive">*</span>
+                  {isAnalyzing && (
+                    <span className="flex items-center gap-1 text-xs text-primary">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      AI กำลังวิเคราะห์...
+                    </span>
+                  )}
                 </Label>
                 <FileUpload
                   value={receiptUrls}
-                  onChange={setReceiptUrls}
+                  onChange={handleFilesChange}
                   folder="receipts"
                   maxFiles={5}
                 />
                 <p className="text-xs text-muted-foreground">
-                  อัปโหลดรูปใบเสร็จหรือหลักฐานการจ่ายเงิน (สูงสุด 5 รูป)
+                  อัปโหลดรูปใบเสร็จหรือหลักฐานการจ่ายเงิน (สูงสุด 5 รูป) - AI จะช่วยอ่านข้อมูลให้อัตโนมัติ
                 </p>
               </div>
+
+              {/* AI Result Preview */}
+              {aiResult && !aiApplied && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border border-violet-200 dark:border-violet-800">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-violet-600" />
+                      <span className="font-medium text-violet-900 dark:text-violet-100">
+                        AI อ่านข้อมูลได้
+                      </span>
+                      {aiResult.confidence?.overall && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300">
+                          {aiResult.confidence.overall}% confident
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={applyAiResult}
+                      className="bg-violet-600 hover:bg-violet-700"
+                    >
+                      <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                      ใช้ข้อมูล AI
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {(aiResult.combined.totalAmount || aiResult.combined.amount) && (
+                      <div>
+                        <span className="text-muted-foreground">ยอดเงิน:</span>
+                        <span className="ml-2 font-semibold text-violet-700 dark:text-violet-300">
+                          ฿{(aiResult.combined.totalAmount || aiResult.combined.amount || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    {aiResult.combined.date && (
+                      <div>
+                        <span className="text-muted-foreground">วันที่:</span>
+                        <span className="ml-2 font-medium">
+                          {new Date(aiResult.combined.date).toLocaleDateString("th-TH")}
+                        </span>
+                      </div>
+                    )}
+                    {aiResult.combined.vendorName && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">ร้านค้า:</span>
+                        <span className="ml-2 font-medium">{aiResult.combined.vendorName}</span>
+                      </div>
+                    )}
+                    {aiResult.combined.description && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">รายละเอียด:</span>
+                        <span className="ml-2">{aiResult.combined.description}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Applied Badge */}
+              {aiApplied && (
+                <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800 dark:text-green-200">
+                    กรอกข้อมูลจาก AI แล้ว - คุณสามารถแก้ไขได้ตามต้องการ
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Personal Info */}
               <div className="space-y-4">
