@@ -21,7 +21,12 @@ import {
   Settings2,
   Zap,
   FileText,
-  Calculator,
+  Wallet,
+  AtSign,
+  MessageCircle,
+  CheckCircle,
+  XCircle,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -161,27 +166,38 @@ function QuickToggle({
   description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-  color?: "primary" | "destructive";
+  color?: "primary" | "destructive" | "amber" | "purple";
 }) {
+  const colorClasses = {
+    primary: {
+      active: "bg-primary/5 border-primary/30",
+      icon: "bg-primary/10 text-primary",
+    },
+    destructive: {
+      active: "bg-destructive/5 border-destructive/30",
+      icon: "bg-destructive/10 text-destructive",
+    },
+    amber: {
+      active: "bg-amber-500/5 border-amber-500/30",
+      icon: "bg-amber-500/10 text-amber-600",
+    },
+    purple: {
+      active: "bg-purple-500/5 border-purple-500/30",
+      icon: "bg-purple-500/10 text-purple-600",
+    },
+  };
+
   return (
     <div 
       className={cn(
         "flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer",
-        checked 
-          ? color === "destructive" 
-            ? "bg-destructive/5 border-destructive/30" 
-            : "bg-primary/5 border-primary/30"
-          : "hover:bg-muted/50"
+        checked ? colorClasses[color].active : "hover:bg-muted/50"
       )}
       onClick={() => onCheckedChange(!checked)}
     >
       <div className={cn(
         "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
-        checked 
-          ? color === "destructive"
-            ? "bg-destructive/10 text-destructive"
-            : "bg-primary/10 text-primary"
-          : "bg-muted text-muted-foreground"
+        checked ? colorClasses[color].icon : "bg-muted text-muted-foreground"
       )}>
         {icon}
       </div>
@@ -264,6 +280,19 @@ export function LineNotificationSettings({
     settings.incomes.onStatusChange.enabled,
     settings.incomes.onUpdate.enabled,
     settings.incomes.onDelete.enabled,
+  ].filter(Boolean).length;
+
+  const reimbursementCount = [
+    settings.reimbursements.onSubmit.enabled,
+    settings.reimbursements.onApprove.enabled,
+    settings.reimbursements.onReject.enabled,
+    settings.reimbursements.onPay.enabled,
+  ].filter(Boolean).length;
+
+  const commentCount = [
+    settings.comments.onComment.enabled,
+    settings.comments.onMention.enabled,
+    settings.comments.onReply.enabled,
   ].filter(Boolean).length;
 
   return (
@@ -400,54 +429,103 @@ export function LineNotificationSettings({
             </CardContent>
           </Card>
 
-          {/* Budget Alerts */}
+          {/* Reimbursement Notifications */}
           <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-muted text-muted-foreground flex items-center justify-center">
-                  <Calculator className="h-5 w-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">แจ้งเตือนงบประมาณ</CardTitle>
-                  <CardDescription>รับการแจ้งเตือนเมื่อใช้จ่ายถึงเกณฑ์ที่กำหนด</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label>เปิดการแจ้งเตือน</Label>
-                <Switch
-                  checked={settings.budgetAlerts.enabled}
-                  onCheckedChange={(v) => updateSettings("budgetAlerts.enabled", v)}
-                />
-              </div>
-              
-              {settings.budgetAlerts.enabled && (
-                <div className="space-y-3 pt-2">
-                  <Label className="text-sm text-muted-foreground">เกณฑ์แจ้งเตือน</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {[50, 70, 80, 90, 100].map((threshold) => (
-                      <Button
-                        key={threshold}
-                        variant={settings.budgetAlerts.thresholds.includes(threshold) ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                          const current = settings.budgetAlerts.thresholds;
-                          const newThresholds = current.includes(threshold)
-                            ? current.filter((t) => t !== threshold)
-                            : [...current, threshold].sort((a, b) => a - b);
-                          updateSettings("budgetAlerts.thresholds", newThresholds);
-                        }}
-                      >
-                        {settings.budgetAlerts.thresholds.includes(threshold) && (
-                          <Check className="h-3 w-3 mr-1" />
-                        )}
-                        {threshold}%
-                      </Button>
-                    ))}
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                    <Wallet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">เบิกจ่าย</CardTitle>
+                    <CardDescription>แจ้งเตือนเกี่ยวกับคำขอเบิกจ่าย</CardDescription>
                   </div>
                 </div>
-              )}
+                <Badge variant="secondary">
+                  {reimbursementCount}/4 เปิดอยู่
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              <QuickToggle
+                icon={<Zap className="h-5 w-5" />}
+                title="ส่งคำขอใหม่"
+                description="เมื่อมีคำขอเบิกจ่ายใหม่"
+                checked={settings.reimbursements.onSubmit.enabled}
+                onCheckedChange={(v) => updateSettings("reimbursements.onSubmit.enabled", v)}
+                color="amber"
+              />
+              <QuickToggle
+                icon={<CheckCircle className="h-5 w-5" />}
+                title="อนุมัติ"
+                description="เมื่อคำขอได้รับการอนุมัติ"
+                checked={settings.reimbursements.onApprove.enabled}
+                onCheckedChange={(v) => updateSettings("reimbursements.onApprove.enabled", v)}
+                color="amber"
+              />
+              <QuickToggle
+                icon={<XCircle className="h-5 w-5" />}
+                title="ปฏิเสธ"
+                description="เมื่อคำขอถูกปฏิเสธ"
+                checked={settings.reimbursements.onReject.enabled}
+                onCheckedChange={(v) => updateSettings("reimbursements.onReject.enabled", v)}
+                color="amber"
+              />
+              <QuickToggle
+                icon={<DollarSign className="h-5 w-5" />}
+                title="จ่ายเงิน"
+                description="เมื่อจ่ายเงินเบิกแล้ว"
+                checked={settings.reimbursements.onPay.enabled}
+                onCheckedChange={(v) => updateSettings("reimbursements.onPay.enabled", v)}
+                color="amber"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Comment & Mention Notifications */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">ความคิดเห็น</CardTitle>
+                    <CardDescription>แจ้งเตือนเมื่อมีการ comment หรือ mention</CardDescription>
+                  </div>
+                </div>
+                <Badge variant="secondary">
+                  {commentCount}/3 เปิดอยู่
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <QuickToggle
+                icon={<MessageSquare className="h-5 w-5" />}
+                title="Comment ใหม่"
+                description="เมื่อมี comment ในเอกสารของคุณ"
+                checked={settings.comments.onComment.enabled}
+                onCheckedChange={(v) => updateSettings("comments.onComment.enabled", v)}
+                color="purple"
+              />
+              <QuickToggle
+                icon={<AtSign className="h-5 w-5" />}
+                title="ถูก Mention"
+                description="เมื่อคุณถูก mention ใน comment"
+                checked={settings.comments.onMention.enabled}
+                onCheckedChange={(v) => updateSettings("comments.onMention.enabled", v)}
+                color="purple"
+              />
+              <QuickToggle
+                icon={<MessageCircle className="h-5 w-5" />}
+                title="ตอบกลับ"
+                description="เมื่อมีการตอบกลับ comment ของคุณ"
+                checked={settings.comments.onReply.enabled}
+                onCheckedChange={(v) => updateSettings("comments.onReply.enabled", v)}
+                color="purple"
+              />
             </CardContent>
           </Card>
         </TabsContent>

@@ -23,15 +23,23 @@ export interface LineNotifySettings {
     onDelete: NotificationScenario;
     onUpdate: NotificationScenario;
   };
+  // Reimbursement Notification Scenarios
+  reimbursements: {
+    onSubmit: NotificationScenario;
+    onApprove: NotificationScenario;
+    onReject: NotificationScenario;
+    onPay: NotificationScenario;
+  };
+  // Comment & Mention Notifications
+  comments: {
+    onComment: NotificationScenario;
+    onMention: NotificationScenario;
+    onReply: NotificationScenario;
+  };
   // Daily Summary
   dailySummary: {
     enabled: boolean;
     time: string; // HH:mm format
-  };
-  // Budget Alerts
-  budgetAlerts: {
-    enabled: boolean;
-    thresholds: number[]; // e.g., [50, 80, 100] for 50%, 80%, 100%
   };
   // Message Format Options
   messageFormat: {
@@ -47,8 +55,9 @@ export interface LineNotifySettings {
     expenseStatusChange: string;
     incomeCreate: string;
     incomeStatusChange: string;
+    reimbursementSubmit: string;
+    reimbursementApprove: string;
     dailySummary: string;
-    budgetAlert: string;
   };
 }
 
@@ -66,13 +75,20 @@ export const DEFAULT_NOTIFY_SETTINGS: LineNotifySettings = {
     onDelete: { enabled: true },
     onUpdate: { enabled: true },
   },
+  reimbursements: {
+    onSubmit: { enabled: true },
+    onApprove: { enabled: true },
+    onReject: { enabled: true },
+    onPay: { enabled: true },
+  },
+  comments: {
+    onComment: { enabled: true },
+    onMention: { enabled: true },
+    onReply: { enabled: true },
+  },
   dailySummary: {
     enabled: false,
     time: "09:00",
-  },
-  budgetAlerts: {
-    enabled: true,
-    thresholds: [80, 100],
   },
   messageFormat: {
     useFlexMessage: true,
@@ -86,8 +102,9 @@ export const DEFAULT_NOTIFY_SETTINGS: LineNotifySettings = {
     expenseStatusChange: "[รายจ่ายอัปเดต]\n{vendorName}\nสถานะ: {oldStatus} -> {newStatus}",
     incomeCreate: "[รายรับใหม่]\n{customerName}\nจำนวน: ฿{amount}\nรับจริง: ฿{netReceived}\nสถานะ: {status}",
     incomeStatusChange: "[รายรับอัปเดต]\n{customerName}\nสถานะ: {oldStatus} -> {newStatus}",
+    reimbursementSubmit: "[คำขอเบิกจ่ายใหม่]\n{requesterName}\nจำนวน: ฿{amount}\nรายละเอียด: {description}",
+    reimbursementApprove: "[คำขอเบิกจ่ายอนุมัติ]\n{requesterName} ฿{amount}\nอนุมัติโดย: {approverName}",
     dailySummary: "[สรุปประจำวัน {date}]\nรายรับ: ฿{totalIncome}\nรายจ่าย: ฿{totalExpense}\nสุทธิ: ฿{netCashFlow}",
-    budgetAlert: "[แจ้งเตือนงบประมาณ]\nหมวด: {category}\nใช้ไป: {percentage}%\n({spent} / {budget})",
   },
 };
 
@@ -125,6 +142,14 @@ export const TEMPLATE_PLACEHOLDERS = {
     "{date}": "วันที่",
     "{invoiceNumber}": "เลขที่ใบกำกับ",
   },
+  reimbursement: {
+    "{requesterName}": "ผู้ขอเบิก",
+    "{amount}": "จำนวนเงิน",
+    "{description}": "รายละเอียด",
+    "{approverName}": "ผู้อนุมัติ",
+    "{status}": "สถานะ",
+    "{reason}": "เหตุผล",
+  },
   summary: {
     "{companyName}": "ชื่อบริษัท",
     "{date}": "วันที่",
@@ -133,14 +158,6 @@ export const TEMPLATE_PLACEHOLDERS = {
     "{netCashFlow}": "กระแสเงินสดสุทธิ",
     "{pendingDocs}": "เอกสารค้าง",
     "{waitingWhtCerts}": "รอใบ 50 ทวิ",
-  },
-  budget: {
-    "{companyName}": "ชื่อบริษัท",
-    "{category}": "บัญชี",
-    "{spent}": "ใช้ไปแล้ว",
-    "{budget}": "งบประมาณ",
-    "{percentage}": "เปอร์เซ็นต์",
-    "{remaining}": "เหลือ",
   },
 };
 
@@ -204,13 +221,17 @@ export function mergeSettings(
       ...DEFAULT_NOTIFY_SETTINGS.incomes,
       ...userSettings.incomes,
     },
+    reimbursements: {
+      ...DEFAULT_NOTIFY_SETTINGS.reimbursements,
+      ...userSettings.reimbursements,
+    },
+    comments: {
+      ...DEFAULT_NOTIFY_SETTINGS.comments,
+      ...userSettings.comments,
+    },
     dailySummary: {
       ...DEFAULT_NOTIFY_SETTINGS.dailySummary,
       ...userSettings.dailySummary,
-    },
-    budgetAlerts: {
-      ...DEFAULT_NOTIFY_SETTINGS.budgetAlerts,
-      ...userSettings.budgetAlerts,
     },
     messageFormat: {
       ...DEFAULT_NOTIFY_SETTINGS.messageFormat,

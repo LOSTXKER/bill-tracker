@@ -135,7 +135,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       referenceNo: data.referenceNo,
       paymentMethod: data.paymentMethod,
       receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
-      status: data.status,
+      // status is legacy field (IncomeDocStatus enum) - don't override, use schema default
       workflowStatus: workflowStatus,
       hasInvoice: hasInvoice,
       hasWhtCert: (data.whtCertUrls?.length || 0) > 0,
@@ -167,7 +167,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.receiveDate !== undefined) updateData.receiveDate = data.receiveDate ? new Date(data.receiveDate) : undefined;
-    if (data.status !== undefined) updateData.status = data.status;
+    // status is legacy field (IncomeDocStatus enum) - don't update from new workflow values
     if (data.workflowStatus !== undefined) updateData.workflowStatus = data.workflowStatus;
     if (data.notes !== undefined) updateData.notes = data.notes;
     

@@ -136,7 +136,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       paymentMethod: data.paymentMethod,
       billDate: data.billDate ? new Date(data.billDate) : new Date(),
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      status: data.status,
+      // status is legacy field (ExpenseDocStatus enum) - don't override, use schema default
       workflowStatus: workflowStatus,
       hasTaxInvoice: hasTaxInvoice,
       hasWhtCert: (data.whtCertUrls?.length || 0) > 0,
@@ -169,7 +169,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.billDate !== undefined) updateData.billDate = data.billDate ? new Date(data.billDate) : undefined;
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-    if (data.status !== undefined) updateData.status = data.status;
+    // status is legacy field (ExpenseDocStatus enum) - don't update from new workflow values
     if (data.workflowStatus !== undefined) updateData.workflowStatus = data.workflowStatus;
     if (data.notes !== undefined) updateData.notes = data.notes;
     

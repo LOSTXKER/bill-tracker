@@ -775,8 +775,20 @@ export function UnifiedTransactionForm({
       // Apply WHT (Withholding Tax) from AI
       const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
       const whtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
+      
+      // Debug: Log WHT data from AI
+      console.log("[AI WHT Debug]", {
+        "suggested.whtRate": suggested.whtRate,
+        "extendedCombined.whtRate": extendedCombined.whtRate,
+        "whtRate (final)": whtRate,
+        "whtType": whtType,
+        "fullSuggested": suggested,
+        "fullCombined": extendedCombined,
+      });
+      
       if (whtRate !== null && whtRate !== undefined && whtRate > 0) {
         // Enable WHT toggle
+        console.log("[AI WHT] Enabling WHT with rate:", whtRate, "type:", whtType);
         setValue(config.fields.whtField.name, true);
         setValue("whtRate", whtRate);
         if (whtType) {
@@ -992,7 +1004,7 @@ export function UnifiedTransactionForm({
     const hasValidContact = selectedContact?.id || oneTimeContactName.trim();
     if (!hasValidContact) validationErrors.push("กรุณาระบุผู้ติดต่อ");
     if (!selectedAccount) validationErrors.push("กรุณาเลือกบัญชี");
-    if (!data.status) validationErrors.push("กรุณาเลือกสถานะเอกสาร");
+    // Note: status is auto-determined based on documents if not selected
 
     const descriptionValue = config.fields.descriptionField
       ? data[config.fields.descriptionField.name]

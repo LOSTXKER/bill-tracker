@@ -13,6 +13,8 @@ import {
   Settings,
   Brain,
   DollarSign,
+  ChevronRight,
+  Receipt,
 } from "lucide-react";
 
 // Settings sections
@@ -23,6 +25,7 @@ import { NotificationSection } from "./sections/notification-section";
 import { AppearanceSection } from "./sections/appearance-section";
 import { AiTrainingSection } from "./sections/ai-training-section";
 import { ExchangeRatesSection } from "./sections/exchange-rates";
+import { WhtSettingsSection } from "./sections/wht-settings-section";
 
 interface Company {
   id: string;
@@ -31,7 +34,7 @@ interface Company {
   taxId: string | null;
   address: string | null;
   phone: string | null;
-  exchangeRates?: any;
+  exchangeRates?: unknown;
 }
 
 interface CompanyAccess {
@@ -54,12 +57,13 @@ interface SettingsLayoutProps {
 
 type SettingSection =
   | "company"
-  | "user"
+  | "wht"
   | "exchange-rates"
+  | "user"
+  | "appearance"
   | "line-bot"
   | "notifications"
-  | "ai-training"
-  | "appearance";
+  | "ai-training";
 
 interface NavItem {
   id: SettingSection;
@@ -68,50 +72,90 @@ interface NavItem {
   description: string;
 }
 
-const navItems: NavItem[] = [
+interface NavGroup {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+// Grouped navigation items
+const navGroups: NavGroup[] = [
   {
     id: "company",
-    label: "ข้อมูลบริษัท",
-    icon: <Building2 className="h-4 w-4" />,
-    description: "ชื่อ ที่อยู่ และข้อมูลทางภาษี",
+    label: "บริษัท",
+    items: [
+      {
+        id: "company",
+        label: "ข้อมูลบริษัท",
+        icon: <Building2 className="h-4 w-4" />,
+        description: "ชื่อ ที่อยู่ และข้อมูลทางภาษี",
+      },
+      {
+        id: "wht",
+        label: "หัก ณ ที่จ่าย",
+        icon: <Receipt className="h-4 w-4" />,
+        description: "ตั้งค่าอัตราภาษีหัก ณ ที่จ่าย",
+      },
+      {
+        id: "exchange-rates",
+        label: "อัตราแลกเปลี่ยน",
+        icon: <DollarSign className="h-4 w-4" />,
+        description: "ตั้งค่าอัตราสกุลเงินต่างประเทศ",
+      },
+    ],
   },
   {
     id: "user",
     label: "บัญชีผู้ใช้",
-    icon: <User className="h-4 w-4" />,
-    description: "ข้อมูลและสิทธิ์ของคุณ",
-  },
-  {
-    id: "exchange-rates",
-    label: "อัตราแลกเปลี่ยน",
-    icon: <DollarSign className="h-4 w-4" />,
-    description: "ตั้งค่าอัตราสกุลเงินต่างประเทศ",
-  },
-  {
-    id: "line-bot",
-    label: "LINE Bot",
-    icon: <MessageSquare className="h-4 w-4" />,
-    description: "เชื่อมต่อและตั้งค่าบอท",
+    items: [
+      {
+        id: "user",
+        label: "ข้อมูลส่วนตัว",
+        icon: <User className="h-4 w-4" />,
+        description: "ข้อมูลและสิทธิ์ของคุณ",
+      },
+      {
+        id: "appearance",
+        label: "รูปแบบแสดงผล",
+        icon: <Palette className="h-4 w-4" />,
+        description: "ธีมและภาษา",
+      },
+    ],
   },
   {
     id: "notifications",
     label: "การแจ้งเตือน",
-    icon: <Bell className="h-4 w-4" />,
-    description: "ปรับแต่งข้อความแจ้งเตือน",
+    items: [
+      {
+        id: "line-bot",
+        label: "LINE Bot",
+        icon: <MessageSquare className="h-4 w-4" />,
+        description: "เชื่อมต่อและตั้งค่าบอท",
+      },
+      {
+        id: "notifications",
+        label: "ตั้งค่าแจ้งเตือน",
+        icon: <Bell className="h-4 w-4" />,
+        description: "ปรับแต่งเหตุการณ์และข้อความ",
+      },
+    ],
   },
   {
-    id: "ai-training",
-    label: "สอน AI",
-    icon: <Brain className="h-4 w-4" />,
-    description: "สอน AI ให้จดจำร้านค้าและการตั้งค่า",
-  },
-  {
-    id: "appearance",
-    label: "รูปแบบแสดงผล",
-    icon: <Palette className="h-4 w-4" />,
-    description: "ธีมและภาษา",
+    id: "automation",
+    label: "ระบบอัตโนมัติ",
+    items: [
+      {
+        id: "ai-training",
+        label: "สอน AI",
+        icon: <Brain className="h-4 w-4" />,
+        description: "สอน AI ให้จดจำร้านค้าและการตั้งค่า",
+      },
+    ],
   },
 ];
+
+// Flatten for easy lookup
+const allNavItems = navGroups.flatMap((group) => group.items);
 
 export function SettingsLayout({
   company,
@@ -125,8 +169,8 @@ export function SettingsLayout({
     switch (activeSection) {
       case "company":
         return <CompanyInfoSection company={company} />;
-      case "user":
-        return <UserInfoSection user={user} companyAccess={companyAccess} />;
+      case "wht":
+        return <WhtSettingsSection companyCode={company.code} />;
       case "exchange-rates":
         return (
           <ExchangeRatesSection
@@ -134,20 +178,22 @@ export function SettingsLayout({
             initialRates={(company.exchangeRates as Record<string, number>) || {}}
           />
         );
+      case "user":
+        return <UserInfoSection user={user} companyAccess={companyAccess} />;
+      case "appearance":
+        return <AppearanceSection />;
       case "line-bot":
         return <LineBotSection companyId={company.id} companyCode={company.code} />;
       case "notifications":
         return <NotificationSection companyId={company.id} />;
       case "ai-training":
         return <AiTrainingSection companyId={company.id} companyCode={company.code} />;
-      case "appearance":
-        return <AppearanceSection />;
       default:
         return null;
     }
   };
 
-  const activeNavItem = navItems.find((item) => item.id === activeSection);
+  const activeNavItem = allNavItems.find((item) => item.id === activeSection);
 
   return (
     <div className="min-h-[calc(100vh-8rem)]">
@@ -168,21 +214,34 @@ export function SettingsLayout({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar Navigation - Desktop */}
         <aside className="hidden lg:block w-56 shrink-0">
-          <nav className="sticky top-20 space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors",
-                  activeSection === item.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-              >
-                {item.icon}
-                <span className="text-sm font-medium">{item.label}</span>
-              </button>
+          <nav className="sticky top-20 space-y-6">
+            {navGroups.map((group) => (
+              <div key={group.id}>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                  {group.label}
+                </h3>
+                <div className="space-y-1">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors group",
+                        activeSection === item.id
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {item.icon}
+                      <span className="text-sm font-medium flex-1">{item.label}</span>
+                      <ChevronRight className={cn(
+                        "h-4 w-4 opacity-0 transition-opacity",
+                        activeSection === item.id ? "opacity-100" : "group-hover:opacity-50"
+                      )} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </aside>
@@ -191,7 +250,7 @@ export function SettingsLayout({
         <div className="lg:hidden">
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-2 pb-3">
-              {navItems.map((item) => (
+              {allNavItems.map((item) => (
                 <Button
                   key={item.id}
                   variant={activeSection === item.id ? "default" : "outline"}

@@ -16,7 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
   Receipt,
   LayoutDashboard,
@@ -25,7 +24,6 @@ import {
   Users,
   Settings,
   LogOut,
-  Menu,
   ChevronLeft,
   PieChart,
   History,
@@ -34,6 +32,8 @@ import {
   Download,
   Wallet,
   User,
+  UserCircle,
+  type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
 import { PermissionProvider } from "@/components/providers/permission-provider";
@@ -54,85 +54,118 @@ interface DashboardShellProps {
   permissions: string[];
 }
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  permission?: string;
+}
+
+interface NavGroup {
+  label?: string;
+  items: NavItem[];
+}
+
 export function DashboardShell({ children, company, user, isOwner, permissions }: DashboardShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const companyCode = company.code.toLowerCase();
 
-  const navigation = [
+  // Grouped navigation
+  const navigationGroups: NavGroup[] = [
     {
-      name: "Dashboard",
-      href: `/${companyCode}/dashboard`,
-      icon: LayoutDashboard,
+      // Main (no label)
+      items: [
+        {
+          name: "Dashboard",
+          href: `/${companyCode}/dashboard`,
+          icon: LayoutDashboard,
+        },
+        {
+          name: "บันทึกรายการ",
+          href: `/${companyCode}/capture`,
+          icon: Receipt,
+        },
+      ],
     },
     {
-      name: "บันทึกรายการ",
-      href: `/${companyCode}/capture`,
-      icon: Receipt,
+      label: "รายการ",
+      items: [
+        {
+          name: "รายจ่าย",
+          href: `/${companyCode}/expenses`,
+          icon: ArrowUpCircle,
+          permission: "expenses:read",
+        },
+        {
+          name: "รายรับ",
+          href: `/${companyCode}/incomes`,
+          icon: ArrowDownCircle,
+          permission: "incomes:read",
+        },
+        {
+          name: "เบิกจ่าย",
+          href: `/${companyCode}/reimbursements`,
+          icon: Wallet,
+        },
+      ],
     },
     {
-      name: "รายจ่าย",
-      href: `/${companyCode}/expenses`,
-      icon: ArrowUpCircle,
-      permission: "expenses:read",
+      label: "ข้อมูล",
+      items: [
+        {
+          name: "รายงาน",
+          href: `/${companyCode}/reports`,
+          icon: PieChart,
+          permission: "reports:read",
+        },
+        {
+          name: "ผู้ติดต่อ",
+          href: `/${companyCode}/contacts`,
+          icon: Users,
+          permission: "contacts:read",
+        },
+        {
+          name: "พนักงาน",
+          href: `/${companyCode}/employees`,
+          icon: UserCircle,
+          permission: "settings:manage-team",
+        },
+        {
+          name: "ผังบัญชี",
+          href: `/${companyCode}/accounts`,
+          icon: Tags,
+          permission: "settings:read",
+        },
+      ],
     },
     {
-      name: "รายรับ",
-      href: `/${companyCode}/incomes`,
-      icon: ArrowDownCircle,
-      permission: "incomes:read",
-    },
-    {
-      name: "เบิกจ่าย",
-      href: `/${companyCode}/reimbursements`,
-      icon: Wallet,
-    },
-    {
-      name: "รายงาน",
-      href: `/${companyCode}/reports`,
-      icon: PieChart,
-      permission: "reports:read",
-    },
-    {
-      name: "ผู้ติดต่อ",
-      href: `/${companyCode}/contacts`,
-      icon: Users,
-      permission: "contacts:read",
-    },
-    {
-      name: "พนักงาน",
-      href: `/${companyCode}/employees`,
-      icon: Users,
-      permission: "settings:manage-team",
-    },
-    {
-      name: "ผังบัญชี",
-      href: `/${companyCode}/accounts`,
-      icon: Tags,
-      permission: "settings:read",
-    },
-    {
-      name: "ความเคลื่อนไหว",
-      href: `/${companyCode}/activity`,
-      icon: Activity,
-    },
-    {
-      name: "ประวัติการแก้ไข",
-      href: `/${companyCode}/audit-logs`,
-      icon: History,
-      permission: "audit:read",
-    },
-    {
-      name: "ส่งออกข้อมูล",
-      href: `/${companyCode}/exports`,
-      icon: Download,
-      permission: "settings:read",
-    },
-    {
-      name: "ตั้งค่า",
-      href: `/${companyCode}/settings`,
-      icon: Settings,
-      permission: "settings:read",
+      label: "ระบบ",
+      items: [
+        {
+          name: "ความเคลื่อนไหว",
+          href: `/${companyCode}/activity`,
+          icon: Activity,
+        },
+        {
+          name: "ประวัติการแก้ไข",
+          href: `/${companyCode}/audit-logs`,
+          icon: History,
+          permission: "audit:read",
+        },
+        {
+          name: "ส่งออกข้อมูล",
+          href: `/${companyCode}/exports`,
+          icon: Download,
+          permission: "settings:read",
+        },
+        {
+          name: "ตั้งค่า",
+          href: `/${companyCode}/settings`,
+          icon: Settings,
+          permission: "settings:read",
+        },
+      ],
     },
   ];
 
@@ -146,30 +179,47 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
     return permissions.includes(`${module}:*`);
   };
 
-  const filteredNavigation = navigation.filter((item) => hasPermission(item.permission));
+  // Filter items by permission
+  const filteredGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => hasPermission(item.permission)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const NavLinks = () => (
-    <>
-      {filteredNavigation.map((item: typeof filteredNavigation[number]) => (
-        <Link
-          key={item.name}
-          href={item.href}
-          onClick={() => setSidebarOpen(false)}
-          className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-            isActive(item.href)
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+    <div className="space-y-4">
+      {filteredGroups.map((group, groupIndex) => (
+        <div key={groupIndex}>
+          {group.label && (
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+              {group.label}
+            </h3>
           )}
-        >
-          <item.icon className={cn(
-            "h-5 w-5 transition-colors",
-            isActive(item.href) ? "text-primary" : ""
-          )} />
-          {item.name}
-        </Link>
+          <div className="space-y-1">
+            {group.items.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive(item.href)
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className={cn(
+                  "h-5 w-5 transition-colors",
+                  isActive(item.href) ? "text-primary" : ""
+                )} />
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        </div>
       ))}
-    </>
+    </div>
   );
 
   return (
@@ -194,7 +244,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+            <nav className="flex-1 overflow-y-auto p-3">
               <NavLinks />
             </nav>
 

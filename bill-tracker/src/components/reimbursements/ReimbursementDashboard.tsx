@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import type { ReimbursementTab } from "@/types/reimbursement";
 import { useReimbursementDashboard } from "@/hooks/use-reimbursement-dashboard";
-import { ReimbursementCard } from "./ReimbursementCard";
+import { ReimbursementTable } from "./ReimbursementTable";
 import { ReimbursementSheet } from "./ReimbursementSheet";
 import { BatchPayDialog } from "./ReimbursementActions";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
@@ -299,56 +299,47 @@ export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardPr
         </Card>
       )}
 
-      {/* Reimbursement List */}
-      <div className="space-y-3">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : reimbursements.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
-                  <Receipt className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-2">
-                    {filters.search
-                      ? "ไม่พบรายการที่ค้นหา"
-                      : filters.tab === "all"
-                      ? "ยังไม่มีรายการเบิกจ่าย"
-                      : "ไม่มีรายการในหมวดนี้"}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {filters.tab === "all" && "พนักงานสามารถส่งคำขอเบิกผ่านลิงก์สาธารณะได้"}
-                  </p>
-                </div>
+      {/* Reimbursement Table */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : reimbursements.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+                <Receipt className="h-8 w-8 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          reimbursements.map((reimbursement) => (
-            <ReimbursementCard
-              key={reimbursement.id}
-              reimbursement={reimbursement}
-              isSelected={selectedItems.has(reimbursement.id)}
-              isProcessing={isProcessing(reimbursement.id)}
-              showCheckbox={showCheckbox && reimbursement.status === "APPROVED"}
-              showActions={!showCheckbox}
-              onSelect={() => toggleSelection(reimbursement.id)}
-              onClick={() => handleCardClick(reimbursement.id)}
-              onApprove={() => handleApprove(reimbursement.id)}
-              onReject={() => {
-                setSelectedId(reimbursement.id);
-              }}
-              onPay={() => {
-                setSelectedId(reimbursement.id);
-              }}
-            />
-          ))
-        )}
-      </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-2">
+                  {filters.search
+                    ? "ไม่พบรายการที่ค้นหา"
+                    : filters.tab === "all"
+                    ? "ยังไม่มีรายการเบิกจ่าย"
+                    : "ไม่มีรายการในหมวดนี้"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {filters.tab === "all" && "พนักงานสามารถส่งคำขอเบิกผ่านลิงก์สาธารณะได้"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <ReimbursementTable
+          reimbursements={reimbursements}
+          selectedItems={selectedItems}
+          processingIds={processingIds}
+          showCheckbox={showCheckbox}
+          onToggleSelection={toggleSelection}
+          onToggleSelectAll={toggleSelectAll}
+          onRowClick={handleCardClick}
+          onApprove={handleApprove}
+          onReject={(id) => setSelectedId(id)}
+          onPay={(id) => setSelectedId(id)}
+        />
+      )}
 
       {/* Detail Sheet */}
       <ReimbursementSheet
