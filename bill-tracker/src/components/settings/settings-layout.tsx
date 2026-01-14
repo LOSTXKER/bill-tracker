@@ -35,6 +35,7 @@ interface Company {
   address: string | null;
   phone: string | null;
   exchangeRates?: unknown;
+  businessDescription: string | null;
 }
 
 interface CompanyAccess {

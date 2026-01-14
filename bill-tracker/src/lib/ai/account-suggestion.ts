@@ -120,6 +120,12 @@ async function analyzeWithAI(
   context: SuggestAccountContext
 ): Promise<AccountSuggestion> {
   try {
+    // Get company info including business description
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { businessDescription: true },
+    });
+
     // Get accounts for this company
     const accountClasses = transactionType === "EXPENSE"
       ? ["COST_OF_SALES", "EXPENSE", "OTHER_EXPENSE"]
@@ -146,7 +152,7 @@ async function analyzeWithAI(
     }
 
     // Build prompt for AI
-    const prompt = buildAIPrompt(accounts, transactionType, context);
+    const prompt = buildAIPrompt(accounts, transactionType, context, company?.businessDescription);
     
     if (!prompt) {
       return {
@@ -210,7 +216,8 @@ async function analyzeWithAI(
 function buildAIPrompt(
   accounts: { id: string; code: string; name: string; description: string | null }[],
   transactionType: "EXPENSE" | "INCOME",
-  context: SuggestAccountContext
+  context: SuggestAccountContext,
+  businessDescription?: string | null
 ): string | null {
   // Build content description
   let contentDescription = "";
@@ -241,15 +248,19 @@ function buildAIPrompt(
     .map((a) => `${a.index}. [${a.code}] ${a.name}${a.desc ? ` - ${a.desc}` : ""} → ID: "${a.id}"`)
     .join("\n");
 
-  const contextInfo = transactionType === "EXPENSE" 
-    ? `นี่คือ "รายจ่าย" ของบริษัท - ค่าใช้จ่ายในการดำเนินงาน ไม่ใช่สินค้าซื้อมาขายต่อ
-ตัวอย่าง: ของใช้สำนักงาน, อุปกรณ์, ค่าบริการ, ค่าน้ำค่าไฟ ฯลฯ`
-    : `นี่คือ "รายรับ" ของบริษัท - รายได้จากการขายสินค้าหรือบริการ`;
+  // Use business description if available, otherwise default context
+  const businessInfo = businessDescription 
+    ? `ธุรกิจของบริษัท: ${businessDescription}`
+    : null;
+
+  const transactionContext = transactionType === "EXPENSE" 
+    ? `นี่คือ "รายจ่าย" ของบริษัท`
+    : `นี่คือ "รายรับ" ของบริษัท`;
 
   return `คุณเป็น AI ที่ฉลาดมาก รู้จักแบรนด์ สินค้า และบริการทั่วโลก
 
-## บริบท
-${contextInfo}
+## บริบทธุรกิจ
+${businessInfo ? businessInfo + "\n" : ""}${transactionContext}
 
 ## รายการที่ต้องจัดหมวดหมู่
 ${contentDescription}
@@ -259,8 +270,7 @@ ${accountListText}
 
 ## กฎ
 - **ต้องเลือกบัญชีเสมอ** - ใช้ความรู้ของคุณตัดสินว่ารายการนี้ควรอยู่บัญชีไหน
-- **หลีกเลี่ยง "ต้นทุนขาย/ซื้อสินค้า"** - ยกเว้นธุรกิจซื้อมาขายไประบุชัดเจน
-- **ของใช้สำนักงาน** → วัสดุสิ้นเปลือง/ค่าใช้จ่ายสำนักงาน
+- **ดูจากธุรกิจ** - ถ้าไม่ใช่ธุรกิจซื้อมาขายไป อย่าเลือกบัญชีต้นทุนสินค้า
 - **Copy ID ให้ถูกต้อง** - เอา ID หลัง "→ ID:" มาใส่
 
 ## ตอบ JSON

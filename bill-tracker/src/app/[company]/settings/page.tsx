@@ -20,6 +20,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
       address: true,
       phone: true,
       exchangeRates: true,
+      businessDescription: true,
     },
   });
 

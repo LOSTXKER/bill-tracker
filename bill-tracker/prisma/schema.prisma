@@ -14,13 +14,14 @@ datasource db {
 // =============================================================================
 
 model Company {
-  id      String  @id @default(cuid())
-  name    String // "Anajak T-Shirt", "Meelike-th"
-  code    String  @unique // "ANJ", "MLK"
-  taxId   String? // เลขประจำตัวผู้เสียภาษี
-  address String?
-  phone   String?
-  logoUrl String?
+  id                  String  @id @default(cuid())
+  name                String // "Anajak T-Shirt", "Meelike-th"
+  code                String  @unique // "ANJ", "MLK"
+  taxId               String? // เลขประจำตัวผู้เสียภาษี
+  address             String?
+  phone               String?
+  logoUrl             String?
+  businessDescription String? // อธิบายธุรกิจ เช่น "บริษัทพัฒนาซอฟต์แวร์" "ร้านขายเสื้อผ้า" สำหรับให้ AI เข้าใจบริบท
 
   // LINE Bot Configuration
   lineChannelSecret      String?  // LINE Bot Channel Secret
