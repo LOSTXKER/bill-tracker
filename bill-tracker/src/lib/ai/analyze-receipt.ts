@@ -100,9 +100,8 @@ export async function analyzeReceipt(
 
   try {
     // 1. ดึงข้อมูลที่ต้องใช้ (ทำพร้อมกัน)
-    const [accounts, contacts, company] = await Promise.all([
+    const [accounts, company] = await Promise.all([
       fetchAccounts(companyId, transactionType),
-      fetchContacts(companyId),
       prisma.company.findUnique({
         where: { id: companyId },
         select: { taxId: true },
@@ -116,8 +115,8 @@ export async function analyzeReceipt(
     // Company tax ID to exclude from vendor extraction
     const companyTaxId = company?.taxId || null;
 
-    // 2. สร้าง Prompt
-    const prompt = buildAnalysisPrompt(accounts, contacts, transactionType);
+    // 2. สร้าง Prompt (no contacts - matching done in smart-ocr.ts)
+    const prompt = buildAnalysisPrompt(accounts, transactionType);
 
     // 3. วิเคราะห์ทุกไฟล์ (parallel)
     const analysisPromises = imageUrls.map(async (url) => {
@@ -129,7 +128,7 @@ export async function analyzeReceipt(
         console.error("[analyzeReceipt] AI error for", url, response.error);
         return null;
       }
-      return parseAIResponse(response.data, accounts, contacts, companyTaxId);
+      return parseAIResponse(response.data, accounts, companyTaxId);
     });
 
     const results = await Promise.all(analysisPromises);
@@ -179,29 +178,12 @@ async function fetchAccounts(companyId: string, transactionType: "EXPENSE" | "IN
   });
 }
 
-async function fetchContacts(companyId: string) {
-  return prisma.contact.findMany({
-    where: {
-      companyId,
-    },
-    select: {
-      id: true,
-      name: true,
-      taxId: true,
-      peakCode: true,
-    },
-    orderBy: { name: "asc" },
-    take: 500,  // จำกัดไม่ให้ prompt ยาวเกิน
-  });
-}
-
 // =============================================================================
 // Prompt Building
 // =============================================================================
 
 function buildAnalysisPrompt(
   accounts: { id: string; code: string; name: string; description: string | null }[],
-  contacts: { id: string; name: string; taxId: string | null }[],
   transactionType: "EXPENSE" | "INCOME"
 ): string {
   // สร้างรายการบัญชี
@@ -209,12 +191,7 @@ function buildAnalysisPrompt(
     .map(a => `${a.code}|${a.name}|${a.id}`)
     .join("\n");
 
-  // สร้างรายการผู้ติดต่อ (เฉพาะที่มี taxId)
-  const contactList = contacts
-    .filter(c => c.taxId)
-    .slice(0, 200)  // จำกัด 200 รายการ
-    .map(c => `${c.taxId}|${c.name}|${c.id}`)
-    .join("\n");
+  // NOTE: Contact matching is done in smart-ocr.ts, not here
 
   return `คุณเป็นนักบัญชีผู้เชี่ยวชาญ วิเคราะห์ใบเสร็จ/เอกสารนี้แล้วตอบเป็น JSON
 
@@ -238,15 +215,12 @@ function buildAnalysisPrompt(
 ## ผังบัญชีที่มี (รหัส|ชื่อ|ID)
 ${accountList}
 
-## ผู้ติดต่อที่มี (เลขภาษี|ชื่อ|ID)
-${contactList || "ไม่มีข้อมูล"}
-
 ## สิ่งที่ต้องทำ
 1. **แยกแยะผู้ขาย vs ผู้ซื้อให้ถูกต้อง** (ดูตำแหน่งและ context)
 2. อ่านข้อมูล**ผู้ขาย** (ชื่อร้าน, เลขภาษี**ของผู้ขาย**, วันที่, ยอดเงิน, VAT, WHT)
-3. จับคู่ผู้ติดต่อจาก Tax ID ของ**ผู้ขาย** (ถ้าตรงกัน)
-4. เลือกบัญชีที่เหมาะสมที่สุดจากผังบัญชี
-5. ให้ Confidence สูง (85-98%) ถ้าเลือกบัญชีได้
+3. เลือกบัญชีที่เหมาะสมที่สุดจากผังบัญชี
+4. ให้ Confidence สูง (85-98%) ถ้าเลือกบัญชีได้
+5. **ห้ามจับคู่ผู้ติดต่อ** - ระบบจะจับคู่เองภายหลัง
 
 ## การดึงข้อมูลหัก ณ ที่จ่าย (WHT) - สำคัญมาก!
 ต้องหา WHT จากหลายรูปแบบ:
@@ -278,11 +252,10 @@ ${contactList || "ไม่มีข้อมูล"}
 {
   "vendor": {
     "name": "ชื่อร้าน/บริษัท",
-    "taxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก หรือ null",
+    "taxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก ของ**ผู้ขาย**เท่านั้น หรือ null ถ้าไม่มี",
     "address": "ที่อยู่ หรือ null",
     "phone": "เบอร์โทร หรือ null",
-    "branchNumber": "สาขา เช่น 00000 หรือ null",
-    "matchedContactId": "ID ของผู้ติดต่อที่ตรงกัน หรือ null"
+    "branchNumber": "สาขา เช่น 00000 หรือ null"
   },
   "date": "YYYY-MM-DD",
   "amount": 8000.00,
@@ -468,7 +441,6 @@ function combineMultipleResults(results: ReceiptAnalysisResult[]): ReceiptAnalys
 function parseAIResponse(
   rawResponse: string,
   accounts: { id: string; code: string; name: string }[],
-  contacts: { id: string; name: string; taxId: string | null }[],
   companyTaxId: string | null = null
 ): ReceiptAnalysisResult {
   let jsonText = rawResponse.trim();
@@ -494,16 +466,8 @@ function parseAIResponse(
       }
     }
 
-    // Validate contact match
-    let matchedContactId: string | null = null;
-    let matchedContactName: string | null = null;
-    if (parsed.vendor?.matchedContactId) {
-      const matchedContact = contacts.find(c => c.id === parsed.vendor.matchedContactId);
-      if (matchedContact) {
-        matchedContactId = matchedContact.id;
-        matchedContactName = matchedContact.name;
-      }
-    }
+    // Contact matching is now done in smart-ocr.ts, not here
+    // AI no longer returns matchedContactId
 
     // Normalize date (แปลง พ.ศ. เป็น ค.ศ. ถ้าจำเป็น)
     let normalizedDate = parsed.date;
@@ -552,8 +516,8 @@ function parseAIResponse(
         address: parsed.vendor?.address || null,
         phone: parsed.vendor?.phone || null,
         branchNumber: parsed.vendor?.branchNumber || null,
-        matchedContactId,
-        matchedContactName,
+        matchedContactId: null,  // Contact matching done in smart-ocr.ts
+        matchedContactName: null,
       },
       date: normalizedDate || null,
       amount: typeof parsed.amount === "number" ? parsed.amount : null,
