@@ -21,7 +21,8 @@ interface CreateNotificationParams {
   message: string;
   actorId?: string;
   actorName?: string;
-  targetUserIds?: string[]; // ถ้าไม่ระบุ = ทุกคนในบริษัท
+  targetUserIds: string[]; // ต้องระบุเสมอ - ไม่ส่ง notification ให้ทุกคน
+  excludeActorFromTargets?: boolean; // ไม่ส่งให้ผู้กระทำ (default: true)
   metadata?: Prisma.InputJsonValue;
 }
 
@@ -45,6 +46,19 @@ interface NotificationWithRead {
 
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
   try {
+    // Filter out actor from targets (default behavior)
+    let targetUserIds = [...params.targetUserIds];
+    const excludeActor = params.excludeActorFromTargets !== false; // default true
+    
+    if (excludeActor && params.actorId) {
+      targetUserIds = targetUserIds.filter(id => id !== params.actorId);
+    }
+    
+    // Don't create notification if no targets
+    if (targetUserIds.length === 0) {
+      return;
+    }
+    
     await prisma.notification.create({
       data: {
         companyId: params.companyId,
@@ -55,7 +69,7 @@ export async function createNotification(params: CreateNotificationParams): Prom
         message: params.message,
         actorId: params.actorId,
         actorName: params.actorName,
-        targetUserIds: params.targetUserIds || [],
+        targetUserIds: targetUserIds,
         metadata: params.metadata ?? undefined,
       },
     });
@@ -76,10 +90,8 @@ export async function getNotificationsForUser(
   const notifications = await prisma.notification.findMany({
     where: {
       companyId,
-      OR: [
-        { targetUserIds: { equals: [] } }, // ทุกคน
-        { targetUserIds: { array_contains: [userId] } }, // หรือ target เฉพาะคน
-      ],
+      // Only get notifications targeted to this user
+      targetUserIds: { array_contains: [userId] },
     },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -111,10 +123,7 @@ export async function getUnreadCount(companyId: string, userId: string): Promise
   const notifications = await prisma.notification.findMany({
     where: {
       companyId,
-      OR: [
-        { targetUserIds: { equals: [] } },
-        { targetUserIds: { array_contains: [userId] } },
-      ],
+      targetUserIds: { array_contains: [userId] },
     },
     select: { readBy: true },
   });
@@ -150,10 +159,7 @@ export async function markAllAsRead(companyId: string, userId: string): Promise<
   const notifications = await prisma.notification.findMany({
     where: {
       companyId,
-      OR: [
-        { targetUserIds: { equals: [] } },
-        { targetUserIds: { array_contains: [userId] } },
-      ],
+      targetUserIds: { array_contains: [userId] },
     },
     select: { id: true, readBy: true },
   });
@@ -184,6 +190,7 @@ interface TransactionNotificationParams {
   action: "created" | "updated" | "deleted" | "status_changed";
   actorId: string;
   actorName: string;
+  creatorId?: string; // ผู้สร้างรายการ (สำหรับแจ้งเตือนเมื่อคนอื่นแก้ไข/ลบ)
   transactionDescription?: string;
   amount?: number;
   oldStatus?: string;
@@ -221,12 +228,36 @@ export async function notifyTransactionChange(params: TransactionNotificationPar
     action,
     actorId,
     actorName,
+    creatorId,
     transactionDescription,
     amount,
     oldStatus,
     newStatus,
     changedFields,
   } = params;
+
+  // Determine target users based on action
+  let targetUserIds: string[] = [];
+  
+  switch (action) {
+    case "created":
+      // ไม่ต้องแจ้งเตือนเมื่อสร้างใหม่ (ปกติธรรมดา)
+      return;
+      
+    case "updated":
+    case "deleted":
+    case "status_changed":
+      // แจ้งเตือนผู้สร้างรายการ (ถ้าคนแก้ไข/ลบ ไม่ใช่ผู้สร้าง)
+      if (creatorId && creatorId !== actorId) {
+        targetUserIds = [creatorId];
+      }
+      break;
+  }
+  
+  // ถ้าไม่มี target ก็ไม่ต้องแจ้ง
+  if (targetUserIds.length === 0) {
+    return;
+  }
 
   const title = ACTION_TITLES[transactionType][action];
   
@@ -254,6 +285,7 @@ export async function notifyTransactionChange(params: TransactionNotificationPar
     message: message.trim(),
     actorId,
     actorName,
+    targetUserIds,
     metadata: {
       transactionType,
       action,
@@ -274,6 +306,7 @@ interface ReimbursementNotificationParams {
   requestId: string;
   action: "submitted" | "approved" | "rejected" | "paid";
   requesterName: string;
+  requesterEmail?: string; // Email ของผู้ส่งคำขอ (สำหรับหา userId)
   amount: number;
   actorId?: string;
   actorName?: string;
@@ -300,11 +333,54 @@ export async function notifyReimbursement(params: ReimbursementNotificationParam
     requestId,
     action,
     requesterName,
+    requesterEmail,
     amount,
     actorId,
     actorName,
     reason,
   } = params;
+
+  // Determine target users based on action
+  let targetUserIds: string[] = [];
+  
+  switch (action) {
+    case "submitted":
+      // แจ้ง Owner และผู้ที่มีสิทธิ์อนุมัติ
+      const approvers = await prisma.companyAccess.findMany({
+        where: {
+          companyId,
+          OR: [
+            { isOwner: true },
+            // ผู้ที่มีสิทธิ์ approve
+            { permissions: { array_contains: ["reimbursements:approve"] } },
+            { permissions: { array_contains: ["reimbursements:*"] } },
+          ],
+        },
+        select: { userId: true },
+      });
+      targetUserIds = approvers.map(a => a.userId);
+      break;
+      
+    case "approved":
+    case "rejected":
+    case "paid":
+      // แจ้งผู้ส่งคำขอ (หาจาก email)
+      if (requesterEmail) {
+        const requester = await prisma.user.findUnique({
+          where: { email: requesterEmail },
+          select: { id: true },
+        });
+        if (requester) {
+          targetUserIds = [requester.id];
+        }
+      }
+      break;
+  }
+  
+  // ถ้าไม่มี target ก็ไม่ต้องแจ้ง
+  if (targetUserIds.length === 0) {
+    return;
+  }
 
   const title = REIMB_TITLES[action];
   let message = `${requesterName} ฿${amount.toLocaleString("th-TH")}`;
@@ -325,6 +401,7 @@ export async function notifyReimbursement(params: ReimbursementNotificationParam
     message,
     actorId,
     actorName,
+    targetUserIds,
     metadata: {
       action,
       requesterName,

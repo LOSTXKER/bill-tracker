@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { MentionInput } from "./MentionInput";
 
 // =============================================================================
 // Types
@@ -75,6 +76,13 @@ interface CommentSectionProps {
 // Component
 // =============================================================================
 
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+}
+
 export function CommentSection({ 
   companyCode, 
   entityType, 
@@ -84,12 +92,15 @@ export function CommentSection({
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
+  const [replyMentionedUserIds, setReplyMentionedUserIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   // Fetch comments
   const fetchComments = useCallback(async () => {
@@ -113,9 +124,44 @@ export function CommentSection({
     fetchComments();
   }, [fetchComments]);
 
+  // Fetch team members for mention suggestions
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      try {
+        // First get company ID
+        const companyRes = await fetch(`/api/companies?code=${companyCode.toUpperCase()}`);
+        if (!companyRes.ok) return;
+        const companyData = await companyRes.json();
+        const companyId = companyData.data?.companies?.[0]?.id;
+        if (!companyId) return;
+
+        // Then get team members
+        const membersRes = await fetch(`/api/companies/${companyId}/members`);
+        if (!membersRes.ok) return;
+        const membersData = await membersRes.json();
+        const members = membersData.data?.members || membersData.members || [];
+        
+        // Map to TeamMember format
+        setTeamMembers(
+          members.map((m: { user: TeamMember }) => ({
+            id: m.user.id,
+            name: m.user.name,
+            email: m.user.email,
+            avatarUrl: m.user.avatarUrl,
+          }))
+        );
+      } catch (error) {
+        console.error("Failed to fetch team members:", error);
+      }
+    };
+    
+    fetchTeamMembers();
+  }, [companyCode]);
+
   // Create comment
   const handleSubmit = async (parentId?: string) => {
     const content = parentId ? replyContent : newComment;
+    const mentions = parentId ? replyMentionedUserIds : mentionedUserIds;
     if (!content.trim()) return;
 
     try {
@@ -128,6 +174,7 @@ export function CommentSection({
           entityId,
           content: content.trim(),
           parentId,
+          mentionedUserIds: mentions.length > 0 ? mentions : undefined,
         }),
       });
 
@@ -135,8 +182,10 @@ export function CommentSection({
         if (parentId) {
           setReplyContent("");
           setReplyingTo(null);
+          setReplyMentionedUserIds([]);
         } else {
           setNewComment("");
+          setMentionedUserIds([]);
         }
         fetchComments();
       }
@@ -334,10 +383,12 @@ export function CommentSection({
             {/* Reply form */}
             {!isReply && replyingTo === comment.id && (
               <div className="mt-3 space-y-2">
-                <Textarea
+                <MentionInput
                   value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="เขียนตอบกลับ..."
+                  onChange={setReplyContent}
+                  onMentionedUsersChange={setReplyMentionedUserIds}
+                  users={teamMembers}
+                  placeholder="เขียนตอบกลับ... พิมพ์ @ เพื่อ mention"
                   className="min-h-[60px]"
                 />
                 <div className="flex gap-2">
@@ -359,6 +410,7 @@ export function CommentSection({
                     onClick={() => {
                       setReplyingTo(null);
                       setReplyContent("");
+                      setReplyMentionedUserIds([]);
                     }}
                   >
                     ยกเลิก
@@ -394,11 +446,12 @@ export function CommentSection({
 
       {/* New comment form */}
       <div className="space-y-2">
-        <Textarea
+        <MentionInput
           value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="เขียนความคิดเห็น... (ถามเอกสาร, ทวงตาม, แจ้งปัญหา)"
-          className="min-h-[80px]"
+          onChange={setNewComment}
+          onMentionedUsersChange={setMentionedUserIds}
+          users={teamMembers}
+          placeholder="เขียนความคิดเห็น... พิมพ์ @ เพื่อ mention ทีม"
         />
         <div className="flex justify-end">
           <Button 
