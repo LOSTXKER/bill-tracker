@@ -76,12 +76,6 @@ export interface MultiDocAnalysisResult {
       id: string;
       name: string;
     } | null;
-    // Contact suggestions when no exact match (user can choose)
-    contactSuggestions?: Array<{
-      id: string;
-      name: string;
-      confidence: number;
-    }>;
     // AI account suggestion when no mapping found
     aiAccountSuggestion?: {
       accountId: string | null;
@@ -805,9 +799,6 @@ export async function analyzeAndClassifyMultiple(
 
     // Track found contact for returning contact info
     let foundContact: { id: string; name: string } | null = null;
-    
-    // Track contact suggestions when no exact match found
-    let contactSuggestions: Array<{ id: string; name: string; confidence: number }> = [];
 
     // Get company's own tax ID to avoid matching vendor with our own company
     const company = await prisma.company.findUnique({
@@ -817,7 +808,7 @@ export async function analyzeAndClassifyMultiple(
     const companyTaxId = company?.taxId?.replace(/[^0-9]/g, "") || null;
 
     // ==========================================================================
-    // STEP 1: Tax ID Exact Match (ONLY way to auto-select contact)
+    // SIMPLE: Tax ID exact match → ใส่ผู้ติดต่อ, ไม่ตรง → แนะนำสร้างใหม่
     // ==========================================================================
     if (combined.vendorTaxId) {
       const normalizedVendorTaxId = combined.vendorTaxId.replace(/[^0-9]/g, "");
@@ -836,51 +827,14 @@ export async function analyzeAndClassifyMultiple(
           select: { id: true, name: true },
         });
         if (contactByTaxId) {
-          console.log("[Smart-OCR] Auto-selected contact by Tax ID:", contactByTaxId.name);
+          console.log("[Smart-OCR] Found contact by Tax ID:", contactByTaxId.name);
           suggested.contactId = contactByTaxId.id;
           foundContact = contactByTaxId;
         }
       }
     }
-
-    // ==========================================================================
-    // STEP 2: Name-based matching → SUGGESTIONS ONLY (never auto-select)
-    // ==========================================================================
-    if (!suggested.contactId && combined.vendorName) {
-      const normalizedVendor = normalizeVendorName(combined.vendorName);
-      
-      // Skip if vendor name is too short (likely garbage data)
-      if (normalizedVendor.length >= 3) {
-        const allContacts = await prisma.contact.findMany({
-          where: { companyId },
-          select: { id: true, name: true },
-        });
-
-        const potentialMatches: Array<{ id: string; name: string; similarity: number }> = [];
-
-        for (const contact of allContacts) {
-          const normalizedContact = normalizeVendorName(contact.name);
-          const similarity = calculateStringSimilarity(normalizedVendor, normalizedContact);
-          
-          // Collect potential matches (>= 40% similarity) for suggestions
-          if (similarity >= 0.4) {
-            potentialMatches.push({ ...contact, similarity });
-          }
-        }
-
-        // Sort by similarity desc and take top 5
-        potentialMatches.sort((a, b) => b.similarity - a.similarity);
-        
-        if (potentialMatches.length > 0) {
-          contactSuggestions = potentialMatches.slice(0, 5).map(m => ({
-            id: m.id,
-            name: m.name,
-            confidence: Math.round(m.similarity * 100),
-          }));
-          console.log("[Smart-OCR] Found contact suggestions:", contactSuggestions.map(s => `${s.name} (${s.confidence}%)`));
-        }
-      }
-    }
+    
+    // ถ้าไม่พบผู้ติดต่อ → isNewVendor = true → UI จะแสดง "สร้างผู้ติดต่อใหม่"
 
     // Use AI to suggest account only when mapping doesn't have accountId
     let aiAccountSuggestion: {
@@ -954,9 +908,7 @@ export async function analyzeAndClassifyMultiple(
       suggested,
       // Include found contact info (from taxId/name lookup, not from mapping)
       foundContact: foundContact || null,
-      // Include contact suggestions when no exact match found
-      contactSuggestions: contactSuggestions.length > 0 ? contactSuggestions : undefined,
-      isNewVendor: !matchResult.mapping,
+      isNewVendor: !matchResult.mapping && !foundContact,  // New vendor if no mapping AND no contact found
       suggestTraining:
         !matchResult.mapping &&
         (combined.vendorName !== null || combined.vendorTaxId !== null),
