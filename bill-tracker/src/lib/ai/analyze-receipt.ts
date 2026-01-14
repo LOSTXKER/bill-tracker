@@ -100,14 +100,21 @@ export async function analyzeReceipt(
 
   try {
     // 1. ดึงข้อมูลที่ต้องใช้ (ทำพร้อมกัน)
-    const [accounts, contacts] = await Promise.all([
+    const [accounts, contacts, company] = await Promise.all([
       fetchAccounts(companyId, transactionType),
       fetchContacts(companyId),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { taxId: true },
+      }),
     ]);
 
     if (accounts.length === 0) {
       return { error: "ไม่มีผังบัญชีในระบบ กรุณา Import จาก Peak ก่อน" };
     }
+
+    // Company tax ID to exclude from vendor extraction
+    const companyTaxId = company?.taxId || null;
 
     // 2. สร้าง Prompt
     const prompt = buildAnalysisPrompt(accounts, contacts, transactionType);
@@ -122,7 +129,7 @@ export async function analyzeReceipt(
         console.error("[analyzeReceipt] AI error for", url, response.error);
         return null;
       }
-      return parseAIResponse(response.data, accounts, contacts);
+      return parseAIResponse(response.data, accounts, contacts, companyTaxId);
     });
 
     const results = await Promise.all(analysisPromises);
@@ -461,7 +468,8 @@ function combineMultipleResults(results: ReceiptAnalysisResult[]): ReceiptAnalys
 function parseAIResponse(
   rawResponse: string,
   accounts: { id: string; code: string; name: string }[],
-  contacts: { id: string; name: string; taxId: string | null }[]
+  contacts: { id: string; name: string; taxId: string | null }[],
+  companyTaxId: string | null = null
 ): ReceiptAnalysisResult {
   let jsonText = rawResponse.trim();
 
@@ -525,10 +533,22 @@ function parseAIResponse(
       else whtRate = null;
     }
 
+    // Validate vendor tax ID - reject if it matches our company's tax ID (customer info, not vendor!)
+    let vendorTaxId = parsed.vendor?.taxId || null;
+    if (vendorTaxId && companyTaxId) {
+      // Normalize both (remove dashes, spaces)
+      const normalizedVendorTaxId = vendorTaxId.replace(/[-\s]/g, "");
+      const normalizedCompanyTaxId = companyTaxId.replace(/[-\s]/g, "");
+      if (normalizedVendorTaxId === normalizedCompanyTaxId) {
+        console.log("[parseAIResponse] Rejected vendor tax ID - matches company tax ID:", vendorTaxId);
+        vendorTaxId = null;
+      }
+    }
+
     return {
       vendor: {
         name: parsed.vendor?.name || null,
-        taxId: parsed.vendor?.taxId || null,
+        taxId: vendorTaxId,
         address: parsed.vendor?.address || null,
         phone: parsed.vendor?.phone || null,
         branchNumber: parsed.vendor?.branchNumber || null,
