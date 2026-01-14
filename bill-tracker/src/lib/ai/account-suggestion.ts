@@ -1,32 +1,14 @@
 /**
- * Account Suggestion Service
- * Single unified function for AI-powered account suggestions
+ * Account Suggestion Service - SIMPLIFIED
+ * AI เลือก account ให้ทุกครั้ง ไม่ต้อง learn อะไร
  */
 
 import { prisma } from "@/lib/db";
-import { findMapping, normalizeVendorName } from "./vendor-mapping";
 import { analyzeImage } from "./gemini";
 
 // =============================================================================
 // Types
 // =============================================================================
-
-export interface SuggestNewAccount {
-  code: string;
-  name: string;
-  class: string;
-  description: string;
-  keywords: string[];
-  reason: string;
-}
-
-export interface AccountSuggestionItem {
-  accountId: string;
-  accountCode: string;
-  accountName: string;
-  confidence: number;
-  reason: string;
-}
 
 export interface AccountSuggestion {
   accountId: string | null;
@@ -34,103 +16,31 @@ export interface AccountSuggestion {
   accountName: string | null;
   confidence: number;
   reason: string;
-  source: "learned" | "ai" | "none";
-  useCount?: number;
-  suggestNewAccount?: SuggestNewAccount;
-  // Multiple suggestions for user to choose
-  alternatives?: AccountSuggestionItem[];
 }
 
 export interface SuggestAccountContext {
   vendorName?: string | null;
-  vendorTaxId?: string | null;
   description?: string | null;
   items?: string[];
   imageUrls?: string[];
 }
 
 // =============================================================================
-// Main Function - One Smart Entry Point
+// Main Function - Simple AI Selection
 // =============================================================================
 
 /**
- * Suggest the best account for a transaction
- * 
- * Flow:
- * 1. Check learned mappings first (highest confidence)
- * 2. If not found, use AI to analyze (medium-high confidence)
- * 3. If no good match, suggest creating new account
+ * AI เลือก account ที่เหมาะสมที่สุด
+ * ไม่มี learned mappings ไม่มี VendorMapping
+ * AI ฉลาดพอ ให้มันทำงาน
  */
 export async function suggestAccount(
   companyId: string,
   transactionType: "EXPENSE" | "INCOME",
   context: SuggestAccountContext
 ): Promise<AccountSuggestion> {
-  // Step 1: Check learned mappings (user-taught)
-  const mappingResult = await checkLearnedMappings(
-    companyId,
-    context.vendorName,
-    context.vendorTaxId,
-    transactionType
-  );
-  
-  if (mappingResult) {
-    return mappingResult;
-  }
-
-  // Step 2: Use AI to analyze
-  const aiResult = await analyzeWithAI(companyId, transactionType, context);
-  
-  return aiResult;
-}
-
-// =============================================================================
-// Step 1: Check Learned Mappings
-// =============================================================================
-
-async function checkLearnedMappings(
-  companyId: string,
-  vendorName: string | null | undefined,
-  vendorTaxId: string | null | undefined,
-  transactionType: "EXPENSE" | "INCOME"
-): Promise<AccountSuggestion | null> {
-  if (!vendorName && !vendorTaxId) {
-    return null;
-  }
-
-  const mapping = await findMapping(
-    companyId,
-    vendorName || null,
-    vendorTaxId || null,
-    transactionType
-  );
-
-  if (mapping && mapping.accountId && mapping.account) {
-    return {
-      accountId: mapping.accountId,
-      accountCode: mapping.account.code,
-      accountName: mapping.account.name,
-      confidence: 100, // Learned mappings are always 100% confident
-      reason: `จดจำจาก "${mapping.vendorName || vendorName}" (ใช้งาน ${mapping.useCount} ครั้ง)`,
-      source: "learned",
-      useCount: mapping.useCount,
-    };
-  }
-
-  return null;
-}
-
-// =============================================================================
-// Step 2: AI Analysis
-// =============================================================================
-
-async function analyzeWithAI(
-  companyId: string,
-  transactionType: "EXPENSE" | "INCOME",
-  context: SuggestAccountContext
-): Promise<AccountSuggestion> {
   try {
-    // Get company info including business description
+    // Get company info
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { businessDescription: true },
@@ -157,12 +67,11 @@ async function analyzeWithAI(
         accountName: null,
         confidence: 0,
         reason: "ไม่มีบัญชีในระบบ",
-        source: "none",
       };
     }
 
-    // Build prompt for AI
-    const prompt = buildAIPrompt(accounts, transactionType, context, company?.businessDescription);
+    // Build simple prompt
+    const prompt = buildPrompt(accounts, transactionType, context, company?.businessDescription);
     
     if (!prompt) {
       return {
@@ -171,7 +80,6 @@ async function analyzeWithAI(
         accountName: null,
         confidence: 0,
         reason: "ไม่มีข้อมูลเพียงพอ",
-        source: "none",
       };
     }
 
@@ -179,8 +87,8 @@ async function analyzeWithAI(
     let response;
     if (context.imageUrls && context.imageUrls.length > 0) {
       response = await analyzeImage(context.imageUrls[0], prompt, {
-        temperature: 0.2, // Lower temperature for more consistent results
-        maxTokens: 1024,
+        temperature: 0.1,
+        maxTokens: 512,
       });
     } else {
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
@@ -198,13 +106,11 @@ async function analyzeWithAI(
         accountName: null,
         confidence: 0,
         reason: "AI ไม่สามารถวิเคราะห์ได้",
-        source: "none",
       };
     }
 
     // Parse response
-    const parsed = parseAIResponse(response.data, accounts);
-    return parsed;
+    return parseResponse(response.data, accounts);
 
   } catch (error) {
     console.error("[suggestAccount] Error:", error);
@@ -214,7 +120,6 @@ async function analyzeWithAI(
       accountName: null,
       confidence: 0,
       reason: "เกิดข้อผิดพลาด",
-      source: "none",
     };
   }
 }
@@ -223,188 +128,93 @@ async function analyzeWithAI(
 // Helper Functions
 // =============================================================================
 
-function buildAIPrompt(
+function buildPrompt(
   accounts: { id: string; code: string; name: string; description: string | null }[],
   transactionType: "EXPENSE" | "INCOME",
   context: SuggestAccountContext,
   businessDescription?: string | null
 ): string | null {
   // Build content description
-  let contentDescription = "";
-  if (context.vendorName) {
-    contentDescription += `ร้านค้า/บริษัท: ${context.vendorName}\n`;
-  }
-  if (context.description) {
-    contentDescription += `รายละเอียด: ${context.description}\n`;
-  }
-  if (context.items && context.items.length > 0) {
-    contentDescription += `รายการ: ${context.items.join(", ")}\n`;
-  }
+  let content = "";
+  if (context.vendorName) content += `ร้าน: ${context.vendorName}\n`;
+  if (context.description) content += `รายละเอียด: ${context.description}\n`;
+  if (context.items?.length) content += `สินค้า: ${context.items.join(", ")}\n`;
 
-  if (!contentDescription.trim()) {
-    return null;
-  }
+  if (!content.trim()) return null;
 
-  // Build account list as a numbered JSON-like structure for easier AI matching
-  const accountList = accounts.map((a, idx) => ({
-    index: idx + 1,
-    id: a.id,
-    code: a.code,
-    name: a.name,
-    desc: a.description || "",
-  }));
-
-  const accountListText = accountList
-    .map((a) => `${a.index}. [${a.code}] ${a.name}${a.desc ? ` - ${a.desc}` : ""} → ID: "${a.id}"`)
+  // Build account list
+  const accountList = accounts
+    .map((a) => `[${a.code}] ${a.name} → ${a.id}`)
     .join("\n");
 
-  // Use business description if available, otherwise default context
-  const businessInfo = businessDescription 
-    ? `ธุรกิจของบริษัท: ${businessDescription}`
-    : null;
+  const type = transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ";
 
-  const transactionContext = transactionType === "EXPENSE" 
-    ? `นี่คือ "รายจ่าย" ของบริษัท`
-    : `นี่คือ "รายรับ" ของบริษัท`;
+  return `เลือกบัญชีที่เหมาะสมที่สุดสำหรับ${type}นี้
 
-  return `คุณเป็น AI ที่ฉลาดมาก รู้จักแบรนด์ สินค้า และบริการทั่วโลก
-
-## บริบทธุรกิจ
-${businessInfo ? businessInfo + "\n" : ""}${transactionContext}
-
-## รายการที่ต้องจัดหมวดหมู่
-${contentDescription}
-
+${businessDescription ? `ธุรกิจ: ${businessDescription}\n` : ""}
+${content}
 ## บัญชีที่มี
-${accountListText}
+${accountList}
 
-## กฎ
-- **เลือก 3 บัญชีที่เหมาะสมที่สุด** เรียงจากดีที่สุดไปน้อยที่สุด
-- **ดูจากธุรกิจ** - ถ้าไม่ใช่ธุรกิจซื้อมาขายไป อย่าเลือกบัญชีต้นทุนสินค้า
-- **Copy ID ให้ถูกต้อง** - เอา ID หลัง "→ ID:" มาใส่
-
-## ตอบ JSON (array ของ 3 ตัวเลือก)
-{"suggestions":[{"accountId":"ID","accountCode":"รหัส","accountName":"ชื่อ","confidence":95,"reason":"เหตุผล"},{"accountId":"ID2","accountCode":"รหัส2","accountName":"ชื่อ2","confidence":80,"reason":"เหตุผล2"},{"accountId":"ID3","accountCode":"รหัส3","accountName":"ชื่อ3","confidence":60,"reason":"เหตุผล3"}]}`;
+## ตอบ JSON เท่านั้น
+{"accountId":"ID ที่เหมาะสม","confidence":85,"reason":"เหตุผลสั้นๆ"}`;
 }
 
-function matchAccount(
-  suggestion: { accountId?: string; accountCode?: string; accountName?: string },
-  accounts: { id: string; code: string; name: string }[]
-): { id: string; code: string; name: string } | null {
-  // 1. Match by exact accountId
-  let matched = accounts.find((a) => a.id === suggestion.accountId);
-  
-  // 2. Match by accountCode if accountId didn't work
-  if (!matched && suggestion.accountCode) {
-    matched = accounts.find((a) => a.code === suggestion.accountCode);
-  }
-  
-  // 3. Match by accountName if still no match
-  if (!matched && suggestion.accountName) {
-    matched = accounts.find((a) => 
-      a.name === suggestion.accountName || 
-      a.name.includes(suggestion.accountName || "") ||
-      (suggestion.accountName || "").includes(a.name)
-    );
-  }
-  
-  // 4. Fuzzy match by name similarity
-  if (!matched && suggestion.accountName) {
-    const nameWords = suggestion.accountName.toLowerCase().split(/[\s/]+/);
-    for (const account of accounts) {
-      const accountWords = account.name.toLowerCase().split(/[\s/]+/);
-      const overlap = nameWords.filter((w: string) => accountWords.some((aw: string) => aw.includes(w) || w.includes(aw)));
-      if (overlap.length >= 1) {
-        matched = account;
-        break;
-      }
-    }
-  }
-  
-  return matched || null;
-}
-
-function parseAIResponse(
+function parseResponse(
   rawResponse: string,
   accounts: { id: string; code: string; name: string }[]
 ): AccountSuggestion {
-  let jsonText = rawResponse.trim();
-  
-  // Remove markdown code blocks
-  if (jsonText.startsWith("```")) {
-    jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
-  }
-  
-  // Also handle trailing text after JSON
-  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    jsonText = jsonMatch[0];
-  }
-
   try {
-    const result = JSON.parse(jsonText);
+    let jsonText = rawResponse.trim();
     
-    // Handle new format with multiple suggestions
-    const suggestions = result.suggestions || [result];
-    const validSuggestions: AccountSuggestionItem[] = [];
-    
-    for (const suggestion of suggestions) {
-      const matched = matchAccount(suggestion, accounts);
-      if (matched) {
-        validSuggestions.push({
-          accountId: matched.id,
-          accountCode: matched.code,
-          accountName: matched.name,
-          confidence: Math.max(0, Math.min(100, suggestion.confidence || 85)),
-          reason: suggestion.reason || "AI วิเคราะห์",
-        });
-      }
+    // Remove markdown code blocks
+    if (jsonText.startsWith("```")) {
+      jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
     }
+
+    const parsed = JSON.parse(jsonText);
     
-    // Remove duplicates
-    const uniqueSuggestions = validSuggestions.filter(
-      (s, i, arr) => arr.findIndex(x => x.accountId === s.accountId) === i
-    );
+    // Find matching account
+    const account = accounts.find((a) => a.id === parsed.accountId);
     
-    if (uniqueSuggestions.length > 0) {
-      const primary = uniqueSuggestions[0];
+    if (account) {
       return {
-        accountId: primary.accountId,
-        accountCode: primary.accountCode,
-        accountName: primary.accountName,
-        confidence: primary.confidence,
-        reason: primary.reason,
-        source: "ai",
-        alternatives: uniqueSuggestions.slice(1), // Other options
-        suggestNewAccount: result.suggestNewAccount || undefined,
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        confidence: parsed.confidence || 80,
+        reason: parsed.reason || "AI แนะนำ",
       };
     }
 
-    // No valid account found
-    console.log("[parseAIResponse] AI response did not match any account:", {
-      suggestions: suggestions.slice(0, 3),
-      availableAccounts: accounts.map(a => `${a.code}: ${a.name}`).slice(0, 5),
-    });
+    // Fallback: try matching by code
+    const byCode = accounts.find((a) => parsed.accountId?.includes(a.code));
+    if (byCode) {
+      return {
+        accountId: byCode.id,
+        accountCode: byCode.code,
+        accountName: byCode.name,
+        confidence: parsed.confidence || 70,
+        reason: parsed.reason || "AI แนะนำ",
+      };
+    }
 
     return {
       accountId: null,
       accountCode: null,
       accountName: null,
       confidence: 0,
-      reason: "ไม่พบบัญชีที่เหมาะสม",
-      source: "ai",
-      suggestNewAccount: result.suggestNewAccount || undefined,
+      reason: "ไม่พบบัญชีที่ตรงกัน",
     };
 
-  } catch (e) {
-    console.error("[parseAIResponse] Failed to parse:", jsonText, e);
+  } catch (error) {
+    console.error("[parseResponse] Error:", error, rawResponse);
     return {
       accountId: null,
       accountCode: null,
       accountName: null,
       confidence: 0,
-      reason: "ไม่สามารถวิเคราะห์ได้",
-      source: "none",
+      reason: "ไม่สามารถแปลผล AI ได้",
     };
   }
 }

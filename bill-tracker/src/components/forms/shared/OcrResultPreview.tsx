@@ -133,32 +133,37 @@ export function OcrResultPreview({
         </Badge>
       </div>
 
-      {/* Smart Match Info */}
-      {smart?.mapping && (
+      {/* AI Account Suggestion */}
+      {smart?.aiAccountSuggestion?.accountId && (
         <div className="px-4 py-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-b border-primary/20">
           <div className="flex items-center gap-2 text-sm">
             <Brain className="h-4 w-4 text-green-600" />
             <span className="text-green-700 dark:text-green-400">
-              จดจำได้! {smart.matchReason}
+              AI แนะนำ: {smart.aiAccountSuggestion.accountName}
             </span>
             <Badge variant="outline" className="ml-auto text-xs border-green-500/50 text-green-600">
-              {smart.matchConfidence}% match
+              {smart.aiAccountSuggestion.confidence}%
             </Badge>
           </div>
-          {smart.mapping.contactName && (
-            <p className="text-xs text-muted-foreground mt-1 ml-6">
-              ผู้ติดต่อ: {smart.mapping.contactName}
-            </p>
-          )}
+        </div>
+      )}
+
+      {/* Found Contact Notice */}
+      {smart?.foundContact && (
+        <div className="px-4 py-2 bg-blue-500/10 border-b border-primary/20">
+          <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-400">
+            <Brain className="h-4 w-4" />
+            <span>พบผู้ติดต่อ: {smart.foundContact.name}</span>
+          </div>
         </div>
       )}
 
       {/* New Vendor Notice */}
-      {smart?.isNewVendor && smart.suggestTraining && (
+      {smart?.isNewVendor && (
         <div className="px-4 py-2 bg-amber-500/10 border-b border-primary/20">
           <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
             <GraduationCap className="h-4 w-4" />
-            <span>ร้านค้าใหม่ - สามารถสอน AI ให้จดจำได้</span>
+            <span>ร้านค้าใหม่ - กดบันทึกผู้ติดต่อใหม่</span>
           </div>
         </div>
       )}
@@ -375,19 +380,6 @@ export function OcrResultPreview({
           </div>
         )}
 
-        {/* Train Button */}
-        {smart?.suggestTraining && onTrain && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={onTrain}
-            className="gap-2 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
-          >
-            <GraduationCap className="h-4 w-4" />
-            สอน AI
-          </Button>
-        )}
       </div>
     </div>
   );

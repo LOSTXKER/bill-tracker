@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "./DatePicker";
 import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
-import { AccountSelector, SuggestNewAccount } from "./account-selector";
+import { AccountSelector } from "./account-selector";
 import { PaymentMethodSelect } from "./PaymentMethodSelect";
 import type { ContactSummary } from "@/types";
 import { Plus, X, ExternalLink, Link2 } from "lucide-react";
@@ -70,19 +70,10 @@ export interface TransactionFieldsSectionProps {
   selectedAccount: string | null;
   onAccountChange: (value: string | null) => void;
   suggestedAccountId?: string;
-  suggestNewAccount?: SuggestNewAccount;
-  accountAlternatives?: Array<{
-    accountId: string;
-    accountCode: string;
-    accountName: string;
-    confidence: number;
-    reason: string;
-  }>;
   
   // Optional AI suggestion button
   onSuggestAccount?: () => void;
   isSuggestingAccount?: boolean;
-  accountSuggestionSource?: "learned" | "ai" | "none";
   
   // AI-detected new vendor suggestion
   aiVendorSuggestion?: AiVendorSuggestion | null;
@@ -116,11 +107,8 @@ export function TransactionFieldsSection({
   selectedAccount,
   onAccountChange,
   suggestedAccountId,
-  suggestNewAccount,
-  accountAlternatives,
   onSuggestAccount,
   isSuggestingAccount,
-  accountSuggestionSource,
   aiVendorSuggestion,
   referenceUrls = [],
   onReferenceUrlsChange,
@@ -344,14 +332,7 @@ export function TransactionFieldsSection({
         {/* Account Selector with AI Button */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-sm font-medium flex items-center gap-1.5">
-              บัญชี
-              {accountSuggestionSource === "learned" && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                  🤖 AI จำได้
-                </span>
-              )}
-            </Label>
+            <Label className="text-sm font-medium">บัญชี</Label>
             {onSuggestAccount && (
               <button
                 type="button"
@@ -376,8 +357,6 @@ export function TransactionFieldsSection({
             companyCode={companyCode}
             placeholder="เลือกบัญชี"
             suggestedAccountId={suggestedAccountId}
-            suggestNewAccount={suggestNewAccount}
-            alternatives={accountAlternatives}
           />
         </div>
       </div>

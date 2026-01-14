@@ -9,7 +9,7 @@ import path from "path";
 
 /**
  * POST /api/ai/analyze-receipt
- * Analyze receipt image using AI OCR with smart vendor matching
+ * Analyze receipt image using AI OCR - SIMPLIFIED
  */
 export async function POST(request: Request) {
   return withAuth(async (req, { session }) => {
@@ -25,8 +25,8 @@ export async function POST(request: Request) {
       imageUrl, 
       imageData, 
       mimeType = "image/jpeg",
-      companyCode, // Optional: for smart matching
-      smartMatch = true, // Enable smart matching by default
+      companyCode,
+      smartMatch = true,
     } = body;
 
     if (!imageUrl && !imageData) {
@@ -38,7 +38,6 @@ export async function POST(request: Request) {
     // Handle image URL (from storage)
     if (imageUrl) {
       try {
-        // If it's a local file path (starts with /uploads/)
         if (imageUrl.startsWith("/uploads/")) {
           const publicDir = path.join(process.cwd(), "public");
           const filePath = path.join(publicDir, imageUrl);
@@ -49,7 +48,6 @@ export async function POST(request: Request) {
 
           imageBuffer = fs.readFileSync(filePath);
         } else {
-          // External URL - fetch it
           const response = await fetch(imageUrl);
           if (!response.ok) {
             return apiResponse.badRequest("Failed to fetch image from URL");
@@ -62,21 +60,18 @@ export async function POST(request: Request) {
         return apiResponse.badRequest("Failed to load image");
       }
     } else {
-      // Handle base64 image data
       imageBuffer = imageData;
     }
 
     const startTime = Date.now();
 
-    // Check if smart matching is enabled and company code is provided
+    // Smart matching if company code is provided
     if (smartMatch && companyCode) {
-      // Find company
       const company = await prisma.company.findUnique({
         where: { code: companyCode.toUpperCase() },
       });
 
       if (company) {
-        // Use smart OCR with vendor matching
         const smartResult = await analyzeAndMatch(imageBuffer, company.id, mimeType);
         const processingTime = Date.now() - startTime;
 
@@ -84,40 +79,23 @@ export async function POST(request: Request) {
           return apiResponse.error(smartResult.error);
         }
 
-        // Validate the OCR data
         const validation = validateReceiptData(smartResult.ocr);
 
-        // Log analysis
         console.log("Smart OCR Analysis:", {
           userId: session.user.id,
           companyId: company.id,
           processingTime,
           confidence: smartResult.ocr.confidence.overall,
-          matchConfidence: smartResult.matchConfidence,
-          matchReason: smartResult.matchReason,
           isNewVendor: smartResult.isNewVendor,
         });
 
         return apiResponse.success({
           data: smartResult.ocr,
           smart: {
-            mapping: smartResult.mapping ? {
-              id: smartResult.mapping.id,
-              vendorName: smartResult.mapping.vendorName,
-              contactId: smartResult.mapping.contactId,
-              contactName: smartResult.mapping.contact?.name,
-              accountId: smartResult.mapping.accountId,
-              accountCode: smartResult.mapping.account?.code,
-              accountName: smartResult.mapping.account?.name,
-              defaultVatRate: smartResult.mapping.defaultVatRate,
-              paymentMethod: smartResult.mapping.paymentMethod,
-              descriptionTemplate: smartResult.mapping.descriptionTemplate,
-            } : null,
-            matchConfidence: smartResult.matchConfidence,
-            matchReason: smartResult.matchReason,
             suggested: smartResult.suggested,
+            foundContact: smartResult.foundContact,
+            aiAccountSuggestion: smartResult.aiAccountSuggestion,
             isNewVendor: smartResult.isNewVendor,
-            suggestTraining: smartResult.suggestTraining,
           },
           validation: {
             isValid: validation.isValid,
@@ -135,7 +113,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fallback to basic OCR (no smart matching)
+    // Fallback to basic OCR
     const result = await analyzeReceipt(imageBuffer, mimeType);
     const processingTime = Date.now() - startTime;
 
@@ -144,23 +122,18 @@ export async function POST(request: Request) {
     }
 
     const receiptData = result as ReceiptData;
-
-    // Validate the extracted data
     const validation = validateReceiptData(receiptData);
 
-    // Log analysis
     console.log("Receipt OCR Analysis:", {
       userId: session.user.id,
       processingTime,
       confidence: receiptData.confidence.overall,
       isValid: validation.isValid,
-      missingFields: validation.missingFields,
     });
 
-    // Return the analyzed data
     return apiResponse.success({
       data: receiptData,
-      smart: null, // No smart matching
+      smart: null,
       validation: {
         isValid: validation.isValid,
         missingFields: validation.missingFields,
@@ -188,10 +161,5 @@ export async function GET() {
     message: isConfigured
       ? "AI receipt analysis is available"
       : "AI features not configured",
-    features: {
-      basicOcr: isConfigured,
-      smartMatching: isConfigured,
-      vendorTraining: isConfigured,
-    },
   });
 }

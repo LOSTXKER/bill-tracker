@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Check, ChevronsUpDown, Sparkles, Search, Plus, Lightbulb } from "lucide-react";
+import { Check, ChevronsUpDown, Sparkles, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,32 +28,13 @@ export interface Account {
   isSystem: boolean;
 }
 
-export interface SuggestNewAccount {
-  code: string;
-  name: string;
-  class: string;
-  description: string;
-  keywords: string[];
-  reason: string;
-}
-
-export interface AccountSuggestionAlternative {
-  accountId: string;
-  accountCode: string;
-  accountName: string;
-  confidence: number;
-  reason: string;
-}
-
 interface AccountSelectorProps {
   value?: string | null;
   onValueChange: (value: string | null) => void;
   companyCode: string;
   className?: string;
   placeholder?: string;
-  suggestedAccountId?: string; // From AI - existing account
-  suggestNewAccount?: SuggestNewAccount; // From AI - suggest creating new
-  alternatives?: AccountSuggestionAlternative[]; // Other AI suggestions
+  suggestedAccountId?: string; // From AI
   disabled?: boolean;
   label?: string;
 }
@@ -76,8 +57,6 @@ export function AccountSelector({
   className,
   placeholder = "เลือกบัญชี...",
   suggestedAccountId,
-  suggestNewAccount,
-  alternatives = [],
   disabled = false,
   label,
 }: AccountSelectorProps) {
@@ -85,7 +64,6 @@ export function AccountSelector({
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch accounts
   const fetchAccounts = useCallback(async () => {
@@ -94,7 +72,6 @@ export function AccountSelector({
       const res = await fetch(`/api/${companyCode.toLowerCase()}/accounts?activeOnly=true`);
       if (res.ok) {
         const json = await res.json();
-        // Handle both old format (array) and new format ({ success, data: { accounts } })
         const accountsData = json.success ? (json.data?.accounts || []) : (Array.isArray(json) ? json : []);
         setAccounts(accountsData);
       }
@@ -149,42 +126,6 @@ export function AccountSelector({
     <div className="space-y-2">
       {label && (
         <label className="text-sm font-medium text-foreground">{label}</label>
-      )}
-      
-      {/* AI Suggest New Account Banner */}
-      {suggestNewAccount && !value && !suggestedAccountId && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm">
-          <div className="flex items-start gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <p className="font-medium text-amber-900 dark:text-amber-100">
-                AI แนะนำสร้างบัญชีใหม่
-              </p>
-              <p className="text-amber-700 dark:text-amber-300 mt-1">
-                <span className="font-mono">{suggestNewAccount.code}</span> - {suggestNewAccount.name}
-              </p>
-              <p className="text-amber-600 dark:text-amber-400 text-xs mt-1">
-                {suggestNewAccount.reason}
-              </p>
-              <CreateAccountDialog
-                companyCode={companyCode}
-                onAccountCreated={handleAccountCreated}
-                aiSuggestion={suggestNewAccount}
-                trigger={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 gap-1 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900"
-                  >
-                    <Plus className="h-3 w-3" />
-                    สร้างบัญชีนี้
-                  </Button>
-                }
-              />
-            </div>
-          </div>
-        </div>
       )}
       
       <Popover open={open} onOpenChange={setOpen}>
@@ -243,64 +184,29 @@ export function AccountSelector({
                 </div>
               </CommandEmpty>
               
-              {/* AI Suggestions (if available and no selection) */}
-              {(suggestedAccount || alternatives.length > 0) && !value && (
+              {/* AI Suggestion */}
+              {suggestedAccount && !value && (
                 <CommandGroup heading="✨ AI แนะนำ">
-                  {/* Primary suggestion */}
-                  {suggestedAccount && (
-                    <CommandItem
-                      key={suggestedAccount.id}
-                      value={`${suggestedAccount.code}-${suggestedAccount.name}`}
-                      onSelect={() => {
-                        onValueChange(suggestedAccount.id);
-                        setOpen(false);
-                      }}
-                      className="bg-primary/5 border-l-2 border-primary"
-                    >
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className="font-mono text-xs font-semibold">
-                          {suggestedAccount.code}
-                        </span>
-                        <span className="flex-1">{suggestedAccount.name}</span>
-                        <Badge variant="secondary" className="gap-1">
-                          <Sparkles className="h-3 w-3" />
-                          อันดับ 1
-                        </Badge>
-                      </div>
-                      {value === suggestedAccount.id && (
-                        <Check className="ml-2 h-4 w-4" />
-                      )}
-                    </CommandItem>
-                  )}
-                  {/* Alternative suggestions */}
-                  {alternatives.map((alt, idx) => {
-                    const altAccount = accounts.find(a => a.id === alt.accountId);
-                    if (!altAccount) return null;
-                    return (
-                      <CommandItem
-                        key={alt.accountId}
-                        value={`${alt.accountCode}-${alt.accountName}`}
-                        onSelect={() => {
-                          onValueChange(alt.accountId);
-                          setOpen(false);
-                        }}
-                        className="bg-muted/30 border-l-2 border-muted-foreground/30"
-                      >
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="font-mono text-xs font-semibold text-muted-foreground">
-                            {alt.accountCode}
-                          </span>
-                          <span className="flex-1">{alt.accountName}</span>
-                          <Badge variant="outline" className="text-xs">
-                            อันดับ {idx + 2}
-                          </Badge>
-                        </div>
-                        {value === alt.accountId && (
-                          <Check className="ml-2 h-4 w-4" />
-                        )}
-                      </CommandItem>
-                    );
-                  })}
+                  <CommandItem
+                    key={suggestedAccount.id}
+                    value={`${suggestedAccount.code}-${suggestedAccount.name}`}
+                    onSelect={() => {
+                      onValueChange(suggestedAccount.id);
+                      setOpen(false);
+                    }}
+                    className="bg-primary/5 border-l-2 border-primary"
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="font-mono text-xs font-semibold">
+                        {suggestedAccount.code}
+                      </span>
+                      <span className="flex-1">{suggestedAccount.name}</span>
+                      <Sparkles className="h-3 w-3 text-primary" />
+                    </div>
+                    {value === suggestedAccount.id && (
+                      <Check className="ml-2 h-4 w-4" />
+                    )}
+                  </CommandItem>
                 </CommandGroup>
               )}
 
@@ -352,27 +258,6 @@ export function AccountSelector({
           </Command>
         </PopoverContent>
       </Popover>
-      
-      {/* Show alternatives as chips below dropdown when account is selected */}
-      {alternatives.length > 0 && value && (
-        <div className="flex flex-wrap gap-2 mt-2">
-          <span className="text-xs text-muted-foreground">ตัวเลือกอื่น:</span>
-          {alternatives.map((alt, idx) => (
-            <button
-              key={alt.accountId}
-              type="button"
-              onClick={() => onValueChange(alt.accountId)}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-muted-foreground/30 hover:bg-muted hover:border-primary transition-colors"
-            >
-              <span className="font-mono">{alt.accountCode}</span>
-              <span className="text-muted-foreground">{alt.accountName}</span>
-              <Badge variant="outline" className="text-[10px] px-1 py-0">
-                #{idx + 2}
-              </Badge>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -11,7 +11,7 @@ const getCompanyFromPath = (req: Request) => {
 
 /**
  * POST /api/[company]/ai/suggest-account
- * AI-powered account suggestion based on vendor name, description, and/or images
+ * AI-powered account suggestion - SIMPLIFIED
  */
 async function handlePost(
   req: Request,
@@ -22,7 +22,6 @@ async function handlePost(
     const { 
       transactionType, 
       vendorName,
-      vendorTaxId,
       description,
       items,
       imageUrls,
@@ -38,7 +37,6 @@ async function handlePost(
       transactionType as "EXPENSE" | "INCOME",
       {
         vendorName,
-        vendorTaxId,
         description,
         items,
         imageUrls,
@@ -51,10 +49,6 @@ async function handlePost(
       accountName: result.accountName,
       confidence: result.confidence,
       reason: result.reason,
-      source: result.source,
-      useCount: result.useCount,
-      suggestNewAccount: result.suggestNewAccount,
-      alternatives: result.alternatives,
     });
   } catch (error) {
     console.error("Account suggestion error:", error);

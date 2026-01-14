@@ -327,23 +327,6 @@ export function UnifiedTransactionForm({
     accountName: string | null;
     confidence: number;
     reason: string;
-    source: "learned" | "ai" | "none";
-    useCount?: number;
-    suggestNewAccount?: {
-      code: string;
-      name: string;
-      class: string;
-      description: string;
-      keywords: string[];
-      reason: string;
-    };
-    alternatives?: Array<{
-      accountId: string;
-      accountCode: string;
-      accountName: string;
-      confidence: number;
-      reason: string;
-    }>;
   } | null>(null);
   const [isSuggestingAccount, setIsSuggestingAccount] = useState(false);
   
@@ -896,13 +879,9 @@ export function UnifiedTransactionForm({
         toast.info("AI แนะนำบัญชี", {
           description: `${suggestion.accountCode} ${suggestion.accountName} (${suggestion.confidence}%) - ${suggestion.reason}`,
         });
-      } else if (suggestion.suggestNewAccount) {
-        toast.info("💡 AI แนะนำสร้างบัญชีใหม่", {
-          description: `${suggestion.suggestNewAccount.code} ${suggestion.suggestNewAccount.name}`,
-        });
       } else {
         toast.warning("AI ไม่พบบัญชีที่เหมาะสม", {
-          description: suggestion.reason || "กรุณาเลือกบัญชีเอง หรือสร้างบัญชีใหม่",
+          description: suggestion.reason || "กรุณาเลือกบัญชีเอง",
         });
       }
     } catch (error) {
@@ -1070,47 +1049,6 @@ export function UnifiedTransactionForm({
 
       if (!response.ok) {
         throw new Error(result.error || "เกิดข้อผิดพลาด");
-      }
-
-      // Auto-learn vendor mapping
-      const vendorName = aiResult?.combined?.vendorName || selectedContact?.name || null;
-      const vendorTaxId = aiResult?.combined?.vendorTaxId || selectedContact?.taxId || null;
-      const hasVendorIdentifier = !!(vendorName || vendorTaxId);
-      const existingMappingId = aiResult?.smart?.mapping?.id || null;
-      const shouldAutoLearn = hasVendorIdentifier && selectedContact?.id;
-
-      if (shouldAutoLearn && !existingMappingId) {
-        try {
-          const learnResponse = await fetch("/api/vendor-mappings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              companyCode: companyCode.toUpperCase(),
-              transactionType: config.type.toUpperCase(),
-              vendorName,
-              vendorTaxId,
-              contactId: selectedContact.id,
-              accountId: selectedAccount,
-              defaultVatRate: watchVatRate,
-              paymentMethod: watch("paymentMethod"),
-              learnSource: "AUTO",
-            }),
-          });
-
-          if (learnResponse.ok) {
-            toast.success(`บันทึก${config.title}สำเร็จ`, {
-              description: `AI จดจำ "${vendorName}" แล้ว`,
-            });
-          } else {
-            toast.success(`บันทึก${config.title}สำเร็จ`);
-          }
-        } catch {
-          toast.success(`บันทึก${config.title}สำเร็จ`);
-        }
-
-        router.push(config.redirectPath);
-        router.refresh();
-        return;
       }
 
       toast.success(`บันทึก${config.title}สำเร็จ`);
@@ -1478,11 +1416,8 @@ export function UnifiedTransactionForm({
                       aiResult?.smart?.aiAccountSuggestion?.accountId ||
                       undefined
                     }
-                    suggestNewAccount={aiResult?.smart?.suggestNewAccount || undefined}
-                    accountAlternatives={accountSuggestion?.alternatives}
                     onSuggestAccount={suggestAccount}
                     isSuggestingAccount={isSuggestingAccount}
-                    accountSuggestionSource={accountSuggestion?.source}
                     aiVendorSuggestion={aiVendorSuggestion}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={setReferenceUrls}
@@ -1620,11 +1555,8 @@ export function UnifiedTransactionForm({
                       aiResult?.smart?.aiAccountSuggestion?.accountId ||
                       undefined
                     }
-                    suggestNewAccount={aiResult?.smart?.suggestNewAccount || undefined}
-                    accountAlternatives={accountSuggestion?.alternatives}
                     onSuggestAccount={suggestAccount}
                     isSuggestingAccount={isSuggestingAccount}
-                    accountSuggestionSource={accountSuggestion?.source}
                     aiVendorSuggestion={aiVendorSuggestion}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={mode === "edit" ? setReferenceUrls : undefined}

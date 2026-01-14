@@ -1,6 +1,7 @@
 /**
- * Smart OCR Service
- * Combines Gemini Vision OCR with learned vendor mappings for intelligent auto-fill
+ * Smart OCR Service - SIMPLIFIED
+ * AI อ่านบิล + เลือก account โดยตรง
+ * ไม่มี VendorMapping ไม่มี learned mappings
  */
 
 import { prisma } from "@/lib/db";
@@ -8,8 +9,7 @@ import { analyzeReceipt, ReceiptData } from "./receipt-ocr";
 import { analyzeImage } from "./gemini";
 import { detectAndConvertAmount, type CurrencyDetectionResult } from "./currency-converter";
 import { suggestAccount } from "./account-suggestion";
-import { findMapping } from "./vendor-mapping";
-import type { VendorMapping, Contact, PaymentMethod } from "@prisma/client";
+import type { PaymentMethod } from "@prisma/client";
 
 // =============================================================================
 // Types
@@ -52,45 +52,21 @@ export interface MultiDocAnalysisResult {
   };
   currencyConversion?: CurrencyDetectionResult;
   smart: {
-    mapping: {
-      id: string;
-      vendorName: string | null;
-      contactId: string | null;
-      contactName: string | null;
-      accountId: string | null;
-      accountCode: string | null;
-      accountName: string | null;
-      defaultVatRate: number | null;
-      defaultWhtRate: number | null;
-      defaultWhtType: string | null;
-      paymentMethod: string | null;
-      descriptionTemplate: string | null;
-    } | null;
-    matchConfidence: number;
-    matchReason: string | null;
+    // ค่าที่แนะนำ (contact, account, etc.)
     suggested: SuggestedValues;
-    isNewVendor: boolean;
-    suggestTraining: boolean;
-    // Contact found by taxId/name lookup (not from mapping)
+    // ผู้ติดต่อที่พบจาก Tax ID
     foundContact?: {
       id: string;
       name: string;
     } | null;
-    // AI account suggestion when no mapping found
+    // เป็น vendor ใหม่หรือไม่ (ไม่พบ contact)
+    isNewVendor: boolean;
+    // AI แนะนำ account
     aiAccountSuggestion?: {
       accountId: string | null;
       accountCode: string | null;
       accountName: string | null;
       confidence: number;
-      reason: string;
-    };
-    // AI suggests creating a new account
-    suggestNewAccount?: {
-      code: string;
-      name: string;
-      class: string;
-      description: string;
-      keywords: string[];
       reason: string;
     };
   } | null;
@@ -101,17 +77,23 @@ export interface SmartOcrResult {
   // Raw OCR data
   ocr: ReceiptData;
   
-  // Matched mapping (if found)
-  mapping: VendorMappingWithRelations | null;
-  matchConfidence: number; // 0-100
-  matchReason: string | null;
-  
-  // Final suggested values (merged from OCR + mapping)
+  // Final suggested values
   suggested: SuggestedValues;
+  
+  // ผู้ติดต่อที่พบจาก Tax ID
+  foundContact?: { id: string; name: string } | null;
+  
+  // AI account suggestion
+  aiAccountSuggestion?: {
+    accountId: string | null;
+    accountCode: string | null;
+    accountName: string | null;
+    confidence: number;
+    reason: string;
+  };
   
   // Flags
   isNewVendor: boolean;
-  suggestTraining: boolean;
 }
 
 export interface SuggestedValues {
@@ -144,17 +126,12 @@ export interface SuggestedValues {
   accountId: string | null;
 }
 
-export interface VendorMappingWithRelations extends VendorMapping {
-  contact: Contact | null;
-  account: { id: string; code: string; name: string } | null;
-}
-
 // =============================================================================
 // Main Functions
 // =============================================================================
 
 /**
- * Analyze image and match with vendor mappings
+ * Analyze image - SIMPLIFIED (ไม่ใช้ VendorMapping)
  */
 export async function analyzeAndMatch(
   imageData: string | Buffer,
@@ -168,147 +145,7 @@ export async function analyzeAndMatch(
     return ocrResult;
   }
   
-  // Step 2: Find best matching vendor mapping
-  const matchResult = await findBestMatch(ocrResult, companyId);
-  
-  // Step 3: Build suggested values
-  const suggested = buildSuggestedValues(ocrResult, matchResult.mapping);
-  
-  return {
-    ocr: ocrResult,
-    mapping: matchResult.mapping,
-    matchConfidence: matchResult.confidence,
-    matchReason: matchResult.reason,
-    suggested,
-    isNewVendor: !matchResult.mapping,
-    suggestTraining: !matchResult.mapping && (ocrResult.vendorName !== null || ocrResult.vendorTaxId !== null),
-  };
-}
-
-/**
- * Find the best matching vendor mapping for OCR result
- */
-export async function findBestMatch(
-  ocrResult: ReceiptData,
-  companyId: string
-): Promise<{
-  mapping: VendorMappingWithRelations | null;
-  confidence: number;
-  reason: string | null;
-}> {
-  // Get all mappings for this company
-  const mappings = await prisma.vendorMapping.findMany({
-    where: { companyId },
-    include: {
-      contact: true,
-      account: true,
-    },
-  });
-  
-  if (mappings.length === 0) {
-    return { mapping: null, confidence: 0, reason: null };
-  }
-  
-  let bestMatch: VendorMappingWithRelations | null = null;
-  let bestScore = 0;
-  let bestReason: string | null = null;
-  
-  for (const mapping of mappings) {
-    const { score, reason } = calculateMatchScore(ocrResult, mapping);
-    
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = mapping;
-      bestReason = reason;
-    }
-  }
-  
-  // Only return match if confidence is >= 80% (increased for accuracy)
-  if (bestScore >= 80) {
-    // Update usage stats
-    if (bestMatch) {
-      await prisma.vendorMapping.update({
-        where: { id: bestMatch.id },
-        data: {
-          useCount: { increment: 1 },
-          lastUsedAt: new Date(),
-        },
-      });
-    }
-    
-    return { mapping: bestMatch, confidence: bestScore, reason: bestReason };
-  }
-  
-  return { mapping: null, confidence: bestScore, reason: null };
-}
-
-/**
- * Calculate match score between OCR result and mapping
- */
-function calculateMatchScore(
-  ocrResult: ReceiptData,
-  mapping: VendorMapping
-): { score: number; reason: string } {
-  // Priority 1: Tax ID exact match (100%)
-  if (ocrResult.vendorTaxId && mapping.vendorTaxId) {
-    const ocrTaxId = ocrResult.vendorTaxId.replace(/[^0-9]/g, "");
-    const mappingTaxId = mapping.vendorTaxId.replace(/[^0-9]/g, "");
-    
-    if (ocrTaxId === mappingTaxId && ocrTaxId.length >= 10) {
-      return { score: 100, reason: "เลขผู้เสียภาษีตรงกัน" };
-    }
-  }
-  
-  // Priority 2: Regex pattern match (90%)
-  if (ocrResult.vendorName && mapping.namePattern) {
-    try {
-      const regex = new RegExp(mapping.namePattern, "i");
-      if (regex.test(ocrResult.vendorName)) {
-        return { score: 90, reason: `ชื่อตรงกับรูปแบบ: ${mapping.namePattern}` };
-      }
-    } catch {
-      // Invalid regex, skip
-    }
-  }
-  
-  // Priority 3: Name fuzzy match
-  if (ocrResult.vendorName && mapping.vendorName) {
-    const normalizedOcr = normalizeVendorName(ocrResult.vendorName);
-    const normalizedMapping = normalizeVendorName(mapping.vendorName);
-    
-    const similarity = calculateStringSimilarity(normalizedOcr, normalizedMapping);
-    
-    // High similarity - very likely the same vendor
-    if (similarity >= 0.85) {
-      return { score: 85, reason: "ชื่อร้านตรงกัน" };
-    }
-    
-    // Medium similarity - probably the same vendor
-    if (similarity >= 0.65) {
-      return { score: Math.round(60 + similarity * 20), reason: "ชื่อร้านคล้ายกัน" };
-    }
-    
-    // Check for token overlap (handles cases like "ABC Company" vs "ABC")
-    if (similarity >= 0.5) {
-      return { score: 55, reason: "ชื่อร้านมีบางส่วนตรงกัน" };
-    }
-    
-    if (similarity >= 0.5) {
-      return { score: 50, reason: "ชื่อร้านคล้ายกันบางส่วน" };
-    }
-  }
-  
-  return { score: 0, reason: "" };
-}
-
-/**
- * Build suggested values from OCR and mapping
- */
-function buildSuggestedValues(
-  ocrResult: ReceiptData,
-  mapping: VendorMappingWithRelations | null
-): SuggestedValues {
-  // Start with OCR values
+  // Step 2: Build suggested values from OCR data
   const suggested: SuggestedValues = {
     vendorName: ocrResult.vendorName,
     vendorTaxId: ocrResult.vendorTaxId,
@@ -327,79 +164,58 @@ function buildSuggestedValues(
     invoiceNumber: ocrResult.invoiceNumber,
     date: ocrResult.date,
     dueDate: ocrResult.dueDate,
-    paymentMethod: normalizePaymentMethod(ocrResult.paymentMethod),
+    paymentMethod: ocrResult.paymentMethod as PaymentMethod | null,
     description: null,
     accountId: null,
   };
-  
-  // Override/enhance with mapping values
-  if (mapping) {
-    // Contact
-    if (mapping.contactId) {
-      suggested.contactId = mapping.contactId;
-    }
+
+  let foundContact: { id: string; name: string } | null = null;
+
+  // Step 3: Find contact by Tax ID (exact match only)
+  if (ocrResult.vendorTaxId) {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { taxId: true },
+    });
+    const companyTaxId = company?.taxId?.replace(/[^0-9]/g, "") || null;
+    const normalizedVendorTaxId = ocrResult.vendorTaxId.replace(/[^0-9]/g, "");
     
-    // Account - ใช้จาก mapping ที่สอนไว้เลย
-    // ถ้าร้านเดียวกันมีหลายบัญชี ให้ผู้ใช้สอนเพิ่มได้
-    if (mapping.accountId) {
-      suggested.accountId = mapping.accountId;
-    }
-    
-    // VAT Rate (use mapping if OCR is uncertain)
-    if (mapping.defaultVatRate !== null && mapping.defaultVatRate !== undefined) {
-      // If OCR confidence for amount is low, use mapping VAT
-      if (!ocrResult.vatRate || ocrResult.confidence.amount < 70) {
-        suggested.vatRate = mapping.defaultVatRate;
+    // Skip if vendor tax ID matches our company
+    if (!companyTaxId || normalizedVendorTaxId !== companyTaxId) {
+      const contact = await prisma.contact.findFirst({
+        where: { companyId, taxId: ocrResult.vendorTaxId },
+        select: { id: true, name: true },
+      });
+      if (contact) {
+        suggested.contactId = contact.id;
+        foundContact = contact;
       }
-    }
-    
-    // WHT Rate (use mapping if no OCR result or mapping has default)
-    const extendedMapping = mapping as typeof mapping & {
-      defaultWhtRate?: number | null;
-      defaultWhtType?: string | null;
-    };
-    if (extendedMapping.defaultWhtRate !== null && extendedMapping.defaultWhtRate !== undefined) {
-      // Use mapping WHT if OCR didn't detect it or has low confidence
-      if (!ocrResult.whtRate || (ocrResult.confidence.wht && ocrResult.confidence.wht < 70)) {
-        suggested.whtRate = extendedMapping.defaultWhtRate;
-      }
-    }
-    if (extendedMapping.defaultWhtType && !ocrResult.whtType) {
-      suggested.whtType = extendedMapping.defaultWhtType;
-    }
-    
-    // Payment Method (prefer mapping)
-    if (mapping.paymentMethod) {
-      suggested.paymentMethod = mapping.paymentMethod;
-    }
-    
-    // Description template
-    if (mapping.descriptionTemplate) {
-      suggested.description = processDescriptionTemplate(
-        mapping.descriptionTemplate,
-        ocrResult,
-        mapping
-      );
     }
   }
-  
-  return suggested;
-}
 
-/**
- * Process description template with variables
- */
-function processDescriptionTemplate(
-  template: string,
-  ocrResult: ReceiptData,
-  mapping: VendorMappingWithRelations
-): string {
-  return template
-    .replace(/\{vendorName\}/g, ocrResult.vendorName || mapping.vendorName || "")
-    .replace(/\{invoiceNumber\}/g, ocrResult.invoiceNumber || "")
-    .replace(/\{date\}/g, ocrResult.date || "")
-    .replace(/\{amount\}/g, ocrResult.totalAmount?.toLocaleString("th-TH") || "")
-    .trim();
+  // Step 4: AI suggests account
+  const aiResult = await suggestAccount(companyId, "EXPENSE", {
+    vendorName: ocrResult.vendorName,
+    description: ocrResult.vendorName ? `ค่าใช้จ่ายจาก ${ocrResult.vendorName}` : null,
+  });
+
+  if (aiResult.accountId && aiResult.confidence >= 70) {
+    suggested.accountId = aiResult.accountId;
+  }
+  
+  return {
+    ocr: ocrResult,
+    suggested,
+    foundContact,
+    aiAccountSuggestion: {
+      accountId: aiResult.accountId,
+      accountCode: aiResult.accountCode,
+      accountName: aiResult.accountName,
+      confidence: aiResult.confidence,
+      reason: aiResult.reason,
+    },
+    isNewVendor: !foundContact,
+  };
 }
 
 // =============================================================================
@@ -756,168 +572,100 @@ export async function analyzeAndClassifyMultiple(
     companyName || ""
   );
 
-  // Find best vendor mapping (filter by transaction type)
+  // ==========================================================================
+  // SIMPLIFIED: ไม่ใช้ VendorMapping - AI เลือก account ทุกครั้ง
+  // ==========================================================================
   let smartResult = null;
-  if (combined.vendorName || combined.vendorTaxId) {
-    // Create a pseudo ReceiptData for matching
-    const pseudoData: ReceiptData = {
-      documentType: combined.documentType as ReceiptData["documentType"],
-      documentTypeConfidence: 80,
-      vendorName: combined.vendorName,
-      vendorTaxId: combined.vendorTaxId,
-      vendorBranchNumber: combined.vendorBranchNumber,
-      vendorAddress: null,
-      vendorPhone: null,
-      vendorEmail: combined.vendorEmail,
-      amount: combined.amount || combined.totalAmount || null,
-      vatRate: combined.vatRate,
-      vatAmount: combined.vatAmount || null,
-      totalAmount: combined.totalAmount || null,
-      whtRate: combined.whtRate,
-      whtAmount: combined.whtAmount,
-      whtType: combined.whtType,
-      netAmount: combined.netAmount,
-      invoiceNumber: combined.invoiceNumbers[0] || null,
-      date: combined.date,
-      dueDate: combined.dueDate,
-      paymentMethod: combined.paymentMethod,
-      items: [],
-      confidence: { overall: 80, amount: 80, vendor: 80, date: 70, wht: 70 },
-    };
+  
+  // สร้าง suggested values ตรงๆ
+  const suggested: SuggestedValues = {
+    vendorName: combined.vendorName,
+    vendorTaxId: combined.vendorTaxId,
+    vendorBranchNumber: combined.vendorBranchNumber,
+    vendorEmail: combined.vendorEmail,
+    contactId: null,
+    amount: combined.amount ?? combined.totalAmount ?? null,
+    vatRate: combined.vatRate ?? 7,
+    vatAmount: combined.vatAmount,
+    totalAmount: combined.totalAmount,
+    whtRate: combined.whtRate,
+    whtAmount: combined.whtAmount,
+    whtType: combined.whtType,
+    netAmount: combined.netAmount,
+    documentType: combined.documentType,
+    invoiceNumber: combined.invoiceNumber ?? null,
+    date: combined.date,
+    dueDate: combined.dueDate,
+    paymentMethod: (combined.paymentMethod ?? null) as PaymentMethod | null,
+    description: combined.description ?? null,
+    accountId: null,
+  };
 
-    const matchResult = await findBestMatchByType(
-      pseudoData,
-      companyId,
-      transactionType
-    );
+  let foundContact: { id: string; name: string } | null = null;
 
-    // Build suggested values from mapping (ONLY for account, not contact)
-    const suggested = buildSuggestedValues(pseudoData, matchResult.mapping);
+  // Get company's tax ID to avoid matching vendor with our own company
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { taxId: true },
+  });
+  const companyTaxId = company?.taxId?.replace(/[^0-9]/g, "") || null;
+
+  // ==========================================================================
+  // STEP 1: หา Contact จาก Tax ID (exact match เท่านั้น)
+  // ==========================================================================
+  if (combined.vendorTaxId) {
+    const normalizedVendorTaxId = combined.vendorTaxId.replace(/[^0-9]/g, "");
     
-    // REFACTORED: Don't use contact from VendorMapping - rely on Tax ID only
-    suggested.contactId = null;
-
-    // Track found contact for returning contact info
-    let foundContact: { id: string; name: string } | null = null;
-
-    // Get company's own tax ID to avoid matching vendor with our own company
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: { taxId: true },
-    });
-    const companyTaxId = company?.taxId?.replace(/[^0-9]/g, "") || null;
-
-    // ==========================================================================
-    // SIMPLE: Tax ID exact match → ใส่ผู้ติดต่อ, ไม่ตรง → แนะนำสร้างใหม่
-    // ==========================================================================
-    if (combined.vendorTaxId) {
-      const normalizedVendorTaxId = combined.vendorTaxId.replace(/[^0-9]/g, "");
-      
-      // Skip if vendor tax ID matches our company's tax ID
-      if (companyTaxId && normalizedVendorTaxId === companyTaxId) {
-        console.log("[Smart-OCR] Skipping - vendor tax ID matches company:", normalizedVendorTaxId);
-        combined.vendorTaxId = null;
-      } else if (normalizedVendorTaxId.length >= 10) {
-        // Only match if tax ID is valid (at least 10 digits)
-        const contactByTaxId = await prisma.contact.findFirst({
-          where: {
-            companyId,
-            taxId: combined.vendorTaxId,
-          },
-          select: { id: true, name: true },
-        });
-        if (contactByTaxId) {
-          console.log("[Smart-OCR] Found contact by Tax ID:", contactByTaxId.name);
-          suggested.contactId = contactByTaxId.id;
-          foundContact = contactByTaxId;
-        }
+    // Skip if vendor tax ID matches our company's tax ID
+    if (companyTaxId && normalizedVendorTaxId === companyTaxId) {
+      console.log("[Smart-OCR] Skipping - vendor tax ID matches company");
+      combined.vendorTaxId = null;
+    } else if (normalizedVendorTaxId.length >= 10) {
+      const contactByTaxId = await prisma.contact.findFirst({
+        where: { companyId, taxId: combined.vendorTaxId },
+        select: { id: true, name: true },
+      });
+      if (contactByTaxId) {
+        console.log("[Smart-OCR] Found contact by Tax ID:", contactByTaxId.name);
+        suggested.contactId = contactByTaxId.id;
+        foundContact = contactByTaxId;
       }
     }
-    
-    // ถ้าไม่พบผู้ติดต่อ → isNewVendor = true → UI จะแสดง "สร้างผู้ติดต่อใหม่"
-
-    // Use AI to suggest account only when mapping doesn't have accountId
-    let aiAccountSuggestion: {
-      accountId: string | null;
-      accountCode: string | null;
-      accountName: string | null;
-      confidence: number;
-      reason: string;
-      suggestNewAccount?: {
-        code: string;
-        name: string;
-        class: string;
-        description: string;
-        keywords: string[];
-        reason: string;
-      };
-    } | null = null;
-
-    // Only run AI account suggestion if no account from mapping
-    if (!suggested.accountId) {
-      // Extract items from OCR for better account suggestion
-      const items = extractedDataList.flatMap((d) => 
-        (d.items || []).map((item) => typeof item === "string" ? item : item.description || "")
-      ).filter(Boolean);
-
-      const aiResult = await suggestAccount(
-        companyId,
-        transactionType,
-        {
-          vendorName: combined.vendorName,
-          description: combined.vendorName ? `ค่าใช้จ่ายจาก ${combined.vendorName}` : null,
-          items: items.length > 0 ? items : undefined,
-          imageUrls: imageUrls.slice(0, 1), // Use first image for context
-        }
-      );
-      
-      aiAccountSuggestion = {
-        accountId: aiResult.accountId,
-        accountCode: aiResult.accountCode,
-        accountName: aiResult.accountName,
-        confidence: aiResult.confidence,
-        reason: aiResult.reason,
-        suggestNewAccount: aiResult.suggestNewAccount,
-      };
-
-      // Auto-apply AI account suggestion if confidence is high enough
-      if (aiAccountSuggestion?.accountId && aiAccountSuggestion.confidence >= 70) {
-        suggested.accountId = aiAccountSuggestion.accountId;
-      }
-    }
-
-    smartResult = {
-      mapping: matchResult.mapping
-        ? {
-            id: matchResult.mapping.id,
-            vendorName: matchResult.mapping.vendorName,
-            contactId: matchResult.mapping.contactId,
-            contactName: matchResult.mapping.contact?.name || null,
-            accountId: matchResult.mapping.accountId,
-            accountCode: matchResult.mapping.account?.code || null,
-            accountName: matchResult.mapping.account?.name || null,
-            defaultVatRate: matchResult.mapping.defaultVatRate,
-            defaultWhtRate: (matchResult.mapping as any).defaultWhtRate || null,
-            defaultWhtType: (matchResult.mapping as any).defaultWhtType || null,
-            paymentMethod: matchResult.mapping.paymentMethod,
-            descriptionTemplate: matchResult.mapping.descriptionTemplate,
-          }
-        : null,
-      matchConfidence: matchResult.confidence,
-      matchReason: matchResult.reason,
-      suggested,
-      // Include found contact info (from taxId/name lookup, not from mapping)
-      foundContact: foundContact || null,
-      isNewVendor: !matchResult.mapping && !foundContact,  // New vendor if no mapping AND no contact found
-      suggestTraining:
-        !matchResult.mapping &&
-        (combined.vendorName !== null || combined.vendorTaxId !== null),
-      // Include AI account suggestion for UI to show confidence
-      aiAccountSuggestion: aiAccountSuggestion || undefined,
-      // Include suggestion to create new account
-      suggestNewAccount: aiAccountSuggestion?.suggestNewAccount || undefined,
-    };
   }
+
+  // ==========================================================================
+  // STEP 2: AI เลือก Account (ทุกครั้ง)
+  // ==========================================================================
+  const items = extractedDataList.flatMap((d) => 
+    (d.items || []).map((item) => typeof item === "string" ? item : item.description || "")
+  ).filter(Boolean);
+
+  const aiResult = await suggestAccount(companyId, transactionType, {
+    vendorName: combined.vendorName,
+    description: combined.description || (combined.vendorName ? `ค่าใช้จ่ายจาก ${combined.vendorName}` : null),
+    items: items.length > 0 ? items : undefined,
+    imageUrls: imageUrls.slice(0, 1),
+  });
+
+  const aiAccountSuggestion = {
+    accountId: aiResult.accountId,
+    accountCode: aiResult.accountCode,
+    accountName: aiResult.accountName,
+    confidence: aiResult.confidence,
+    reason: aiResult.reason,
+  };
+
+  // Auto-apply if confidence >= 70%
+  if (aiResult.accountId && aiResult.confidence >= 70) {
+    suggested.accountId = aiResult.accountId;
+  }
+
+  smartResult = {
+    suggested,
+    foundContact: foundContact || null,
+    isNewVendor: !foundContact,
+    aiAccountSuggestion,
+  };
 
   return {
     files: fileResults,
@@ -1303,65 +1051,6 @@ function detectTransactionTypeFromDocs(
     confidence: 50,
     reason: "ไม่พบข้อมูลชัดเจน ใช้ค่าตามประเภทฟอร์ม",
   };
-}
-
-/**
- * Find best match filtered by transaction type
- */
-async function findBestMatchByType(
-  ocrResult: ReceiptData,
-  companyId: string,
-  transactionType: "EXPENSE" | "INCOME"
-): Promise<{
-  mapping: VendorMappingWithRelations | null;
-  confidence: number;
-  reason: string | null;
-}> {
-  // Get mappings filtered by transaction type
-  const mappings = await prisma.vendorMapping.findMany({
-    where: {
-      companyId,
-      transactionType,
-    },
-    include: {
-      contact: true,
-      account: true,
-    },
-  });
-
-  if (mappings.length === 0) {
-    return { mapping: null, confidence: 0, reason: null };
-  }
-
-  let bestMatch: VendorMappingWithRelations | null = null;
-  let bestScore = 0;
-  let bestReason: string | null = null;
-
-  for (const mapping of mappings) {
-    const { score, reason } = calculateMatchScore(ocrResult, mapping);
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = mapping;
-      bestReason = reason;
-    }
-  }
-
-  // Only return match if confidence is >= 80% (increased for accuracy)
-  if (bestScore >= 80 && bestMatch) {
-    // Update usage stats
-    await prisma.vendorMapping.update({
-      where: { id: bestMatch.id },
-      data: {
-        useCount: { increment: 1 },
-        lastUsedAt: new Date(),
-      },
-    });
-
-    return { mapping: bestMatch, confidence: bestScore, reason: bestReason };
-  }
-
-  return { mapping: null, confidence: bestScore, reason: null };
 }
 
 /**
