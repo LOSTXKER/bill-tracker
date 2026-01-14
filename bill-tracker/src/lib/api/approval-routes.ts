@@ -244,3 +244,123 @@ export function createApprovalRoutes(config: ApprovalRouteConfig) {
     reject: createRejectHandler(config),
   };
 }
+
+// =============================================================================
+// Payment Route Config
+// =============================================================================
+
+export interface PaymentRouteConfig {
+  // Entity name for error messages
+  entityName: string;
+  entityDisplayName: string;
+  
+  // Prisma model accessor
+  prismaModel: PrismaModelDelegate;
+  
+  // Fields to use for payment
+  fields: {
+    statusField: string;          // e.g., "status"
+    companyIdField: string;       // e.g., "companyId"
+    paidByField: string;          // e.g., "paidBy"
+    paidAtField: string;          // e.g., "paidAt"
+    paymentRefField: string;      // e.g., "paymentRef"
+    descriptionField: string;     // e.g., "description"
+    amountField: string;          // e.g., "netAmount"
+  };
+  
+  // Payment configuration
+  payment: {
+    permission: string;           // e.g., "reimbursements:pay"
+    allowedStatuses: string[];    // e.g., ["APPROVED"]
+    paidStatus: string;           // e.g., "PAID"
+  };
+  
+  // Include for findUnique
+  findInclude?: Record<string, unknown>;
+  
+  // Include for update response
+  updateInclude?: Record<string, unknown>;
+  
+  // Response key (e.g., "request")
+  responseKey: string;
+}
+
+/**
+ * Create payment handler
+ */
+export function createPayHandler(config: PaymentRouteConfig) {
+  return (request: Request, routeParams: { params: Promise<{ id: string }> }) => {
+    return withAuth(async (req, { session }) => {
+      const { id } = await routeParams.params;
+      const body = await req.json();
+      const { paymentRef } = body;
+      
+      // Find the entity
+      const entity = await config.prismaModel.findUnique({
+        where: { id },
+        include: config.findInclude || { company: true, contact: true },
+      });
+      
+      if (!entity) {
+        return apiResponse.notFound(`${config.entityDisplayName} not found`);
+      }
+      
+      const currentStatus = entity[config.fields.statusField] as string;
+      const companyId = entity[config.fields.companyIdField] as string;
+      
+      // Check if status allows payment
+      if (!config.payment.allowedStatuses.includes(currentStatus)) {
+        return apiResponse.badRequest(
+          `สามารถจ่ายเงินได้เฉพาะ${config.entityDisplayName}ที่อนุมัติแล้วเท่านั้น`
+        );
+      }
+      
+      // Check permission
+      const canPay = await hasPermission(
+        session.user.id,
+        companyId,
+        config.payment.permission
+      );
+      
+      if (!canPay) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์บันทึกการจ่ายเงิน");
+      }
+      
+      // Update the entity
+      const updateData: Record<string, unknown> = {
+        [config.fields.statusField]: config.payment.paidStatus,
+        [config.fields.paidByField]: session.user.id,
+        [config.fields.paidAtField]: new Date(),
+        [config.fields.paymentRefField]: paymentRef || null,
+      };
+      
+      const updatedEntity = await config.prismaModel.update({
+        where: { id },
+        data: updateData,
+        include: config.updateInclude,
+      });
+      
+      // Create audit log
+      const description = (entity[config.fields.descriptionField] as string) || "ไม่ระบุ";
+      const amount = entity[config.fields.amountField];
+      
+      await createAuditLog({
+        userId: session.user.id,
+        companyId,
+        action: "STATUS_CHANGE" as AuditAction,
+        entityType: config.entityName,
+        entityId: id,
+        description: `จ่ายเงิน${config.entityDisplayName}: ${description} จำนวน ${amount} บาท`,
+        changes: {
+          before: { [config.fields.statusField]: currentStatus },
+          after: { [config.fields.statusField]: config.payment.paidStatus, paymentRef },
+        },
+      });
+      
+      return apiResponse.success(
+        { [config.responseKey]: updatedEntity },
+        "บันทึกการจ่ายเงินสำเร็จ"
+      );
+    })(request);
+  };
+}

@@ -62,13 +62,7 @@ export const FIELD_LABELS: Record<string, string> = {
 
 // Status labels for translation
 export const STATUS_LABELS: Record<string, string> = {
-  // Expense document statuses (Legacy)
-  WAITING_FOR_DOC: "ร้านส่งบิลตามมา",
-  PENDING_PHYSICAL: "ได้บิลครบแล้ว (รอส่งบัญชี)",
-  READY_TO_SEND: "พร้อมส่ง",
-  SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
-  
-  // Expense Workflow statuses (New)
+  // Expense Workflow statuses
   PAID: "จ่ายเงินแล้ว",
   WAITING_TAX_INVOICE: "รอใบกำกับภาษี",
   TAX_INVOICE_RECEIVED: "ได้รับใบกำกับแล้ว",
@@ -79,14 +73,7 @@ export const STATUS_LABELS: Record<string, string> = {
   SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
   COMPLETED: "เสร็จสิ้น",
   
-  // Income document statuses (Legacy)
-  NO_DOC_REQUIRED: "ไม่ต้องทำเอกสาร",
-  WAITING_ISSUE: "รอออกบิลให้ลูกค้า",
-  WAITING_WHT_CERT: "รอใบ 50 ทวิ จากลูกค้า",
-  PENDING_COPY_SEND: "เอกสารครบ (รอส่งบัญชี)",
-  SENT_COPY: "ส่งสำเนาให้บัญชีแล้ว",
-  
-  // Income Workflow statuses (New)
+  // Income Workflow statuses
   RECEIVED: "รับเงินแล้ว",
   NO_INVOICE_NEEDED: "ไม่ต้องออกบิล",
   WAITING_INVOICE_ISSUE: "รอออกใบกำกับ",

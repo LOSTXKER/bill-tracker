@@ -57,14 +57,14 @@ export const DEFAULT_NOTIFY_SETTINGS: LineNotifySettings = {
   expenses: {
     onCreate: { enabled: true },
     onStatusChange: { enabled: true },
-    onDelete: { enabled: false },
-    onUpdate: { enabled: false },
+    onDelete: { enabled: true },
+    onUpdate: { enabled: true },
   },
   incomes: {
     onCreate: { enabled: true },
     onStatusChange: { enabled: true },
-    onDelete: { enabled: false },
-    onUpdate: { enabled: false },
+    onDelete: { enabled: true },
+    onUpdate: { enabled: true },
   },
   dailySummary: {
     enabled: false,

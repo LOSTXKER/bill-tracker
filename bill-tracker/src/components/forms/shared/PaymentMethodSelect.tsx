@@ -9,17 +9,38 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const PAYMENT_METHODS: Record<string, string> = {
+  CASH: "เงินสด",
+  BANK_TRANSFER: "โอนเงิน",
+  PROMPTPAY: "พร้อมเพย์",
+  CREDIT_CARD: "บัตรเครดิต",
+  CHEQUE: "เช็ค",
+};
+
 interface PaymentMethodSelectProps {
   value: string;
   onChange: (value: string) => void;
   label?: string;
+  disabled?: boolean;
 }
 
 export function PaymentMethodSelect({
   value,
   onChange,
   label = "วิธีชำระเงิน",
+  disabled = false,
 }: PaymentMethodSelectProps) {
+  // View mode - display text only
+  if (disabled) {
+    return (
+      <Select value={value} disabled>
+        <SelectTrigger className="h-11 bg-transparent border-0 p-0 shadow-none font-medium [&>svg]:hidden">
+          <SelectValue>{PAYMENT_METHODS[value] || value}</SelectValue>
+        </SelectTrigger>
+      </Select>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <Label className="text-foreground font-medium">{label}</Label>
@@ -28,11 +49,11 @@ export function PaymentMethodSelect({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="CASH">เงินสด</SelectItem>
-          <SelectItem value="BANK_TRANSFER">โอนเงิน</SelectItem>
-          <SelectItem value="PROMPTPAY">พร้อมเพย์</SelectItem>
-          <SelectItem value="CREDIT_CARD">บัตรเครดิต</SelectItem>
-          <SelectItem value="CHEQUE">เช็ค</SelectItem>
+          {Object.entries(PAYMENT_METHODS).map(([key, labelText]) => (
+            <SelectItem key={key} value={key}>
+              {labelText}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

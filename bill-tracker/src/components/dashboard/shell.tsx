@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   PieChart,
   History,
+  Activity,
   Tags,
   Download,
   Wallet,
@@ -37,6 +38,7 @@ import {
 import type { Company, UserRole } from "@prisma/client";
 import { PermissionProvider } from "@/components/providers/permission-provider";
 import { BottomNav } from "@/components/dashboard/bottom-nav";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -108,6 +110,11 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       href: `/${companyCode}/accounts`,
       icon: Tags,
       permission: "settings:read",
+    },
+    {
+      name: "ความเคลื่อนไหว",
+      href: `/${companyCode}/activity`,
+      icon: Activity,
     },
     {
       name: "ประวัติการแก้ไข",
@@ -220,6 +227,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
 
           {/* Right side actions */}
           <div className="flex items-center gap-2">
+            <NotificationCenter companyCode={companyCode} />
             <ThemeToggle />
 
             {/* User menu */}

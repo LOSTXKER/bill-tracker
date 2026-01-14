@@ -1,6 +1,16 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { nanoid } from "nanoid";
+import { analyzeReimbursementRequest } from "@/lib/ai/fraud-detection";
+
+/**
+ * Generate a unique tracking code for reimbursement requests
+ * Format: RB-XXXXXX (6 alphanumeric characters)
+ */
+function generateTrackingCode(): string {
+  return `RB-${nanoid(6).toUpperCase()}`;
+}
 
 /**
  * GET /api/reimbursement-requests?company=ABC
@@ -99,10 +109,14 @@ export async function POST(request: Request) {
     const calculatedVatAmount = vatRate > 0 ? (amount * vatRate) / 100 : 0;
     const netAmount = amount + (vatAmount || calculatedVatAmount);
 
+    // Generate unique tracking code
+    const trackingCode = generateTrackingCode();
+
     // Create reimbursement request (Anonymous)
     const reimbursementRequest = await prisma.reimbursementRequest.create({
       data: {
         company: { connect: { id: company.id } },
+        trackingCode,
         requesterName: requesterName.trim(),
         requesterPhone: requesterPhone?.trim() || null,
         requesterEmail: requesterEmail?.trim() || null,
@@ -133,8 +147,10 @@ export async function POST(request: Request) {
     // Skip audit log for anonymous submission (no user to link)
     // Audit trail is maintained via trackingCode and createdAt timestamp
 
-    // TODO: Run AI fraud detection in background
-    // analyzeReimbursementRequest(reimbursementRequest.id).catch(console.error);
+    // Run AI fraud detection in background (non-blocking)
+    analyzeReimbursementRequest(reimbursementRequest.id).catch((error) => {
+      console.error("[Fraud Detection] Background analysis failed:", error);
+    });
 
     return apiResponse.created(
       {

@@ -1,112 +1,58 @@
-import { prisma } from "@/lib/db";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  ArrowDownCircle,
-  ArrowUpCircle,
-  TrendingUp,
-  Clock,
-} from "lucide-react";
+import { StatsGrid } from "@/components/shared/StatsGrid";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { getCompanyId } from "@/lib/cache/company";
+import { getExpenseStats, getIncomeStats } from "@/lib/cache/stats";
 
 export async function StatsCards({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
-  if (!company) return null;
-
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const [incomeSum, expenseSum, pendingDocs] = await Promise.all([
-    prisma.income.aggregate({
-      where: {
-        companyId: company.id,
-        receiveDate: { gte: startOfMonth, lte: endOfMonth },
-        deletedAt: null,
-      },
-      _sum: { netReceived: true },
-    }),
-    prisma.expense.aggregate({
-      where: {
-        companyId: company.id,
-        billDate: { gte: startOfMonth, lte: endOfMonth },
-        deletedAt: null,
-      },
-      _sum: { netPaid: true },
-    }),
-    // Count pending documents using new workflow statuses
-    prisma.expense.count({
-      where: {
-        companyId: company.id,
-        workflowStatus: { 
-          in: ["WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE", "READY_FOR_ACCOUNTING"] 
-        },
-        deletedAt: null,
-      },
-    }),
+  // Use cached stats for better performance
+  const [expenseStats, incomeStats] = await Promise.all([
+    getExpenseStats(companyId),
+    getIncomeStats(companyId),
   ]);
 
-  const totalIncome = Number(incomeSum._sum.netReceived) || 0;
-  const totalExpense = Number(expenseSum._sum.netPaid) || 0;
+  const totalIncome = incomeStats.monthlyTotal;
+  const totalExpense = expenseStats.monthlyTotal;
   const netCashFlow = totalIncome - totalExpense;
+  const pendingDocs = expenseStats.waitingTaxInvoice + expenseStats.readyForAccounting;
 
+  // Format stats for StatsGrid component
   const stats = [
     {
       title: "รายรับเดือนนี้",
       value: formatCurrency(totalIncome),
-      icon: ArrowDownCircle,
+      subtitle: "เดือนนี้",
+      icon: "arrow-down-circle",
       iconColor: "text-primary",
-      trend: "positive" as const,
     },
     {
       title: "รายจ่ายเดือนนี้",
       value: formatCurrency(totalExpense),
-      icon: ArrowUpCircle,
+      subtitle: "เดือนนี้",
+      icon: "arrow-up-circle",
       iconColor: "text-destructive",
-      trend: "negative" as const,
     },
     {
       title: "กระแสเงินสดสุทธิ",
       value: formatCurrency(netCashFlow),
-      icon: TrendingUp,
+      subtitle: netCashFlow >= 0 ? "กำไร" : "ขาดทุน",
+      icon: "trending-up",
       iconColor: netCashFlow >= 0 ? "text-primary" : "text-destructive",
-      trend: netCashFlow >= 0 ? "positive" as const : "negative" as const,
     },
     {
       title: "เอกสารค้าง",
       value: `${pendingDocs} รายการ`,
-      icon: Clock,
+      subtitle: "รอดำเนินการ",
+      icon: "clock",
       iconColor: "text-amber-500",
-      trend: "neutral" as const,
     },
   ];
 
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
-      {stats.map((stat, i) => (
-        <Card key={i} className="border-border/50 shadow-card hover-lift">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {stat.title}
-            </CardTitle>
-            <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-semibold tracking-tight ${
-              stat.trend === "positive" ? "text-primary" :
-              stat.trend === "negative" ? "text-destructive" :
-              "text-foreground"
-            }`}>
-              {stat.value}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+  return <StatsGrid stats={stats} />;
 }
 
 export function StatsSkeleton() {

@@ -112,20 +112,34 @@ export async function analyzeReceipt(
     // 2. สร้าง Prompt
     const prompt = buildAnalysisPrompt(accounts, contacts, transactionType);
 
-    // 3. เรียก AI (ใช้รูปแรก)
-    const response = await analyzeImage(imageUrls[0], prompt, {
-      temperature: 0.1,  // ต่ำมาก = ผลลัพธ์คงที่
-      maxTokens: 2048,
+    // 3. วิเคราะห์ทุกไฟล์ (parallel)
+    const analysisPromises = imageUrls.map(async (url) => {
+      const response = await analyzeImage(url, prompt, {
+        temperature: 0.1,
+        maxTokens: 2048,
+      });
+      if (response.error) {
+        console.error("[analyzeReceipt] AI error for", url, response.error);
+        return null;
+      }
+      return parseAIResponse(response.data, accounts, contacts);
     });
 
-    if (response.error) {
-      console.error("[analyzeReceipt] AI error:", response.error);
+    const results = await Promise.all(analysisPromises);
+    const validResults = results.filter((r): r is ReceiptAnalysisResult => r !== null);
+
+    if (validResults.length === 0) {
       return { error: "AI ไม่สามารถวิเคราะห์ได้" };
     }
 
-    // 4. Parse ผลลัพธ์
-    const result = parseAIResponse(response.data, accounts, contacts);
-    return result;
+    // 4. ถ้ามีแค่ไฟล์เดียว ใช้ผลลัพธ์นั้นเลย
+    if (validResults.length === 1) {
+      return validResults[0];
+    }
+
+    // 5. รวมผลลัพธ์จากหลายไฟล์
+    const combinedResult = combineMultipleResults(validResults);
+    return combinedResult;
 
   } catch (error) {
     console.error("[analyzeReceipt] Error:", error);
@@ -259,6 +273,138 @@ ${contactList || "ไม่มีข้อมูล"}
     "account": 85
   }
 }`;
+}
+
+// =============================================================================
+// Combine Multiple Results
+// =============================================================================
+
+/**
+ * รวมผลลัพธ์จากหลายเอกสาร
+ * - รวมยอดเงินทั้งหมด
+ * - ใช้วันที่ล่าสุด
+ * - รวม description
+ * - ใช้ vendor จากเอกสารแรกที่มีข้อมูล
+ */
+function combineMultipleResults(results: ReceiptAnalysisResult[]): ReceiptAnalysisResult {
+  // รวมยอดเงิน
+  let totalAmount = 0;
+  let totalVatAmount = 0;
+  let totalNetAmount = 0;
+  let totalWhtAmount = 0;
+
+  // เก็บ descriptions
+  const descriptions: string[] = [];
+  const allItems: string[] = [];
+  const invoiceNumbers: string[] = [];
+
+  // หา vendor จากเอกสารแรกที่มีข้อมูล
+  let bestVendor: ReceiptAnalysisResult["vendor"] | null = null;
+  let bestAccount: ReceiptAnalysisResult["account"] | null = null;
+  let latestDate: string | null = null;
+  let documentType: string | null = null;
+  let whtRate: number | null = null;
+  let whtType: string | null = null;
+  let vatRate: number | null = null;
+
+  for (const result of results) {
+    // รวมยอดเงิน
+    if (result.amount) totalAmount += result.amount;
+    if (result.vatAmount) totalVatAmount += result.vatAmount;
+    if (result.netAmount) totalNetAmount += result.netAmount;
+    if (result.wht.amount) totalWhtAmount += result.wht.amount;
+
+    // เก็บ descriptions
+    if (result.description) {
+      descriptions.push(result.description);
+    }
+
+    // เก็บ items
+    if (result.items.length > 0) {
+      allItems.push(...result.items);
+    }
+
+    // เก็บ invoice numbers
+    if (result.invoiceNumber) {
+      invoiceNumbers.push(result.invoiceNumber);
+    }
+
+    // ใช้ vendor จากเอกสารแรกที่มีข้อมูล
+    if (!bestVendor && result.vendor.name) {
+      bestVendor = result.vendor;
+    }
+
+    // ใช้ account จากเอกสารที่มี confidence สูงสุด
+    if (result.account.id && (!bestAccount || result.confidence.account > 0)) {
+      bestAccount = result.account;
+    }
+
+    // ใช้วันที่ล่าสุด
+    if (result.date) {
+      if (!latestDate || result.date > latestDate) {
+        latestDate = result.date;
+      }
+    }
+
+    // ใช้ document type แรกที่พบ
+    if (!documentType && result.documentType) {
+      documentType = result.documentType;
+    }
+
+    // ใช้ WHT rate แรกที่พบ
+    if (!whtRate && result.wht.rate) {
+      whtRate = result.wht.rate;
+      whtType = result.wht.type;
+    }
+
+    // ใช้ VAT rate แรกที่พบ
+    if (vatRate === null && result.vatRate !== null) {
+      vatRate = result.vatRate;
+    }
+  }
+
+  // สร้าง combined description
+  const uniqueDescriptions = [...new Set(descriptions)];
+  const combinedDescription = uniqueDescriptions.length > 0
+    ? uniqueDescriptions.join(" + ")
+    : null;
+
+  // คำนวณ confidence เฉลี่ย
+  const avgConfidence = {
+    overall: Math.round(results.reduce((sum, r) => sum + r.confidence.overall, 0) / results.length),
+    vendor: Math.round(results.reduce((sum, r) => sum + r.confidence.vendor, 0) / results.length),
+    amount: Math.round(results.reduce((sum, r) => sum + r.confidence.amount, 0) / results.length),
+    date: Math.round(results.reduce((sum, r) => sum + r.confidence.date, 0) / results.length),
+    account: Math.round(results.reduce((sum, r) => sum + r.confidence.account, 0) / results.length),
+  };
+
+  return {
+    vendor: bestVendor || {
+      name: null,
+      taxId: null,
+      address: null,
+      phone: null,
+      branchNumber: null,
+      matchedContactId: null,
+      matchedContactName: null,
+    },
+    date: latestDate,
+    amount: totalAmount > 0 ? totalAmount : null,
+    vatAmount: totalVatAmount > 0 ? totalVatAmount : null,
+    vatRate: vatRate,
+    wht: {
+      rate: whtRate,
+      amount: totalWhtAmount > 0 ? totalWhtAmount : null,
+      type: whtType,
+    },
+    netAmount: totalNetAmount > 0 ? totalNetAmount : null,
+    account: bestAccount || { id: null, code: null, name: null },
+    documentType,
+    invoiceNumber: invoiceNumbers.length > 0 ? invoiceNumbers.join(", ") : null,
+    items: [...new Set(allItems)],
+    confidence: avgConfidence,
+    description: combinedDescription,
+  };
 }
 
 // =============================================================================

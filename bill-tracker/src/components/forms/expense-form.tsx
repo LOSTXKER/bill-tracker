@@ -2,11 +2,9 @@
 
 import { Receipt } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
-import { calculateExpenseTotals } from "@/lib/utils/tax-calculator";
+import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import { DatePicker } from "./shared/DatePicker";
 import {
-  EXPENSE_STATUS_FLOW,
-  EXPENSE_STATUS_INFO,
   EXPENSE_WORKFLOW_FLOW,
   EXPENSE_WORKFLOW_INFO,
 } from "@/lib/constants/transaction";
@@ -17,6 +15,7 @@ interface ExpenseFormProps {
   transactionId?: string;
   onModeChange?: (mode: "view" | "edit") => void;
   prefillData?: Record<string, unknown>;
+  currentUserId?: string;
 }
 
 // Shared expense configuration for all modes
@@ -109,7 +108,7 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
     ],
 
     // Calculation function
-    calculateTotals: calculateExpenseTotals,
+    calculateTotals: calculateTransactionTotals,
 
     // Document upload configuration
     documentConfig: {
@@ -170,6 +169,7 @@ export function ExpenseForm({
   transactionId,
   onModeChange,
   prefillData,
+  currentUserId,
 }: ExpenseFormProps) {
   const baseConfig = getExpenseConfig(companyCode);
   
@@ -195,6 +195,7 @@ export function ExpenseForm({
       mode={mode}
       transactionId={transactionId}
       onModeChange={onModeChange}
+      currentUserId={currentUserId}
     />
   );
 }

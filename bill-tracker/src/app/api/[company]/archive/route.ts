@@ -5,6 +5,7 @@ import {
   generateAccountingArchive,
   getArchiveStats,
 } from "@/lib/export/archive";
+import { apiResponse } from "@/lib/api/response";
 
 // Helper to extract company code from URL path
 const getCompanyFromPath = (req: Request) => {
@@ -42,10 +43,7 @@ async function handleGetPreview(
   const year = parseInt(searchParams.get("year") || "");
 
   if (!month || !year || month < 1 || month > 12) {
-    return NextResponse.json(
-      { error: "กรุณาระบุเดือนและปีให้ถูกต้อง" },
-      { status: 400 }
-    );
+    return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
   }
 
   const startDate = new Date(year, month - 1, 1);
@@ -104,7 +102,7 @@ async function handleGetPreview(
 
   const stats = getArchiveStats(expensesWithFiles, incomesWithFiles);
 
-  return NextResponse.json({
+  return apiResponse.success({
     ...stats,
     month,
     year,
@@ -124,10 +122,7 @@ async function handlePost(
     const { month, year } = body;
 
     if (!month || !year || month < 1 || month > 12) {
-      return NextResponse.json(
-        { error: "กรุณาระบุเดือนและปีให้ถูกต้อง" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
     }
 
     const startDate = new Date(year, month - 1, 1);
@@ -223,14 +218,10 @@ async function handlePost(
     });
   } catch (error) {
     console.error("Archive generation error:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "เกิดข้อผิดพลาดในการสร้างไฟล์",
-      },
-      { status: 500 }
+    return apiResponse.error(
+      error instanceof Error
+        ? error.message
+        : "เกิดข้อผิดพลาดในการสร้างไฟล์"
     );
   }
 }

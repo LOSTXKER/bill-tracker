@@ -3,8 +3,6 @@ import {
   calculateVAT,
   calculateWHT,
   calculateTransactionTotals,
-  calculateExpenseTotals,
-  calculateIncomeTotals,
   reverseVAT,
   formatCurrency,
   calculateVATSummary,
@@ -70,9 +68,9 @@ describe("Tax Calculator", () => {
     });
   });
 
-  describe("calculateExpenseTotals (backward compat)", () => {
+  describe("calculateTransactionTotals - expense scenarios", () => {
     it("should calculate expense totals with VAT only", () => {
-      const result = calculateExpenseTotals(1000, 7, 0);
+      const result = calculateTransactionTotals(1000, 7, 0);
       expect(result.baseAmount).toBe(1000);
       expect(result.vatAmount).toBe(70);
       expect(result.whtAmount).toBe(0);
@@ -81,7 +79,7 @@ describe("Tax Calculator", () => {
     });
 
     it("should calculate expense totals with VAT and WHT", () => {
-      const result = calculateExpenseTotals(1000, 7, 3);
+      const result = calculateTransactionTotals(1000, 7, 3);
       expect(result.baseAmount).toBe(1000);
       expect(result.vatAmount).toBe(70);
       expect(result.whtAmount).toBe(30);
@@ -90,7 +88,7 @@ describe("Tax Calculator", () => {
     });
 
     it("should handle no VAT case", () => {
-      const result = calculateExpenseTotals(1000, 0, 3);
+      const result = calculateTransactionTotals(1000, 0, 3);
       expect(result.baseAmount).toBe(1000);
       expect(result.vatAmount).toBe(0);
       expect(result.whtAmount).toBe(30);
@@ -100,7 +98,7 @@ describe("Tax Calculator", () => {
 
     it("should handle real-world scenario: จ้างฟรีแลนซ์", () => {
       // จ้างฟรีแลนซ์ 5,000 บาท หัก 3%
-      const result = calculateExpenseTotals(5000, 0, 3);
+      const result = calculateTransactionTotals(5000, 0, 3);
       expect(result.baseAmount).toBe(5000);
       expect(result.whtAmount).toBe(150);
       expect(result.netAmount).toBe(4850);
@@ -108,16 +106,16 @@ describe("Tax Calculator", () => {
 
     it("should handle real-world scenario: ซื้อของมีใบกำกับภาษี", () => {
       // ซื้อหมึก 10,000 + VAT 7%
-      const result = calculateExpenseTotals(10000, 7, 0);
+      const result = calculateTransactionTotals(10000, 7, 0);
       expect(result.vatAmount).toBe(700);
       expect(result.netAmount).toBe(10700);
     });
   });
 
-  describe("calculateIncomeTotals", () => {
+  describe("calculateTransactionTotals - income scenarios", () => {
     it("should calculate income totals when customer deducts WHT", () => {
       // ขายของ 10,000 + VAT 7%, ลูกค้าหัก 3%
-      const result = calculateIncomeTotals(10000, 7, 3);
+      const result = calculateTransactionTotals(10000, 7, 3);
       expect(result.baseAmount).toBe(10000);
       expect(result.vatAmount).toBe(700);
       expect(result.whtAmount).toBe(300);
@@ -126,12 +124,12 @@ describe("Tax Calculator", () => {
     });
 
     it("should calculate income totals without WHT", () => {
-      const result = calculateIncomeTotals(10000, 7, 0);
+      const result = calculateTransactionTotals(10000, 7, 0);
       expect(result.netAmount).toBe(10700);
     });
 
     it("should calculate income totals without VAT", () => {
-      const result = calculateIncomeTotals(10000, 0, 3);
+      const result = calculateTransactionTotals(10000, 0, 3);
       expect(result.netAmount).toBe(9700);
     });
   });

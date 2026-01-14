@@ -1,3 +1,17 @@
+/**
+ * LINE Notify Integration (legacy)
+ * Uses LINE Notify API for simple notifications
+ * 
+ * Note: This module imports STATUS_LABELS and formatCurrency from settings.ts
+ * to avoid duplication.
+ */
+
+import { STATUS_LABELS, formatCurrency } from "./settings";
+
+// =============================================================================
+// Types
+// =============================================================================
+
 export interface LineNotifyConfig {
   token: string;
 }
@@ -26,30 +40,9 @@ export interface IncomeNotification {
   status: string;
 }
 
-// Status labels using new workflow statuses
-const STATUS_LABELS: Record<string, string> = {
-  // Expense workflow statuses
-  PAID: "จ่ายแล้ว",
-  WAITING_TAX_INVOICE: "รอใบกำกับภาษี",
-  RECEIVED_TAX_INVOICE: "ได้ใบกำกับแล้ว",
-  WHT_PENDING_ISSUE: "รอออก 50 ทวิ",
-  WHT_ISSUED: "ออก 50 ทวิแล้ว",
-  READY_FOR_ACCOUNTING: "พร้อมส่งบัญชี",
-  SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
-  // Income workflow statuses
-  RECEIVED: "รับเงินแล้ว",
-  WAITING_INVOICE_ISSUE: "รอออกบิล",
-  INVOICE_ISSUED: "ออกบิลแล้ว",
-  WHT_PENDING_CERT: "รอใบ 50 ทวิ",
-  WHT_RECEIVED: "ได้ใบ 50 ทวิแล้ว",
-};
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("th-TH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
+// =============================================================================
+// LINE Notify API
+// =============================================================================
 
 export async function sendLineNotify(
   message: string,
@@ -77,6 +70,10 @@ export async function sendLineNotify(
     return false;
   }
 }
+
+// =============================================================================
+// Message Formatters
+// =============================================================================
 
 export function formatExpenseNotification(data: ExpenseNotification): string {
   const lines = [
@@ -143,6 +140,10 @@ export function formatIncomeNotification(data: IncomeNotification): string {
 
   return lines.join("\n");
 }
+
+// =============================================================================
+// Notification Helpers
+// =============================================================================
 
 export async function notifyExpense(
   data: ExpenseNotification,

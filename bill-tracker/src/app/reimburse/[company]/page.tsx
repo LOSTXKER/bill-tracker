@@ -32,10 +32,15 @@ import {
   AlertTriangle, 
   Sparkles,
   Wand2,
+  Search,
+  PlusCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import { THAI_BANKS } from "@/lib/constants/banks";
 import Image from "next/image";
+
+type PageView = "home" | "create" | "track";
 
 interface ReimbursementFormData {
   requesterName: string;
@@ -76,6 +81,11 @@ export default function PublicReimbursePage() {
   const params = useParams();
   const router = useRouter();
   const companyCode = (params.company as string).toUpperCase();
+
+  // Page view state
+  const [pageView, setPageView] = useState<PageView>("home");
+  const [trackingInput, setTrackingInput] = useState("");
+  const [isTracking, setIsTracking] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [receiptUrls, setReceiptUrls] = useState<string[]>([]);
@@ -130,13 +140,12 @@ export default function PublicReimbursePage() {
     setAiApplied(false);
     
     try {
-      const response = await fetch("/api/ai/analyze-documents", {
+      const response = await fetch("/api/ai/analyze-public", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrls: urls,
           companyId: company.id,
-          transactionType: "EXPENSE",
         }),
       });
 
@@ -341,80 +350,249 @@ export default function PublicReimbursePage() {
     }
   };
 
+  // Handle tracking
+  const handleTrack = async () => {
+    if (!trackingInput.trim()) {
+      toast.error("กรุณาใส่รหัสติดตาม");
+      return;
+    }
+
+    setIsTracking(true);
+    try {
+      const response = await fetch(`/api/track/${trackingInput.trim().toUpperCase()}`);
+      if (response.ok) {
+        router.push(`/track/${trackingInput.trim().toUpperCase()}`);
+      } else {
+        toast.error("ไม่พบรหัสติดตามนี้ กรุณาตรวจสอบอีกครั้ง");
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
+    } finally {
+      setIsTracking(false);
+    }
+  };
+
+  // Home page - Choose action
+  if (pageView === "home") {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        {/* Header */}
+        <div className="bg-background border-b">
+          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+            {company?.logoUrl && (
+              <Image
+                src={company.logoUrl}
+                alt={company.name}
+                width={40}
+                height={40}
+                className="rounded-lg"
+              />
+            )}
+            <div>
+              <h1 className="font-semibold">{company?.name || "Bill Tracker"}</h1>
+              <p className="text-xs text-muted-foreground">ระบบเบิกจ่ายออนไลน์</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="max-w-2xl mx-auto p-4 space-y-4">
+          {/* Create Request Card */}
+          <button
+            type="button"
+            className="w-full text-left bg-card rounded-lg border hover:shadow-md transition-shadow hover:border-primary/50 p-5 flex items-center gap-4"
+            onClick={() => setPageView("create")}
+          >
+            <div className="p-3 rounded-xl bg-primary/10">
+              <PlusCircle className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-semibold">ส่งคำขอเบิกจ่าย</h2>
+              <p className="text-muted-foreground text-sm">
+                อัปโหลดใบเสร็จและส่งคำขอเบิกเงิน
+              </p>
+            </div>
+            <ArrowLeft className="h-5 w-5 rotate-180 text-muted-foreground" />
+          </button>
+
+          {/* Track Request Card */}
+          <Card className="border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-muted">
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">ติดตามสถานะ</CardTitle>
+                  <CardDescription>ตรวจสอบสถานะคำขอเบิกจ่ายของคุณ</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="ใส่รหัสติดตาม เช่น RB-ABC123"
+                  value={trackingInput}
+                  onChange={(e) => setTrackingInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && handleTrack()}
+                  className="font-mono"
+                />
+                <Button 
+                  onClick={handleTrack}
+                  disabled={isTracking}
+                >
+                  {isTracking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "ค้นหา"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Info */}
+          <div className="text-center pt-4">
+            <p className="text-xs text-muted-foreground">
+              ✨ AI ช่วยอ่านใบเสร็จอัตโนมัติ
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading overlay
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-12 pb-12">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="text-lg font-semibold">กำลังส่งคำขอ...</p>
+                <p className="text-sm text-muted-foreground mt-1">กรุณารอสักครู่</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Success page
   if (trackingCode) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 to-primary/10">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+      <div className="min-h-screen bg-muted/30">
+        {/* Header */}
+        <div className="bg-background border-b">
+          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+            {company?.logoUrl && (
+              <Image
+                src={company.logoUrl}
+                alt={company.name}
+                width={40}
+                height={40}
+                className="rounded-lg"
+              />
+            )}
+            <div>
+              <h1 className="font-semibold">{company?.name || "Bill Tracker"}</h1>
+              <p className="text-xs text-muted-foreground">ระบบเบิกจ่ายออนไลน์</p>
             </div>
-            <CardTitle>ส่งคำขอสำเร็จ</CardTitle>
-            <CardDescription>
-              คำขอเบิกจ่ายของคุณได้รับการบันทึกเรียบร้อยแล้ว
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-muted rounded-lg text-center">
-              <p className="text-sm text-muted-foreground mb-2">
-                รหัสติดตามสถานะ
-              </p>
-              <p className="text-2xl font-bold font-mono">{trackingCode}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                เก็บรหัสนี้ไว้เพื่อเช็คสถานะ
-              </p>
-            </div>
+          </div>
+        </div>
 
-            <Alert>
-              <AlertDescription>
-                คำขอของคุณจะได้รับการพิจารณาภายใน 1-3 วันทำการ
-                คุณสามารถเช็คสถานะได้ด้านล่าง
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-          <CardFooter className="flex-col gap-2">
-            <Button
-              className="w-full"
-              onClick={() => router.push(`/track/${trackingCode}`)}
-            >
-              เช็คสถานะคำขอ
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => window.location.reload()}
-            >
-              ส่งคำขอใหม่
-            </Button>
-          </CardFooter>
-        </Card>
+        {/* Content */}
+        <div className="max-w-md mx-auto p-4 pt-8">
+          <Card>
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle2 className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="text-xl">ส่งคำขอสำเร็จ!</CardTitle>
+              <CardDescription>
+                คำขอเบิกจ่ายของคุณได้รับการบันทึกเรียบร้อยแล้ว
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg text-center">
+                <p className="text-sm text-muted-foreground mb-2">
+                  รหัสติดตามสถานะ
+                </p>
+                <p className="text-2xl font-bold font-mono tracking-wider">
+                  {trackingCode}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  เก็บรหัสนี้ไว้เพื่อเช็คสถานะการเบิกจ่าย
+                </p>
+              </div>
+
+              <Alert>
+                <AlertDescription>
+                  คำขอของคุณจะได้รับการพิจารณาภายใน 1-3 วันทำการ
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+            <CardFooter className="flex-col gap-2">
+              <Button
+                className="w-full"
+                onClick={() => router.push(`/track/${trackingCode}`)}
+              >
+                เช็คสถานะคำขอ
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setTrackingCode(null);
+                  setPageView("home");
+                  setReceiptUrls([]);
+                  setAiResult(null);
+                  setAiApplied(false);
+                }}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                กลับหน้าหลัก
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     );
   }
 
   // Submit form page
   return (
-    <div className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-primary/5 to-primary/10">
-      <div className="max-w-2xl mx-auto">
-        {/* Company Branding */}
-        {company && (
-          <div className="text-center mb-8">
-            {company.logoUrl && (
-              <div className="mb-4">
-                <Image
-                  src={company.logoUrl}
-                  alt={company.name}
-                  width={120}
-                  height={120}
-                  className="mx-auto rounded-lg"
-                />
-              </div>
-            )}
-            <h1 className="text-3xl font-bold mb-2">{company.name}</h1>
-            <p className="text-muted-foreground">ขอเบิกค่าใช้จ่าย</p>
+    <div className="min-h-screen bg-muted/30">
+      {/* Header */}
+      <div className="bg-background border-b sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPageView("home")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          {company?.logoUrl && (
+            <Image
+              src={company.logoUrl}
+              alt={company.name}
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
+          )}
+          <div className="flex-1">
+            <h1 className="font-semibold text-sm">{company?.name}</h1>
+            <p className="text-xs text-muted-foreground">ส่งคำขอเบิกจ่าย</p>
           </div>
-        )}
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto p-4">
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <Card>

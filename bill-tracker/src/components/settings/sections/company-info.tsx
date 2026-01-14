@@ -1,10 +1,8 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Building2, Edit, MapPin, Phone, FileText } from "lucide-react";
+import { Building2, MapPin, Phone, FileText } from "lucide-react";
+import { SettingsCard, SettingsField } from "../SettingsCard";
 
 interface Company {
   id: string;
@@ -22,54 +20,26 @@ interface CompanyInfoSectionProps {
 export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
   return (
     <div className="space-y-6">
-      {/* Company Card */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div>
-                <CardTitle className="text-lg">{company.name}</CardTitle>
-                <CardDescription>รหัส: {company.code}</CardDescription>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" disabled className="gap-2">
-              <Edit className="h-4 w-4" />
-              แก้ไข
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-6 sm:grid-cols-2">
-          {/* Tax ID */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-muted-foreground">
-              <FileText className="h-4 w-4" />
-              เลขประจำตัวผู้เสียภาษี
-            </Label>
-            <Input value={company.taxId || "-"} disabled className="bg-muted/50" />
-          </div>
+      <SettingsCard
+        title={company.name}
+        description={`รหัส: ${company.code}`}
+        icon={Building2}
+        showEditButton
+        editDisabled
+        contentClassName="grid gap-6 sm:grid-cols-2"
+      >
+        <SettingsField label="เลขประจำตัวผู้เสียภาษี" icon={FileText}>
+          <Input value={company.taxId || "-"} disabled className="bg-muted/50" />
+        </SettingsField>
 
-          {/* Phone */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="h-4 w-4" />
-              โทรศัพท์
-            </Label>
-            <Input value={company.phone || "-"} disabled className="bg-muted/50" />
-          </div>
+        <SettingsField label="โทรศัพท์" icon={Phone}>
+          <Input value={company.phone || "-"} disabled className="bg-muted/50" />
+        </SettingsField>
 
-          {/* Address - Full Width */}
-          <div className="space-y-2 sm:col-span-2">
-            <Label className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              ที่อยู่
-            </Label>
-            <Input value={company.address || "-"} disabled className="bg-muted/50" />
-          </div>
-        </CardContent>
-      </Card>
+        <SettingsField label="ที่อยู่" icon={MapPin} fullWidth>
+          <Input value={company.address || "-"} disabled className="bg-muted/50" />
+        </SettingsField>
+      </SettingsCard>
     </div>
   );
 }

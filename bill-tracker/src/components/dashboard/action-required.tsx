@@ -4,37 +4,35 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { getCompanyId } from "@/lib/cache/company";
 
 export async function ActionRequired({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   // Use new workflow statuses
   const [waitingDocs, waitingWht, waitingIssue, whtPendingIssue] = await Promise.all([
     // Expenses waiting for tax invoice
     prisma.expense.findMany({
-      where: { companyId: company.id, workflowStatus: "WAITING_TAX_INVOICE", deletedAt: null },
+      where: { companyId: companyId, workflowStatus: "WAITING_TAX_INVOICE", deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),
     // Incomes waiting for WHT cert from customer
     prisma.income.findMany({
-      where: { companyId: company.id, workflowStatus: "WHT_PENDING_CERT", deletedAt: null },
+      where: { companyId: companyId, workflowStatus: "WHT_PENDING_CERT", deletedAt: null },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
     // Incomes waiting to issue invoice
     prisma.income.findMany({
-      where: { companyId: company.id, workflowStatus: "WAITING_INVOICE_ISSUE", deletedAt: null },
+      where: { companyId: companyId, workflowStatus: "WAITING_INVOICE_ISSUE", deletedAt: null },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
     // Expenses needing to issue WHT cert to vendor
     prisma.expense.findMany({
-      where: { companyId: company.id, workflowStatus: "WHT_PENDING_ISSUE", deletedAt: null },
+      where: { companyId: companyId, workflowStatus: "WHT_PENDING_ISSUE", deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),

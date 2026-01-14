@@ -32,10 +32,10 @@ export function CombinedHistorySection({
   const [activeTab, setActiveTab] = useState<"document" | "audit">("document");
 
   return (
-    <Card>
+    <Card className="shadow-sm border-border bg-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
             <History className="h-4 w-4 text-muted-foreground" />
             ประวัติ
           </CardTitle>

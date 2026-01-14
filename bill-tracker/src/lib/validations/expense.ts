@@ -64,27 +64,5 @@ export const expenseUpdateSchema = expenseBaseSchema.partial().extend({
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type ExpenseUpdateInput = z.infer<typeof expenseUpdateSchema>;
 
-/**
- * DEPRECATED: Category labels for old enum-based categories
- * Use Account model with accountId instead
- * Kept for backward compatibility only
- */
-export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
-  MATERIAL: "วัตถุดิบ",
-  UTILITY: "สาธารณูปโภค",
-  MARKETING: "การตลาด",
-  SALARY: "เงินเดือน",
-  FREELANCE: "ค่าจ้างฟรีแลนซ์",
-  TRANSPORT: "ค่าขนส่ง",
-  RENT: "ค่าเช่า",
-  OFFICE: "สำนักงาน",
-  OTHER: "อื่นๆ",
-};
-
-// Status labels in Thai
-export const EXPENSE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  WAITING_FOR_DOC: { label: "รอใบเสร็จ", color: "orange" },
-  PENDING_PHYSICAL: { label: "รอส่งบัญชี", color: "red" },
-  READY_TO_SEND: { label: "พร้อมส่ง", color: "yellow" },
-  SENT_TO_ACCOUNT: { label: "ส่งแล้ว", color: "green" },
-};
+// Status labels in Thai - Re-export from constants for backward compatibility
+export { EXPENSE_STATUS_LABELS } from "@/lib/constants/transaction";

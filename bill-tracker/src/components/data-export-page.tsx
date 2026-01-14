@@ -67,7 +67,7 @@ interface BackupStats {
     expenses: number;
     incomes: number;
     contacts: number;
-    categories: number;
+    accounts: number;
     users: number;
   };
   estimatedSize: string;
@@ -134,8 +134,13 @@ export function DataExportPage({
         if (!res.ok) {
           throw new Error("ไม่สามารถโหลดข้อมูลได้");
         }
-        const data = await res.json();
-        setArchiveStats(data);
+        const response = await res.json();
+        // API uses apiResponse.success() which wraps data in { success, data }
+        if (response.success && response.data) {
+          setArchiveStats(response.data);
+        } else {
+          throw new Error(response.error || "ไม่สามารถโหลดข้อมูลได้");
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         setArchiveStats(null);
@@ -159,8 +164,13 @@ export function DataExportPage({
         if (!res.ok) {
           throw new Error("ไม่สามารถโหลดข้อมูลได้");
         }
-        const data = await res.json();
-        setPeakStats(data);
+        const response = await res.json();
+        // API uses apiResponse.success() which wraps data in { success, data }
+        if (response.success && response.data) {
+          setPeakStats(response.data);
+        } else {
+          throw new Error(response.error || "ไม่สามารถโหลดข้อมูลได้");
+        }
       } catch (err) {
         setPeakError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         setPeakStats(null);
@@ -184,8 +194,13 @@ export function DataExportPage({
         if (!res.ok) {
           throw new Error("ไม่สามารถโหลดข้อมูลได้");
         }
-        const data = await res.json();
-        setBackupStats(data);
+        const response = await res.json();
+        // API uses apiResponse.success() which wraps data in { success, data }
+        if (response.success && response.data) {
+          setBackupStats(response.data);
+        } else {
+          throw new Error(response.error || "ไม่สามารถโหลดข้อมูลได้");
+        }
       } catch (err) {
         setBackupError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         setBackupStats(null);
@@ -790,7 +805,7 @@ export function DataExportPage({
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <FolderOpen className="h-4 w-4 mx-auto text-muted-foreground" />
                     <p className="text-xl font-bold mt-1">
-                      {backupStats.stats.categories}
+                      {backupStats.stats.accounts}
                     </p>
                     <p className="text-xs text-muted-foreground">บัญชี</p>
                   </div>

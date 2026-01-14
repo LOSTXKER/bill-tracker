@@ -1,10 +1,11 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Banknote } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Banknote, AlertTriangle } from "lucide-react";
 import { formatCurrency, WHT_RATES } from "@/lib/utils/tax-calculator";
 import { VatToggle } from "./VatToggle";
 import { WhtSection } from "./WhtSection";
@@ -21,6 +32,13 @@ import { CalculationSummary } from "./CalculationSummary";
 // =============================================================================
 // Types
 // =============================================================================
+
+// WHT Change confirmation info
+export interface WhtChangeInfo {
+  requiresConfirmation: boolean;
+  message?: string;
+  isLocked?: boolean;
+}
 
 export interface TransactionAmountCardProps {
   mode: "create" | "view" | "edit";
@@ -37,13 +55,16 @@ export interface TransactionAmountCardProps {
   
   // WHT
   whtEnabled: boolean;
-  onWhtToggle?: (enabled: boolean) => void;
+  onWhtToggle?: (enabled: boolean, confirmed?: boolean, reason?: string) => void;
   whtRate?: number;
   whtType?: string;
   onWhtRateSelect?: (rate: number, type: string) => void;
   whtAmount: number;
   whtLabel?: string;
   whtDescription?: string;
+  
+  // WHT validation (for edit mode)
+  whtChangeInfo?: WhtChangeInfo;
   
   // Calculated values
   totalWithVat: number;
@@ -71,11 +92,52 @@ export function TransactionAmountCard({
   whtAmount,
   whtLabel = "หัก ณ ที่จ่าย",
   whtDescription = "หักภาษีผู้ขาย?",
+  whtChangeInfo,
   totalWithVat,
   netAmount,
   netAmountLabel,
 }: TransactionAmountCardProps) {
   const isEditable = mode === "create" || mode === "edit";
+  
+  // WHT confirmation dialog state
+  const [showWhtConfirmDialog, setShowWhtConfirmDialog] = useState(false);
+  const [pendingWhtChange, setPendingWhtChange] = useState<boolean | null>(null);
+  const [whtChangeReason, setWhtChangeReason] = useState("");
+  
+  // Handle WHT toggle with confirmation check
+  const handleWhtToggle = (newValue: boolean) => {
+    // If locked, don't allow change
+    if (whtChangeInfo?.isLocked) {
+      return;
+    }
+    
+    // If requires confirmation, show dialog
+    if (whtChangeInfo?.requiresConfirmation && newValue !== whtEnabled) {
+      setPendingWhtChange(newValue);
+      setShowWhtConfirmDialog(true);
+      return;
+    }
+    
+    // Otherwise, proceed directly
+    onWhtToggle?.(newValue);
+  };
+  
+  // Confirm WHT change
+  const handleConfirmWhtChange = () => {
+    if (pendingWhtChange !== null) {
+      onWhtToggle?.(pendingWhtChange, true, whtChangeReason);
+    }
+    setShowWhtConfirmDialog(false);
+    setPendingWhtChange(null);
+    setWhtChangeReason("");
+  };
+  
+  // Cancel WHT change
+  const handleCancelWhtChange = () => {
+    setShowWhtConfirmDialog(false);
+    setPendingWhtChange(null);
+    setWhtChangeReason("");
+  };
 
   // Create mode uses a different layout with VatToggle and WhtSection components
   if (mode === "create") {
@@ -115,72 +177,112 @@ export function TransactionAmountCard({
     );
   }
 
-  // View/Edit mode uses a Card layout
-  return (
-    <Card>
-      <CardHeader className="pb-4">
-        <CardTitle className="text-base flex items-center gap-2">
+  // View mode - clean table layout
+  if (!isEditable) {
+    return (
+      <div className="rounded-xl bg-muted/40 p-5 space-y-3">
+        <div className="flex items-center gap-2.5 pb-1">
           <Banknote className="h-4 w-4 text-muted-foreground" />
-          รายละเอียดยอดเงิน
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Amount before tax */}
-        <div className="flex items-center justify-between">
-          <Label className="text-sm text-muted-foreground">จำนวนเงินก่อนภาษี</Label>
-          {isEditable ? (
-            <Input
-              type="number"
-              value={amount || ""}
-              onChange={(e) => onAmountChange?.(Number(e.target.value) || 0)}
-              className="w-40 h-10 text-right bg-muted/30"
-              placeholder="0.00"
-            />
-          ) : (
-            <span className="font-mono font-medium">{formatCurrency(amount)}</span>
+          <span className="font-medium text-foreground">รายละเอียดยอดเงิน</span>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">จำนวนเงินก่อนภาษี</span>
+            <span className="font-mono text-sm font-medium">{formatCurrency(amount)}</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">VAT ({vatRate}%)</span>
+            <span className="font-mono text-sm">{formatCurrency(vatAmount)}</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">รวมเป็นเงิน</span>
+            <span className="font-mono text-sm font-medium">{formatCurrency(totalWithVat)}</span>
+          </div>
+
+          {whtEnabled && whtAmount > 0 && (
+            <div className="flex items-center justify-between text-destructive">
+              <span className="text-sm">
+                {whtLabel}{" "}
+                <span className="text-xs opacity-80">
+                  ({Object.entries(WHT_RATES).find(([key]) => key === whtType)?.[1]?.description || `${whtRate}%`})
+                </span>
+              </span>
+              <span className="font-mono text-sm">-{formatCurrency(whtAmount)}</span>
+            </div>
           )}
+        </div>
+
+        <div className="border-t border-border/50 pt-3">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">{netAmountLabel}</span>
+            <span className="text-xl font-bold text-emerald-600">{formatCurrency(netAmount)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Edit mode - with form controls
+  return (
+    <div className="rounded-xl bg-muted/30 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Banknote className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium text-foreground">รายละเอียดยอดเงิน</span>
+      </div>
+
+      <div className="space-y-3 text-sm">
+        {/* Amount */}
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">จำนวนเงินก่อนภาษี</span>
+          <Input
+            type="number"
+            value={amount || ""}
+            onChange={(e) => onAmountChange?.(Number(e.target.value) || 0)}
+            className="w-40 h-9 text-right bg-background"
+            placeholder="0.00"
+          />
         </div>
 
         {/* VAT */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Label className="text-sm text-muted-foreground">VAT</Label>
-            {isEditable && (
-              <Select
-                value={String(vatRate || 0)}
-                onValueChange={(v) => onVatRateChange?.(Number(v))}
-              >
-                <SelectTrigger className="w-20 h-8 bg-muted/30">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">0%</SelectItem>
-                  <SelectItem value="7">7%</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {!isEditable && <span className="text-sm text-muted-foreground">({vatRate}%)</span>}
+            <span className="text-muted-foreground">VAT</span>
+            <Select
+              value={String(vatRate || 0)}
+              onValueChange={(v) => onVatRateChange?.(Number(v))}
+            >
+              <SelectTrigger className="w-20 h-8 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">0%</SelectItem>
+                <SelectItem value="7">7%</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <span className="font-mono">{formatCurrency(vatAmount)}</span>
         </div>
 
-        <div className="h-px bg-border" />
-
         {/* Total */}
         <div className="flex items-center justify-between">
-          <Label className="text-sm text-muted-foreground">รวมเป็นเงิน</Label>
+          <span className="text-muted-foreground">รวมเป็นเงิน</span>
           <span className="font-mono font-medium">{formatCurrency(totalWithVat)}</span>
         </div>
 
         {/* WHT Toggle */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2">
-            <Label className="text-sm text-muted-foreground">{whtLabel}</Label>
-            {isEditable && (
-              <Switch
-                checked={whtEnabled}
-                onCheckedChange={(checked) => onWhtToggle?.(checked)}
-              />
+            <span className="text-muted-foreground">{whtLabel}</span>
+            <Switch
+              checked={whtEnabled}
+              onCheckedChange={handleWhtToggle}
+              disabled={whtChangeInfo?.isLocked}
+            />
+            {whtChangeInfo?.isLocked && (
+              <span className="text-xs text-muted-foreground">(ล็อคแล้ว)</span>
             )}
           </div>
           {whtEnabled && (
@@ -188,8 +290,8 @@ export function TransactionAmountCard({
           )}
         </div>
 
-        {/* WHT Type Selector */}
-        {isEditable && whtEnabled && (
+        {/* WHT Type */}
+        {whtEnabled && (
           <Select
             value={whtType}
             onValueChange={(v) => {
@@ -199,7 +301,7 @@ export function TransactionAmountCard({
               }
             }}
           >
-            <SelectTrigger className="h-10 bg-muted/30">
+            <SelectTrigger className="h-9 bg-background">
               <SelectValue placeholder="เลือกประเภทหัก ณ ที่จ่าย..." />
             </SelectTrigger>
             <SelectContent>
@@ -211,21 +313,55 @@ export function TransactionAmountCard({
             </SelectContent>
           </Select>
         )}
+      </div>
 
-        {!isEditable && whtEnabled && whtType && (
-          <div className="text-sm text-muted-foreground">
-            ประเภท: {Object.entries(WHT_RATES).find(([key]) => key === whtType)?.[1]?.description}
+      <Separator />
+
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">{netAmountLabel}</span>
+        <span className="text-xl font-bold text-emerald-600">{formatCurrency(netAmount)}</span>
+      </div>
+      
+      {/* WHT Change Confirmation Dialog */}
+      <AlertDialog open={showWhtConfirmDialog} onOpenChange={setShowWhtConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              ยืนยันการเปลี่ยนหัก ณ ที่จ่าย
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              {whtChangeInfo?.message || (pendingWhtChange 
+                ? "คุณต้องการเปิดหัก ณ ที่จ่าย?"
+                : "คุณต้องการปิดหัก ณ ที่จ่าย?"
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="py-2">
+            <label className="text-sm font-medium">เหตุผลในการเปลี่ยน (ไม่บังคับ)</label>
+            <Textarea
+              value={whtChangeReason}
+              onChange={(e) => setWhtChangeReason(e.target.value)}
+              placeholder="ระบุเหตุผล เช่น ข้อมูลผิดพลาด, ลูกค้าแจ้งเปลี่ยน..."
+              className="mt-2"
+              rows={2}
+            />
           </div>
-        )}
-
-        <div className="h-px bg-border" />
-
-        {/* Net Amount */}
-        <div className="flex items-center justify-between pt-2">
-          <Label className="text-base font-medium">{netAmountLabel}</Label>
-          <span className="text-xl font-bold text-emerald-600">{formatCurrency(netAmount)}</span>
-        </div>
-      </CardContent>
-    </Card>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelWhtChange}>
+              ยกเลิก
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmWhtChange}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              ยืนยันการเปลี่ยน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

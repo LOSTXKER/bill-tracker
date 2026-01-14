@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { exportContactsToPEAK } from "@/lib/export/peak-export";
 import { NextResponse } from "next/server";
+import { apiResponse } from "@/lib/api/response";
 
 /**
  * GET /api/contacts/export?company=ABC&format=peak
@@ -30,10 +31,7 @@ export const GET = withCompanyAccess(
       });
     }
 
-    return NextResponse.json(
-      { success: false, error: "Unsupported format" },
-      { status: 400 }
-    );
+    return apiResponse.badRequest("Unsupported format");
   },
   { permission: "contacts:read" }
 );

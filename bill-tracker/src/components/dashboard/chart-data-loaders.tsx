@@ -4,13 +4,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CashFlowChart } from "@/components/charts/cash-flow-chart";
 import { ExpenseCategoryChart } from "@/components/charts/expense-category-chart";
 import { MonthlyTrendChart } from "@/components/charts/monthly-trend-chart";
+import { getCompanyId } from "@/lib/cache/company";
 
 export async function CashFlowChartData({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   const now = new Date();
   const months = [];
@@ -23,7 +21,7 @@ export async function CashFlowChartData({ companyCode }: { companyCode: string }
     const [incomeSum, expenseSum] = await Promise.all([
       prisma.income.aggregate({
         where: {
-          companyId: company.id,
+          companyId: companyId,
           receiveDate: { gte: startDate, lte: endDate },
           deletedAt: null,
         },
@@ -31,7 +29,7 @@ export async function CashFlowChartData({ companyCode }: { companyCode: string }
       }),
       prisma.expense.aggregate({
         where: {
-          companyId: company.id,
+          companyId: companyId,
           billDate: { gte: startDate, lte: endDate },
           deletedAt: null,
         },
@@ -57,11 +55,8 @@ export async function CashFlowChartData({ companyCode }: { companyCode: string }
 }
 
 export async function MonthlyTrendChartData({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   const now = new Date();
   const months = [];
@@ -74,7 +69,7 @@ export async function MonthlyTrendChartData({ companyCode }: { companyCode: stri
     const [incomeSum, expenseSum] = await Promise.all([
       prisma.income.aggregate({
         where: {
-          companyId: company.id,
+          companyId: companyId,
           receiveDate: { gte: startDate, lte: endDate },
           deletedAt: null,
         },
@@ -82,7 +77,7 @@ export async function MonthlyTrendChartData({ companyCode }: { companyCode: stri
       }),
       prisma.expense.aggregate({
         where: {
-          companyId: company.id,
+          companyId: companyId,
           billDate: { gte: startDate, lte: endDate },
           deletedAt: null,
         },
@@ -101,11 +96,8 @@ export async function MonthlyTrendChartData({ companyCode }: { companyCode: stri
 }
 
 export async function ExpenseCategoryChartData({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -114,7 +106,7 @@ export async function ExpenseCategoryChartData({ companyCode }: { companyCode: s
   const expenseByAccount = await prisma.expense.groupBy({
     by: ["accountId"],
     where: {
-      companyId: company.id,
+      companyId: companyId,
       billDate: { gte: startOfMonth, lte: endOfMonth },
       accountId: { not: null },
       deletedAt: null,

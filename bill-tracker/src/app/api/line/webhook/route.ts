@@ -1,277 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
-import { prisma } from "@/lib/db";
-
 /**
  * LINE Bot Webhook Handler
  * Receives events from LINE Messaging API and processes them
  */
 
-interface LineWebhookEvent {
-  type: string;
-  replyToken?: string;
-  source: {
-    type: string;
-    userId?: string;
-    groupId?: string;
-    roomId?: string;
-  };
-  timestamp: number;
-  message?: {
-    type: string;
-    id: string;
-    text?: string;
-    contentProvider?: {
-      type: string;
-    };
-  };
-  mode?: string;
-}
-
-interface LineWebhookBody {
-  destination: string;
-  events: LineWebhookEvent[];
-}
-
-/**
- * Verify LINE webhook signature
- */
-function verifySignature(
-  body: string,
-  signature: string,
-  channelSecret: string
-): boolean {
-  const hash = crypto
-    .createHmac("sha256", channelSecret)
-    .update(body)
-    .digest("base64");
-  return hash === signature;
-}
-
-/**
- * Send reply message to LINE
- */
-async function replyToLine(
-  replyToken: string,
-  messages: any[],
-  channelAccessToken: string
-): Promise<boolean> {
-  try {
-    const response = await fetch("https://api.line.me/v2/bot/message/reply", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${channelAccessToken}`,
-      },
-      body: JSON.stringify({
-        replyToken,
-        messages,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("LINE reply error:", error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error("Failed to reply to LINE:", error);
-    return false;
-  }
-}
-
-/**
- * Handle text message commands
- */
-async function handleTextMessage(
-  event: LineWebhookEvent,
-  company: any,
-  channelAccessToken: string
-): Promise<void> {
-  const text = event.message?.text?.toLowerCase().trim() || "";
-  const replyToken = event.replyToken;
-
-  if (!replyToken) return;
-
-  // Command: Get Group ID
-  if (text === "group id" || text === "groupid" || text === "group") {
-    const groupId = event.source.groupId;
-    if (!groupId) {
-      await replyToLine(
-        replyToken,
-        [
-          {
-            type: "text",
-            text: "⚠️ คำสั่งนี้ใช้ได้เฉพาะใน Group เท่านั้น\n\nกรุณาเพิ่มบอทเข้า Group แล้วพิมพ์คำสั่งนี้อีกครั้ง",
-          },
-        ],
-        channelAccessToken
-      );
-      return;
-    }
-
-    // Update company with group ID
-    await prisma.company.update({
-      where: { id: company.id },
-      data: { lineGroupId: groupId },
-    });
-
-    await replyToLine(
-      replyToken,
-      [
-        {
-          type: "text",
-          text: `✅ บันทึก Group ID สำเร็จ!\n\n📱 Group ID:\n${groupId}\n\nคุณสามารถคัดลอก ID นี้ไปใช้ในการตั้งค่าบนเว็บได้แล้ว`,
-        },
-      ],
-      channelAccessToken
-    );
-    return;
-  }
-
-  // Command: Help
-  if (text === "help" || text === "ช่วยเหลือ" || text === "คำสั่ง") {
-    await replyToLine(
-      replyToken,
-      [
-        {
-          type: "text",
-          text: `🤖 คำสั่งที่ใช้ได้:\n\n📱 group id - ดู Group ID\n📊 summary / สรุป - สรุปรายการวันนี้\n📷 ส่งรูปใบเสร็จ - วิเคราะห์ด้วย AI\n❓ help / ช่วยเหลือ - แสดงคำสั่งนี้`,
-        },
-      ],
-      channelAccessToken
-    );
-    return;
-  }
-
-  // Command: Summary
-  if (text === "summary" || text === "สรุป") {
-    // Get today's expenses and incomes
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const [expenses, incomes] = await Promise.all([
-      prisma.expense.findMany({
-        where: {
-          companyId: company.id,
-          billDate: {
-            gte: today,
-            lt: tomorrow,
-          },
-        },
-      }),
-      prisma.income.findMany({
-        where: {
-          companyId: company.id,
-          receiveDate: {
-            gte: today,
-            lt: tomorrow,
-          },
-        },
-      }),
-    ]);
-
-    const totalExpense = expenses.reduce(
-      (sum: number, exp: typeof expenses[number]) => sum + Number(exp.netPaid),
-      0
-    );
-    const totalIncome = incomes.reduce(
-      (sum: number, inc: typeof incomes[number]) => sum + Number(inc.netReceived),
-      0
-    );
-    const netCashFlow = totalIncome - totalExpense;
-
-    const formatCurrency = (amount: number) =>
-      new Intl.NumberFormat("th-TH", {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount);
-
-    await replyToLine(
-      replyToken,
-      [
-        {
-          type: "text",
-          text: `📊 สรุปประจำวัน ${company.name}\n${today.toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}\n\n💰 รายรับ: ฿${formatCurrency(totalIncome)} (${incomes.length} รายการ)\n💸 รายจ่าย: ฿${formatCurrency(totalExpense)} (${expenses.length} รายการ)\n${"━".repeat(30)}\n📈 สุทธิ: ฿${formatCurrency(netCashFlow)}${netCashFlow >= 0 ? " ✅" : " ⚠️"}`,
-        },
-      ],
-      channelAccessToken
-    );
-    return;
-  }
-
-  // Default: Unknown command
-  await replyToLine(
-    replyToken,
-    [
-      {
-        type: "text",
-        text: '❓ ไม่เข้าใจคำสั่ง\n\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้',
-      },
-    ],
-    channelAccessToken
-  );
-}
-
-/**
- * Handle image message (receipt OCR)
- */
-async function handleImageMessage(
-  event: LineWebhookEvent,
-  company: any,
-  channelAccessToken: string
-): Promise<void> {
-  const replyToken = event.replyToken;
-  if (!replyToken) return;
-
-  // TODO: Implement OCR in later phase
-  await replyToLine(
-    replyToken,
-    [
-      {
-        type: "text",
-        text: "📷 ได้รับรูปใบเสร็จแล้ว!\n\n🤖 ฟีเจอร์วิเคราะห์ด้วย AI กำลังพัฒนา...\nกรุณารอการอัพเดทในเร็วๆ นี้",
-      },
-    ],
-    channelAccessToken
-  );
-}
-
-/**
- * Handle join event (bot added to group)
- */
-async function handleJoinEvent(
-  event: LineWebhookEvent,
-  company: any,
-  channelAccessToken: string
-): Promise<void> {
-  const replyToken = event.replyToken;
-  if (!replyToken) return;
-
-  const groupId = event.source.groupId;
-  if (groupId && company) {
-    // Auto-save group ID
-    await prisma.company.update({
-      where: { id: company.id },
-      data: { lineGroupId: groupId },
-    });
-  }
-
-  await replyToLine(
-    replyToken,
-    [
-      {
-        type: "text",
-        text: `👋 สวัสดีครับ!\n\nผมคือบอทจัดการบัญชีสำหรับ ${company?.name || "บริษัทของคุณ"}\n\n✅ Group ID ถูกบันทึกอัตโนมัติแล้ว\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้`,
-      },
-    ],
-    channelAccessToken
-  );
-}
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import {
+  verifySignature,
+  handleTextMessage,
+  handleImageMessage,
+  handleJoinEvent,
+  type LineWebhookBody,
+  type LineCompanyConfig,
+} from "@/lib/line";
 
 /**
  * POST /api/line/webhook
@@ -279,6 +20,7 @@ async function handleJoinEvent(
  */
 export async function POST(request: NextRequest) {
   try {
+    // Validate signature header
     const signature = request.headers.get("x-line-signature");
     if (!signature) {
       return NextResponse.json(
@@ -287,17 +29,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Parse request body
     const bodyText = await request.text();
     const body: LineWebhookBody = JSON.parse(bodyText);
 
-    // Find company by channel access token (we'll need to match against stored token)
-    // For now, we'll process events for all companies that have LINE configured
-    // In production, you might want to use destination (bot's user ID) to match
-
+    // Process each event
     for (const event of body.events) {
       console.log("LINE Event:", event.type, event);
 
-      // Try to find company by checking all companies with LINE configured
+      // Find company with matching LINE configuration
       const companies = await prisma.company.findMany({
         where: {
           lineChannelSecret: { not: null },
@@ -310,7 +50,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Verify signature
+        // Verify signature matches this company's secret
         const isValid = verifySignature(
           bodyText,
           signature,
@@ -321,19 +61,28 @@ export async function POST(request: NextRequest) {
           continue; // Try next company
         }
 
-        // Signature is valid, process event
+        // Create typed company config
+        const companyConfig: LineCompanyConfig = {
+          id: company.id,
+          name: company.name,
+          lineChannelSecret: company.lineChannelSecret,
+          lineChannelAccessToken: company.lineChannelAccessToken,
+          lineGroupId: company.lineGroupId,
+        };
+
+        // Process event based on type
         switch (event.type) {
           case "message":
             if (event.message?.type === "text") {
               await handleTextMessage(
                 event,
-                company,
+                companyConfig,
                 company.lineChannelAccessToken
               );
             } else if (event.message?.type === "image") {
               await handleImageMessage(
                 event,
-                company,
+                companyConfig,
                 company.lineChannelAccessToken
               );
             }
@@ -342,7 +91,7 @@ export async function POST(request: NextRequest) {
           case "join":
             await handleJoinEvent(
               event,
-              company,
+              companyConfig,
               company.lineChannelAccessToken
             );
             break;

@@ -1,8 +1,12 @@
 "use client";
 
 import { ArrowUpCircle } from "lucide-react";
-import { ExpenseTableRow } from "@/components/expenses/expense-table-row";
-import { TransactionListClient, type TransactionListConfig } from "@/components/transactions";
+import { 
+  TransactionListClient, 
+  type TransactionListConfig,
+  TransactionTableRow,
+  expenseRowConfig,
+} from "@/components/transactions";
 import { fetchExpenses } from "@/app/[company]/expenses/actions";
 import { EXPENSE_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
@@ -31,16 +35,18 @@ const expenseListConfig: TransactionListConfig = {
     { key: "description", label: "รายละเอียด" },
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },
+    { key: "updatedAt", label: "แก้ไขล่าสุด", sortable: true },
     { key: "line", label: "LINE", align: "center" },
   ],
   
   showCategory: true,
   
   renderRow: (expense, companyCode, selected, onToggle) => (
-    <ExpenseTableRow
+    <TransactionTableRow
       key={expense.id}
-      expense={expense}
+      transaction={expense}
       companyCode={companyCode}
+      config={expenseRowConfig}
       selected={selected}
       onToggleSelect={onToggle}
     />

@@ -100,6 +100,9 @@ model User {
   
   // Document Events
   documentEvents                DocumentEvent[] @relation("DocumentEventCreator")
+  
+  // Comments
+  comments                      Comment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -384,6 +387,9 @@ model Expense {
 
   // Link from ReimbursementRequest (reverse relation)
   reimbursementRequest ReimbursementRequest?
+  
+  // Comments
+  comments Comment[]
 
   @@index([companyId, billDate])
   @@index([status])
@@ -585,6 +591,9 @@ model ReimbursementRequest {
   fraudScore      Int?      // 0-100
   fraudFlags      Json?     // รายละเอียดที่ AI ตรวจพบ
   fraudAnalyzedAt DateTime?
+  
+  // Comments
+  comments        Comment[]
 
   // Tracking
   createdAt DateTime @default(now())
@@ -658,6 +667,9 @@ model Income {
   
   // NEW: Timeline Events
   documentEvents    DocumentEvent[]
+  
+  // Comments
+  comments          Comment[]
 
   // Job Order (สำหรับ Phase 5 - Anajak)
   jobOrderId String?
@@ -852,4 +864,117 @@ model VendorMapping {
   @@unique([companyId, vendorTaxId, transactionType])
   @@index([companyId, vendorName])
   @@index([companyId, transactionType])
+}
+
+// =============================================================================
+// In-App Notifications (แจ้งเตือนในแอพ)
+// =============================================================================
+
+model Notification {
+  id        String  @id @default(cuid())
+  companyId String
+  
+  // Target Users (ใครควรเห็น)
+  // null = ทุกคนในบริษัท, หรือ array ของ userId ที่ควรเห็น
+  targetUserIds Json @default("[]") // Array of user IDs
+  
+  // Notification Type
+  type          NotificationType
+  
+  // Related Entity
+  entityType    String   // "Expense", "Income", "ReimbursementRequest"
+  entityId      String
+  
+  // Content
+  title         String   // หัวข้อ เช่น "รายจ่ายถูกแก้ไข"
+  message       String   // รายละเอียด เช่น "ค่าวัสดุ ฿5,000 โดย สมชาย"
+  
+  // Actor (ใครทำ action)
+  actorId       String?
+  actorName     String?  // ชื่อผู้ทำ (cache ไว้)
+  
+  // Read Status per User (JSON object: { "userId": true/false })
+  readBy        Json     @default("{}")
+  
+  // Metadata
+  metadata      Json?    // ข้อมูลเพิ่มเติม (changes, old values, etc.)
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+}
+
+enum NotificationType {
+  // Transaction Events
+  TRANSACTION_CREATED      // สร้างรายการใหม่
+  TRANSACTION_UPDATED      // แก้ไขรายการ
+  TRANSACTION_DELETED      // ลบรายการ
+  TRANSACTION_STATUS_CHANGED // เปลี่ยนสถานะ
+  
+  // File Events
+  FILE_UPLOADED            // อัปโหลดไฟล์
+  
+  // Reimbursement Events
+  REIMBURSEMENT_SUBMITTED  // ส่งคำขอเบิก
+  REIMBURSEMENT_APPROVED   // อนุมัติคำขอเบิก
+  REIMBURSEMENT_REJECTED   // ปฏิเสธคำขอเบิก
+  REIMBURSEMENT_PAID       // จ่ายเงินคืนแล้ว
+  
+  // System
+  REMINDER                 // แจ้งเตือนทั่วไป
+  
+  // Comments
+  COMMENT_ADDED            // มี comment ใหม่
+  COMMENT_REPLY            // ตอบกลับ comment
+  COMMENT_MENTION          // ถูก mention ใน comment
+}
+
+// =============================================================================
+// Comments (ความคิดเห็น/สนทนา ในเอกสาร)
+// =============================================================================
+
+model Comment {
+  id          String   @id @default(cuid())
+  
+  // Link to transaction (one of these)
+  expenseId   String?
+  expense     Expense? @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  incomeId    String?
+  income      Income?  @relation(fields: [incomeId], references: [id], onDelete: Cascade)
+  reimbursementRequestId String?
+  reimbursementRequest   ReimbursementRequest? @relation(fields: [reimbursementRequestId], references: [id], onDelete: Cascade)
+  
+  // Content
+  content     String   @db.Text
+  
+  // Reply to another comment (nested comments)
+  parentId    String?
+  parent      Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentReplies")
+  
+  // Mentions (@user)
+  mentionedUserIds Json @default("[]") // Array of user IDs mentioned
+  
+  // Author
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  
+  // Status
+  isResolved  Boolean  @default(false) // ถูกแก้ไขแล้ว/ตอบแล้ว
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  
+  // Soft delete
+  deletedAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([expenseId])
+  @@index([incomeId])
+  @@index([reimbursementRequestId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt])
 }

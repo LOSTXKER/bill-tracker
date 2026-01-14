@@ -1,6 +1,7 @@
 "use client";
 
 import { ThemeProvider } from "next-themes";
+import { SessionProvider } from "next-auth/react";
 import { SWRConfig } from "swr";
 import { swrConfig } from "@/lib/swr-config";
 
@@ -10,15 +11,17 @@ import { swrConfig } from "@/lib/swr-config";
  */
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SWRConfig value={swrConfig}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange={false}
-      >
-        {children}
-      </ThemeProvider>
-    </SWRConfig>
+    <SessionProvider>
+      <SWRConfig value={swrConfig}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
+          {children}
+        </ThemeProvider>
+      </SWRConfig>
+    </SessionProvider>
   );
 }

@@ -64,6 +64,34 @@ interface TransactionListClientProps {
 // Component
 // ============================================================================
 
+// Status tab configuration
+interface StatusTab {
+  key: string;
+  label: string;
+  statuses: string[]; // Statuses to include in this tab
+  icon?: string;
+}
+
+// Expense workflow: จ่ายแล้ว → รอใบกำกับ → (ออก 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
+const EXPENSE_STATUS_TABS: StatusTab[] = [
+  { key: "all", label: "ทั้งหมด", statuses: [] },
+  { key: "waiting_doc", label: "รอเอกสาร", statuses: ["PAID", "WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE"] },
+  { key: "doc_received", label: "ได้เอกสารแล้ว", statuses: ["TAX_INVOICE_RECEIVED", "WHT_ISSUED", "WHT_SENT_TO_VENDOR"] },
+  { key: "ready", label: "รอส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
+  { key: "sent", label: "ส่งบัญชีแล้ว", statuses: ["SENT_TO_ACCOUNTANT", "COMPLETED"] },
+  { key: "recent", label: "แก้ไขล่าสุด", statuses: [] },
+];
+
+// Income workflow: รับเงินแล้ว → รอออกบิล → (รอ 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
+const INCOME_STATUS_TABS: StatusTab[] = [
+  { key: "all", label: "ทั้งหมด", statuses: [] },
+  { key: "waiting_doc", label: "รอออกบิล", statuses: ["RECEIVED", "NO_INVOICE_NEEDED", "WAITING_INVOICE_ISSUE", "WHT_PENDING_CERT"] },
+  { key: "doc_issued", label: "ออกบิลแล้ว", statuses: ["INVOICE_ISSUED", "INVOICE_SENT", "WHT_CERT_RECEIVED"] },
+  { key: "ready", label: "รอส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
+  { key: "sent", label: "ส่งบัญชีแล้ว", statuses: ["SENT_TO_ACCOUNTANT", "COMPLETED"] },
+  { key: "recent", label: "แก้ไขล่าสุด", statuses: [] },
+];
+
 export function TransactionListClient({
   companyCode,
   initialData,
@@ -72,13 +100,57 @@ export function TransactionListClient({
   fetchData,
 }: TransactionListClientProps) {
   const router = useRouter();
-  const { filters } = useTransactionFilters();
+  const { filters, setFilter, setFilterWithSort } = useTransactionFilters();
   const { page, limit, setPage, setLimit } = usePagination();
   const { sortBy, sortOrder, toggleSort } = useSorting();
   const [data, setData] = useState(initialData);
   const [total, setTotal] = useState(initialTotal);
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("all");
+  
+  const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
+  
+  // Sync activeTab with URL status filter
+  useEffect(() => {
+    if (sortBy === "updatedAt") {
+      setActiveTab("recent");
+      return;
+    }
+    
+    if (!filters.status) {
+      setActiveTab("all");
+      return;
+    }
+    
+    // Find which tab matches the current status filter
+    const currentStatuses = filters.status.split(",");
+    const matchingTab = statusTabs.find(tab => 
+      tab.statuses.length > 0 && 
+      tab.statuses.every(s => currentStatuses.includes(s)) &&
+      currentStatuses.every(s => tab.statuses.includes(s))
+    );
+    
+    if (matchingTab) {
+      setActiveTab(matchingTab.key);
+    }
+  }, [filters.status, sortBy, statusTabs]);
+  
+  // Handle tab change - use setFilterWithSort for single navigation
+  const handleTabChange = (tabKey: string) => {
+    const tab = statusTabs.find(t => t.key === tabKey);
+    
+    if (tabKey === "recent") {
+      // Sort by updatedAt desc, clear status filter
+      setFilterWithSort("status", "", "updatedAt", "desc");
+    } else if (tab && tab.statuses.length > 0) {
+      // Filter by statuses in this tab
+      setFilterWithSort("status", tab.statuses.join(","), config.dateField, "desc");
+    } else {
+      // All: clear filters
+      setFilterWithSort("status", "", config.dateField, "desc");
+    }
+  };
 
   // Fetch data when filters change
   useEffect(() => {
@@ -230,30 +302,77 @@ export function TransactionListClient({
 
   const EmptyIcon = config.emptyIcon;
 
+  // Count items per tab (for badges)
+  const getTabCount = (tab: StatusTab) => {
+    if (tab.key === "all") return total;
+    if (tab.key === "recent") return null; // Don't show count for recent
+    return data.filter(item => tab.statuses.includes(item.workflowStatus || item.status)).length;
+  };
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <TransactionFilters
-        type={config.type}
-        statuses={statusOptions}
-      />
+      {/* Header: Tabs + Filters */}
+      <div className="flex flex-col gap-3">
+        {/* Status Tabs - Pill Style */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {statusTabs.map((tab) => {
+            const count = getTabCount(tab);
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+                  isActive 
+                    ? "bg-primary text-primary-foreground shadow-sm" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {tab.label}
+                {count !== null && count > 0 && (
+                  <span className={cn(
+                    "inline-flex items-center justify-center h-5 min-w-5 px-1 text-xs font-semibold rounded-md",
+                    isActive 
+                      ? "bg-primary-foreground/20 text-primary-foreground" 
+                      : "bg-muted text-muted-foreground"
+                  )}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Filters */}
+        <TransactionFilters
+          type={config.type}
+          statuses={statusOptions}
+          hideStatusFilter={true}
+          hideStatusBadges={false}
+        />
+      </div>
 
       {/* Table */}
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="text-sm font-semibold">{config.title}</h3>
           <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground">{config.title}</h3>
+            <span className="text-xs text-muted-foreground">
+              ({total} รายการ)
+            </span>
             {isPending && (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
             )}
-            <ExportButton
-              data={data}
-              filename={`${config.type}s-${new Date().toISOString().split("T")[0]}`}
-              type={config.type}
-            />
           </div>
+          <ExportButton
+            data={data}
+            filename={`${config.type}s-${new Date().toISOString().split("T")[0]}`}
+            type={config.type}
+          />
         </div>
-        <div className="p-0">
+        <div>
           {data.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">

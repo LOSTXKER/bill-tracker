@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   "arrow-up-circle": ArrowUpCircle,
   "arrow-down-circle": ArrowDownCircle,
+  "trending-up": TrendingUp,
+  "trending-down": TrendingDown,
   "clock": Clock,
   "check-circle": CheckCircle,
   "file-text": FileText,

@@ -3,22 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { getCompanyId } from "@/lib/cache/company";
 
 export async function RecentTransactions({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   const [recentExpenses, recentIncomes] = await Promise.all([
     prisma.expense.findMany({
-      where: { companyId: company.id, deletedAt: null },
+      where: { companyId: companyId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
     prisma.income.findMany({
-      where: { companyId: company.id, deletedAt: null },
+      where: { companyId: companyId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),

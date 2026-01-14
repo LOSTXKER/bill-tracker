@@ -1,8 +1,12 @@
 "use client";
 
 import { ArrowDownCircle } from "lucide-react";
-import { IncomeTableRow } from "@/components/incomes/income-table-row";
-import { TransactionListClient, type TransactionListConfig } from "@/components/transactions";
+import { 
+  TransactionListClient, 
+  type TransactionListConfig,
+  TransactionTableRow,
+  incomeRowConfig,
+} from "@/components/transactions";
 import { fetchIncomes } from "@/app/[company]/incomes/actions";
 import { INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
@@ -31,6 +35,7 @@ const incomeListConfig: TransactionListConfig = {
     { key: "source", label: "รายละเอียด" },
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },
+    { key: "updatedAt", label: "แก้ไขล่าสุด", sortable: true },
     { key: "wht", label: "WHT", align: "center" },
     { key: "line", label: "LINE", align: "center" },
   ],
@@ -38,10 +43,11 @@ const incomeListConfig: TransactionListConfig = {
   showCategory: true,
   
   renderRow: (income, companyCode, selected, onToggle) => (
-    <IncomeTableRow
+    <TransactionTableRow
       key={income.id}
-      income={income}
+      transaction={income}
       companyCode={companyCode}
+      config={incomeRowConfig}
       selected={selected}
       onToggleSelect={onToggle}
     />

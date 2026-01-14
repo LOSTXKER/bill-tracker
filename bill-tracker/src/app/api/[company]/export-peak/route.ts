@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { exportExpensesToPEAK } from "@/lib/export/peak-export";
+import { apiResponse } from "@/lib/api/response";
 
 // Helper to extract company code from URL path
 const getCompanyFromPath = (req: Request) => {
@@ -22,10 +23,7 @@ async function handlePost(
     const { month, year, status } = body;
 
     if (!month || !year || month < 1 || month > 12) {
-      return NextResponse.json(
-        { error: "กรุณาระบุเดือนและปีให้ถูกต้อง" },
-        { status: 400 }
-      );
+      return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
     }
 
     const startDate = new Date(year, month - 1, 1);
@@ -66,10 +64,7 @@ async function handlePost(
     });
 
     if (expenses.length === 0) {
-      return NextResponse.json(
-        { error: "ไม่พบข้อมูลรายจ่ายในช่วงเวลาที่เลือก" },
-        { status: 404 }
-      );
+      return apiResponse.notFound("ไม่พบข้อมูลรายจ่ายในช่วงเวลาที่เลือก");
     }
 
     // Transform data for PEAK export
@@ -124,14 +119,10 @@ async function handlePost(
     });
   } catch (error) {
     console.error("PEAK export error:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "เกิดข้อผิดพลาดในการสร้างไฟล์ Excel",
-      },
-      { status: 500 }
+    return apiResponse.error(
+      error instanceof Error
+        ? error.message
+        : "เกิดข้อผิดพลาดในการสร้างไฟล์ Excel"
     );
   }
 }
@@ -147,10 +138,7 @@ async function handleGet(
   const year = parseInt(searchParams.get("year") || "");
 
   if (!month || !year || month < 1 || month > 12) {
-    return NextResponse.json(
-      { error: "กรุณาระบุเดือนและปีให้ถูกต้อง" },
-      { status: 400 }
-    );
+    return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
   }
 
   const startDate = new Date(year, month - 1, 1);
@@ -191,7 +179,7 @@ async function handleGet(
     }),
   ]);
 
-  return NextResponse.json({
+  return apiResponse.success({
     total,
     withAccount,
     withoutAccount,

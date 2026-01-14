@@ -1,0 +1,232 @@
+"use client";
+
+import React from "react";
+import { Check, Clock, CreditCard, FileText, FileBadge, Send, CheckCircle2, Wallet, Receipt, FileCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface TimelineStepperProps {
+  type: "expense" | "income";
+  currentStatus: string;
+  isWht?: boolean;
+  className?: string;
+}
+
+interface Step {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+// =============================================================================
+// Step Definitions
+// =============================================================================
+
+const EXPENSE_STEPS: Step[] = [
+  { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
+  { key: "RECEIVED_TAX_INVOICE", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
+  { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+const EXPENSE_STEPS_NO_WHT: Step[] = [
+  { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
+  { key: "RECEIVED_TAX_INVOICE", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+const INCOME_STEPS: Step[] = [
+  { key: "RECEIVED", label: "รับเงินแล้ว", icon: <Wallet className="h-4 w-4" /> },
+  { key: "INVOICE_ISSUED", label: "ออกบิลแล้ว", icon: <Receipt className="h-4 w-4" /> },
+  { key: "WHT_RECEIVED", label: "ได้ใบ 50 ทวิ", icon: <FileCheck className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+const INCOME_STEPS_NO_WHT: Step[] = [
+  { key: "RECEIVED", label: "รับเงินแล้ว", icon: <Wallet className="h-4 w-4" /> },
+  { key: "INVOICE_ISSUED", label: "ออกบิลแล้ว", icon: <Receipt className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+// Map intermediate statuses to their parent step
+const STATUS_MAP: Record<string, string> = {
+  // Expense
+  PAID: "PAID",
+  WAITING_TAX_INVOICE: "PAID",
+  RECEIVED_TAX_INVOICE: "RECEIVED_TAX_INVOICE",
+  WHT_PENDING_ISSUE: "RECEIVED_TAX_INVOICE",
+  WHT_ISSUED: "WHT_ISSUED",
+  READY_FOR_ACCOUNTING: "READY_FOR_ACCOUNTING",
+  SENT_TO_ACCOUNTANT: "SENT_TO_ACCOUNTANT",
+  COMPLETED: "SENT_TO_ACCOUNTANT",
+  // Income
+  RECEIVED: "RECEIVED",
+  WAITING_INVOICE_ISSUE: "RECEIVED",
+  INVOICE_ISSUED: "INVOICE_ISSUED",
+  INVOICE_SENT: "INVOICE_ISSUED",
+  WHT_PENDING_CERT: "INVOICE_ISSUED",
+  WHT_RECEIVED: "WHT_RECEIVED",
+};
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function TimelineStepper({
+  type,
+  currentStatus,
+  isWht = false,
+  className,
+}: TimelineStepperProps) {
+  // Get steps based on type and WHT
+  const steps = type === "expense"
+    ? (isWht ? EXPENSE_STEPS : EXPENSE_STEPS_NO_WHT)
+    : (isWht ? INCOME_STEPS : INCOME_STEPS_NO_WHT);
+
+  // Map current status to step key
+  const mappedStatus = STATUS_MAP[currentStatus] || currentStatus;
+  
+  // Find current step index
+  const currentIndex = steps.findIndex(step => step.key === mappedStatus);
+  
+  // Check if waiting status (show clock icon)
+  const isWaiting = currentStatus.includes("WAITING") || currentStatus.includes("PENDING");
+
+  return (
+    <div className={cn(
+      "py-3 sm:py-4",
+      className
+    )}>
+      <div className="max-w-4xl mx-auto">
+        {/* Desktop/Tablet View */}
+        <div className="hidden sm:flex items-center">
+          {steps.map((step, index) => {
+            const isCompleted = index < currentIndex;
+            const isCurrent = index === currentIndex;
+            const isPending = index > currentIndex;
+
+            return (
+              <React.Fragment key={step.key}>
+                {/* Step */}
+                <div className="flex flex-col items-center gap-1.5 min-w-0">
+                  {/* Circle */}
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                      isCompleted && "bg-emerald-500 text-white",
+                      isCurrent && !isWaiting && "bg-primary text-white ring-2 ring-primary/20",
+                      isCurrent && isWaiting && "bg-amber-500 text-white ring-2 ring-amber-500/20",
+                      isPending && "bg-muted text-muted-foreground border border-border"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <Check className="h-4 w-4" strokeWidth={2.5} />
+                    ) : isCurrent && isWaiting ? (
+                      <Clock className="h-4 w-4" />
+                    ) : (
+                      <span className="[&>svg]:h-3.5 [&>svg]:w-3.5">{step.icon}</span>
+                    )}
+                  </div>
+                  
+                  {/* Label */}
+                  <span
+                    className={cn(
+                      "text-xs font-medium text-center whitespace-nowrap",
+                      isCompleted && "text-emerald-600 dark:text-emerald-400",
+                      isCurrent && !isWaiting && "text-primary font-semibold",
+                      isCurrent && isWaiting && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isPending && "text-slate-400 dark:text-slate-500"
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+
+                {/* Connector Line */}
+                {index < steps.length - 1 && (
+                  <div className="flex-1 mx-1.5 h-0.5 min-w-[30px]">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        index < currentIndex 
+                          ? "bg-emerald-500" 
+                          : "bg-border"
+                      )}
+                    />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* Mobile View */}
+        <div className="sm:hidden">
+          {/* Progress Bar */}
+          <div className="relative mb-4">
+            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  isWaiting ? "bg-amber-500" : "bg-emerald-500"
+                )}
+                style={{
+                  width: `${Math.max(0, (currentIndex / (steps.length - 1)) * 100)}%`
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Steps Dots */}
+          <div className="flex justify-between items-start">
+            {steps.map((step, index) => {
+              const isCompleted = index < currentIndex;
+              const isCurrent = index === currentIndex;
+              const isPending = index > currentIndex;
+
+              return (
+                <div key={step.key} className="flex flex-col items-center gap-1.5 flex-1">
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                      isCompleted && "bg-emerald-500 text-white",
+                      isCurrent && !isWaiting && "bg-primary text-white ring-2 ring-primary/30",
+                      isCurrent && isWaiting && "bg-amber-500 text-white ring-2 ring-amber-500/30",
+                      isPending && "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <Check className="h-4 w-4" strokeWidth={2.5} />
+                    ) : isCurrent && isWaiting ? (
+                      <Clock className="h-4 w-4" />
+                    ) : (
+                      <span className="[&>svg]:h-3.5 [&>svg]:w-3.5">{step.icon}</span>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium text-center leading-tight px-0.5",
+                      isCompleted && "text-emerald-600 dark:text-emerald-400",
+                      isCurrent && !isWaiting && "text-primary font-semibold",
+                      isCurrent && isWaiting && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isPending && "text-slate-400 dark:text-slate-500"
+                    )}
+                  >
+                    {step.label.split("แล้ว")[0]}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

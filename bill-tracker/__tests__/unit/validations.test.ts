@@ -2,29 +2,39 @@ import { describe, it, expect } from "vitest";
 import { expenseSchema } from "@/lib/validations/expense";
 import { incomeSchema } from "@/lib/validations/income";
 
+// Base valid data to be used in tests
+const baseExpenseData = {
+  companyId: "company-123",
+  contactId: "contact-123",
+  amount: 1000,
+  vatRate: 7,
+  description: "Test expense description",
+  paymentMethod: "BANK_TRANSFER",
+  billDate: new Date(),
+  status: "PENDING_PHYSICAL",
+};
+
+const baseIncomeData = {
+  companyId: "company-123",
+  contactId: "contact-123",
+  amount: 1000,
+  vatRate: 7,
+  source: "Test income source",
+  paymentMethod: "BANK_TRANSFER",
+  receiveDate: new Date(),
+  status: "PENDING_COPY_SEND",
+};
+
 describe("Expense Validation", () => {
   it("should validate valid expense data", () => {
-    const validData = {
-      companyId: "company-123",
-      amount: 1000,
-      vatRate: 7,
-      paymentMethod: "BANK_TRANSFER",
-      billDate: new Date(),
-      status: "PENDING_PHYSICAL",
-    };
-
-    const result = expenseSchema.safeParse(validData);
+    const result = expenseSchema.safeParse(baseExpenseData);
     expect(result.success).toBe(true);
   });
 
   it("should reject negative amounts", () => {
     const invalidData = {
-      companyId: "company-123",
+      ...baseExpenseData,
       amount: -100,
-      vatRate: 7,
-      paymentMethod: "BANK_TRANSFER",
-      billDate: new Date(),
-      status: "PENDING_PHYSICAL",
     };
 
     const result = expenseSchema.safeParse(invalidData);
@@ -33,12 +43,8 @@ describe("Expense Validation", () => {
 
   it("should reject zero amount", () => {
     const invalidData = {
-      companyId: "company-123",
+      ...baseExpenseData,
       amount: 0,
-      vatRate: 7,
-      paymentMethod: "BANK_TRANSFER",
-      billDate: new Date(),
-      status: "PENDING_PHYSICAL",
     };
 
     const result = expenseSchema.safeParse(invalidData);
@@ -50,12 +56,8 @@ describe("Expense Validation", () => {
 
     validRates.forEach((vatRate) => {
       const data = {
-        companyId: "company-123",
-        amount: 1000,
+        ...baseExpenseData,
         vatRate,
-        paymentMethod: "BANK_TRANSFER",
-        billDate: new Date(),
-        status: "PENDING_PHYSICAL",
       };
 
       const result = expenseSchema.safeParse(data);
@@ -68,15 +70,10 @@ describe("Expense Validation", () => {
 
     validWhtRates.forEach((whtRate) => {
       const data = {
-        companyId: "company-123",
-        amount: 1000,
-        vatRate: 7,
+        ...baseExpenseData,
         isWht: true,
         whtRate,
         whtType: "SERVICE_3",
-        paymentMethod: "BANK_TRANSFER",
-        billDate: new Date(),
-        status: "PENDING_PHYSICAL",
       };
 
       const result = expenseSchema.safeParse(data);
@@ -94,11 +91,7 @@ describe("Expense Validation", () => {
 
     validStatuses.forEach((status) => {
       const data = {
-        companyId: "company-123",
-        amount: 1000,
-        vatRate: 7,
-        paymentMethod: "BANK_TRANSFER",
-        billDate: new Date(),
+        ...baseExpenseData,
         status,
       };
 
@@ -109,11 +102,7 @@ describe("Expense Validation", () => {
 
   it("should reject invalid status", () => {
     const data = {
-      companyId: "company-123",
-      amount: 1000,
-      vatRate: 7,
-      paymentMethod: "BANK_TRANSFER",
-      billDate: new Date(),
+      ...baseExpenseData,
       status: "INVALID_STATUS",
     };
 
@@ -126,43 +115,58 @@ describe("Expense Validation", () => {
 
     validMethods.forEach((paymentMethod) => {
       const data = {
-        companyId: "company-123",
-        amount: 1000,
-        vatRate: 7,
+        ...baseExpenseData,
         paymentMethod,
-        billDate: new Date(),
-        status: "PENDING_PHYSICAL",
       };
 
       const result = expenseSchema.safeParse(data);
       expect(result.success).toBe(true);
     });
   });
+
+  it("should require description", () => {
+    const data = {
+      companyId: "company-123",
+      contactId: "contact-123",
+      amount: 1000,
+      vatRate: 7,
+      paymentMethod: "BANK_TRANSFER",
+      billDate: new Date(),
+      status: "PENDING_PHYSICAL",
+      // description is missing
+    };
+
+    const result = expenseSchema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it("should require contactId", () => {
+    const data = {
+      companyId: "company-123",
+      // contactId is missing
+      amount: 1000,
+      vatRate: 7,
+      description: "Test",
+      paymentMethod: "BANK_TRANSFER",
+      billDate: new Date(),
+      status: "PENDING_PHYSICAL",
+    };
+
+    const result = expenseSchema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("Income Validation", () => {
   it("should validate valid income data", () => {
-    const validData = {
-      companyId: "company-123",
-      amount: 1000,
-      vatRate: 7,
-      paymentMethod: "BANK_TRANSFER",
-      receiveDate: new Date(),
-      status: "PENDING_COPY_SEND",
-    };
-
-    const result = incomeSchema.safeParse(validData);
+    const result = incomeSchema.safeParse(baseIncomeData);
     expect(result.success).toBe(true);
   });
 
   it("should reject negative amounts", () => {
     const invalidData = {
-      companyId: "company-123",
+      ...baseIncomeData,
       amount: -100,
-      vatRate: 7,
-      paymentMethod: "BANK_TRANSFER",
-      receiveDate: new Date(),
-      status: "PENDING_COPY_SEND",
     };
 
     const result = incomeSchema.safeParse(invalidData);
@@ -180,11 +184,7 @@ describe("Income Validation", () => {
 
     validStatuses.forEach((status) => {
       const data = {
-        companyId: "company-123",
-        amount: 1000,
-        vatRate: 7,
-        paymentMethod: "BANK_TRANSFER",
-        receiveDate: new Date(),
+        ...baseIncomeData,
         status,
       };
 
@@ -195,15 +195,11 @@ describe("Income Validation", () => {
 
   it("should accept income with WHT deduction", () => {
     const data = {
-      companyId: "company-123",
+      ...baseIncomeData,
       amount: 10000,
-      vatRate: 7,
       isWhtDeducted: true,
       whtRate: 3,
       whtType: "SERVICE_3",
-      paymentMethod: "BANK_TRANSFER",
-      receiveDate: new Date(),
-      status: "PENDING_COPY_SEND",
     };
 
     const result = incomeSchema.safeParse(data);
@@ -212,31 +208,64 @@ describe("Income Validation", () => {
 
   it("should accept income with source", () => {
     const data = {
-      companyId: "company-123",
-      amount: 1000,
-      vatRate: 7,
+      ...baseIncomeData,
       source: "ขายสินค้าให้บริษัท ABC",
-      paymentMethod: "BANK_TRANSFER",
-      receiveDate: new Date(),
-      status: "PENDING_COPY_SEND",
     };
 
     const result = incomeSchema.safeParse(data);
     expect(result.success).toBe(true);
   });
 
-  it("should accept income with contact ID", () => {
+  it("should accept income with different contact ID", () => {
+    const data = {
+      ...baseIncomeData,
+      contactId: "different-contact-456",
+    };
+
+    const result = incomeSchema.safeParse(data);
+    expect(result.success).toBe(true);
+  });
+
+  it("should require source", () => {
     const data = {
       companyId: "company-123",
+      contactId: "contact-123",
       amount: 1000,
       vatRate: 7,
-      contactId: "contact-123",
+      paymentMethod: "BANK_TRANSFER",
+      receiveDate: new Date(),
+      status: "PENDING_COPY_SEND",
+      // source is missing
+    };
+
+    const result = incomeSchema.safeParse(data);
+    expect(result.success).toBe(false);
+  });
+
+  it("should require contactId", () => {
+    const data = {
+      companyId: "company-123",
+      // contactId is missing
+      amount: 1000,
+      vatRate: 7,
+      source: "Test source",
       paymentMethod: "BANK_TRANSFER",
       receiveDate: new Date(),
       status: "PENDING_COPY_SEND",
     };
 
     const result = incomeSchema.safeParse(data);
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject WHT deduction without rate", () => {
+    const data = {
+      ...baseIncomeData,
+      isWhtDeducted: true,
+      // whtRate is missing
+    };
+
+    const result = incomeSchema.safeParse(data);
+    expect(result.success).toBe(false);
   });
 });

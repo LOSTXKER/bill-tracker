@@ -1,1 +1,5 @@
-export { ReimbursementTableRow } from "./reimbursement-table-row";
+// Re-export from transactions for backward compatibility
+export { 
+  TransactionTableRow as ReimbursementTableRow,
+  reimbursementRowConfig,
+} from "@/components/transactions";

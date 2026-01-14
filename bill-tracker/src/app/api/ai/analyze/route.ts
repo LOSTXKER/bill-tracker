@@ -6,17 +6,18 @@
  * - Return ข้อมูลครบ พร้อม Vendor Memory override
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { analyzeReceipt, ReceiptAnalysisResult } from "@/lib/ai/analyze-receipt";
 import { findVendorMemory, VendorMemory } from "@/lib/ai/vendor-memory";
+import { apiResponse } from "@/lib/api/response";
 
 export async function POST(request: NextRequest) {
   try {
     // Auth check
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiResponse.unauthorized();
     }
 
     // Parse request
@@ -24,15 +25,15 @@ export async function POST(request: NextRequest) {
     const { imageUrls, companyId, transactionType } = body;
 
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
-      return NextResponse.json({ error: "imageUrls is required" }, { status: 400 });
+      return apiResponse.badRequest("imageUrls is required");
     }
 
     if (!companyId) {
-      return NextResponse.json({ error: "companyId is required" }, { status: 400 });
+      return apiResponse.badRequest("companyId is required");
     }
 
     if (!transactionType || !["EXPENSE", "INCOME"].includes(transactionType)) {
-      return NextResponse.json({ error: "transactionType must be EXPENSE or INCOME" }, { status: 400 });
+      return apiResponse.badRequest("transactionType must be EXPENSE or INCOME");
     }
 
     // 1. เรียก AI วิเคราะห์
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Check error
     if ("error" in aiResult) {
-      return NextResponse.json({ error: aiResult.error }, { status: 500 });
+      return apiResponse.error(aiResult.error);
     }
 
     // 2. เช็ค Vendor Memory (override ถ้ามี)
@@ -66,9 +67,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Return result
-    return NextResponse.json({
-      success: true,
-      data: finalResult,
+    return apiResponse.success({
+      ...finalResult,
       memory: vendorMemory ? {
         found: true,
         id: vendorMemory.id,
@@ -80,10 +80,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("[AI Analyze API] Error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiResponse.error("Internal server error");
   }
 }
 

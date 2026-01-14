@@ -3,26 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileCheck } from "lucide-react";
+import { getCompanyId } from "@/lib/cache/company";
 
 export async function ReadyToSend({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   // Use new workflow statuses
   const [pendingExpenses, pendingIncomes] = await Promise.all([
     prisma.expense.count({
       where: {
-        companyId: company.id,
+        companyId: companyId,
         workflowStatus: "READY_FOR_ACCOUNTING",
         deletedAt: null,
       },
     }),
     prisma.income.count({
       where: {
-        companyId: company.id,
+        companyId: companyId,
         workflowStatus: "READY_FOR_ACCOUNTING",
         deletedAt: null,
       },

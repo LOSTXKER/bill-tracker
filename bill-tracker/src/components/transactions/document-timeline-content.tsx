@@ -17,6 +17,15 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { th } from "date-fns/locale";
+import { EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
+
+// Helper to get status label in Thai
+const getStatusLabel = (status: string, isExpense: boolean) => {
+  const info = isExpense 
+    ? EXPENSE_WORKFLOW_INFO[status as keyof typeof EXPENSE_WORKFLOW_INFO]
+    : INCOME_WORKFLOW_INFO[status as keyof typeof INCOME_WORKFLOW_INFO];
+  return info?.label || status;
+};
 
 interface DocumentTimelineContentProps {
   companyCode: string;
@@ -138,7 +147,7 @@ export function DocumentTimelineContent({ companyCode, expenseId, incomeId }: Do
                   <span className="text-sm font-medium">{config.label}</span>
                   {event.toStatus && (
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                      {event.toStatus}
+                      {getStatusLabel(event.toStatus, !!expenseId)}
                     </Badge>
                   )}
                 </div>

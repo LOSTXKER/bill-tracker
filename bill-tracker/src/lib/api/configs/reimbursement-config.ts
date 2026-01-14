@@ -1,10 +1,10 @@
 /**
  * Reimbursement Request Route Configuration
- * Shared configuration for approval workflow
+ * Shared configuration for approval and payment workflow
  */
 
 import { prisma } from "@/lib/db";
-import type { ApprovalRouteConfig } from "../approval-routes";
+import type { ApprovalRouteConfig, PaymentRouteConfig } from "../approval-routes";
 
 export const reimbursementApprovalConfig: ApprovalRouteConfig = {
   entityName: "ReimbursementRequest",
@@ -41,6 +41,49 @@ export const reimbursementApprovalConfig: ApprovalRouteConfig = {
       select: { id: true, name: true },
     },
     contact: true,
+  },
+  
+  responseKey: "request",
+};
+
+export const reimbursementPaymentConfig: PaymentRouteConfig = {
+  entityName: "ReimbursementRequest",
+  entityDisplayName: "คำขอเบิกจ่าย",
+  
+  prismaModel: prisma.reimbursementRequest,
+  
+  fields: {
+    statusField: "status",
+    companyIdField: "companyId",
+    paidByField: "paidBy",
+    paidAtField: "paidAt",
+    paymentRefField: "paymentRef",
+    descriptionField: "description",
+    amountField: "netAmount",
+  },
+  
+  payment: {
+    permission: "reimbursements:pay",
+    allowedStatuses: ["APPROVED"],
+    paidStatus: "PAID",
+  },
+  
+  findInclude: {
+    company: true,
+    contact: true,
+  },
+  
+  updateInclude: {
+    approver: {
+      select: { id: true, name: true },
+    },
+    payer: {
+      select: { id: true, name: true },
+    },
+    contact: true,
+    linkedExpense: {
+      select: { id: true, status: true },
+    },
   },
   
   responseKey: "request",

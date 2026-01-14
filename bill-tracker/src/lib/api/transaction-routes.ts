@@ -10,7 +10,8 @@ import { withAuth } from "./with-auth";
 import { apiResponse } from "./response";
 import { ApiErrors } from "./errors";
 import { hasPermission } from "@/lib/permissions/checker";
-import { logCreate, logUpdate, logStatusChange, logDelete } from "@/lib/audit/logger";
+import { logCreate, logUpdate, logStatusChange, logDelete, logWhtChange } from "@/lib/audit/logger";
+import { notifyTransactionChange } from "@/lib/notifications/in-app";
 
 // =============================================================================
 // Types
@@ -166,7 +167,21 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
       // Create audit log
       await logCreate(config.displayName, item, session.user.id, company.id);
 
-      // Send notification (non-blocking)
+      // Send in-app notification (non-blocking)
+      notifyTransactionChange({
+        companyId: company.id,
+        transactionType: config.modelName,
+        transactionId: item.id,
+        action: "created",
+        actorId: session.user.id,
+        actorName: session.user.name || "ผู้ใช้",
+        transactionDescription: item.description,
+        amount: Number(item[config.fields.netAmountField]),
+      }).catch((error) => {
+        console.error("Failed to create in-app notification:", error);
+      });
+
+      // Send LINE notification (non-blocking)
       if (config.notifyCreate) {
         const url = new URL(request.url);
         const baseUrl = `${url.protocol}//${url.host}`;
@@ -282,7 +297,32 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
 
     // Create audit log
     const statusField = config.fields.statusField;
-    if (body[statusField] && body[statusField] !== existingItem[statusField]) {
+    const isStatusChange = body[statusField] && body[statusField] !== existingItem[statusField];
+    
+    // Check if WHT changed
+    const whtField = config.modelName === "expense" ? "isWht" : "isWhtDeducted";
+    const wasWht = existingItem[whtField];
+    const nowWht = item[whtField];
+    const isWhtChange = wasWht !== nowWht;
+    
+    if (isWhtChange) {
+      // Log WHT-specific change
+      const statusRollback = existingItem.workflowStatus !== item.workflowStatus
+        ? { from: existingItem.workflowStatus, to: item.workflowStatus }
+        : undefined;
+      
+      await logWhtChange(
+        config.displayName as "Expense" | "Income",
+        item.id,
+        wasWht,
+        nowWht,
+        body._whtChangeReason,
+        statusRollback,
+        session.user.id,
+        item.companyId,
+        config.getEntityDisplayName?.(item)
+      );
+    } else if (isStatusChange) {
       await logStatusChange(
         config.displayName,
         item.id,
@@ -302,6 +342,43 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
         item.companyId
       );
     }
+
+    // Calculate changed fields for notification
+    const changedFields: string[] = [];
+    const fieldLabels: Record<string, string> = {
+      amount: "ยอดเงิน",
+      description: "รายละเอียด",
+      contactId: "ผู้ติดต่อ",
+      accountId: "หมวดหมู่",
+      vatAmount: "VAT",
+      whtAmount: "หัก ณ ที่จ่าย",
+      paymentMethod: "วิธีชำระ",
+      invoiceNumber: "เลขที่เอกสาร",
+    };
+    
+    Object.keys(fieldLabels).forEach((field) => {
+      if (body[field] !== undefined && 
+          JSON.stringify(existingItem[field]) !== JSON.stringify(body[field])) {
+        changedFields.push(fieldLabels[field]);
+      }
+    });
+
+    // Send in-app notification (non-blocking)
+    notifyTransactionChange({
+      companyId: item.companyId,
+      transactionType: config.modelName,
+      transactionId: item.id,
+      action: isStatusChange ? "status_changed" : "updated",
+      actorId: session.user.id,
+      actorName: session.user.name || "ผู้ใช้",
+      transactionDescription: item.description,
+      amount: Number(item[config.fields.netAmountField]),
+      oldStatus: isStatusChange ? existingItem[statusField] : undefined,
+      newStatus: isStatusChange ? body[statusField] : undefined,
+      changedFields: changedFields.length > 0 ? changedFields : undefined,
+    }).catch((error) => {
+      console.error("Failed to create in-app notification:", error);
+    });
 
     return apiResponse.success({ [config.modelName]: item });
   });
@@ -364,6 +441,20 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
       session.user.id,
       item.companyId
     );
+
+    // Send in-app notification (non-blocking)
+    notifyTransactionChange({
+      companyId: item.companyId,
+      transactionType: config.modelName,
+      transactionId: item.id,
+      action: "deleted",
+      actorId: session.user.id,
+      actorName: session.user.name || "ผู้ใช้",
+      transactionDescription: existingItem.description,
+      amount: Number(existingItem[config.fields.netAmountField]),
+    }).catch((error) => {
+      console.error("Failed to create in-app notification:", error);
+    });
 
     return apiResponse.success({ 
       message: "ลบรายการสำเร็จ",

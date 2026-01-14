@@ -58,49 +58,7 @@ export interface StatusInfo {
 }
 
 // =============================================================================
-// Expense Status Configuration (Legacy - for backward compatibility)
-// =============================================================================
-
-export const EXPENSE_STATUS_FLOW = [
-  "WAITING_FOR_DOC",
-  "PENDING_PHYSICAL",
-  "READY_TO_SEND",
-  "SENT_TO_ACCOUNT",
-] as const;
-
-export const EXPENSE_STATUS_INFO: Record<string, StatusInfo> = {
-  WAITING_FOR_DOC: {
-    label: "ร้านส่งบิลตามมา",
-    description: "รอร้านค้าส่งใบเสร็จมา",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
-    dotColor: "bg-amber-500",
-  },
-  PENDING_PHYSICAL: {
-    label: "ได้บิลครบแล้ว (รอส่งบัญชี)",
-    description: "ได้ใบเสร็จแล้ว รอส่งบัญชี",
-    color: "text-destructive",
-    bgColor: "bg-destructive/10 border-destructive/20",
-    dotColor: "bg-destructive",
-  },
-  READY_TO_SEND: {
-    label: "พร้อมส่ง",
-    description: "รวบรวมเอกสารครบแล้ว",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
-    dotColor: "bg-blue-500",
-  },
-  SENT_TO_ACCOUNT: {
-    label: "ส่งบัญชีแล้ว",
-    description: "ส่งให้บัญชีเรียบร้อย",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
-  },
-};
-
-// =============================================================================
-// NEW: Expense Workflow Status Configuration
+// Expense Workflow Status Configuration
 // =============================================================================
 
 export const EXPENSE_WORKFLOW_FLOW = [
@@ -185,57 +143,7 @@ export const EXPENSE_WORKFLOW_INFO: Record<string, StatusInfo> = {
 };
 
 // =============================================================================
-// Income Status Configuration (Legacy - for backward compatibility)
-// =============================================================================
-
-export const INCOME_STATUS_FLOW = [
-  "NO_DOC_REQUIRED",
-  "WAITING_ISSUE",
-  "WAITING_WHT_CERT",
-  "PENDING_COPY_SEND",
-  "SENT_COPY",
-] as const;
-
-export const INCOME_STATUS_INFO: Record<string, StatusInfo> = {
-  NO_DOC_REQUIRED: {
-    label: "ไม่ต้องทำเอกสาร",
-    description: "รับเงินแล้ว ไม่ต้องออกเอกสาร",
-    color: "text-slate-600",
-    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
-    dotColor: "bg-slate-400",
-  },
-  WAITING_ISSUE: {
-    label: "รอออกบิล",
-    description: "รับเงินแล้ว รอออกใบเสร็จ",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
-    dotColor: "bg-amber-500",
-  },
-  WAITING_WHT_CERT: {
-    label: "รอใบ 50 ทวิ",
-    description: "ออกบิลแล้ว รอใบหัก ณ ที่จ่าย",
-    color: "text-orange-600",
-    bgColor: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900",
-    dotColor: "bg-orange-500",
-  },
-  PENDING_COPY_SEND: {
-    label: "รอส่งสำเนา",
-    description: "เอกสารครบ รอส่งบัญชี",
-    color: "text-destructive",
-    bgColor: "bg-destructive/10 border-destructive/20",
-    dotColor: "bg-destructive",
-  },
-  SENT_COPY: {
-    label: "ส่งแล้ว",
-    description: "ส่งสำเนาให้บัญชีแล้ว",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
-  },
-};
-
-// =============================================================================
-// NEW: Income Workflow Status Configuration
+// Income Workflow Status Configuration
 // =============================================================================
 
 export const INCOME_WORKFLOW_FLOW = [
@@ -376,39 +284,42 @@ export const REIMBURSEMENT_STATUS_INFO: Record<string, StatusInfo> = {
   },
 };
 
-// Status labels for StatusBadge component
+// =============================================================================
+// Status Labels for StatusBadge component (consolidated)
+// =============================================================================
+
+// Expense Status Labels (Workflow)
+export const EXPENSE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  PAID: { label: "จ่ายเงินแล้ว", color: "blue" },
+  WAITING_TAX_INVOICE: { label: "รอใบกำกับ", color: "orange" },
+  TAX_INVOICE_RECEIVED: { label: "ได้ใบกำกับแล้ว", color: "green" },
+  WHT_PENDING_ISSUE: { label: "รอออก 50 ทวิ", color: "amber" },
+  WHT_ISSUED: { label: "ออก 50 ทวิแล้ว", color: "purple" },
+  WHT_SENT_TO_VENDOR: { label: "ส่ง 50 ทวิแล้ว", color: "green" },
+  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "indigo" },
+  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "green" },
+  COMPLETED: { label: "เสร็จสิ้น", color: "green" },
+};
+
+// Income Status Labels (Workflow)
+export const INCOME_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  RECEIVED: { label: "รับเงินแล้ว", color: "blue" },
+  NO_INVOICE_NEEDED: { label: "ไม่ต้องออกบิล", color: "gray" },
+  WAITING_INVOICE_ISSUE: { label: "รอออกบิล", color: "amber" },
+  INVOICE_ISSUED: { label: "ออกบิลแล้ว", color: "green" },
+  INVOICE_SENT: { label: "ส่งบิลแล้ว", color: "green" },
+  WHT_PENDING_CERT: { label: "รอใบ 50 ทวิ", color: "amber" },
+  WHT_CERT_RECEIVED: { label: "ได้ใบ 50 ทวิ", color: "purple" },
+  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "indigo" },
+  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "green" },
+  COMPLETED: { label: "เสร็จสิ้น", color: "green" },
+};
+
+// Reimbursement Status Labels
 export const REIMBURSEMENT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   PENDING: { label: "รออนุมัติ", color: "orange" },
   FLAGGED: { label: "AI พบปัญหา", color: "red" },
   APPROVED: { label: "รอจ่ายเงิน", color: "yellow" },
   REJECTED: { label: "ถูกปฏิเสธ", color: "gray" },
   PAID: { label: "จ่ายแล้ว", color: "green" },
-};
-
-// =============================================================================
-// Legacy Category Colors (for backward compatibility)
-// =============================================================================
-
-export const CATEGORY_COLORS: Record<string, string> = {
-  MATERIAL: "#22c55e",
-  UTILITY: "#f59e0b",
-  MARKETING: "#ec4899",
-  SALARY: "#3b82f6",
-  FREELANCE: "#8b5cf6",
-  TRANSPORT: "#14b8a6",
-  RENT: "#f97316",
-  OFFICE: "#6b7280",
-  OTHER: "#71717a",
-};
-
-export const CATEGORY_LABELS: Record<string, string> = {
-  MATERIAL: "วัตถุดิบ",
-  UTILITY: "สาธารณูปโภค",
-  MARKETING: "การตลาด",
-  SALARY: "เงินเดือน",
-  FREELANCE: "ค่าจ้างฟรีแลนซ์",
-  TRANSPORT: "ค่าขนส่ง",
-  RENT: "ค่าเช่า",
-  OFFICE: "สำนักงาน",
-  OTHER: "อื่นๆ",
 };

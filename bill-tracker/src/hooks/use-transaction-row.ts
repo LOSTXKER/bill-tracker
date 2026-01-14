@@ -3,6 +3,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo } from "react";
 import { useLineNotification } from "./use-line-notification";
 
 export type TransactionType = "expense" | "income" | "reimbursement";
@@ -30,9 +31,19 @@ export function useTransactionRow({
   const notificationType = transactionType === "reimbursement" ? "expense" : transactionType;
   const { sending, sendNotification } = useLineNotification(notificationType);
 
-  const handleRowClick = () => {
+  // Build the detail URL
+  const detailUrl = useMemo(() => {
     const path = typeToPath[transactionType];
-    router.push(`/${companyCode.toLowerCase()}/${path}/${transactionId}`);
+    return `/${companyCode.toLowerCase()}/${path}/${transactionId}`;
+  }, [companyCode, transactionType, transactionId]);
+
+  // Prefetch the detail page on mount for faster navigation
+  useEffect(() => {
+    router.prefetch(detailUrl);
+  }, [router, detailUrl]);
+
+  const handleRowClick = () => {
+    router.push(detailUrl);
   };
 
   const handleSendNotification = async (e: React.MouseEvent) => {
@@ -44,5 +55,6 @@ export function useTransactionRow({
     handleRowClick,
     handleSendNotification,
     sending,
+    detailUrl,
   };
 }

@@ -138,21 +138,30 @@ export function TransactionFieldsSection({
     }
   }, [selectedAccount, isEditable, companyCode]);
 
-  return (
-    <div className="space-y-4">
-      {/* Row 1: Date & Amount */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        {isEditable ? (
-          <DatePicker
-            label={config.dateField.label}
-            value={watchDate as Date | undefined}
-            onChange={(date) => setValue(config.dateField.name, date || new Date())}
-            required
-          />
-        ) : (
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">{config.dateField.label}</Label>
-            <p className="text-sm font-medium">
+  // View mode: Clean label-value display
+  if (!isEditable) {
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat("th-TH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    };
+
+    const PAYMENT_METHOD_LABELS: Record<string, string> = {
+      CASH: "เงินสด",
+      BANK_TRANSFER: "โอนเงิน",
+      PROMPTPAY: "พร้อมเพย์",
+      CREDIT_CARD: "บัตรเครดิต",
+      CHEQUE: "เช็ค",
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Row 1: Date & Amount */}
+        <div className="grid grid-cols-2 gap-x-12">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">{config.dateField.label}</p>
+            <p className="text-base font-semibold text-foreground">
               {watchDate ? new Date(watchDate as string).toLocaleDateString("th-TH", {
                 day: "numeric",
                 month: "long",
@@ -160,78 +169,133 @@ export function TransactionFieldsSection({
               }) : "-"}
             </p>
           </div>
-        )}
-
-        {isEditable ? (
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-foreground font-medium">
-              จำนวนเงิน (ก่อน VAT)
-            </Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-                ฿
-              </span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                className="pl-10 text-2xl h-14 font-semibold bg-muted/30 border-border focus:bg-background transition-colors"
-                placeholder="0.00"
-                {...register("amount")}
-              />
-            </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">จำนวนเงิน (ก่อน VAT)</p>
+            <p className="text-xl font-bold text-foreground">
+              ฿{formatCurrency((watch("amount") as number) || 0)}
+            </p>
           </div>
-        ) : (
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">จำนวนเงิน (ก่อน VAT)</Label>
-            <p className="text-lg font-semibold">
-              {new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format((watch("amount") as number) || 0)}
+        </div>
+
+        {/* Row 2: Contact & Account */}
+        <div className="grid grid-cols-2 gap-x-12">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">
+              {config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
+            </p>
+            <p className="text-base font-semibold text-foreground">
+              {selectedContact?.name || <span className="text-muted-foreground font-normal">-</span>}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">บัญชี</p>
+            <p className="text-base font-semibold text-foreground">
+              {accountDetails ? `${accountDetails.code} ${accountDetails.name}` : <span className="text-muted-foreground font-normal">-</span>}
+            </p>
+          </div>
+        </div>
+
+        {/* Row 3: Description */}
+        {config.descriptionField && (
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">{config.descriptionField.label}</p>
+            <p className="text-base text-foreground leading-relaxed">
+              {(watch(config.descriptionField.name) as string) || <span className="text-muted-foreground">-</span>}
             </p>
           </div>
         )}
+
+        {/* Row 4: Invoice & Reference */}
+        <div className="grid grid-cols-2 gap-x-12">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">เลขที่ใบกำกับ</p>
+            <p className="text-base font-semibold text-foreground">
+              {(watch("invoiceNumber") as string) || <span className="text-muted-foreground font-normal">-</span>}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">เลขอ้างอิง</p>
+            <p className="text-base font-semibold text-foreground">
+              {(watch("referenceNo") as string) || <span className="text-muted-foreground font-normal">-</span>}
+            </p>
+          </div>
+        </div>
+
+        {/* Row 5: Due Date & Payment Method */}
+        <div className="grid grid-cols-2 gap-x-12">
+          {renderAdditionalFields?.()}
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">วิธีชำระเงิน</p>
+            <p className="text-base font-semibold text-foreground">
+              {PAYMENT_METHOD_LABELS[(watch("paymentMethod") as string)] || "โอนเงิน"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Create/Edit mode: Form inputs
+  return (
+    <div className="space-y-4">
+      {/* Row 1: Date & Amount */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <DatePicker
+          label={config.dateField.label}
+          value={watchDate as Date | undefined}
+          onChange={(date) => setValue(config.dateField.name, date || new Date())}
+          required
+        />
+        <div className="space-y-2">
+          <Label htmlFor="amount" className="text-foreground font-medium">
+            จำนวนเงิน (ก่อน VAT)
+          </Label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+              ฿
+            </span>
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              min="0"
+              className="pl-10 text-2xl h-14 font-semibold bg-muted/30 border-border focus:bg-background transition-colors"
+              placeholder="0.00"
+              {...register("amount")}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Row 2: Contact & Account */}
       <div className="grid sm:grid-cols-2 gap-4">
-        {isEditable ? (
-          <ContactSelector
-            contacts={contacts}
-            isLoading={contactsLoading}
-            selectedContact={selectedContact}
-            onSelect={onContactSelect}
-            label={config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
-            placeholder="พิมพ์ชื่อหรือเลือกจากรายชื่อ..."
-            companyCode={companyCode}
-            onContactCreated={onContactCreated}
-            required
-            contactName={oneTimeContactName}
-            onContactNameChange={onOneTimeContactNameChange}
-            aiVendorSuggestion={aiVendorSuggestion}
-          />
-        ) : (
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">
-              {config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
-            </Label>
-            <p className="text-sm font-medium">
-              {selectedContact?.name || <span className="text-muted-foreground">-</span>}
-            </p>
-          </div>
-        )}
+        <ContactSelector
+          contacts={contacts}
+          isLoading={contactsLoading}
+          selectedContact={selectedContact}
+          onSelect={onContactSelect}
+          label={config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
+          placeholder="พิมพ์ชื่อหรือเลือกจากรายชื่อ..."
+          companyCode={companyCode}
+          onContactCreated={onContactCreated}
+          required
+          contactName={oneTimeContactName}
+          onContactNameChange={onOneTimeContactNameChange}
+          aiVendorSuggestion={aiVendorSuggestion}
+        />
 
         {/* Account Selector with AI Button */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              บัญชี {isEditable && <span className="text-red-500">*</span>}
+              บัญชี <span className="text-red-500">*</span>
               {accountSuggestionSource === "learned" && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                   🤖 AI จำได้
                 </span>
               )}
             </Label>
-            {isEditable && onSuggestAccount && (
+            {onSuggestAccount && (
               <button
                 type="button"
                 className="inline-flex items-center h-7 px-2.5 text-xs border border-primary/30 rounded-md hover:bg-primary/10 hover:text-primary hover:border-primary disabled:opacity-50"
@@ -249,28 +313,14 @@ export function TransactionFieldsSection({
               </button>
             )}
           </div>
-          {isEditable ? (
-            <AccountSelector
-              value={selectedAccount}
-              onValueChange={onAccountChange}
-              companyCode={companyCode}
-              placeholder="เลือกบัญชี"
-              suggestedAccountId={suggestedAccountId}
-              suggestNewAccount={suggestNewAccount}
-            />
-          ) : (
-            <p className="text-sm font-medium">
-              {selectedAccount ? (
-                accountDetails ? (
-                  <span>{accountDetails.code} {accountDetails.name}</span>
-                ) : (
-                  <span className="text-muted-foreground">กำลังโหลด...</span>
-                )
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </p>
-          )}
+          <AccountSelector
+            value={selectedAccount}
+            onValueChange={onAccountChange}
+            companyCode={companyCode}
+            placeholder="เลือกบัญชี"
+            suggestedAccountId={suggestedAccountId}
+            suggestNewAccount={suggestNewAccount}
+          />
         </div>
       </div>
 
@@ -278,21 +328,15 @@ export function TransactionFieldsSection({
       {config.descriptionField && (
         <div className="space-y-2">
           <Label htmlFor={config.descriptionField.name} className="text-sm text-muted-foreground">
-            {config.descriptionField.label} {isEditable && <span className="text-red-500">*</span>}
+            {config.descriptionField.label} <span className="text-red-500">*</span>
           </Label>
-          {isEditable ? (
-            <Input
-              id={config.descriptionField.name}
-              placeholder={config.descriptionField.placeholder}
-              className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-              {...register(config.descriptionField.name)}
-              required
-            />
-          ) : (
-            <p className="text-sm font-medium">
-              {(watch(config.descriptionField.name) as string) || <span className="text-muted-foreground">-</span>}
-            </p>
-          )}
+          <Input
+            id={config.descriptionField.name}
+            placeholder={config.descriptionField.placeholder}
+            className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
+            {...register(config.descriptionField.name)}
+            required
+          />
         </div>
       )}
 
@@ -302,40 +346,27 @@ export function TransactionFieldsSection({
           <Label htmlFor="invoiceNumber" className="text-sm text-muted-foreground">
             เลขที่ใบกำกับ
           </Label>
-          {isEditable ? (
-            <Input
-              id="invoiceNumber"
-              placeholder="เลขที่ใบกำกับภาษี (ถ้ามี)"
-              className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-              {...register("invoiceNumber")}
-            />
-          ) : (
-            <p className="text-sm font-medium">
-              {(watch("invoiceNumber") as string) || <span className="text-muted-foreground">-</span>}
-            </p>
-          )}
+          <Input
+            id="invoiceNumber"
+            placeholder="เลขที่ใบกำกับภาษี (ถ้ามี)"
+            className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
+            {...register("invoiceNumber")}
+          />
         </div>
-
         <div className="space-y-2">
           <Label htmlFor="referenceNo" className="text-sm text-muted-foreground">
             เลขอ้างอิง
           </Label>
-          {isEditable ? (
-            <Input
-              id="referenceNo"
-              placeholder="เลขอ้างอิง (ถ้ามี)"
-              className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-              {...register("referenceNo")}
-            />
-          ) : (
-            <p className="text-sm font-medium">
-              {(watch("referenceNo") as string) || <span className="text-muted-foreground">-</span>}
-            </p>
-          )}
+          <Input
+            id="referenceNo"
+            placeholder="เลขอ้างอิง (ถ้ามี)"
+            className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
+            {...register("referenceNo")}
+          />
         </div>
       </div>
 
-      {/* Row 5: Additional fields (due date) + Payment Method + Status */}
+      {/* Row 5: Additional fields + Payment Method + Status */}
       <div className="grid sm:grid-cols-2 gap-4">
         {renderAdditionalFields?.()}
 
@@ -345,12 +376,10 @@ export function TransactionFieldsSection({
           label={config.type === "income" ? "วิธีรับเงิน" : undefined}
         />
 
-        {/* Status Selector - Only in create mode (edit/view uses WorkflowCard) */}
+        {/* Status Selector - Only in create mode */}
         {mode === "create" && config.statusOptions.length > 0 && (
           <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">
-              สถานะเริ่มต้น
-            </Label>
+            <Label className="text-sm text-muted-foreground">สถานะเริ่มต้น</Label>
             <Select
               value={watchStatus || ""}
               onValueChange={(value) => setValue("status", value)}

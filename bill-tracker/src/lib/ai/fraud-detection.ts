@@ -403,6 +403,68 @@ function getRecommendation(
 // =============================================================================
 
 /**
+ * วิเคราะห์และอัพเดท reimbursement request record
+ * เรียกใช้ใน background หลัง create
+ */
+export async function analyzeReimbursementRequest(
+  requestId: string
+): Promise<FraudAnalysisResult | null> {
+  try {
+    const request = await prisma.reimbursementRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        id: true,
+        companyId: true,
+        netAmount: true,
+        description: true,
+        receiptUrls: true,
+        requesterName: true,
+        invoiceNumber: true,
+        billDate: true,
+      },
+    });
+
+    if (!request) {
+      return null;
+    }
+
+    const receiptUrls = Array.isArray(request.receiptUrls)
+      ? (request.receiptUrls as string[])
+      : [];
+
+    // Check for duplicates using requester name as identifier
+    const result = await analyzeForFraud(request.companyId, {
+      amount: Number(request.netAmount),
+      description: request.description || undefined,
+      receiptUrls,
+      requesterId: request.requesterName, // Use requester name as identifier
+      invoiceNumber: request.invoiceNumber || undefined,
+      billDate: request.billDate,
+      accountId: undefined,
+    });
+
+    // Update reimbursement request with fraud analysis
+    await prisma.reimbursementRequest.update({
+      where: { id: requestId },
+      data: {
+        fraudScore: result.overallScore,
+        fraudFlags: JSON.parse(JSON.stringify(result.flags)),
+        fraudAnalyzedAt: result.analyzedAt,
+        // Auto-flag if high risk (keep PENDING but flag for review)
+        // Note: We don't auto-reject, just flag for human review
+      },
+    });
+
+    console.log(`[Fraud Detection] Analyzed request ${requestId}: score=${result.overallScore}, recommendation=${result.recommendation}`);
+
+    return result;
+  } catch (error) {
+    console.error("Error analyzing reimbursement request:", error);
+    return null;
+  }
+}
+
+/**
  * วิเคราะห์และอัพเดท expense record
  */
 export async function analyzeAndUpdateExpense(

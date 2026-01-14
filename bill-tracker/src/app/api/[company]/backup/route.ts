@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 
 // Helper to extract company code from URL path
 const getCompanyFromPath = (req: Request) => {
@@ -39,7 +40,7 @@ async function handleGet(
     }),
   ]);
 
-  return NextResponse.json({
+  return apiResponse.success({
     companyCode: context.company.code,
     companyName: context.company.name,
     stats: {
@@ -223,14 +224,10 @@ async function handlePost(
     });
   } catch (error) {
     console.error("Backup generation error:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "เกิดข้อผิดพลาดในการสร้างไฟล์สำรอง",
-      },
-      { status: 500 }
+    return apiResponse.error(
+      error instanceof Error
+        ? error.message
+        : "เกิดข้อผิดพลาดในการสร้างไฟล์สำรอง"
     );
   }
 }

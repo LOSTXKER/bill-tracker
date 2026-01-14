@@ -42,7 +42,7 @@ export function useTransactionFilters() {
     // Reset to page 1 when filters change
     params.delete("page");
     
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`);
   }, [searchParams, pathname, router]);
 
   // Update multiple filters at once
@@ -60,12 +60,12 @@ export function useTransactionFilters() {
     // Reset to page 1 when filters change
     params.delete("page");
     
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`);
   }, [searchParams, pathname, router]);
 
   // Clear all filters
   const clearFilters = useCallback(() => {
-    router.push(pathname);
+    router.replace(pathname);
   }, [pathname, router]);
 
   // Check if any filters are active
@@ -85,9 +85,38 @@ export function useTransactionFilters() {
       .map(([key, value]) => ({ key: key as keyof TransactionFilters, value }));
   }, [filters]);
 
+  // Alias for updateFilter (for simpler API)
+  const setFilter = updateFilter;
+
+  // Set filter with sorting in a single navigation
+  const setFilterWithSort = useCallback((
+    key: keyof TransactionFilters, 
+    value: string,
+    sortBy: string,
+    sortOrder: "asc" | "desc"
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    
+    params.set("sortBy", sortBy);
+    params.set("sortOrder", sortOrder);
+    
+    // Reset to page 1
+    params.delete("page");
+    
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [searchParams, pathname, router]);
+
   return {
     filters,
     updateFilter,
+    setFilter,
+    setFilterWithSort,
     updateFilters,
     clearFilters,
     hasActiveFilters,
@@ -113,14 +142,14 @@ export function usePagination() {
   const setPage = useCallback((newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", newPage.toString());
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`);
   }, [searchParams, pathname, router]);
 
   const setLimit = useCallback((newLimit: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("limit", newLimit.toString());
     params.delete("page"); // Reset to page 1 when limit changes
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`);
   }, [searchParams, pathname, router]);
 
   return {
@@ -157,12 +186,21 @@ export function useSorting() {
       params.set("sortOrder", "desc");
     }
     
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`);
   }, [searchParams, pathname, router, sortBy, sortOrder]);
+
+  // Set sorting directly
+  const setSorting = useCallback((field: string, order: "asc" | "desc") => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("sortBy", field);
+    params.set("sortOrder", order);
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [searchParams, pathname, router]);
 
   return {
     sortBy,
     sortOrder,
     toggleSort,
+    setSorting,
   };
 }

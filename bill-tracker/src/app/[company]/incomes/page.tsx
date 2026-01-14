@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { StatsGrid } from "@/components/shared/StatsGrid";
 import { StatsSkeleton, TableSkeleton } from "@/components/shared/TableSkeleton";
 import { IncomesClient } from "@/components/incomes/IncomesClient";
+import { getCompanyId } from "@/lib/cache/company";
+import { getIncomeStats } from "@/lib/cache/stats";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
@@ -47,80 +49,30 @@ export default async function IncomesPage({ params }: IncomesPageProps) {
 }
 
 async function IncomeStats({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
-  if (!company) return null;
-
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  // Previous month for trend calculation
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-
-  // Use new workflow statuses
-  const [
-    monthlyTotal,
-    lastMonthTotal,
-    waitingInvoice,
-    waitingWhtCert,
-    sentToAccountant,
-    totalIncomes
-  ] = await Promise.all([
-    prisma.income.aggregate({
-      where: {
-        companyId: company.id,
-        receiveDate: { gte: startOfMonth, lte: endOfMonth },
-        deletedAt: null,
-      },
-      _sum: { netReceived: true },
-      _count: true,
-    }),
-    prisma.income.aggregate({
-      where: {
-        companyId: company.id,
-        receiveDate: { gte: startOfLastMonth, lte: endOfLastMonth },
-        deletedAt: null,
-      },
-      _sum: { netReceived: true },
-    }),
-    prisma.income.count({
-      where: { companyId: company.id, workflowStatus: "WAITING_INVOICE_ISSUE", deletedAt: null },
-    }),
-    prisma.income.count({
-      where: { companyId: company.id, workflowStatus: "WHT_PENDING_CERT", deletedAt: null },
-    }),
-    prisma.income.count({
-      where: { companyId: company.id, workflowStatus: "SENT_TO_ACCOUNTANT", deletedAt: null },
-    }),
-    prisma.income.count({
-      where: { companyId: company.id, deletedAt: null },
-    }),
-  ]);
+  // Use cached stats for better performance
+  const stats = await getIncomeStats(companyId);
 
   // Calculate trend
-  const currentAmount = Number(monthlyTotal._sum.netReceived) || 0;
-  const lastMonthAmount = Number(lastMonthTotal._sum.netReceived) || 0;
-  const trendValue = lastMonthAmount > 0 
-    ? ((currentAmount - lastMonthAmount) / lastMonthAmount) * 100 
+  const trendValue = stats.lastMonthTotal > 0 
+    ? ((stats.monthlyTotal - stats.lastMonthTotal) / stats.lastMonthTotal) * 100 
     : 0;
 
   // Calculate progress percentages
-  const totalPending = waitingInvoice + waitingWhtCert;
-  const waitingInvoiceProgress = totalPending > 0 ? (waitingInvoice / totalPending) * 100 : 0;
-  const waitingWhtProgress = totalPending > 0 ? (waitingWhtCert / totalPending) * 100 : 0;
-  const sentProgress = totalIncomes > 0 ? (sentToAccountant / totalIncomes) * 100 : 0;
+  const totalPending = stats.waitingInvoice + stats.waitingWhtCert;
+  const waitingInvoiceProgress = totalPending > 0 ? (stats.waitingInvoice / totalPending) * 100 : 0;
+  const waitingWhtProgress = totalPending > 0 ? (stats.waitingWhtCert / totalPending) * 100 : 0;
+  const sentProgress = stats.totalIncomes > 0 ? (stats.sentToAccountant / stats.totalIncomes) * 100 : 0;
 
   return (
     <StatsGrid
       stats={[
         {
           title: "รายรับเดือนนี้",
-          value: formatCurrency(currentAmount),
-          subtitle: `${monthlyTotal._count} รายการ`,
+          value: formatCurrency(stats.monthlyTotal),
+          subtitle: `${stats.monthlyCount} รายการ`,
           icon: "arrow-down-circle",
           iconColor: "text-primary",
           featured: true,
@@ -131,7 +83,7 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "รอออกบิล",
-          value: waitingInvoice.toString(),
+          value: stats.waitingInvoice.toString(),
           subtitle: "รายการ",
           icon: "clock",
           iconColor: "text-amber-500",
@@ -139,7 +91,7 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "รอใบ 50 ทวิ",
-          value: waitingWhtCert.toString(),
+          value: stats.waitingWhtCert.toString(),
           subtitle: "รายการ",
           icon: "file-text",
           iconColor: "text-amber-500",
@@ -147,7 +99,7 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "ส่งบัญชีแล้ว",
-          value: sentToAccountant.toString(),
+          value: stats.sentToAccountant.toString(),
           subtitle: "รายการ",
           icon: "check-circle",
           iconColor: "text-primary",
@@ -159,15 +111,12 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
 }
 
 async function IncomesData({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   const [incomes, total] = await Promise.all([
     prisma.income.findMany({
-      where: { companyId: company.id, deletedAt: null },
+      where: { companyId: companyId, deletedAt: null },
       orderBy: { receiveDate: "desc" },
       take: 20,
       include: {
@@ -182,7 +131,7 @@ async function IncomesData({ companyCode }: { companyCode: string }) {
         },
       },
     }),
-    prisma.income.count({ where: { companyId: company.id, deletedAt: null } }),
+    prisma.income.count({ where: { companyId: companyId, deletedAt: null } }),
   ]);
 
   // Serialize incomes for client component

@@ -53,11 +53,5 @@ export const incomeUpdateSchema = incomeBaseSchema.partial().extend({
 export type IncomeInput = z.infer<typeof incomeSchema>;
 export type IncomeUpdateInput = z.infer<typeof incomeUpdateSchema>;
 
-// Status labels in Thai
-export const INCOME_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  NO_DOC_REQUIRED: { label: "ไม่ต้องทำเอกสาร", color: "gray" },
-  WAITING_ISSUE: { label: "รอออกบิล", color: "orange" },
-  WAITING_WHT_CERT: { label: "รอใบ 50 ทวิ", color: "orange" },
-  PENDING_COPY_SEND: { label: "รอส่งสำเนา", color: "red" },
-  SENT_COPY: { label: "ส่งแล้ว", color: "green" },
-};
+// Status labels in Thai - Re-export from constants for backward compatibility
+export { INCOME_STATUS_LABELS } from "@/lib/constants/transaction";

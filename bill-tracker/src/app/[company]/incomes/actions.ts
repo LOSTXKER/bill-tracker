@@ -57,8 +57,12 @@ export async function fetchIncomes(params: FetchIncomesParams) {
   }
 
   if (status) {
-    // Use workflowStatus for new workflow system
-    where.workflowStatus = status;
+    // Support multiple statuses (comma-separated)
+    if (status.includes(",")) {
+      where.workflowStatus = { in: status.split(",") };
+    } else {
+      where.workflowStatus = status;
+    }
   }
 
   if (category) {
@@ -93,6 +97,8 @@ export async function fetchIncomes(params: FetchIncomesParams) {
     orderBy.creator = { name: sortOrder };
   } else if (sortBy === "contact") {
     orderBy.contact = { name: sortOrder };
+  } else if (sortBy === "updatedAt") {
+    orderBy.updatedAt = sortOrder;
   } else {
     orderBy.receiveDate = "desc";
   }

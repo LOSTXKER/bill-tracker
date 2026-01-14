@@ -2,10 +2,8 @@
 
 import { Wallet } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
-import { calculateIncomeTotals } from "@/lib/utils/tax-calculator";
+import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import {
-  INCOME_STATUS_FLOW,
-  INCOME_STATUS_INFO,
   INCOME_WORKFLOW_FLOW,
   INCOME_WORKFLOW_INFO,
 } from "@/lib/constants/transaction";
@@ -15,6 +13,7 @@ interface IncomeFormProps {
   mode?: "create" | "view" | "edit";
   transactionId?: string;
   onModeChange?: (mode: "view" | "edit") => void;
+  currentUserId?: string;
 }
 
 // Shared income configuration for all modes
@@ -111,7 +110,7 @@ export function getIncomeConfig(companyCode: string): UnifiedTransactionConfig {
     ],
 
     // Calculation function
-    calculateTotals: calculateIncomeTotals,
+    calculateTotals: calculateTransactionTotals,
 
     // Document upload configuration
     documentConfig: {
@@ -140,6 +139,7 @@ export function IncomeForm({
   mode = "create", 
   transactionId,
   onModeChange,
+  currentUserId,
 }: IncomeFormProps) {
   const config = getIncomeConfig(companyCode);
 
@@ -150,6 +150,7 @@ export function IncomeForm({
       mode={mode}
       transactionId={transactionId}
       onModeChange={onModeChange}
+      currentUserId={currentUserId}
     />
   );
 }

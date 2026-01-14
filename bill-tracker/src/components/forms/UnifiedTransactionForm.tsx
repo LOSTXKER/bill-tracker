@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
+import { useState, useEffect, useCallback, ReactNode, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
@@ -73,7 +73,8 @@ import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { DatePicker } from "./shared/DatePicker";
 
 // Transaction components
-import { StatusProgressBar, WorkflowProgressBar, WorkflowCard, DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions } from "@/components/transactions";
+import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper } from "@/components/transactions";
+import { CommentSection } from "@/components/comments/CommentSection";
 // AuditHistorySection is now part of CombinedHistorySection
 
 // Types & Constants
@@ -180,6 +181,7 @@ interface UnifiedTransactionFormProps {
   mode: "create" | "view" | "edit";
   transactionId?: string;
   onModeChange?: (mode: "view" | "edit") => void;
+  currentUserId?: string; // For comment section
 }
 
 interface BaseTransaction {
@@ -252,6 +254,7 @@ export function UnifiedTransactionForm({
   mode,
   transactionId,
   onModeChange,
+  currentUserId,
 }: UnifiedTransactionFormProps) {
   const router = useRouter();
   // Use mode from props directly (controlled by parent)
@@ -458,8 +461,6 @@ export function UnifiedTransactionForm({
   const {
     deleting,
     handleDelete,
-    handleNextStatus: nextStatus,
-    handlePreviousStatus: prevStatus,
   } = useTransactionActions({
     transactionType: config.type,
     transactionId: transactionId || "",
@@ -1164,17 +1165,6 @@ export function UnifiedTransactionForm({
     }
   };
 
-  // Status navigation wrappers
-  const handleNextStatus = () => {
-    if (!transaction) return;
-    nextStatus(transaction.status, transaction);
-  };
-
-  const handlePreviousStatus = () => {
-    if (!transaction) return;
-    prevStatus(transaction.status, transaction);
-  };
-
   // File upload wrappers for view/edit mode
   const handleFileUploadWrapper = async (file: File, type: "slip" | "invoice" | "wht") => {
     if (!transaction) return;
@@ -1193,22 +1183,62 @@ export function UnifiedTransactionForm({
     });
     await handleDeleteFile(type, urlToDelete, currentUrls, transaction);
   };
-
-  // Status helpers
-  const getCurrentStatusIndex = () =>
-    transaction ? config.statusFlow.indexOf(transaction.status) : -1;
-
-  const getNextStatusInfo = () => {
-    const idx = getCurrentStatusIndex();
-    if (idx === -1 || idx >= config.statusFlow.length - 1) return null;
-    return config.statusInfo[config.statusFlow[idx + 1]];
-  };
-
-  const getPreviousStatusInfo = () => {
-    const idx = getCurrentStatusIndex();
-    if (idx <= 0) return null;
-    return config.statusInfo[config.statusFlow[idx - 1]];
-  };
+  
+  // ==========================================================================
+  // WHT Change Rules (must be before early returns to maintain hooks order)
+  // ==========================================================================
+  const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
+  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_RECEIVED", "READY_FOR_ACCOUNTING"];
+  
+  const whtChangeInfo = useMemo(() => {
+    if (!transaction || mode !== "edit") {
+      return undefined;
+    }
+    
+    const currentStatus = transaction.workflowStatus || "";
+    const hasWhtCert = transaction.hasWhtCert || false;
+    const currentWht = config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted;
+    
+    // Check if locked
+    if (WHT_LOCKED_STATUSES.includes(currentStatus)) {
+      return {
+        isLocked: true,
+        requiresConfirmation: false,
+        message: "ไม่สามารถเปลี่ยนได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว",
+      };
+    }
+    
+    // Check if requires confirmation
+    if (WHT_CONFIRM_STATUSES.includes(currentStatus) || hasWhtCert) {
+      return {
+        isLocked: false,
+        requiresConfirmation: true,
+        message: currentWht
+          ? "คุณกำลังจะยกเลิกหัก ณ ที่จ่าย สถานะจะถูกย้อนกลับและอาจต้อง void เอกสาร 50 ทวิ"
+          : "คุณกำลังจะเพิ่มหัก ณ ที่จ่าย ต้องออกหนังสือรับรอง (50 ทวิ) ก่อนส่งบัญชี",
+      };
+    }
+    
+    return undefined;
+  }, [transaction, mode, config.type]);
+  
+  // Handle WHT toggle with confirmation
+  const handleWhtToggle = useCallback((enabled: boolean, confirmed?: boolean, reason?: string) => {
+    setValue(config.fields.whtField.name, enabled);
+    
+    if (!enabled) {
+      setValue("whtRate", undefined);
+      setValue("whtType", undefined);
+    }
+    
+    // Store confirmation flag for API
+    if (confirmed) {
+      setValue("_whtChangeConfirmed" as any, true);
+      if (reason) {
+        setValue("_whtChangeReason" as any, reason);
+      }
+    }
+  }, [setValue, config.fields.whtField.name]);
 
   // Loading state for view/edit mode
   if (mode !== "create" && loading) {
@@ -1241,8 +1271,6 @@ export function UnifiedTransactionForm({
         : config.statusInfo[transaction.status]) || config.statusInfo[config.defaultStatus]
     : null;
   const isDeleted = transaction?.deletedAt ? true : false;
-  const nextStatusInfo = getNextStatusInfo();
-  const previousStatusInfo = getPreviousStatusInfo();
 
   // Build fields config for TransactionFieldsSection
   const fieldsConfig: TransactionFieldsConfig = {
@@ -1261,14 +1289,14 @@ export function UnifiedTransactionForm({
     <>
       {/* View/Edit Mode Header */}
       {mode !== "create" && transaction && (
-        <div className="max-w-6xl mx-auto pb-24">
+        <div className="max-w-6xl mx-auto px-4 mb-4">
           {/* Deleted Warning Banner */}
           {isDeleted && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 mb-4 flex items-center gap-3">
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-3 flex items-center gap-3">
               <Trash2 className="h-5 w-5 text-destructive shrink-0" />
               <div>
-                <p className="font-medium text-destructive">รายการนี้ถูกลบแล้ว</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-medium text-destructive text-sm">รายการนี้ถูกลบแล้ว</p>
+                <p className="text-xs text-muted-foreground">
                   ลบเมื่อ {new Date(transaction.deletedAt as string).toLocaleString("th-TH")}
                   {transaction.deletedByUser && ` โดย ${transaction.deletedByUser.name}`}
                 </p>
@@ -1276,130 +1304,116 @@ export function UnifiedTransactionForm({
             </div>
           )}
 
-          {/* Header */}
-          <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b -mx-4 px-4 py-3 mb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <Link href={`/${companyCode}/${config.listUrl}`}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn("shrink-0 -ml-2 rounded-full", config.iconColor)}
-                  >
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
-                </Link>
-                <div className="min-w-0">
-                  <h1 className="text-lg font-bold text-foreground flex items-center gap-2 truncate">
-                    {config.title}
-                    {statusInfo && (
-                      <Badge className={cn("text-xs shrink-0", statusInfo.bgColor, statusInfo.color)}>
-                        {statusInfo.label}
-                      </Badge>
-                    )}
-                  </h1>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {new Date(transaction[config.fields.dateField.name] as string).toLocaleDateString(
-                      "th-TH",
-                      { day: "numeric", month: "long", year: "numeric" }
-                    )}
-                  </p>
+          {/* Compact Header */}
+          <div className="flex items-center justify-between gap-4 py-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link href={`/${companyCode}/${config.listUrl}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn("shrink-0 rounded-full h-9 w-9", config.iconColor)}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
+                  {statusInfo && (
+                    <Badge className={cn("text-xs", statusInfo.bgColor, statusInfo.color)}>
+                      {statusInfo.label}
+                    </Badge>
+                  )}
                 </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(transaction[config.fields.dateField.name] as string).toLocaleDateString(
+                    "th-TH",
+                    { day: "numeric", month: "long", year: "numeric" }
+                  )}
+                </p>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {isDeleted ? (
-                  <Badge variant="destructive" className="gap-1">
-                    <Trash2 className="h-3 w-3" />
-                    ถูกลบแล้ว
-                  </Badge>
-                ) : mode === "edit" ? (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={saving}>
-                      <X className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">ยกเลิก</span>
-                    </Button>
-                    <Button size="sm" onClick={handleSave} disabled={saving} className="bg-primary">
-                      {saving ? (
-                        <Loader2 className="h-4 w-4 animate-spin sm:mr-1" />
-                      ) : (
-                        <Save className="h-4 w-4 sm:mr-1" />
-                      )}
-                      <span className="hidden sm:inline">บันทึก</span>
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    {previousStatusInfo && (
-                      <Button variant="outline" size="sm" onClick={handlePreviousStatus} disabled={saving}>
-                        <ChevronLeft className="h-4 w-4 sm:mr-1" />
-                        <span className="hidden sm:inline">ย้อนสถานะ</span>
-                      </Button>
-                    )}
-                    {nextStatusInfo && (
-                      <Button
-                        size="sm"
-                        onClick={handleNextStatus}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                      >
-                        {saving && <Loader2 className="h-4 w-4 animate-spin sm:mr-1" />}
-                        <span className="hidden sm:inline">{nextStatusInfo.label}</span>
-                        <span className="sm:hidden">ถัดไป</span>
-                        <ChevronRight className="h-4 w-4 sm:ml-1" />
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={handleEditClick}>
-                      <Edit className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">แก้ไข</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">ลบ</span>
-                    </Button>
-                  </>
-                )}
-              </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {isDeleted ? (
+                <Badge variant="destructive" className="gap-1 text-xs">
+                  <Trash2 className="h-3 w-3" />
+                  ถูกลบแล้ว
+                </Badge>
+              ) : mode === "edit" ? (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={saving}>
+                    <X className="h-4 w-4 mr-1" />
+                    ยกเลิก
+                  </Button>
+                  <Button size="sm" onClick={handleSave} disabled={saving} className="bg-primary">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    บันทึก
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {transaction?.workflowStatus && (
+                    <WorkflowActions
+                      companyCode={companyCode}
+                      type={config.type}
+                      transactionId={transaction.id}
+                      currentStatus={transaction.workflowStatus}
+                      isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
+                      onActionComplete={() => {
+                        fetchTransaction();
+                        setAuditRefreshKey((k) => k + 1);
+                      }}
+                      variant="compact"
+                    />
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleEditClick}>
+                    <Edit className="h-4 w-4 mr-1" />
+                    แก้ไข
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    ลบ
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Status Progress - Show only for legacy status (no workflowStatus) */}
-          {!transaction.workflowStatus && transaction.status && (
-            <StatusProgressBar
-              statusFlow={config.statusFlow}
-              statusInfo={config.statusInfo}
-              currentStatus={transaction.status}
-              className="mb-6"
-            />
+          {/* Timeline Stepper - Compact */}
+          {transaction?.workflowStatus && (
+            <div className="pb-2">
+              <TimelineStepper
+                type={config.type}
+                currentStatus={transaction.workflowStatus}
+                isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
+              />
+            </div>
           )}
         </div>
       )}
 
       {/* Form Content */}
       <form onSubmit={mode === "create" ? handleSubmit(onSubmit) : (e) => e.preventDefault()}>
-        <div className={mode !== "create" ? "max-w-6xl mx-auto" : ""}>
+        {/* CREATE MODE */}
+        {mode === "create" && (
           <Card className="border-border/50 shadow-card">
-            {mode === "create" && (
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-lg font-semibold">
-                  <div className={`p-2 rounded-xl ${config.iconColor}`}>
-                    <config.icon className="h-5 w-5" />
-                  </div>
-                  {config.title}
-                </CardTitle>
-              </CardHeader>
-            )}
-
-            <CardContent className={mode === "create" ? "p-0" : ""}>
-              <div className="grid gap-6 lg:grid-cols-5">
-                {/* Left Column (3/5): Main Info + Amount */}
-                <div className="lg:col-span-3 space-y-6 p-6">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+                <div className={`p-2 rounded-xl ${config.iconColor}`}>
+                  <config.icon className="h-5 w-5" />
+                </div>
+                {config.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid lg:grid-cols-5 gap-6">
+              <div className="lg:col-span-3 space-y-6">
                   {/* Fields Section */}
                   <TransactionFieldsSection
                     config={fieldsConfig}
@@ -1414,13 +1428,13 @@ export function UnifiedTransactionForm({
                     onContactSelect={(contact) => {
                       setSelectedContact(contact);
                       if (contact) {
-                        setAiVendorSuggestion(null); // Clear suggestion when contact is selected
+                        setAiVendorSuggestion(null);
                       }
                     }}
                     onContactCreated={(contact) => {
                       refetchContacts();
                       setSelectedContact(contact);
-                      setAiVendorSuggestion(null); // Clear suggestion when contact is created
+                      setAiVendorSuggestion(null);
                     }}
                     oneTimeContactName={oneTimeContactName}
                     onOneTimeContactNameChange={setOneTimeContactName}
@@ -1446,7 +1460,8 @@ export function UnifiedTransactionForm({
                     <CurrencyConversionNote currencyConversion={aiResult.currencyConversion} />
                   )}
 
-                  <Separator />
+                  {/* Divider */}
+                  <div className="border-t border-border" />
 
                   {/* Tax & Amount Section */}
                   <TransactionAmountCard
@@ -1458,13 +1473,7 @@ export function UnifiedTransactionForm({
                     onVatRateChange={(value) => setValue("vatRate", value)}
                     vatAmount={calculation.vatAmount}
                     whtEnabled={watchIsWht || false}
-                    onWhtToggle={(enabled) => {
-                      setValue(config.fields.whtField.name, enabled);
-                      if (!enabled) {
-                        setValue("whtRate", undefined);
-                        setValue("whtType", undefined);
-                      }
-                    }}
+                    onWhtToggle={handleWhtToggle}
                     whtRate={watchWhtRate}
                     whtType={watchWhtType}
                     onWhtRateSelect={(rate, type) => {
@@ -1474,6 +1483,7 @@ export function UnifiedTransactionForm({
                     whtAmount={calculation.whtAmount}
                     whtLabel={config.fields.whtField.label}
                     whtDescription={config.fields.whtField.description}
+                    whtChangeInfo={whtChangeInfo}
                     totalWithVat={calculation.totalWithVat}
                     netAmount={calculation.netAmount}
                     netAmountLabel={config.fields.netAmountLabel}
@@ -1481,84 +1491,180 @@ export function UnifiedTransactionForm({
 
                   {/* Notes (view/edit mode only) */}
                   {mode !== "create" && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">หมายเหตุ</Label>
+                    <div className="pt-2">
+                      <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
                       {mode === "edit" ? (
                         <Textarea
                           {...register("notes")}
                           placeholder="เพิ่มหมายเหตุ..."
-                          rows={3}
+                          rows={2}
                           className="bg-muted/30 resize-none"
                         />
                       ) : (
-                        <p className="text-sm p-3 rounded-lg bg-muted/30 min-h-[60px] whitespace-pre-wrap">
-                          {(watch("notes") as string) || (
-                            <span className="text-muted-foreground italic">ไม่มีหมายเหตุ</span>
-                          )}
+                        <p className="text-base text-muted-foreground">
+                          {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
                         </p>
                       )}
                     </div>
                   )}
-                </div>
+              </div>
 
-                {/* Right Column (2/5): Documents */}
-                <div className="lg:col-span-2 bg-muted/20 lg:border-l p-6 space-y-4">
-                  {/* Create mode: Full AI OCR upload */}
-                  {mode === "create" && (
-                    <DocumentUploadSection
-                      key={filesInitialized ? "with-prefill" : "fresh"}
-                      companyCode={companyCode}
-                      transactionType={config.type}
-                      onFilesChange={setCategorizedFiles}
-                      onAiResult={handleAiResult}
-                      showWhtCert={watchIsWht}
-                      initialFiles={filesInitialized ? categorizedFiles : undefined}
+              {/* Right Column for CREATE mode */}
+              <div className="lg:col-span-2">
+                <DocumentUploadSection
+                  key={filesInitialized ? "with-prefill" : "fresh"}
+                  companyCode={companyCode}
+                  transactionType={config.type}
+                  onFilesChange={setCategorizedFiles}
+                  onAiResult={handleAiResult}
+                  showWhtCert={watchIsWht}
+                  initialFiles={filesInitialized ? categorizedFiles : undefined}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={() => router.back()}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="submit"
+                className={`flex-1 h-11 ${config.buttonColor}`}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    กำลังบันทึก...
+                  </>
+                ) : (
+                  `บันทึก${config.title}`
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {/* VIEW/EDIT MODE - Separate Cards */}
+        {mode !== "create" && transaction && (
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="grid lg:grid-cols-5 gap-6">
+              {/* Left Column: Main Info - PROMINENT */}
+              <Card className="lg:col-span-3 shadow-lg border-border">
+                <CardContent className="p-6 lg:p-8 space-y-6">
+                  <TransactionFieldsSection
+                    config={fieldsConfig}
+                    companyCode={companyCode}
+                    mode={mode}
+                    register={register}
+                    watch={watch}
+                    setValue={setValue}
+                    contacts={contacts}
+                    contactsLoading={contactsLoading}
+                    selectedContact={selectedContact}
+                    onContactSelect={(contact) => {
+                      setSelectedContact(contact);
+                      if (contact) setAiVendorSuggestion(null);
+                    }}
+                    onContactCreated={(contact) => {
+                      refetchContacts();
+                      setSelectedContact(contact);
+                      setAiVendorSuggestion(null);
+                    }}
+                    oneTimeContactName={oneTimeContactName}
+                    onOneTimeContactNameChange={setOneTimeContactName}
+                    selectedAccount={selectedAccount}
+                    onAccountChange={setSelectedAccount}
+                    suggestedAccountId={
+                      accountSuggestion?.accountId ||
+                      aiResult?.smart?.aiAccountSuggestion?.accountId ||
+                      undefined
+                    }
+                    suggestNewAccount={aiResult?.smart?.suggestNewAccount || undefined}
+                    onSuggestAccount={suggestAccount}
+                    isSuggestingAccount={isSuggestingAccount}
+                    accountSuggestionSource={accountSuggestion?.source}
+                    aiVendorSuggestion={aiVendorSuggestion}
+                    renderAdditionalFields={() =>
+                      config.renderAdditionalFields?.({ register, watch, setValue, mode })
+                    }
+                  />
+
+                  <div className="border-t border-border" />
+
+                  <TransactionAmountCard
+                    mode={mode}
+                    type={config.type}
+                    amount={watchAmount || 0}
+                    onAmountChange={(value) => setValue("amount", value)}
+                    vatRate={watchVatRate || 0}
+                    onVatRateChange={(value) => setValue("vatRate", value)}
+                    vatAmount={calculation.vatAmount}
+                    whtEnabled={watchIsWht || false}
+                    onWhtToggle={handleWhtToggle}
+                    whtRate={watchWhtRate}
+                    whtType={watchWhtType}
+                    onWhtRateSelect={(rate, type) => {
+                      setValue("whtRate", rate);
+                      setValue("whtType", type);
+                    }}
+                    whtAmount={calculation.whtAmount}
+                    whtLabel={config.fields.whtField.label}
+                    whtDescription={config.fields.whtField.description}
+                    whtChangeInfo={whtChangeInfo}
+                    totalWithVat={calculation.totalWithVat}
+                    netAmount={calculation.netAmount}
+                    netAmountLabel={config.fields.netAmountLabel}
+                  />
+
+                  <div className="pt-2">
+                    <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
+                    {mode === "edit" ? (
+                      <Textarea
+                        {...register("notes")}
+                        placeholder="เพิ่มหมายเหตุ..."
+                        rows={2}
+                        className="bg-muted/30 resize-none"
+                      />
+                    ) : (
+                      <p className="text-muted-foreground">
+                        {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Right Column: Documents - SUBTLE */}
+              <div className="lg:col-span-2 space-y-4">
+                <Card className="shadow-sm border-border bg-card">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Receipt className="h-4 w-4 text-muted-foreground" />
+                      {config.type === "expense" ? "หลักฐานการจ่าย" : "หลักฐานการรับเงิน"}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <DocumentSection
+                      label={config.fileFields.slip.label}
+                      urls={(transaction[config.fileFields.slip.urlsField] as string[]) || []}
+                      onUpload={(file) => handleFileUploadWrapper(file, "slip")}
+                      onDelete={(url) => handleDeleteFileWrapper("slip", url)}
+                      isUploading={uploadingType === "slip"}
+                      icon={<CreditCard className="h-4 w-4" />}
                     />
-                  )}
-
-                  {/* View/Edit mode: Document display with upload capability */}
-                  {(mode === "view" || mode === "edit") && transaction && (
-                    <>
-                      {/* Workflow Status & Actions - New UI */}
-                      {transaction.workflowStatus && (
-                        <WorkflowCard
-                          companyCode={companyCode}
-                          type={config.type}
-                          transactionId={transaction.id}
-                          currentStatus={transaction.workflowStatus}
-                          isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
-                          onActionComplete={() => {
-                            fetchTransaction();
-                            setAuditRefreshKey((k) => k + 1);
-                          }}
-                        />
-                      )}
-
-                      <Card>
-                        <CardHeader className="pb-4">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <Receipt className="h-4 w-4 text-muted-foreground" />
-                            {config.type === "expense" ? "หลักฐานการจ่าย" : "หลักฐานการรับเงิน"}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          <DocumentSection
-                            label={config.fileFields.slip.label}
-                            urls={(transaction[config.fileFields.slip.urlsField] as string[]) || []}
-                            onUpload={(file) => handleFileUploadWrapper(file, "slip")}
-                            onDelete={(url) => handleDeleteFileWrapper("slip", url)}
-                            isUploading={uploadingType === "slip"}
-                            icon={<CreditCard className="h-4 w-4" />}
-                          />
-
-                          <DocumentSection
-                            label={config.fileFields.invoice.label}
-                            urls={(transaction[config.fileFields.invoice.urlsField] as string[]) || []}
-                            onUpload={(file) => handleFileUploadWrapper(file, "invoice")}
-                            onDelete={(url) => handleDeleteFileWrapper("invoice", url)}
-                            isUploading={uploadingType === "invoice"}
-                            icon={<FileText className="h-4 w-4" />}
-                          />
+                    <DocumentSection
+                      label={config.fileFields.invoice.label}
+                      urls={(transaction[config.fileFields.invoice.urlsField] as string[]) || []}
+                      onUpload={(file) => handleFileUploadWrapper(file, "invoice")}
+                      onDelete={(url) => handleDeleteFileWrapper("invoice", url)}
+                      isUploading={uploadingType === "invoice"}
+                      icon={<FileText className="h-4 w-4" />}
+                    />
 
                           {(transaction[config.fields.whtField.name] as boolean) && (
                             <DocumentSection
@@ -1570,74 +1676,57 @@ export function UnifiedTransactionForm({
                               icon={<FileText className="h-4 w-4" />}
                             />
                           )}
-                        </CardContent>
+                  </CardContent>
 
-                        {/* Meta Info */}
-                        <div className="px-6 py-4 border-t bg-muted/30 text-xs text-muted-foreground space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                              <User className="h-3.5 w-3.5" />
-                              สร้างโดย
-                            </span>
-                            <span className="font-medium text-foreground">
-                              {transaction.creator?.name || "-"}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                              <Calendar className="h-3.5 w-3.5" />
-                              วันที่สร้าง
-                            </span>
-                            <span>{new Date(transaction.createdAt).toLocaleDateString("th-TH")}</span>
-                          </div>
-                        </div>
-                      </Card>
+                  {/* Meta Info */}
+                  <div className="px-6 py-4 border-t bg-muted/40 text-xs text-muted-foreground space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5" />
+                        สร้างโดย
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {transaction.creator?.name || "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" />
+                        วันที่สร้าง
+                      </span>
+                      <span>{new Date(transaction.createdAt).toLocaleDateString("th-TH")}</span>
+                    </div>
+                  </div>
+                </Card>
 
-                      {/* Combined History (Document Events + Audit Logs) */}
-                      <CombinedHistorySection
+                {/* History */}
+                <CombinedHistorySection
+                  companyCode={companyCode}
+                  companyId={transaction.companyId}
+                  entityType={config.entityType}
+                  entityId={transaction.id}
+                  expenseId={config.type === "expense" ? transaction.id : undefined}
+                  incomeId={config.type === "income" ? transaction.id : undefined}
+                  refreshKey={auditRefreshKey}
+                />
+
+                {/* Comments */}
+                {currentUserId && (
+                  <Card className="shadow-sm border-border bg-card">
+                    <CardContent className="pt-6">
+                      <CommentSection
                         companyCode={companyCode}
-                        companyId={transaction.companyId}
-                        entityType={config.entityType}
+                        entityType={config.type}
                         entityId={transaction.id}
-                        expenseId={config.type === "expense" ? transaction.id : undefined}
-                        incomeId={config.type === "income" ? transaction.id : undefined}
-                        refreshKey={auditRefreshKey}
+                        currentUserId={currentUserId}
                       />
-                    </>
-                  )}
-                </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-            </CardContent>
-
-            {/* Footer (create mode only) */}
-            {mode === "create" && (
-              <CardFooter className="flex gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 h-11"
-                  onClick={() => router.back()}
-                >
-                  ยกเลิก
-                </Button>
-                <Button
-                  type="submit"
-                  className={`flex-1 h-11 ${config.buttonColor}`}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      กำลังบันทึก...
-                    </>
-                  ) : (
-                    `บันทึก${config.title}`
-                  )}
-                </Button>
-              </CardFooter>
-            )}
-          </Card>
-        </div>
+            </div>
+          </div>
+        )}
       </form>
 
       {/* Train AI Dialog */}

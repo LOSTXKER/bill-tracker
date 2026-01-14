@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { StatsGrid } from "@/components/shared/StatsGrid";
 import { StatsSkeleton, TableSkeleton } from "@/components/shared/TableSkeleton";
 import { ExpensesClient } from "@/components/expenses/ExpensesClient";
+import { getCompanyId } from "@/lib/cache/company";
+import { getExpenseStats } from "@/lib/cache/stats";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
@@ -47,88 +49,30 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
 }
 
 async function ExpenseStats({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
-  if (!company) return null;
-
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  // Previous month for trend calculation
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-
-  // Filter: Only count regular expenses OR reimbursements that have been PAID
-  const expenseFilter = {
-    companyId: company.id,
-    deletedAt: null,
-    OR: [
-      { isReimbursement: false },
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
-
-  // Use new workflow statuses
-  const [
-    monthlyTotal,
-    lastMonthTotal,
-    waitingTaxInvoice,
-    readyForAccounting,
-    sentToAccountant,
-    totalExpenses
-  ] = await Promise.all([
-    prisma.expense.aggregate({
-      where: {
-        ...expenseFilter,
-        billDate: { gte: startOfMonth, lte: endOfMonth },
-      },
-      _sum: { netPaid: true },
-      _count: true,
-    }),
-    prisma.expense.aggregate({
-      where: {
-        ...expenseFilter,
-        billDate: { gte: startOfLastMonth, lte: endOfLastMonth },
-      },
-      _sum: { netPaid: true },
-    }),
-    prisma.expense.count({
-      where: { ...expenseFilter, workflowStatus: "WAITING_TAX_INVOICE" },
-    }),
-    prisma.expense.count({
-      where: { ...expenseFilter, workflowStatus: "READY_FOR_ACCOUNTING" },
-    }),
-    prisma.expense.count({
-      where: { ...expenseFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },
-    }),
-    prisma.expense.count({
-      where: expenseFilter,
-    }),
-  ]);
+  // Use cached stats for better performance
+  const stats = await getExpenseStats(companyId);
 
   // Calculate trend
-  const currentAmount = Number(monthlyTotal._sum.netPaid) || 0;
-  const lastMonthAmount = Number(lastMonthTotal._sum.netPaid) || 0;
-  const trendValue = lastMonthAmount > 0 
-    ? ((currentAmount - lastMonthAmount) / lastMonthAmount) * 100 
+  const trendValue = stats.lastMonthTotal > 0 
+    ? ((stats.monthlyTotal - stats.lastMonthTotal) / stats.lastMonthTotal) * 100 
     : 0;
 
   // Calculate progress percentages
-  const totalPending = waitingTaxInvoice + readyForAccounting;
-  const waitingDocsProgress = totalPending > 0 ? (waitingTaxInvoice / totalPending) * 100 : 0;
-  const readyProgress = totalPending > 0 ? (readyForAccounting / totalPending) * 100 : 0;
-  const sentProgress = totalExpenses > 0 ? (sentToAccountant / totalExpenses) * 100 : 0;
+  const totalPending = stats.waitingTaxInvoice + stats.readyForAccounting;
+  const waitingDocsProgress = totalPending > 0 ? (stats.waitingTaxInvoice / totalPending) * 100 : 0;
+  const readyProgress = totalPending > 0 ? (stats.readyForAccounting / totalPending) * 100 : 0;
+  const sentProgress = stats.totalExpenses > 0 ? (stats.sentToAccountant / stats.totalExpenses) * 100 : 0;
 
   return (
     <StatsGrid
       stats={[
         {
           title: "รายจ่ายเดือนนี้",
-          value: formatCurrency(currentAmount),
-          subtitle: `${monthlyTotal._count} รายการ`,
+          value: formatCurrency(stats.monthlyTotal),
+          subtitle: `${stats.monthlyCount} รายการ`,
           icon: "arrow-up-circle",
           iconColor: "text-destructive",
           featured: true,
@@ -139,7 +83,7 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "รอใบกำกับ",
-          value: waitingTaxInvoice.toString(),
+          value: stats.waitingTaxInvoice.toString(),
           subtitle: "รายการ",
           icon: "clock",
           iconColor: "text-amber-500",
@@ -147,7 +91,7 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "พร้อมส่งบัญชี",
-          value: readyForAccounting.toString(),
+          value: stats.readyForAccounting.toString(),
           subtitle: "รายการ",
           icon: "file-text",
           iconColor: "text-blue-500",
@@ -155,7 +99,7 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
         },
         {
           title: "ส่งบัญชีแล้ว",
-          value: sentToAccountant.toString(),
+          value: stats.sentToAccountant.toString(),
           subtitle: "รายการ",
           icon: "check-circle",
           iconColor: "text-primary",
@@ -167,16 +111,13 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
 }
 
 async function ExpensesData({ companyCode }: { companyCode: string }) {
-  const company = await prisma.company.findUnique({
-    where: { code: companyCode.toUpperCase() },
-  });
-
-  if (!company) return null;
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
 
   // Filter: Only show regular expenses OR reimbursements that have been PAID
   // REJECTED/PENDING/APPROVED reimbursements should NOT appear in expenses
   const whereClause = {
-    companyId: company.id,
+    companyId,
     deletedAt: null,
     OR: [
       { isReimbursement: false },

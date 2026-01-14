@@ -32,11 +32,14 @@ import {
 
 interface WorkflowActionsProps {
   companyCode: string;
-  transactionType: "expense" | "income";
+  type?: "expense" | "income"; // alias for transactionType
+  transactionType?: "expense" | "income";
   transactionId: string;
-  workflowStatus: string;
+  currentStatus?: string; // alias for workflowStatus
+  workflowStatus?: string;
   isWht?: boolean;
   onActionComplete?: () => void;
+  variant?: "default" | "compact";
 }
 
 interface ActionConfig {
@@ -109,19 +112,26 @@ const INCOME_ACTIONS: Record<string, ActionConfig[]> = {
 
 export function WorkflowActions({
   companyCode,
+  type,
   transactionType,
   transactionId,
+  currentStatus,
   workflowStatus,
   isWht,
   onActionComplete,
+  variant = "default",
 }: WorkflowActionsProps) {
   const [loading, setLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ActionConfig | null>(null);
   const [notes, setNotes] = useState("");
 
-  const actions = transactionType === "expense" 
-    ? EXPENSE_ACTIONS[workflowStatus] || []
-    : INCOME_ACTIONS[workflowStatus] || [];
+  // Support both prop names
+  const txType = type || transactionType || "expense";
+  const status = currentStatus || workflowStatus || "";
+
+  const actions = txType === "expense" 
+    ? EXPENSE_ACTIONS[status] || []
+    : INCOME_ACTIONS[status] || [];
 
   // Filter WHT actions based on isWht flag
   const filteredActions = actions.filter((action) => {
@@ -146,7 +156,7 @@ export function WorkflowActions({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          transactionType,
+          transactionType: txType,
           transactionId,
           action,
           notes: actionNotes || notes,
@@ -173,6 +183,63 @@ export function WorkflowActions({
     return null;
   }
 
+  const primaryAction = filteredActions[0];
+  const secondaryActions = filteredActions.slice(1);
+
+  // Compact variant - single primary button with optional dropdown
+  if (variant === "compact") {
+    return (
+      <>
+        <div className="flex items-center gap-2">
+          {primaryAction && (
+            <Button
+              onClick={() => handleAction(primaryAction)}
+              disabled={loading}
+              size="sm"
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : primaryAction.icon}
+              {primaryAction.label}
+            </Button>
+          )}
+          {secondaryActions.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={loading}>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {secondaryActions.map((action, index) => (
+                  <div key={action.action}>
+                    {index > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuItem onClick={() => handleAction(action)}>
+                      {action.icon}
+                      <span className="ml-2">{action.label}</span>
+                    </DropdownMenuItem>
+                  </div>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        <ConfirmDialog
+          action={confirmDialog}
+          notes={notes}
+          setNotes={setNotes}
+          loading={loading}
+          onConfirm={() => executeAction(confirmDialog?.action || "", notes)}
+          onCancel={() => {
+            setConfirmDialog(null);
+            setNotes("");
+          }}
+        />
+      </>
+    );
+  }
+
+  // Default variant
   // If only one action, show as button
   if (filteredActions.length === 1) {
     const action = filteredActions[0];

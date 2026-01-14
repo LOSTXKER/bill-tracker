@@ -43,18 +43,6 @@ export function calculateTransactionTotals(
 }
 
 /**
- * Calculate expense totals (wrapper for backward compatibility)
- * @deprecated Use calculateTransactionTotals instead
- */
-export const calculateExpenseTotals = calculateTransactionTotals;
-
-/**
- * Calculate income totals (wrapper for backward compatibility)
- * @deprecated Use calculateTransactionTotals instead
- */
-export const calculateIncomeTotals = calculateTransactionTotals;
-
-/**
  * Reverse calculate base amount from total with VAT
  */
 export function reverseVAT(totalWithVat: number, vatRate: number): number {

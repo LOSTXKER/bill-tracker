@@ -185,19 +185,28 @@ export async function logDelete(
   });
 }
 
-// Thai labels for expense statuses
+// Thai labels for expense statuses (Workflow)
 const EXPENSE_STATUS_LABELS: Record<string, string> = {
-  PENDING_PHYSICAL: "ร้านส่งบิลตามมา",
-  WAITING_FOR_DOC: "ได้บิลครบแล้ว (รอส่งบัญชี)",
-  READY_TO_SEND: "พร้อมส่ง",
-  SENT_TO_ACCOUNT: "ส่งบัญชีแล้ว",
+  PAID: "จ่ายเงินแล้ว",
+  WAITING_TAX_INVOICE: "รอใบกำกับ",
+  TAX_INVOICE_RECEIVED: "ได้ใบกำกับแล้ว",
+  WHT_PENDING_ISSUE: "รอออก 50 ทวิ",
+  WHT_ISSUED: "ออก 50 ทวิแล้ว",
+  READY_FOR_ACCOUNTING: "รอส่งบัญชี",
+  SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
+  COMPLETED: "เสร็จสิ้น",
 };
 
-// Thai labels for income statuses
+// Thai labels for income statuses (Workflow)
 const INCOME_STATUS_LABELS: Record<string, string> = {
-  PENDING_INVOICE: "รอออกบิล",
+  RECEIVED: "รับเงินแล้ว",
+  NO_INVOICE_NEEDED: "ไม่ต้องออกบิล",
+  WAITING_INVOICE_ISSUE: "รอออกบิล",
   INVOICE_ISSUED: "ออกบิลแล้ว",
-  COPY_SENT: "ส่งสำเนาแล้ว",
+  WHT_PENDING_CERT: "รอใบ 50 ทวิ",
+  WHT_CERT_RECEIVED: "ได้ใบ 50 ทวิ",
+  READY_FOR_ACCOUNTING: "รอส่งบัญชี",
+  SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
   COMPLETED: "เสร็จสิ้น",
 };
 
@@ -435,5 +444,48 @@ export async function logBulkAction(
     entityId: `bulk_${Date.now()}`,
     changes: { count, filters },
     description: `${actionText}${entityType}จำนวน ${count} รายการ`,
+  });
+}
+
+/**
+ * Log WHT (Withholding Tax) change
+ * This is a special audit log for tracking changes to WHT settings
+ * which may require document adjustments (e.g., voiding 50 ทวิ forms)
+ */
+export async function logWhtChange(
+  entityType: "Expense" | "Income",
+  entityId: string,
+  wasWht: boolean,
+  nowWht: boolean,
+  reason: string | undefined,
+  statusRollback: { from: string; to: string } | undefined,
+  userId: string,
+  companyId?: string,
+  entityName?: string
+): Promise<void> {
+  const typeLabel = getEntityTypeLabel(entityType);
+  const changeDesc = wasWht ? "ยกเลิกหัก ณ ที่จ่าย" : "เพิ่มหัก ณ ที่จ่าย";
+  const name = entityName ? ` "${entityName}"` : "";
+  
+  let description = `${changeDesc}${typeLabel}${name}`;
+  if (statusRollback) {
+    description += ` (ย้อนสถานะ: ${statusRollback.from} → ${statusRollback.to})`;
+  }
+  
+  await createAuditLog({
+    userId,
+    companyId,
+    action: "UPDATE",
+    entityType,
+    entityId,
+    changes: {
+      whtChange: {
+        before: wasWht,
+        after: nowWht,
+        reason: reason || undefined,
+        statusRollback,
+      },
+    },
+    description,
   });
 }
