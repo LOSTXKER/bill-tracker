@@ -1014,8 +1014,7 @@ export function UnifiedTransactionForm({
     const validationErrors: string[] = [];
     const hasValidContact = selectedContact?.id || oneTimeContactName.trim();
     if (!hasValidContact) validationErrors.push("กรุณาระบุผู้ติดต่อ");
-    if (!selectedAccount) validationErrors.push("กรุณาเลือกบัญชี");
-    // Note: status is auto-determined based on documents if not selected
+    // Note: account is optional, status is auto-determined based on documents if not selected
 
     const descriptionValue = config.fields.descriptionField
       ? data[config.fields.descriptionField.name]

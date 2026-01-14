@@ -296,7 +296,7 @@ export function TransactionFieldsSection({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              บัญชี <span className="text-red-500">*</span>
+              บัญชี
               {accountSuggestionSource === "learned" && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                   🤖 AI จำได้
