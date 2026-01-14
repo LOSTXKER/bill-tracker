@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
 import { AccountSelector, SuggestNewAccount } from "./account-selector";
 import { PaymentMethodSelect } from "./PaymentMethodSelect";
 import type { ContactSummary } from "@/types";
+import { Plus, X, ExternalLink, Link2 } from "lucide-react";
 
 // =============================================================================
 // Types
@@ -85,6 +87,10 @@ export interface TransactionFieldsSectionProps {
   // AI-detected new vendor suggestion
   aiVendorSuggestion?: AiVendorSuggestion | null;
   
+  // Reference URLs state
+  referenceUrls?: string[];
+  onReferenceUrlsChange?: (urls: string[]) => void;
+  
   // Additional fields renderer (e.g., due date for expenses)
   renderAdditionalFields?: () => React.ReactNode;
 }
@@ -116,12 +122,34 @@ export function TransactionFieldsSection({
   isSuggestingAccount,
   accountSuggestionSource,
   aiVendorSuggestion,
+  referenceUrls = [],
+  onReferenceUrlsChange,
   renderAdditionalFields,
 }: TransactionFieldsSectionProps) {
   const isEditable = mode === "create" || mode === "edit";
   const watchStatus = watch("status") as string | undefined;
   const watchDate = watch(config.dateField.name);
   const formData = watch() as Record<string, unknown>;
+  
+  // Reference URL input state
+  const [newReferenceUrl, setNewReferenceUrl] = useState("");
+  
+  const addReferenceUrl = () => {
+    if (!newReferenceUrl.trim()) return;
+    const url = newReferenceUrl.trim();
+    // Validate URL format
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      return;
+    }
+    if (!referenceUrls.includes(url)) {
+      onReferenceUrlsChange?.([...referenceUrls, url]);
+    }
+    setNewReferenceUrl("");
+  };
+  
+  const removeReferenceUrl = (urlToRemove: string) => {
+    onReferenceUrlsChange?.(referenceUrls.filter(url => url !== urlToRemove));
+  };
 
   // Load account details for view mode
   const [accountDetails, setAccountDetails] = useState<{ code: string; name: string } | null>(null);
@@ -239,6 +267,27 @@ export function TransactionFieldsSection({
             </p>
           </div>
         </div>
+        
+        {/* Row 6: Reference URLs */}
+        {referenceUrls.length > 0 && (
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">ลิงค์อ้างอิง</p>
+            <div className="space-y-2">
+              {referenceUrls.map((url, index) => (
+                <a
+                  key={index}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{url}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -415,6 +464,76 @@ export function TransactionFieldsSection({
           </div>
         )}
       </div>
+      
+      {/* Row 6: Reference URLs */}
+      {onReferenceUrlsChange && (
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            ลิงค์อ้างอิง
+          </Label>
+          
+          {/* Existing URLs */}
+          {referenceUrls.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {referenceUrls.map((url, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg group"
+                >
+                  <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline truncate flex-1"
+                  >
+                    {url}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeReferenceUrl(url)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Add new URL */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://..."
+              value={newReferenceUrl}
+              onChange={(e) => setNewReferenceUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addReferenceUrl();
+                }
+              }}
+              className="h-10 bg-muted/30 border-border focus:bg-background"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 flex-shrink-0"
+              onClick={addReferenceUrl}
+              disabled={!newReferenceUrl.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            เพิ่มลิงค์สินค้า, ลิงค์ติดตามพัสดุ, หรือลิงค์อ้างอิงอื่นๆ
+          </p>
+        </div>
+      )}
     </div>
   );
 }

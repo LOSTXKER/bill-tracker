@@ -345,6 +345,9 @@ export function UnifiedTransactionForm({
     }>;
   } | null>(null);
   const [isSuggestingAccount, setIsSuggestingAccount] = useState(false);
+  
+  // Reference URLs (for external links to products, orders, etc.)
+  const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
 
   // Form setup
   const {
@@ -442,6 +445,11 @@ export function UnifiedTransactionForm({
           whtCert: data[config.fileFields.wht.urlsField] || [],
           uncategorized: [],
         });
+        
+        // Set reference URLs
+        if (data.referenceUrls && Array.isArray(data.referenceUrls)) {
+          setReferenceUrls(data.referenceUrls);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -1052,6 +1060,7 @@ export function UnifiedTransactionForm({
           vatAmount: calculation.vatAmount,
           whtAmount: calculation.whtAmount,
           [config.fields.netAmountField]: calculation.netAmount,
+          referenceUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
           ...fileData,
         }),
       });
@@ -1140,6 +1149,7 @@ export function UnifiedTransactionForm({
           whtRate: whtEnabled ? Number(formData.whtRate) : null,
           whtAmount: whtEnabled ? calc.whtAmount : null,
           [config.fields.netAmountField]: calc.netAmount,
+          referenceUrls: referenceUrls.length > 0 ? referenceUrls : [],
         }),
       });
 
@@ -1473,6 +1483,8 @@ export function UnifiedTransactionForm({
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}
                     aiVendorSuggestion={aiVendorSuggestion}
+                    referenceUrls={referenceUrls}
+                    onReferenceUrlsChange={setReferenceUrls}
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }
@@ -1613,6 +1625,8 @@ export function UnifiedTransactionForm({
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}
                     aiVendorSuggestion={aiVendorSuggestion}
+                    referenceUrls={referenceUrls}
+                    onReferenceUrlsChange={mode === "edit" ? setReferenceUrls : undefined}
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }

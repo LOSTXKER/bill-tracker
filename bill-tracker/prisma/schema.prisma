@@ -320,6 +320,7 @@ model Expense {
   slipUrls       Json @default("[]") // Array of slip URLs
   taxInvoiceUrls Json @default("[]") // Array of tax invoice URLs
   whtCertUrls    Json @default("[]") // Array of WHT cert URLs
+  referenceUrls  Json @default("[]") // Array of reference URLs (links to products, order tracking, etc.)
 
   // Dates
   billDate DateTime  @default(now()) // วันที่จ่ายเงิน
@@ -567,7 +568,8 @@ model ReimbursementRequest {
   billDate      DateTime      @default(now()) // วันที่จ่ายเงินจริง
 
   // Evidence Files (receipts)
-  receiptUrls Json @default("[]") // Array of receipt URLs
+  receiptUrls   Json @default("[]") // Array of receipt URLs
+  referenceUrls Json @default("[]") // Array of reference URLs (links to products, order tracking, etc.)
 
   // Status & Workflow
   status ReimbursementStatus @default(PENDING)
@@ -643,6 +645,7 @@ model Income {
   customerSlipUrls Json @default("[]") // Array of customer slip URLs
   myBillCopyUrls   Json @default("[]") // Array of bill copy URLs
   whtCertUrls      Json @default("[]") // Array of WHT cert URLs
+  referenceUrls    Json @default("[]") // Array of reference URLs (links to orders, contracts, etc.)
 
   // Dates
   receiveDate DateTime @default(now())
