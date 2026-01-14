@@ -336,6 +336,13 @@ export function UnifiedTransactionForm({
       keywords: string[];
       reason: string;
     };
+    alternatives?: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      confidence: number;
+      reason: string;
+    }>;
   } | null>(null);
   const [isSuggestingAccount, setIsSuggestingAccount] = useState(false);
 
@@ -1462,6 +1469,7 @@ export function UnifiedTransactionForm({
                       undefined
                     }
                     suggestNewAccount={aiResult?.smart?.suggestNewAccount || undefined}
+                    accountAlternatives={accountSuggestion?.alternatives}
                     onSuggestAccount={suggestAccount}
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}
@@ -1601,6 +1609,7 @@ export function UnifiedTransactionForm({
                       undefined
                     }
                     suggestNewAccount={aiResult?.smart?.suggestNewAccount || undefined}
+                    accountAlternatives={accountSuggestion?.alternatives}
                     onSuggestAccount={suggestAccount}
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}

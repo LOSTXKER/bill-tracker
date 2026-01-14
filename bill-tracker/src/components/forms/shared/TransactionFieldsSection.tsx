@@ -69,6 +69,13 @@ export interface TransactionFieldsSectionProps {
   onAccountChange: (value: string | null) => void;
   suggestedAccountId?: string;
   suggestNewAccount?: SuggestNewAccount;
+  accountAlternatives?: Array<{
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    confidence: number;
+    reason: string;
+  }>;
   
   // Optional AI suggestion button
   onSuggestAccount?: () => void;
@@ -104,6 +111,7 @@ export function TransactionFieldsSection({
   onAccountChange,
   suggestedAccountId,
   suggestNewAccount,
+  accountAlternatives,
   onSuggestAccount,
   isSuggestingAccount,
   accountSuggestionSource,
@@ -320,6 +328,7 @@ export function TransactionFieldsSection({
             placeholder="เลือกบัญชี"
             suggestedAccountId={suggestedAccountId}
             suggestNewAccount={suggestNewAccount}
+            alternatives={accountAlternatives}
           />
         </div>
       </div>

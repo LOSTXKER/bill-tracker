@@ -37,6 +37,14 @@ export interface SuggestNewAccount {
   reason: string;
 }
 
+export interface AccountSuggestionAlternative {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  confidence: number;
+  reason: string;
+}
+
 interface AccountSelectorProps {
   value?: string | null;
   onValueChange: (value: string | null) => void;
@@ -45,6 +53,7 @@ interface AccountSelectorProps {
   placeholder?: string;
   suggestedAccountId?: string; // From AI - existing account
   suggestNewAccount?: SuggestNewAccount; // From AI - suggest creating new
+  alternatives?: AccountSuggestionAlternative[]; // Other AI suggestions
   disabled?: boolean;
   label?: string;
 }
@@ -68,6 +77,7 @@ export function AccountSelector({
   placeholder = "เลือกบัญชี...",
   suggestedAccountId,
   suggestNewAccount,
+  alternatives = [],
   disabled = false,
   label,
 }: AccountSelectorProps) {
@@ -233,32 +243,64 @@ export function AccountSelector({
                 </div>
               </CommandEmpty>
               
-              {/* AI Suggestion (if available and no selection) */}
-              {suggestedAccount && !value && (
+              {/* AI Suggestions (if available and no selection) */}
+              {(suggestedAccount || alternatives.length > 0) && !value && (
                 <CommandGroup heading="✨ AI แนะนำ">
-                  <CommandItem
-                    key={suggestedAccount.id}
-                    value={`${suggestedAccount.code}-${suggestedAccount.name}`}
-                    onSelect={() => {
-                      onValueChange(suggestedAccount.id);
-                      setOpen(false);
-                    }}
-                    className="bg-primary/5 border-l-2 border-primary"
-                  >
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="font-mono text-xs font-semibold">
-                        {suggestedAccount.code}
-                      </span>
-                      <span className="flex-1">{suggestedAccount.name}</span>
-                      <Badge variant="secondary" className="gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        แนะนำ
-                      </Badge>
-                    </div>
-                    {value === suggestedAccount.id && (
-                      <Check className="ml-2 h-4 w-4" />
-                    )}
-                  </CommandItem>
+                  {/* Primary suggestion */}
+                  {suggestedAccount && (
+                    <CommandItem
+                      key={suggestedAccount.id}
+                      value={`${suggestedAccount.code}-${suggestedAccount.name}`}
+                      onSelect={() => {
+                        onValueChange(suggestedAccount.id);
+                        setOpen(false);
+                      }}
+                      className="bg-primary/5 border-l-2 border-primary"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="font-mono text-xs font-semibold">
+                          {suggestedAccount.code}
+                        </span>
+                        <span className="flex-1">{suggestedAccount.name}</span>
+                        <Badge variant="secondary" className="gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          อันดับ 1
+                        </Badge>
+                      </div>
+                      {value === suggestedAccount.id && (
+                        <Check className="ml-2 h-4 w-4" />
+                      )}
+                    </CommandItem>
+                  )}
+                  {/* Alternative suggestions */}
+                  {alternatives.map((alt, idx) => {
+                    const altAccount = accounts.find(a => a.id === alt.accountId);
+                    if (!altAccount) return null;
+                    return (
+                      <CommandItem
+                        key={alt.accountId}
+                        value={`${alt.accountCode}-${alt.accountName}`}
+                        onSelect={() => {
+                          onValueChange(alt.accountId);
+                          setOpen(false);
+                        }}
+                        className="bg-muted/30 border-l-2 border-muted-foreground/30"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="font-mono text-xs font-semibold text-muted-foreground">
+                            {alt.accountCode}
+                          </span>
+                          <span className="flex-1">{alt.accountName}</span>
+                          <Badge variant="outline" className="text-xs">
+                            อันดับ {idx + 2}
+                          </Badge>
+                        </div>
+                        {value === alt.accountId && (
+                          <Check className="ml-2 h-4 w-4" />
+                        )}
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               )}
 

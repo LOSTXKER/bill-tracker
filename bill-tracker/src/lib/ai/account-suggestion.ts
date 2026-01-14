@@ -20,6 +20,14 @@ export interface SuggestNewAccount {
   reason: string;
 }
 
+export interface AccountSuggestionItem {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  confidence: number;
+  reason: string;
+}
+
 export interface AccountSuggestion {
   accountId: string | null;
   accountCode: string | null;
@@ -29,6 +37,8 @@ export interface AccountSuggestion {
   source: "learned" | "ai" | "none";
   useCount?: number;
   suggestNewAccount?: SuggestNewAccount;
+  // Multiple suggestions for user to choose
+  alternatives?: AccountSuggestionItem[];
 }
 
 export interface SuggestAccountContext {
@@ -265,16 +275,53 @@ ${businessInfo ? businessInfo + "\n" : ""}${transactionContext}
 ## รายการที่ต้องจัดหมวดหมู่
 ${contentDescription}
 
-## บัญชีที่มี (ต้องเลือก 1 รายการ)
+## บัญชีที่มี
 ${accountListText}
 
 ## กฎ
-- **ต้องเลือกบัญชีเสมอ** - ใช้ความรู้ของคุณตัดสินว่ารายการนี้ควรอยู่บัญชีไหน
+- **เลือก 3 บัญชีที่เหมาะสมที่สุด** เรียงจากดีที่สุดไปน้อยที่สุด
 - **ดูจากธุรกิจ** - ถ้าไม่ใช่ธุรกิจซื้อมาขายไป อย่าเลือกบัญชีต้นทุนสินค้า
 - **Copy ID ให้ถูกต้อง** - เอา ID หลัง "→ ID:" มาใส่
 
-## ตอบ JSON
-{"accountId":"ID_จากรายการ","accountCode":"รหัส","accountName":"ชื่อ","confidence":90,"reason":"เหตุผลสั้นๆ"}`;
+## ตอบ JSON (array ของ 3 ตัวเลือก)
+{"suggestions":[{"accountId":"ID","accountCode":"รหัส","accountName":"ชื่อ","confidence":95,"reason":"เหตุผล"},{"accountId":"ID2","accountCode":"รหัส2","accountName":"ชื่อ2","confidence":80,"reason":"เหตุผล2"},{"accountId":"ID3","accountCode":"รหัส3","accountName":"ชื่อ3","confidence":60,"reason":"เหตุผล3"}]}`;
+}
+
+function matchAccount(
+  suggestion: { accountId?: string; accountCode?: string; accountName?: string },
+  accounts: { id: string; code: string; name: string }[]
+): { id: string; code: string; name: string } | null {
+  // 1. Match by exact accountId
+  let matched = accounts.find((a) => a.id === suggestion.accountId);
+  
+  // 2. Match by accountCode if accountId didn't work
+  if (!matched && suggestion.accountCode) {
+    matched = accounts.find((a) => a.code === suggestion.accountCode);
+  }
+  
+  // 3. Match by accountName if still no match
+  if (!matched && suggestion.accountName) {
+    matched = accounts.find((a) => 
+      a.name === suggestion.accountName || 
+      a.name.includes(suggestion.accountName || "") ||
+      (suggestion.accountName || "").includes(a.name)
+    );
+  }
+  
+  // 4. Fuzzy match by name similarity
+  if (!matched && suggestion.accountName) {
+    const nameWords = suggestion.accountName.toLowerCase().split(/[\s/]+/);
+    for (const account of accounts) {
+      const accountWords = account.name.toLowerCase().split(/[\s/]+/);
+      const overlap = nameWords.filter((w: string) => accountWords.some((aw: string) => aw.includes(w) || w.includes(aw)));
+      if (overlap.length >= 1) {
+        matched = account;
+        break;
+      }
+    }
+  }
+  
+  return matched || null;
 }
 
 function parseAIResponse(
@@ -297,54 +344,45 @@ function parseAIResponse(
   try {
     const result = JSON.parse(jsonText);
     
-    // Try multiple matching strategies:
-    // 1. Match by exact accountId
-    let matchedAccount = accounts.find((a) => a.id === result.accountId);
+    // Handle new format with multiple suggestions
+    const suggestions = result.suggestions || [result];
+    const validSuggestions: AccountSuggestionItem[] = [];
     
-    // 2. Match by accountCode if accountId didn't work
-    if (!matchedAccount && result.accountCode) {
-      matchedAccount = accounts.find((a) => a.code === result.accountCode);
-    }
-    
-    // 3. Match by accountName if still no match
-    if (!matchedAccount && result.accountName) {
-      matchedAccount = accounts.find((a) => 
-        a.name === result.accountName || 
-        a.name.includes(result.accountName) ||
-        result.accountName.includes(a.name)
-      );
-    }
-    
-    // 4. Fuzzy match by name similarity
-    if (!matchedAccount && result.accountName) {
-      const nameWords = result.accountName.toLowerCase().split(/[\s/]+/);
-      for (const account of accounts) {
-        const accountWords = account.name.toLowerCase().split(/[\s/]+/);
-        const overlap = nameWords.filter((w: string) => accountWords.some((aw: string) => aw.includes(w) || w.includes(aw)));
-        if (overlap.length >= 1) {
-          matchedAccount = account;
-          break;
-        }
+    for (const suggestion of suggestions) {
+      const matched = matchAccount(suggestion, accounts);
+      if (matched) {
+        validSuggestions.push({
+          accountId: matched.id,
+          accountCode: matched.code,
+          accountName: matched.name,
+          confidence: Math.max(0, Math.min(100, suggestion.confidence || 85)),
+          reason: suggestion.reason || "AI วิเคราะห์",
+        });
       }
     }
     
-    if (matchedAccount) {
+    // Remove duplicates
+    const uniqueSuggestions = validSuggestions.filter(
+      (s, i, arr) => arr.findIndex(x => x.accountId === s.accountId) === i
+    );
+    
+    if (uniqueSuggestions.length > 0) {
+      const primary = uniqueSuggestions[0];
       return {
-        accountId: matchedAccount.id,
-        accountCode: matchedAccount.code,
-        accountName: matchedAccount.name,
-        confidence: Math.max(0, Math.min(100, result.confidence || 85)),
-        reason: result.reason || "AI วิเคราะห์",
+        accountId: primary.accountId,
+        accountCode: primary.accountCode,
+        accountName: primary.accountName,
+        confidence: primary.confidence,
+        reason: primary.reason,
         source: "ai",
+        alternatives: uniqueSuggestions.slice(1), // Other options
         suggestNewAccount: result.suggestNewAccount || undefined,
       };
     }
 
-    // No valid account found - but log what AI said for debugging
+    // No valid account found
     console.log("[parseAIResponse] AI response did not match any account:", {
-      aiAccountId: result.accountId,
-      aiAccountCode: result.accountCode,
-      aiAccountName: result.accountName,
+      suggestions: suggestions.slice(0, 3),
       availableAccounts: accounts.map(a => `${a.code}: ${a.name}`).slice(0, 5),
     });
 
@@ -352,8 +390,8 @@ function parseAIResponse(
       accountId: null,
       accountCode: null,
       accountName: null,
-      confidence: result.confidence || 0,
-      reason: result.reason || "ไม่พบบัญชีที่เหมาะสม",
+      confidence: 0,
+      reason: "ไม่พบบัญชีที่เหมาะสม",
       source: "ai",
       suggestNewAccount: result.suggestNewAccount || undefined,
     };

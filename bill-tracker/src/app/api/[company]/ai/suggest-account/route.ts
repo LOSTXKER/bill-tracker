@@ -54,6 +54,7 @@ async function handlePost(
       source: result.source,
       useCount: result.useCount,
       suggestNewAccount: result.suggestNewAccount,
+      alternatives: result.alternatives,
     });
   } catch (error) {
     console.error("Account suggestion error:", error);
