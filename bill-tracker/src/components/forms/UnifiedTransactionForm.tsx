@@ -840,13 +840,17 @@ export function UnifiedTransactionForm({
     setAccountSuggestion(null);
 
     try {
+      // Gather all available context for AI
+      const selectedContactData = selectedContact ? contacts?.find(c => c.id === selectedContact.id) : null;
+      
       const response = await fetch(`/api/${companyCode.toLowerCase()}/ai/suggest-account`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transactionType: config.type.toUpperCase(),
           vendorName,
-          description,
+          vendorTaxId: selectedContactData?.taxId || aiVendorSuggestion?.taxId,
+          description, // Description includes AI-extracted items
           imageUrls: allFileUrls.slice(0, 1),
         }),
       });
