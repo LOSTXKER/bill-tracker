@@ -174,14 +174,14 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
   },
   audit: {
     key: "audit",
-    label: "ประวัติการแก้ไข (Audit Logs)",
-    description: "ดูประวัติการเปลี่ยนแปลงในระบบ",
+    label: "บันทึกระบบ (Audit Logs)",
+    description: "ดูประวัติการกระทำทั้งหมดในระบบ",
     icon: History,
     permissions: [
       {
         key: "audit:read",
-        label: "ดูประวัติ",
-        description: "ดูประวัติการแก้ไขทั้งหมดในระบบ",
+        label: "ดูบันทึก",
+        description: "ดูบันทึกระบบทั้งหมด (Audit Log)",
       },
     ],
   },

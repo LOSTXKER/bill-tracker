@@ -315,6 +315,13 @@ export function UnifiedTransactionForm({
     email?: string | null;
   } | null>(null);
 
+  // Contact suggestions from AI (when no exact match found)
+  const [contactSuggestions, setContactSuggestions] = useState<Array<{
+    id: string;
+    name: string;
+    confidence: number;
+  }>>([]);
+
   // Account
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
@@ -761,9 +768,14 @@ export function UnifiedTransactionForm({
         if (contact) {
           setSelectedContact(contact);
           setAiVendorSuggestion(null); // Clear suggestion when contact is found
+          setContactSuggestions([]); // Clear suggestions when contact is found
         } else {
           setPendingContactId(contactIdToUse);
         }
+      } else if (result.smart?.contactSuggestions && result.smart.contactSuggestions.length > 0) {
+        // AI found similar contacts but not exact match - show suggestions
+        setContactSuggestions(result.smart.contactSuggestions);
+        setAiVendorSuggestion(null);
       } else if (result.smart?.isNewVendor && (combined.vendorName || combined.vendorTaxId)) {
         // AI detected a new vendor - show suggestion to create contact
         setAiVendorSuggestion({
@@ -774,6 +786,7 @@ export function UnifiedTransactionForm({
           phone: null,
           email: extendedCombined.vendorEmail ?? null,
         });
+        setContactSuggestions([]);
       }
 
       // Apply account
@@ -1483,6 +1496,12 @@ export function UnifiedTransactionForm({
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}
                     aiVendorSuggestion={aiVendorSuggestion}
+                    contactSuggestions={contactSuggestions}
+                    onContactSuggestionSelect={(contact) => {
+                      setSelectedContact(contact);
+                      setContactSuggestions([]);
+                      setAiVendorSuggestion(null);
+                    }}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={setReferenceUrls}
                     renderAdditionalFields={() =>
@@ -1625,6 +1644,12 @@ export function UnifiedTransactionForm({
                     isSuggestingAccount={isSuggestingAccount}
                     accountSuggestionSource={accountSuggestion?.source}
                     aiVendorSuggestion={aiVendorSuggestion}
+                    contactSuggestions={contactSuggestions}
+                    onContactSuggestionSelect={(contact) => {
+                      setSelectedContact(contact);
+                      setContactSuggestions([]);
+                      setAiVendorSuggestion(null);
+                    }}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={mode === "edit" ? setReferenceUrls : undefined}
                     renderAdditionalFields={() =>

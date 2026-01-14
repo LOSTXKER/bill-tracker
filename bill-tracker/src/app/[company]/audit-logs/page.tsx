@@ -30,10 +30,10 @@ export default async function AuditLogsPage({
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <History className="h-6 w-6" />
-          ประวัติการเปลี่ยนแปลง
+          บันทึกระบบ
         </h1>
         <p className="text-muted-foreground mt-1">
-          บันทึกการกระทำทั้งหมดในระบบ
+          ประวัติการกระทำทั้งหมดในระบบ (Audit Log)
         </p>
       </div>
 

@@ -109,7 +109,7 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
       permission: "settings:read",
     },
     {
-      name: "ประวัติการแก้ไข",
+      name: "บันทึกระบบ",
       href: `/${companyCode}/audit-logs`,
       icon: History,
       permission: "audit:read",

@@ -143,12 +143,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       label: "ระบบ",
       items: [
         {
-          name: "ความเคลื่อนไหว",
+          name: "การแจ้งเตือน",
           href: `/${companyCode}/activity`,
           icon: Activity,
         },
         {
-          name: "ประวัติการแก้ไข",
+          name: "บันทึกระบบ",
           href: `/${companyCode}/audit-logs`,
           icon: History,
           permission: "audit:read",

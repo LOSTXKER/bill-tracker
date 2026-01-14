@@ -87,6 +87,14 @@ export interface TransactionFieldsSectionProps {
   // AI-detected new vendor suggestion
   aiVendorSuggestion?: AiVendorSuggestion | null;
   
+  // Contact suggestions (when AI found similar but not exact matches)
+  contactSuggestions?: Array<{
+    id: string;
+    name: string;
+    confidence: number;
+  }>;
+  onContactSuggestionSelect?: (contact: ContactSummary) => void;
+  
   // Reference URLs state
   referenceUrls?: string[];
   onReferenceUrlsChange?: (urls: string[]) => void;
@@ -122,6 +130,8 @@ export function TransactionFieldsSection({
   isSuggestingAccount,
   accountSuggestionSource,
   aiVendorSuggestion,
+  contactSuggestions = [],
+  onContactSuggestionSelect,
   referenceUrls = [],
   onReferenceUrlsChange,
   renderAdditionalFields,
@@ -339,6 +349,8 @@ export function TransactionFieldsSection({
           contactName={oneTimeContactName}
           onContactNameChange={onOneTimeContactNameChange}
           aiVendorSuggestion={aiVendorSuggestion}
+          contactSuggestions={contactSuggestions}
+          onContactSuggestionSelect={onContactSuggestionSelect}
         />
 
         {/* Account Selector with AI Button */}

@@ -291,10 +291,10 @@ export default function ActivityPage({ params }: PageProps) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Bell className="h-6 w-6" />
-            ความเคลื่อนไหว
+            การแจ้งเตือน
           </h1>
           <p className="text-muted-foreground">
-            ติดตามการเปลี่ยนแปลงเอกสารทั้งหมดในระบบ
+            การแจ้งเตือนและกิจกรรมที่เกี่ยวข้องกับคุณ
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export default function ActivityPage({ params }: PageProps) {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="ค้นหาความเคลื่อนไหว..."
+                  placeholder="ค้นหาการแจ้งเตือน..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9"
@@ -403,8 +403,8 @@ export default function ActivityPage({ params }: PageProps) {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">ไม่มีความเคลื่อนไหว</p>
-            <p className="text-sm">ยังไม่มีการเปลี่ยนแปลงใดๆ ในระบบ</p>
+            <p className="text-lg font-medium">ไม่มีการแจ้งเตือน</p>
+            <p className="text-sm">ยังไม่มีการแจ้งเตือนใดๆ สำหรับคุณ</p>
           </CardContent>
         </Card>
       ) : (

@@ -76,6 +76,12 @@ export interface MultiDocAnalysisResult {
       id: string;
       name: string;
     } | null;
+    // Contact suggestions when no exact match (user can choose)
+    contactSuggestions?: Array<{
+      id: string;
+      name: string;
+      confidence: number;
+    }>;
     // AI account suggestion when no mapping found
     aiAccountSuggestion?: {
       accountId: string | null;
@@ -223,8 +229,8 @@ export async function findBestMatch(
     }
   }
   
-  // Only return match if confidence is >= 50% (lowered for better learning)
-  if (bestScore >= 50) {
+  // Only return match if confidence is >= 80% (increased for accuracy)
+  if (bestScore >= 80) {
     // Update usage stats
     if (bestMatch) {
       await prisma.vendorMapping.update({
@@ -791,64 +797,88 @@ export async function analyzeAndClassifyMultiple(
       transactionType
     );
 
-    // Build suggested values from mapping
+    // Build suggested values from mapping (ONLY for account, not contact)
     const suggested = buildSuggestedValues(pseudoData, matchResult.mapping);
+    
+    // REFACTORED: Don't use contact from VendorMapping - rely on Tax ID only
+    suggested.contactId = null;
 
     // Track found contact for returning contact info
     let foundContact: { id: string; name: string } | null = null;
+    
+    // Track contact suggestions when no exact match found
+    let contactSuggestions: Array<{ id: string; name: string; confidence: number }> = [];
 
-    // If no contactId from mapping, try to find Contact by vendorTaxId
-    if (!suggested.contactId && combined.vendorTaxId) {
-      const contactByTaxId = await prisma.contact.findFirst({
-        where: {
-          companyId,
-          taxId: combined.vendorTaxId,
-        },
-        select: { id: true, name: true },
-      });
-      if (contactByTaxId) {
-        suggested.contactId = contactByTaxId.id;
-        foundContact = contactByTaxId;
+    // Get company's own tax ID to avoid matching vendor with our own company
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { taxId: true },
+    });
+    const companyTaxId = company?.taxId?.replace(/[^0-9]/g, "") || null;
+
+    // ==========================================================================
+    // STEP 1: Tax ID Exact Match (ONLY way to auto-select contact)
+    // ==========================================================================
+    if (combined.vendorTaxId) {
+      const normalizedVendorTaxId = combined.vendorTaxId.replace(/[^0-9]/g, "");
+      
+      // Skip if vendor tax ID matches our company's tax ID
+      if (companyTaxId && normalizedVendorTaxId === companyTaxId) {
+        console.log("[Smart-OCR] Skipping - vendor tax ID matches company:", normalizedVendorTaxId);
+        combined.vendorTaxId = null;
+      } else if (normalizedVendorTaxId.length >= 10) {
+        // Only match if tax ID is valid (at least 10 digits)
+        const contactByTaxId = await prisma.contact.findFirst({
+          where: {
+            companyId,
+            taxId: combined.vendorTaxId,
+          },
+          select: { id: true, name: true },
+        });
+        if (contactByTaxId) {
+          console.log("[Smart-OCR] Auto-selected contact by Tax ID:", contactByTaxId.name);
+          suggested.contactId = contactByTaxId.id;
+          foundContact = contactByTaxId;
+        }
       }
     }
 
-    // If still no contactId, try to find Contact by vendorName (fuzzy match)
+    // ==========================================================================
+    // STEP 2: Name-based matching → SUGGESTIONS ONLY (never auto-select)
+    // ==========================================================================
     if (!suggested.contactId && combined.vendorName) {
-      // First try exact contains match
-      let contactByName = await prisma.contact.findFirst({
-        where: {
-          companyId,
-          name: {
-            contains: combined.vendorName,
-            mode: "insensitive",
-          },
-        },
-        select: { id: true, name: true },
-      });
-
-      // If not found, try normalized name matching
-      if (!contactByName) {
-        const normalizedVendor = normalizeVendorName(combined.vendorName);
+      const normalizedVendor = normalizeVendorName(combined.vendorName);
+      
+      // Skip if vendor name is too short (likely garbage data)
+      if (normalizedVendor.length >= 3) {
         const allContacts = await prisma.contact.findMany({
           where: { companyId },
           select: { id: true, name: true },
         });
 
-        // Find best match using normalized names
+        const potentialMatches: Array<{ id: string; name: string; similarity: number }> = [];
+
         for (const contact of allContacts) {
           const normalizedContact = normalizeVendorName(contact.name);
           const similarity = calculateStringSimilarity(normalizedVendor, normalizedContact);
           
-          if (similarity >= 0.7) {
-            contactByName = contact;
-            break;
+          // Collect potential matches (>= 40% similarity) for suggestions
+          if (similarity >= 0.4) {
+            potentialMatches.push({ ...contact, similarity });
           }
         }
-      }
 
-      if (contactByName) {
-        suggested.contactId = contactByName.id;
-        foundContact = contactByName;
+        // Sort by similarity desc and take top 5
+        potentialMatches.sort((a, b) => b.similarity - a.similarity);
+        
+        if (potentialMatches.length > 0) {
+          contactSuggestions = potentialMatches.slice(0, 5).map(m => ({
+            id: m.id,
+            name: m.name,
+            confidence: Math.round(m.similarity * 100),
+          }));
+          console.log("[Smart-OCR] Found contact suggestions:", contactSuggestions.map(s => `${s.name} (${s.confidence}%)`));
+        }
       }
     }
 
@@ -924,6 +954,8 @@ export async function analyzeAndClassifyMultiple(
       suggested,
       // Include found contact info (from taxId/name lookup, not from mapping)
       foundContact: foundContact || null,
+      // Include contact suggestions when no exact match found
+      contactSuggestions: contactSuggestions.length > 0 ? contactSuggestions : undefined,
       isNewVendor: !matchResult.mapping,
       suggestTraining:
         !matchResult.mapping &&
@@ -1363,8 +1395,8 @@ async function findBestMatchByType(
     }
   }
 
-  // Only return match if confidence is >= 50% (lowered for better learning)
-  if (bestScore >= 50 && bestMatch) {
+  // Only return match if confidence is >= 80% (increased for accuracy)
+  if (bestScore >= 80 && bestMatch) {
     // Update usage stats
     await prisma.vendorMapping.update({
       where: { id: bestMatch.id },

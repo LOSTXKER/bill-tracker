@@ -55,6 +55,13 @@ interface ContactSelectorProps {
   onContactNameChange?: (name: string) => void;
   // AI-detected new vendor suggestion
   aiVendorSuggestion?: AiVendorSuggestion | null;
+  // Contact suggestions (when AI found similar but not exact matches)
+  contactSuggestions?: Array<{
+    id: string;
+    name: string;
+    confidence: number;
+  }>;
+  onContactSuggestionSelect?: (contact: ContactSummary) => void;
   // Mode for showing/hiding required indicator
   mode?: "create" | "edit" | "view";
 }
@@ -73,6 +80,8 @@ export function ContactSelector({
   contactName = "",
   onContactNameChange,
   aiVendorSuggestion,
+  contactSuggestions = [],
+  onContactSuggestionSelect,
   mode = "create",
 }: ContactSelectorProps) {
   const [open, setOpen] = useState(false);
@@ -163,6 +172,42 @@ export function ContactSelector({
                 <Plus className="h-3 w-3" />
                 บันทึกผู้ติดต่อนี้
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Suggestions from AI (when no exact match found) */}
+      {contactSuggestions.length > 0 && !selectedContact && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-900 dark:text-amber-100">
+                AI พบผู้ติดต่อที่คล้ายกัน
+              </p>
+              <p className="text-amber-700 dark:text-amber-300 text-xs mt-1">
+                เลือกผู้ติดต่อที่ถูกต้อง หรือพิมพ์ชื่อใหม่
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {contactSuggestions.map((suggestion) => {
+                  const contact = contacts.find(c => c.id === suggestion.id);
+                  if (!contact) return null;
+                  return (
+                    <Button
+                      key={suggestion.id}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900"
+                      onClick={() => onContactSuggestionSelect?.(contact)}
+                    >
+                      <span>{suggestion.name}</span>
+                      <span className="text-xs opacity-60">({suggestion.confidence}%)</span>
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
