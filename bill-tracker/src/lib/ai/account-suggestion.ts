@@ -228,47 +228,56 @@ function buildAIPrompt(
     return null;
   }
 
-  // Build account list with clear formatting
-  const accountListText = accounts
-    .map((a) => `• ${a.code} - ${a.name}${a.description ? ` (${a.description})` : ""} [ID: ${a.id}]`)
+  // Build account list as a numbered JSON-like structure for easier AI matching
+  const accountList = accounts.map((a, idx) => ({
+    index: idx + 1,
+    id: a.id,
+    code: a.code,
+    name: a.name,
+    desc: a.description || "",
+  }));
+
+  const accountListText = accountList
+    .map((a) => `${a.index}. [${a.code}] ${a.name}${a.desc ? ` - ${a.desc}` : ""} → ID: "${a.id}"`)
     .join("\n");
 
-  return `คุณเป็นนักบัญชีผู้เชี่ยวชาญ มีความรู้กว้างขวางเกี่ยวกับธุรกิจและแบรนด์ทั่วโลก
+  return `# คุณเป็นนักบัญชีมืออาชีพ
 
-## งานของคุณ
-ดูข้อมูลร้านค้า/รายการ แล้วเลือกบัญชีที่เหมาะสมที่สุดจากรายการด้านล่าง
+คุณมีความรู้เกี่ยวกับ:
+- บัญชีค่าใช้จ่ายประเภทต่างๆ ตามมาตรฐานบัญชี
+- แบรนด์และบริษัทในไทยและต่างประเทศ  
+- ประเภทสินค้าและบริการทั่วไป
+
+## ประเภทสินค้าทั่วไป (ใช้ประกอบการตัดสินใจ)
+| ประเภท | ตัวอย่างสินค้า | บัญชีที่ควรใช้ |
+|--------|---------------|---------------|
+| วัสดุสำนักงาน | กระดาษ, ปากกา, แฟ้ม, ชั้นวาง, ตะกร้า, กล่อง | วัสดุสิ้นเปลือง/สำนักงาน |
+| อุปกรณ์สำนักงาน | เครื่องพิมพ์, คอมพิวเตอร์, จอภาพ | ค่าอุปกรณ์ |
+| ค่าบริการ | ซ่อมแซม, รักษา, ทำความสะอาด | ค่าบริการ/ค่าซ่อมแซม |
+| ค่าสาธารณูปโภค | ไฟฟ้า, น้ำประปา, อินเทอร์เน็ต | ค่าสาธารณูปโภค |
+| ค่าซอฟต์แวร์ | โปรแกรม, แอป, SaaS, Cloud | ค่าซอฟต์แวร์/IT |
+| ค่าอาหาร | อาหาร, เครื่องดื่ม, ขนม | ค่าอาหาร/เลี้ยงรับรอง |
+| ค่าเดินทาง | น้ำมัน, ทางด่วน, รถไฟ, เครื่องบิน | ค่าเดินทาง/พาหนะ |
 
 ## ข้อมูลที่ต้องวิเคราะห์
 ${contentDescription}
 
-## บัญชี${transactionType === "EXPENSE" ? "ค่าใช้จ่าย" : "รายได้"}ที่มี (เลือก 1 รายการ)
+## บัญชี${transactionType === "EXPENSE" ? "ค่าใช้จ่าย" : "รายได้"}ที่มีในระบบ (เลือก 1 รายการ)
 ${accountListText}
 
-## วิธีเลือก
-1. **อ่านชื่อบัญชีทุกตัว** - ดูว่าตัวไหนตรงกับประเภทร้านค้า/รายการมากที่สุด
-2. **ใช้ความรู้ทั่วไป** - คุณรู้จักแบรนด์และบริษัทต่างๆ ทั่วโลก
-3. **เลือกบัญชีที่ใกล้เคียงที่สุด** - ถ้าไม่มีตรง 100% ให้เลือกที่ใกล้เคียง
-
-## ตัวอย่างการตัดสินใจ
-- "Cursor" → ค่าซอฟต์แวร์/ค่าบริการ (confidence 95%)
-- "7-Eleven" → ค่าอาหาร/เครื่องดื่ม/วัสดุสิ้นเปลือง (confidence 90%)
-- "การไฟฟ้า" → ค่าสาธารณูปโภค/ค่าไฟฟ้า (confidence 98%)
-- "บริษัท XXX จำกัด" → ดูจากบริบท ถ้าไม่ชัดเลือก "ค่าบริการ" (confidence 80%)
-
 ## กฎสำคัญ
-- **ต้องเลือกบัญชีเสมอ** ถ้ามีบัญชีที่พอจะใช้ได้
-- **Confidence 85-98%** ถ้าเลือกได้ตรงหรือใกล้เคียง
-- **Confidence 70-84%** เฉพาะเมื่อไม่มีบัญชีที่ตรงเลย แต่พอจะใส่ได้
-- **suggestNewAccount** ใช้เฉพาะเมื่อไม่มีบัญชีที่เหมาะสมเลยจริงๆ
+1. **ต้องเลือกบัญชีจากรายการด้านบนเสมอ** - ถ้ามีบัญชีที่พอจะใช้ได้ ให้เลือก
+2. **ใช้ ID ตรงตามที่ให้มา** - Copy ID ที่อยู่หลัง "→ ID:" มาใส่ในคำตอบ
+3. **"วัสดุสิ้นเปลือง"/"วัสดุสำนักงาน"** ครอบคลุมสินค้าสำนักงานทั่วไป (กระดาษ, ชั้นวาง, แฟ้ม ฯลฯ)
+4. **ถ้าไม่ตรง 100% ให้เลือกที่ใกล้เคียงที่สุด**
 
-## ตอบ JSON
+## ตอบ JSON เท่านั้น (ไม่ต้องมี markdown code block)
 {
-  "accountId": "ID ของบัญชีที่เลือก",
-  "accountCode": "รหัสบัญชี 6 หลัก",
+  "accountId": "COPY_EXACT_ID_FROM_LIST",
+  "accountCode": "รหัส 6 หลัก",
   "accountName": "ชื่อบัญชี",
   "confidence": 85,
-  "reason": "เหตุผลสั้นๆ ภาษาไทย",
-  "suggestNewAccount": null
+  "reason": "เหตุผลสั้นๆ ภาษาไทย"
 }`;
 }
 
@@ -282,26 +291,67 @@ function parseAIResponse(
   if (jsonText.startsWith("```")) {
     jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
   }
+  
+  // Also handle trailing text after JSON
+  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    jsonText = jsonMatch[0];
+  }
 
   try {
     const result = JSON.parse(jsonText);
     
-    // Validate accountId exists
-    const matchedAccount = accounts.find((a) => a.id === result.accountId);
+    // Try multiple matching strategies:
+    // 1. Match by exact accountId
+    let matchedAccount = accounts.find((a) => a.id === result.accountId);
+    
+    // 2. Match by accountCode if accountId didn't work
+    if (!matchedAccount && result.accountCode) {
+      matchedAccount = accounts.find((a) => a.code === result.accountCode);
+    }
+    
+    // 3. Match by accountName if still no match
+    if (!matchedAccount && result.accountName) {
+      matchedAccount = accounts.find((a) => 
+        a.name === result.accountName || 
+        a.name.includes(result.accountName) ||
+        result.accountName.includes(a.name)
+      );
+    }
+    
+    // 4. Fuzzy match by name similarity
+    if (!matchedAccount && result.accountName) {
+      const nameWords = result.accountName.toLowerCase().split(/[\s/]+/);
+      for (const account of accounts) {
+        const accountWords = account.name.toLowerCase().split(/[\s/]+/);
+        const overlap = nameWords.filter((w: string) => accountWords.some((aw: string) => aw.includes(w) || w.includes(aw)));
+        if (overlap.length >= 1) {
+          matchedAccount = account;
+          break;
+        }
+      }
+    }
     
     if (matchedAccount) {
       return {
-        accountId: result.accountId,
+        accountId: matchedAccount.id,
         accountCode: matchedAccount.code,
         accountName: matchedAccount.name,
-        confidence: Math.max(0, Math.min(100, result.confidence || 0)),
+        confidence: Math.max(0, Math.min(100, result.confidence || 85)),
         reason: result.reason || "AI วิเคราะห์",
         source: "ai",
         suggestNewAccount: result.suggestNewAccount || undefined,
       };
     }
 
-    // No valid account found
+    // No valid account found - but log what AI said for debugging
+    console.log("[parseAIResponse] AI response did not match any account:", {
+      aiAccountId: result.accountId,
+      aiAccountCode: result.accountCode,
+      aiAccountName: result.accountName,
+      availableAccounts: accounts.map(a => `${a.code}: ${a.name}`).slice(0, 5),
+    });
+
     return {
       accountId: null,
       accountCode: null,
@@ -312,8 +362,8 @@ function parseAIResponse(
       suggestNewAccount: result.suggestNewAccount || undefined,
     };
 
-  } catch {
-    console.error("[parseAIResponse] Failed to parse:", jsonText);
+  } catch (e) {
+    console.error("[parseAIResponse] Failed to parse:", jsonText, e);
     return {
       accountId: null,
       accountCode: null,
