@@ -7,6 +7,7 @@
 import { apiResponse } from "@/lib/api/response";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { prisma } from "@/lib/db";
+import { hasPermission } from "@/lib/permissions/checker";
 
 // Helper to extract company code from URL path
 const getCompanyFromPath = (req: Request) => {
@@ -75,7 +76,7 @@ async function handlePatch(request: Request, { session }: { session: { user: { i
 }
 
 // DELETE: Soft delete a comment
-async function handleDelete(request: Request, { session }: { session: { user: { id: string } } }, routeContext?: RouteContext) {
+async function handleDelete(request: Request, { session, company }: { session: { user: { id: string } }; company: { id: string } }, routeContext?: RouteContext) {
   if (!routeContext) {
     return apiResponse.badRequest("Missing route context");
   }
@@ -91,8 +92,13 @@ async function handleDelete(request: Request, { session }: { session: { user: { 
     return apiResponse.notFound("Comment not found");
   }
 
-  // Only author can delete their own comment
-  if (comment.authorId !== session.user.id) {
+  // Check if user can delete this comment
+  const isAuthor = comment.authorId === session.user.id;
+  const canDeleteAll = await hasPermission(session.user.id, company.id, "comments:delete-all");
+
+  // Author can delete their own comment with comments:delete permission
+  // Users with comments:delete-all can delete any comment
+  if (!isAuthor && !canDeleteAll) {
     return apiResponse.forbidden("You can only delete your own comments");
   }
 
@@ -106,8 +112,10 @@ async function handleDelete(request: Request, { session }: { session: { user: { 
 
 export const PATCH = withCompanyAccess(handlePatch, {
   getCompanyCode: getCompanyFromPath,
+  permission: "comments:create", // Need create permission to edit own comments
 });
 
 export const DELETE = withCompanyAccess(handleDelete, {
   getCompanyCode: getCompanyFromPath,
+  permission: "comments:delete",
 });

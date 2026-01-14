@@ -162,8 +162,10 @@ async function handlePost(request: Request, { session, company }: { session: { u
 
 export const GET = withCompanyAccess(handleGet, {
   getCompanyCode: getCompanyFromPath,
+  permission: "comments:read",
 });
 
 export const POST = withCompanyAccess(handlePost, {
   getCompanyCode: getCompanyFromPath,
+  permission: "comments:create",
 });

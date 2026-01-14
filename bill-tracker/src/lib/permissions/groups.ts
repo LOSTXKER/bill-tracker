@@ -13,6 +13,7 @@ import {
   Settings,
   History,
   Wallet,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -209,6 +210,34 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
         key: "reimbursements:pay",
         label: "จ่ายเงิน",
         description: "บันทึกการจ่ายเงินคืน (สำหรับบัญชี)",
+      },
+    ],
+  },
+  comments: {
+    key: "comments",
+    label: "ความคิดเห็น (Comments)",
+    description: "จัดการความคิดเห็นในเอกสาร",
+    icon: MessageSquare,
+    permissions: [
+      {
+        key: "comments:read",
+        label: "ดูความคิดเห็น",
+        description: "ดูความคิดเห็นในเอกสาร",
+      },
+      {
+        key: "comments:create",
+        label: "เพิ่มความคิดเห็น",
+        description: "เพิ่มความคิดเห็นใหม่",
+      },
+      {
+        key: "comments:delete",
+        label: "ลบความคิดเห็น",
+        description: "ลบความคิดเห็นของตัวเอง",
+      },
+      {
+        key: "comments:delete-all",
+        label: "ลบความคิดเห็นทั้งหมด",
+        description: "ลบความคิดเห็นของทุกคน (สำหรับผู้จัดการ)",
       },
     ],
   },
