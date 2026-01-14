@@ -352,6 +352,27 @@ export function AccountSelector({
           </Command>
         </PopoverContent>
       </Popover>
+      
+      {/* Show alternatives as chips below dropdown when account is selected */}
+      {alternatives.length > 0 && value && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          <span className="text-xs text-muted-foreground">ตัวเลือกอื่น:</span>
+          {alternatives.map((alt, idx) => (
+            <button
+              key={alt.accountId}
+              type="button"
+              onClick={() => onValueChange(alt.accountId)}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-muted-foreground/30 hover:bg-muted hover:border-primary transition-colors"
+            >
+              <span className="font-mono">{alt.accountCode}</span>
+              <span className="text-muted-foreground">{alt.accountName}</span>
+              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                #{idx + 2}
+              </Badge>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
