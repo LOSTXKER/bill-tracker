@@ -56,10 +56,16 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ companyCode }: NotificationCenterProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+
+  // Prevent hydration mismatch by waiting for client mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
@@ -174,6 +180,15 @@ export function NotificationCenter({ companyCode }: NotificationCenterProps) {
     if (days < 7) return `${days} วันที่แล้ว`;
     return date.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
   };
+
+  // Show placeholder before client hydration to prevent mismatch
+  if (!mounted) {
+    return (
+      <Button variant="ghost" size="icon" className="relative">
+        <Bell className="h-5 w-5" />
+      </Button>
+    );
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>

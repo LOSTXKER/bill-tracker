@@ -70,10 +70,13 @@ export interface TransactionFieldsSectionProps {
   selectedAccount: string | null;
   onAccountChange: (value: string | null) => void;
   suggestedAccountId?: string;
-  
-  // Optional AI suggestion button
-  onSuggestAccount?: () => void;
-  isSuggestingAccount?: boolean;
+  suggestedAccountAlternatives?: Array<{
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    confidence: number;
+    reason: string;
+  }>;
   
   // AI-detected new vendor suggestion
   aiVendorSuggestion?: AiVendorSuggestion | null;
@@ -107,8 +110,7 @@ export function TransactionFieldsSection({
   selectedAccount,
   onAccountChange,
   suggestedAccountId,
-  onSuggestAccount,
-  isSuggestingAccount,
+  suggestedAccountAlternatives,
   aiVendorSuggestion,
   referenceUrls = [],
   onReferenceUrlsChange,
@@ -124,11 +126,21 @@ export function TransactionFieldsSection({
   
   const addReferenceUrl = () => {
     if (!newReferenceUrl.trim()) return;
-    const url = newReferenceUrl.trim();
-    // Validate URL format
+    let url = newReferenceUrl.trim();
+    
+    // Auto-add https:// if missing
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(url);
+    } catch {
+      // Invalid URL, don't add
       return;
     }
+    
     if (!referenceUrls.includes(url)) {
       onReferenceUrlsChange?.([...referenceUrls, url]);
     }
@@ -329,34 +341,16 @@ export function TransactionFieldsSection({
           aiVendorSuggestion={aiVendorSuggestion}
         />
 
-        {/* Account Selector with AI Button */}
+        {/* Account Selector - AI แนะนำจากเอกสารอัตโนมัติ */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-sm font-medium">บัญชี</Label>
-            {onSuggestAccount && (
-              <button
-                type="button"
-                className="inline-flex items-center h-7 px-2.5 text-xs border border-primary/30 rounded-md hover:bg-primary/10 hover:text-primary hover:border-primary disabled:opacity-50"
-                onClick={onSuggestAccount}
-                disabled={isSuggestingAccount}
-              >
-                {isSuggestingAccount ? (
-                  <span className="animate-spin h-3.5 w-3.5">⏳</span>
-                ) : (
-                  <>
-                    <span className="mr-1.5">✨</span>
-                    <span className="font-medium">AI แนะนำ</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+          <Label className="text-sm font-medium">บัญชี</Label>
           <AccountSelector
             value={selectedAccount}
             onValueChange={onAccountChange}
             companyCode={companyCode}
             placeholder="เลือกบัญชี"
             suggestedAccountId={suggestedAccountId}
+            alternatives={suggestedAccountAlternatives}
           />
         </div>
       </div>
@@ -486,7 +480,7 @@ export function TransactionFieldsSection({
           {/* Add new URL */}
           <div className="flex gap-2">
             <Input
-              placeholder="https://..."
+              placeholder="พิมพ์ลิงค์ เช่น shopee.co.th/..."
               value={newReferenceUrl}
               onChange={(e) => setNewReferenceUrl(e.target.value)}
               onKeyDown={(e) => {
@@ -499,9 +493,9 @@ export function TransactionFieldsSection({
             />
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="icon"
-              className="h-10 w-10 flex-shrink-0"
+              className="h-10 w-10 flex-shrink-0 bg-primary hover:bg-primary/90"
               onClick={addReferenceUrl}
               disabled={!newReferenceUrl.trim()}
             >
@@ -509,7 +503,7 @@ export function TransactionFieldsSection({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            เพิ่มลิงค์สินค้า, ลิงค์ติดตามพัสดุ, หรือลิงค์อ้างอิงอื่นๆ
+            เพิ่มลิงค์สินค้า, ลิงค์ติดตามพัสดุ, หรือลิงค์อ้างอิงอื่นๆ (ระบบจะเติม https:// ให้อัตโนมัติ)
           </p>
         </div>
       )}

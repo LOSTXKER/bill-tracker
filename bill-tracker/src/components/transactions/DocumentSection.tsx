@@ -3,6 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { extractDisplayName } from "@/lib/storage/upload";
 
 interface DocumentSectionProps {
   label: string;
@@ -76,10 +77,11 @@ export function DocumentSection({
       {urls.length > 0 && (
         <div className="grid gap-2">
           {urls.map((url, index) => {
-            const fileName = url.split("/").pop() || `ไฟล์ ${index + 1}`;
+            const rawFileName = url.split("/").pop() || `ไฟล์ ${index + 1}`;
+            const displayName = extractDisplayName(rawFileName);
             const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
             const shortName =
-              fileName.length > 20 ? fileName.substring(0, 20) + "..." : fileName;
+              displayName.length > 20 ? displayName.substring(0, 20) + "..." : displayName;
 
             return (
               <div
@@ -95,7 +97,7 @@ export function DocumentSection({
                   {isImage ? (
                     <img
                       src={url}
-                      alt={fileName}
+                      alt={displayName}
                       className="w-full h-full object-cover"
                     />
                   ) : (

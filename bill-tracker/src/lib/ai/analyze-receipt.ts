@@ -1,94 +1,45 @@
 /**
- * 🧠 AI Receipt Analyzer - ระบบ AI ใหม่ที่ทำทุกอย่างในครั้งเดียว
+ * 🧠 AI Receipt Analyzer - ระบบ AI อัจฉริยะ
+ * 
+ * แนวคิด: AI ฉลาดอยู่แล้ว - ส่ง context ให้มัน แล้วให้มันตัดสินใจเอง
  * 
  * Flow:
- * 1. รับรูปใบเสร็จ + ผังบัญชี + ผู้ติดต่อ
- * 2. AI วิเคราะห์ทุกอย่างในคำสั่งเดียว
- * 3. Return ข้อมูลครบ พร้อมใช้งาน
+ * 1. ดึงข้อมูล: ผังบัญชี + ผู้ติดต่อทั้งหมด
+ * 2. ส่งให้ AI พร้อมรูปเอกสาร
+ * 3. AI วิเคราะห์และ return ข้อมูลครบ (รวม contact matching)
  */
 
 import { prisma } from "@/lib/db";
 import { analyzeImage } from "./gemini";
 
-// =============================================================================
-// Types
-// =============================================================================
+// Import types from centralized location
+import type {
+  ReceiptAnalysisInput,
+  AnalyzedVendor,
+  AnalyzedAccount,
+  AccountAlternative,
+  AnalyzedWHT,
+  ConfidenceScores,
+  AnalysisWarning,
+  ReceiptAnalysisResult,
+} from "./types";
 
-export interface ReceiptAnalysisInput {
-  imageUrls: string[];
-  companyId: string;
-  transactionType: "EXPENSE" | "INCOME";
-}
-
-export interface AnalyzedVendor {
-  name: string | null;
-  taxId: string | null;
-  address: string | null;
-  phone: string | null;
-  branchNumber: string | null;
-  matchedContactId: string | null;
-  matchedContactName: string | null;
-}
-
-export interface AnalyzedAccount {
-  id: string | null;
-  code: string | null;
-  name: string | null;
-}
-
-export interface AnalyzedWHT {
-  rate: number | null;  // 1, 3, 5
-  amount: number | null;
-  type: string | null;  // ค่าบริการ, ค่าเช่า, ค่าจ้างทำของ
-}
-
-export interface ConfidenceScores {
-  overall: number;
-  vendor: number;
-  amount: number;
-  date: number;
-  account: number;
-}
-
-export interface ReceiptAnalysisResult {
-  // ข้อมูลพื้นฐาน
-  vendor: AnalyzedVendor;
-  date: string | null;  // ISO date string
-  amount: number | null;
-  vatAmount: number | null;
-  vatRate: number | null;  // 0 or 7
-  wht: AnalyzedWHT;
-  netAmount: number | null;
-  
-  // บัญชีที่แนะนำ
-  account: AnalyzedAccount;
-  
-  // ประเภทเอกสาร
-  documentType: string | null;  // TAX_INVOICE, RECEIPT, SLIP, WHT_CERT
-  
-  // เลขที่เอกสาร
-  invoiceNumber: string | null;  // เลขที่ใบกำกับภาษี/ใบเสร็จ
-  
-  // รายการ (ถ้ามี)
-  items: string[];
-  
-  // Confidence
-  confidence: ConfidenceScores;
-  
-  // คำอธิบาย
-  description: string | null;
-  
-  // ข้อมูลดิบจาก AI (สำหรับ debug)
-  rawText?: string;
-}
+// Re-export types for convenience
+export type {
+  ReceiptAnalysisInput,
+  AnalyzedVendor,
+  AnalyzedAccount,
+  AccountAlternative,
+  AnalyzedWHT,
+  ConfidenceScores,
+  AnalysisWarning,
+  ReceiptAnalysisResult,
+};
 
 // =============================================================================
 // Main Function
 // =============================================================================
 
-/**
- * วิเคราะห์ใบเสร็จด้วย AI - ทำทุกอย่างในครั้งเดียว
- */
 export async function analyzeReceipt(
   input: ReceiptAnalysisInput
 ): Promise<ReceiptAnalysisResult | { error: string }> {
@@ -99,12 +50,13 @@ export async function analyzeReceipt(
   }
 
   try {
-    // 1. ดึงข้อมูลที่ต้องใช้ (ทำพร้อมกัน)
-    const [accounts, company] = await Promise.all([
+    // 1. ดึงข้อมูลทั้งหมดที่ AI ต้องใช้
+    const [accounts, contacts, company] = await Promise.all([
       fetchAccounts(companyId, transactionType),
+      fetchContacts(companyId),
       prisma.company.findUnique({
         where: { id: companyId },
-        select: { taxId: true },
+        select: { name: true, taxId: true },
       }),
     ]);
 
@@ -112,23 +64,20 @@ export async function analyzeReceipt(
       return { error: "ไม่มีผังบัญชีในระบบ กรุณา Import จาก Peak ก่อน" };
     }
 
-    // Company tax ID to exclude from vendor extraction
-    const companyTaxId = company?.taxId || null;
+    // 2. สร้าง Prompt ที่ส่ง context ทั้งหมดให้ AI
+    const prompt = buildSmartPrompt(accounts, contacts, transactionType, company);
 
-    // 2. สร้าง Prompt (no contacts - matching done in smart-ocr.ts)
-    const prompt = buildAnalysisPrompt(accounts, transactionType);
-
-    // 3. วิเคราะห์ทุกไฟล์ (parallel)
+    // 3. วิเคราะห์ทุกไฟล์
     const analysisPromises = imageUrls.map(async (url) => {
       const response = await analyzeImage(url, prompt, {
         temperature: 0.1,
-        maxTokens: 2048,
+        maxTokens: 4096,
       });
       if (response.error) {
         console.error("[analyzeReceipt] AI error for", url, response.error);
         return null;
       }
-      return parseAIResponse(response.data, accounts, companyTaxId);
+      return parseAIResponse(response.data, accounts, contacts, company?.taxId);
     });
 
     const results = await Promise.all(analysisPromises);
@@ -138,14 +87,12 @@ export async function analyzeReceipt(
       return { error: "AI ไม่สามารถวิเคราะห์ได้" };
     }
 
-    // 4. ถ้ามีแค่ไฟล์เดียว ใช้ผลลัพธ์นั้นเลย
+    // 4. ถ้ามีหลายไฟล์ → รวมผลลัพธ์
     if (validResults.length === 1) {
       return validResults[0];
     }
 
-    // 5. รวมผลลัพธ์จากหลายไฟล์
-    const combinedResult = combineMultipleResults(validResults);
-    return combinedResult;
+    return combineResults(validResults);
 
   } catch (error) {
     console.error("[analyzeReceipt] Error:", error);
@@ -178,84 +125,81 @@ async function fetchAccounts(companyId: string, transactionType: "EXPENSE" | "IN
   });
 }
 
+async function fetchContacts(companyId: string) {
+  return prisma.contact.findMany({
+    where: { companyId },
+    select: {
+      id: true,
+      name: true,
+      taxId: true,
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
 // =============================================================================
-// Prompt Building
+// Smart Prompt - ให้ AI เข้าใจ context และตัดสินใจเอง
 // =============================================================================
 
-function buildAnalysisPrompt(
+function buildSmartPrompt(
   accounts: { id: string; code: string; name: string; description: string | null }[],
-  transactionType: "EXPENSE" | "INCOME"
+  contacts: { id: string; name: string; taxId: string | null }[],
+  transactionType: "EXPENSE" | "INCOME",
+  company: { name: string; taxId: string | null } | null
 ): string {
   // สร้างรายการบัญชี
   const accountList = accounts
-    .map(a => `${a.code}|${a.name}|${a.id}`)
+    .map(a => `- ${a.code} | ${a.name} | ID: ${a.id}`)
     .join("\n");
 
-  // NOTE: Contact matching is done in smart-ocr.ts, not here
+  // สร้างรายการผู้ติดต่อ
+  const contactList = contacts.length > 0
+    ? contacts.map(c => `- ${c.name}${c.taxId ? ` (${c.taxId})` : ""} | ID: ${c.id}`).join("\n")
+    : "(ไม่มีผู้ติดต่อในระบบ)";
 
-  return `คุณเป็นนักบัญชีผู้เชี่ยวชาญ วิเคราะห์ใบเสร็จ/เอกสารนี้แล้วตอบเป็น JSON
+  return `คุณเป็นนักบัญชีผู้เชี่ยวชาญ วิเคราะห์เอกสารนี้แล้วตอบเป็น JSON
 
-## ประเภทรายการ: ${transactionType === "EXPENSE" ? "รายจ่าย" : "รายรับ"}
+## ข้อมูลบริษัทของเรา
+- ชื่อ: ${company?.name || "ไม่ระบุ"}
+- เลขภาษี: ${company?.taxId || "ไม่ระบุ"}
 
-## ⚠️ สำคัญมาก: ต้องแยกแยะ "ผู้ขาย" vs "ผู้ซื้อ/ลูกค้า"
-เอกสารมักมี 2 ฝ่าย - ต้องระวังอย่าสับสน!
+## ประเภทรายการ: ${transactionType === "EXPENSE" ? "รายจ่าย (เราเป็นผู้ซื้อ)" : "รายรับ (เราเป็นผู้ขาย)"}
 
-**ผู้ขาย (Seller/Vendor) = ร้านที่ออกบิล:**
-- ปกติอยู่ **ด้านบนสุด** ของเอกสาร หรือมี **logo**
-- มีหัวข้อแบบ: ชื่อบริษัท, ที่อยู่, เบอร์โทร (ไม่มีคำว่า "ลูกค้า")
-- นี่คือข้อมูลที่เราต้องการใส่ใน vendor
-
-**ผู้ซื้อ/ลูกค้า (Buyer/Customer) = คนที่ซื้อสินค้า:**
-- ปกติอยู่หลังคำว่า: "ลูกค้า", "CUSTOMER", "ชื่อผู้ซื้อ", "นาม"
-- เลขประจำตัวผู้เสียภาษีในส่วนนี้คือของลูกค้า **ไม่ใช่ของผู้ขาย**
-- **ห้ามนำมาใส่ใน vendor.taxId!**
-
-**ถ้าผู้ขายไม่มีเลขภาษี** → vendor.taxId = null (อย่าเอาเลขของลูกค้ามาใส่!)
-
-## ผังบัญชีที่มี (รหัส|ชื่อ|ID)
+## ผังบัญชีที่มี
 ${accountList}
 
+## รายชื่อผู้ติดต่อที่มีในระบบ
+${contactList}
+
 ## สิ่งที่ต้องทำ
-1. **แยกแยะผู้ขาย vs ผู้ซื้อให้ถูกต้อง** (ดูตำแหน่งและ context)
-2. อ่านข้อมูล**ผู้ขาย** (ชื่อร้าน, เลขภาษี**ของผู้ขาย**, วันที่, ยอดเงิน, VAT, WHT)
-3. เลือกบัญชีที่เหมาะสมที่สุดจากผังบัญชี
-4. ให้ Confidence สูง (85-98%) ถ้าเลือกบัญชีได้
-5. **ห้ามจับคู่ผู้ติดต่อ** - ระบบจะจับคู่เองภายหลัง
 
-## การดึงข้อมูลหัก ณ ที่จ่าย (WHT) - สำคัญมาก!
-ต้องหา WHT จากหลายรูปแบบ:
-1. **"ภาษีหัก ณ ที่จ่าย"** หรือ **"จำนวนเงินที่ถูกหัก ณ ที่จ่าย"** → นี่คือ whtAmount
-2. **"ยอดสุทธิ"** หรือ **"จำนวนเงินที่ชำระ"** → นี่คือ netAmount (ยอดรวม - WHT)
-3. ถ้าพบ whtAmount แต่ไม่พบ whtRate → คำนวณ: whtRate = (whtAmount / ยอดก่อน VAT) * 100
-   - ถ้าได้ 3% → whtRate = 3
-   - ถ้าได้ 1% → whtRate = 1  
-   - ถ้าได้ 5% → whtRate = 5
-4. ประเภท WHT ทั่วไป:
-   - ค่าบริการ: 3%
-   - ค่าเช่า: 5%
-   - ค่าจ้างทำของ: 3%
-   - ค่าขนส่ง: 1%
-   - ค่าโฆษณา: 2%
+1. **อ่านเอกสาร** - ดูว่าเป็นเอกสารอะไร (ใบกำกับภาษี, ใบเสร็จ, สลิป, ใบหัก ณ ที่จ่าย)
 
-## ความรู้ที่คุณมี (ใช้เลือกบัญชี)
-- ซอฟต์แวร์/SaaS: Cursor, GitHub, Notion, Figma, Adobe, Microsoft, Google → ค่าซอฟต์แวร์/ค่าบริการ
-- Cloud: AWS, Vercel, Cloudflare, Firebase → ค่าบริการ/ค่าซอฟต์แวร์
-- โฆษณา: Facebook Ads, Google Ads, LINE Ads → ค่าโฆษณา
-- โทรศัพท์: TRUE, AIS, DTAC → ค่าโทรศัพท์
-- สาธารณูปโภค: การไฟฟ้า, การประปา → ค่าสาธารณูปโภค
-- ขนส่ง: Kerry, Flash, Grab → ค่าขนส่ง
-- น้ำมัน: PTT, Shell, Esso → ค่าน้ำมัน
-- อาหาร: 7-Eleven, Starbucks, ร้านอาหาร → ค่าอาหาร/รับรอง
-- จ้างทำของ/พัฒนาระบบ → ค่าจ้างทำของ/ค่าบริการ
+2. **หาผู้ขาย/ผู้ติดต่อ** 
+   - ${transactionType === "EXPENSE" ? "หาชื่อ ผู้ขาย (ร้านที่ออกบิล ไม่ใช่ชื่อบริษัทเรา)" : "หาชื่อ ลูกค้า"}
+   - ดึงเลขประจำตัวผู้เสียภาษี (ถ้ามี)
+   - **สำคัญ: ตรวจสอบว่าผู้ขาย/ผู้ติดต่อนี้มีในรายชื่อข้างบนหรือไม่**
+   - ถ้าพบตรงกัน (ชื่อคล้ายกัน หรือ เลขภาษีตรงกัน) → ใส่ matchedContactId
+   - ถ้าไม่พบ → matchedContactId = null
+
+3. **ดึงข้อมูลการเงิน**
+   - ยอดก่อน VAT (amount)
+   - VAT (vatAmount, vatRate)
+   - หัก ณ ที่จ่าย (whtRate, whtAmount, whtType)
+   - ยอดสุทธิที่ต้องจ่าย/รับจริง (netAmount)
+
+4. **เลือกบัญชี** - เลือกบัญชีที่เหมาะสมที่สุด + ทางเลือกอื่นอีก 2 บัญชี
 
 ## ตอบ JSON เท่านั้น (ห้ามมี text อื่น)
 {
   "vendor": {
-    "name": "ชื่อร้าน/บริษัท",
-    "taxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก ของ**ผู้ขาย**เท่านั้น หรือ null ถ้าไม่มี",
+    "name": "ชื่อผู้ขาย/ผู้ติดต่อ",
+    "taxId": "เลขภาษี 13 หลัก หรือ null",
     "address": "ที่อยู่ หรือ null",
     "phone": "เบอร์โทร หรือ null",
-    "branchNumber": "สาขา เช่น 00000 หรือ null"
+    "branchNumber": "รหัสสาขา เช่น 00000 หรือ null",
+    "matchedContactId": "ID ของผู้ติดต่อที่ match (จากรายชื่อข้างบน) หรือ null ถ้าไม่พบ",
+    "matchedContactName": "ชื่อผู้ติดต่อที่ match หรือ null"
   },
   "date": "YYYY-MM-DD",
   "amount": 8000.00,
@@ -268,14 +212,20 @@ ${accountList}
   },
   "netAmount": 8320.00,
   "account": {
-    "id": "ID จากผังบัญชี",
-    "code": "รหัส 6 หลัก",
-    "name": "ชื่อบัญชี"
+    "id": "ID ของบัญชีที่เลือก",
+    "code": "รหัสบัญชี",
+    "name": "ชื่อบัญชี",
+    "confidence": 90,
+    "reason": "เหตุผลสั้นๆ ที่เลือกบัญชีนี้"
   },
-  "documentType": "TAX_INVOICE",
-  "invoiceNumber": "เลขที่ใบกำกับภาษี/ใบเสร็จ เช่น 'IV2401-0001' หรือ null ถ้าไม่มี",
+  "accountAlternatives": [
+    { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 75, "reason": "เหตุผล" },
+    { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 60, "reason": "เหตุผล" }
+  ],
+  "documentType": "TAX_INVOICE | RECEIPT | BANK_SLIP | WHT_CERT",
+  "invoiceNumber": "เลขที่เอกสาร หรือ null",
   "items": ["รายการที่ 1", "รายการที่ 2"],
-  "description": "สรุปสั้นๆ ว่าค่าใช้จ่ายนี้คืออะไร",
+  "description": "สรุปสั้นๆ ว่าค่าใช้จ่าย/รายรับนี้คืออะไร",
   "confidence": {
     "overall": 90,
     "vendor": 95,
@@ -285,153 +235,12 @@ ${accountList}
   }
 }
 
-## ตัวอย่าง: ถ้าเอกสารมี
-- ยอดก่อน VAT: 8,000 บาท
-- VAT 7%: 560 บาท
-- ยอดรวม: 8,560 บาท
-- จำนวนเงินที่ถูกหัก ณ ที่จ่าย: 240 บาท
-- จำนวนเงินที่ชำระ: 8,320 บาท
-
-ต้องตอบ:
-- amount: 8000
-- vatAmount: 560
-- vatRate: 7
-- wht.rate: 3 (เพราะ 240/8000 = 3%)
-- wht.amount: 240
-- wht.type: "ค่าบริการ" (หรือดูจากรายละเอียด)
-- netAmount: 8320`;
-}
-
-// =============================================================================
-// Combine Multiple Results
-// =============================================================================
-
-/**
- * รวมผลลัพธ์จากหลายเอกสาร
- * - รวมยอดเงินทั้งหมด
- * - ใช้วันที่ล่าสุด
- * - รวม description
- * - ใช้ vendor จากเอกสารแรกที่มีข้อมูล
- */
-function combineMultipleResults(results: ReceiptAnalysisResult[]): ReceiptAnalysisResult {
-  // รวมยอดเงิน
-  let totalAmount = 0;
-  let totalVatAmount = 0;
-  let totalNetAmount = 0;
-  let totalWhtAmount = 0;
-
-  // เก็บ descriptions
-  const descriptions: string[] = [];
-  const allItems: string[] = [];
-  const invoiceNumbers: string[] = [];
-
-  // หา vendor จากเอกสารแรกที่มีข้อมูล
-  let bestVendor: ReceiptAnalysisResult["vendor"] | null = null;
-  let bestAccount: ReceiptAnalysisResult["account"] | null = null;
-  let latestDate: string | null = null;
-  let documentType: string | null = null;
-  let whtRate: number | null = null;
-  let whtType: string | null = null;
-  let vatRate: number | null = null;
-
-  for (const result of results) {
-    // รวมยอดเงิน
-    if (result.amount) totalAmount += result.amount;
-    if (result.vatAmount) totalVatAmount += result.vatAmount;
-    if (result.netAmount) totalNetAmount += result.netAmount;
-    if (result.wht.amount) totalWhtAmount += result.wht.amount;
-
-    // เก็บ descriptions
-    if (result.description) {
-      descriptions.push(result.description);
-    }
-
-    // เก็บ items
-    if (result.items.length > 0) {
-      allItems.push(...result.items);
-    }
-
-    // เก็บ invoice numbers
-    if (result.invoiceNumber) {
-      invoiceNumbers.push(result.invoiceNumber);
-    }
-
-    // ใช้ vendor จากเอกสารแรกที่มีข้อมูล
-    if (!bestVendor && result.vendor.name) {
-      bestVendor = result.vendor;
-    }
-
-    // ใช้ account จากเอกสารที่มี confidence สูงสุด
-    if (result.account.id && (!bestAccount || result.confidence.account > 0)) {
-      bestAccount = result.account;
-    }
-
-    // ใช้วันที่ล่าสุด
-    if (result.date) {
-      if (!latestDate || result.date > latestDate) {
-        latestDate = result.date;
-      }
-    }
-
-    // ใช้ document type แรกที่พบ
-    if (!documentType && result.documentType) {
-      documentType = result.documentType;
-    }
-
-    // ใช้ WHT rate แรกที่พบ
-    if (!whtRate && result.wht.rate) {
-      whtRate = result.wht.rate;
-      whtType = result.wht.type;
-    }
-
-    // ใช้ VAT rate แรกที่พบ
-    if (vatRate === null && result.vatRate !== null) {
-      vatRate = result.vatRate;
-    }
-  }
-
-  // สร้าง combined description
-  const uniqueDescriptions = [...new Set(descriptions)];
-  const combinedDescription = uniqueDescriptions.length > 0
-    ? uniqueDescriptions.join(" + ")
-    : null;
-
-  // คำนวณ confidence เฉลี่ย
-  const avgConfidence = {
-    overall: Math.round(results.reduce((sum, r) => sum + r.confidence.overall, 0) / results.length),
-    vendor: Math.round(results.reduce((sum, r) => sum + r.confidence.vendor, 0) / results.length),
-    amount: Math.round(results.reduce((sum, r) => sum + r.confidence.amount, 0) / results.length),
-    date: Math.round(results.reduce((sum, r) => sum + r.confidence.date, 0) / results.length),
-    account: Math.round(results.reduce((sum, r) => sum + r.confidence.account, 0) / results.length),
-  };
-
-  return {
-    vendor: bestVendor || {
-      name: null,
-      taxId: null,
-      address: null,
-      phone: null,
-      branchNumber: null,
-      matchedContactId: null,
-      matchedContactName: null,
-    },
-    date: latestDate,
-    amount: totalAmount > 0 ? totalAmount : null,
-    vatAmount: totalVatAmount > 0 ? totalVatAmount : null,
-    vatRate: vatRate,
-    wht: {
-      rate: whtRate,
-      amount: totalWhtAmount > 0 ? totalWhtAmount : null,
-      type: whtType,
-    },
-    netAmount: totalNetAmount > 0 ? totalNetAmount : null,
-    account: bestAccount || { id: null, code: null, name: null },
-    documentType,
-    invoiceNumber: invoiceNumbers.length > 0 ? invoiceNumbers.join(", ") : null,
-    items: [...new Set(allItems)],
-    confidence: avgConfidence,
-    description: combinedDescription,
-  };
+## หมายเหตุสำคัญ
+- ถ้าเอกสารมีชื่อบริษัทเรา (${company?.name || ""}) ให้ข้ามไป มองหาชื่ออีกฝั่ง
+- เลขภาษีของบริษัทเรา (${company?.taxId || ""}) ไม่ใช่ของผู้ขาย
+- VAT rate ในไทยคือ 0% หรือ 7%
+- WHT rate ทั่วไป: 1%, 2%, 3%, 5%
+- ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)`;
 }
 
 // =============================================================================
@@ -441,6 +250,7 @@ function combineMultipleResults(results: ReceiptAnalysisResult[]): ReceiptAnalys
 function parseAIResponse(
   rawResponse: string,
   accounts: { id: string; code: string; name: string }[],
+  contacts: { id: string; name: string; taxId: string | null }[],
   companyTaxId: string | null = null
 ): ReceiptAnalysisResult {
   let jsonText = rawResponse.trim();
@@ -453,7 +263,7 @@ function parseAIResponse(
   try {
     const parsed = JSON.parse(jsonText);
 
-    // Validate และ normalize account
+    // Validate account
     let account: AnalyzedAccount = { id: null, code: null, name: null };
     if (parsed.account?.id) {
       const matchedAccount = accounts.find(a => a.id === parsed.account.id);
@@ -462,14 +272,69 @@ function parseAIResponse(
           id: matchedAccount.id,
           code: matchedAccount.code,
           name: matchedAccount.name,
+          confidence: parsed.account.confidence || parsed.confidence?.account || 0,
+          reason: parsed.account.reason || "AI วิเคราะห์จากเอกสาร",
         };
       }
     }
 
-    // Contact matching is now done in smart-ocr.ts, not here
-    // AI no longer returns matchedContactId
+    // Parse account alternatives
+    const accountAlternatives: AccountAlternative[] = [];
+    if (parsed.accountAlternatives && Array.isArray(parsed.accountAlternatives)) {
+      for (const alt of parsed.accountAlternatives) {
+        if (alt?.id) {
+          const matchedAlt = accounts.find(a => a.id === alt.id);
+          if (matchedAlt && matchedAlt.id !== account.id) {
+            accountAlternatives.push({
+              id: matchedAlt.id,
+              code: matchedAlt.code,
+              name: matchedAlt.name,
+              confidence: alt.confidence || 50,
+              reason: alt.reason || "ทางเลือกอื่น",
+            });
+          }
+        }
+      }
+    }
+    console.log("[AI] Account:", account.code, "| Alternatives:", accountAlternatives.map(a => a.code).join(", ") || "none");
 
-    // Normalize date (แปลง พ.ศ. เป็น ค.ศ. ถ้าจำเป็น)
+    // Validate contact (AI อาจ match ผิด ต้องเช็คอีกที)
+    let matchedContactId: string | null = null;
+    let matchedContactName: string | null = null;
+    
+    if (parsed.vendor?.matchedContactId) {
+      const matchedContact = contacts.find(c => c.id === parsed.vendor.matchedContactId);
+      if (matchedContact) {
+        matchedContactId = matchedContact.id;
+        matchedContactName = matchedContact.name;
+      }
+    }
+
+    // ถ้า AI ไม่ match แต่เรามี taxId → ลองหาเอง
+    if (!matchedContactId && parsed.vendor?.taxId) {
+      const normalizedTaxId = parsed.vendor.taxId.replace(/[^0-9]/g, "");
+      const foundByTaxId = contacts.find(c => 
+        c.taxId?.replace(/[^0-9]/g, "") === normalizedTaxId
+      );
+      if (foundByTaxId) {
+        matchedContactId = foundByTaxId.id;
+        matchedContactName = foundByTaxId.name;
+        console.log("[AI] Contact matched by taxId verification:", foundByTaxId.name);
+      }
+    }
+
+    // Validate vendor tax ID - ไม่ใช่ tax ID ของบริษัทเรา
+    let vendorTaxId = parsed.vendor?.taxId || null;
+    if (vendorTaxId && companyTaxId) {
+      const normalizedVendorTaxId = vendorTaxId.replace(/[^0-9]/g, "");
+      const normalizedCompanyTaxId = companyTaxId.replace(/[^0-9]/g, "");
+      if (normalizedVendorTaxId === normalizedCompanyTaxId) {
+        console.log("[AI] Rejected vendor tax ID - matches company tax ID");
+        vendorTaxId = null;
+      }
+    }
+
+    // Normalize date (พ.ศ. → ค.ศ.)
     let normalizedDate = parsed.date;
     if (normalizedDate) {
       const yearMatch = normalizedDate.match(/^(\d{4})/);
@@ -490,23 +355,10 @@ function parseAIResponse(
     // Normalize WHT rate
     let whtRate = parsed.wht?.rate;
     if (whtRate && ![1, 2, 3, 5, 10, 15].includes(whtRate)) {
-      // Round to nearest common rate
       if (whtRate < 2) whtRate = 1;
       else if (whtRate < 4) whtRate = 3;
       else if (whtRate < 7) whtRate = 5;
       else whtRate = null;
-    }
-
-    // Validate vendor tax ID - reject if it matches our company's tax ID (customer info, not vendor!)
-    let vendorTaxId = parsed.vendor?.taxId || null;
-    if (vendorTaxId && companyTaxId) {
-      // Normalize both (remove dashes, spaces)
-      const normalizedVendorTaxId = vendorTaxId.replace(/[-\s]/g, "");
-      const normalizedCompanyTaxId = companyTaxId.replace(/[-\s]/g, "");
-      if (normalizedVendorTaxId === normalizedCompanyTaxId) {
-        console.log("[parseAIResponse] Rejected vendor tax ID - matches company tax ID:", vendorTaxId);
-        vendorTaxId = null;
-      }
     }
 
     return {
@@ -516,8 +368,8 @@ function parseAIResponse(
         address: parsed.vendor?.address || null,
         phone: parsed.vendor?.phone || null,
         branchNumber: parsed.vendor?.branchNumber || null,
-        matchedContactId: null,  // Contact matching done in smart-ocr.ts
-        matchedContactName: null,
+        matchedContactId,
+        matchedContactName,
       },
       date: normalizedDate || null,
       amount: typeof parsed.amount === "number" ? parsed.amount : null,
@@ -530,6 +382,7 @@ function parseAIResponse(
       },
       netAmount: typeof parsed.netAmount === "number" ? parsed.netAmount : null,
       account,
+      accountAlternatives: accountAlternatives.slice(0, 2),  // Max 2 alternatives
       documentType: parsed.documentType || null,
       invoiceNumber: parsed.invoiceNumber || null,
       items: Array.isArray(parsed.items) ? parsed.items : [],
@@ -541,6 +394,7 @@ function parseAIResponse(
         account: parsed.confidence?.account || 0,
       },
       description: parsed.description || null,
+      warnings: [],
       rawText: rawResponse,
     };
 
@@ -548,30 +402,132 @@ function parseAIResponse(
     console.error("[parseAIResponse] Parse error:", error);
     console.error("[parseAIResponse] Raw:", rawResponse);
 
-    // Return empty result
-    return {
-      vendor: {
-        name: null,
-        taxId: null,
-        address: null,
-        phone: null,
-        branchNumber: null,
-        matchedContactId: null,
-        matchedContactName: null,
-      },
-      date: null,
-      amount: null,
-      vatAmount: null,
-      vatRate: null,
-      wht: { rate: null, amount: null, type: null },
-      netAmount: null,
-      account: { id: null, code: null, name: null },
-      documentType: null,
-      invoiceNumber: null,
-      items: [],
-      confidence: { overall: 0, vendor: 0, amount: 0, date: 0, account: 0 },
-      description: null,
-      rawText: rawResponse,
+    return createEmptyResult(rawResponse);
+  }
+}
+
+function createEmptyResult(rawText?: string): ReceiptAnalysisResult {
+  return {
+    vendor: {
+      name: null,
+      taxId: null,
+      address: null,
+      phone: null,
+      branchNumber: null,
+      matchedContactId: null,
+      matchedContactName: null,
+    },
+    date: null,
+    amount: null,
+    vatAmount: null,
+    vatRate: null,
+    wht: { rate: null, amount: null, type: null },
+    netAmount: null,
+    account: { id: null, code: null, name: null },
+    accountAlternatives: [],
+    documentType: null,
+    invoiceNumber: null,
+    items: [],
+    confidence: { overall: 0, vendor: 0, amount: 0, date: 0, account: 0 },
+    description: null,
+    warnings: [],
+    rawText,
+  };
+}
+
+// =============================================================================
+// Combine Multiple Results - Priority-Based (Not Sum)
+// =============================================================================
+
+/**
+ * รวมผลการวิเคราะห์จากหลายเอกสาร
+ * 
+ * หลักการ: ใช้ลำดับความสำคัญ ไม่ใช่การรวมยอด
+ * - ใบกำกับภาษี: แหล่งหลัก (ยอด, ผู้ขาย, วันที่, รายการ)
+ * - สลิปโอน: ยืนยันการจ่าย, อาจได้วันจ่ายจริง
+ * - ใบหักที่จ่าย: ข้อมูล WHT
+ */
+function combineResults(results: ReceiptAnalysisResult[]): ReceiptAnalysisResult {
+  const warnings: AnalysisWarning[] = [];
+  
+  // จัดกลุ่มตามประเภทเอกสาร
+  const invoices = results.filter(r => 
+    r.documentType === "TAX_INVOICE" || r.documentType === "RECEIPT"
+  );
+  const slips = results.filter(r => r.documentType === "BANK_SLIP");
+  const whtCerts = results.filter(r => r.documentType === "WHT_CERT");
+  const others = results.filter(r => 
+    !["TAX_INVOICE", "RECEIPT", "BANK_SLIP", "WHT_CERT"].includes(r.documentType || "")
+  );
+
+  // เลือกเอกสารหลักตามลำดับความสำคัญ
+  const primaryDoc = invoices[0] || slips[0] || others[0] || results[0];
+  
+  if (!primaryDoc) {
+    return createEmptyResult();
+  }
+
+  // ⚠️ เตือนเฉพาะกรณีเดียว: หลายใบกำกับจากคนละร้าน (ควรแยกรายการ)
+  if (invoices.length > 1) {
+    const vendorNames = [...new Set(invoices.map(i => i.vendor.name).filter(Boolean))];
+    if (vendorNames.length > 1) {
+      warnings.push({
+        type: "multiple_invoices",
+        message: `พบใบกำกับ ${invoices.length} ใบ จากคนละร้าน - ควรสร้างแยกรายการ`,
+        severity: "warning",
+      });
+    }
+  }
+
+  // ดึงข้อมูลจากเอกสารหลัก
+  const result: ReceiptAnalysisResult = {
+    ...primaryDoc,
+    invoiceNumber: [...new Set(results.map(r => r.invoiceNumber).filter(Boolean))].join(", ") || null,
+    items: [...new Set(results.flatMap(r => r.items))],
+    description: [...new Set(results.map(r => r.description).filter(Boolean))].join(" | ") || null,
+    warnings, // เพิ่ม warnings
+  };
+
+  // เสริมข้อมูล WHT จากใบหักที่จ่าย
+  if (whtCerts.length > 0 && !result.wht.rate) {
+    const whtDoc = whtCerts[0];
+    result.wht = {
+      rate: whtDoc.wht.rate,
+      amount: whtDoc.wht.amount,
+      type: whtDoc.wht.type,
     };
   }
+
+  // ถ้าใบกำกับไม่มียอด แต่สลิปมี → ใช้จากสลิป
+  if (!result.amount && slips.length > 0 && slips[0].amount) {
+    result.amount = slips[0].amount;
+    result.netAmount = slips[0].netAmount;
+  }
+
+  // ไม่ตรวจสอบยอดอัตโนมัติ - เพราะมี use case หลากหลาย
+  // (จ่ายแบ่งงวด, หัก WHT, มัดจำ, จ่ายรวมหลายบิล ฯลฯ)
+  // ให้ user ตรวจสอบเอง
+
+  // เลือกบัญชีที่ดีที่สุด
+  const bestAccountDoc = results.reduce((best, current) => {
+    if (!current.account.id) return best;
+    if (!best) return current;
+    return (current.account.confidence || 0) > (best.account.confidence || 0) ? current : best;
+  }, null as ReceiptAnalysisResult | null);
+
+  if (bestAccountDoc && bestAccountDoc.account.id) {
+    result.account = bestAccountDoc.account;
+    result.accountAlternatives = bestAccountDoc.accountAlternatives;
+  }
+
+  // คำนวณ confidence เฉลี่ย
+  result.confidence = {
+    overall: Math.round(results.reduce((sum, r) => sum + r.confidence.overall, 0) / results.length),
+    vendor: Math.round(results.reduce((sum, r) => sum + r.confidence.vendor, 0) / results.length),
+    amount: Math.round(results.reduce((sum, r) => sum + r.confidence.amount, 0) / results.length),
+    date: Math.round(results.reduce((sum, r) => sum + r.confidence.date, 0) / results.length),
+    account: Math.round(results.reduce((sum, r) => sum + r.confidence.account, 0) / results.length),
+  };
+
+  return result;
 }

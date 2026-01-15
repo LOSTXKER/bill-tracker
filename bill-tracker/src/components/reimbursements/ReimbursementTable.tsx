@@ -17,6 +17,7 @@ import {
   XCircle,
   CreditCard,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import type { Reimbursement } from "@/types/reimbursement";
 import { getStatusConfig } from "@/types/reimbursement";
@@ -33,6 +34,7 @@ interface ReimbursementTableProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onPay: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const ReimbursementTable = memo(function ReimbursementTable({
@@ -46,6 +48,7 @@ export const ReimbursementTable = memo(function ReimbursementTable({
   onApprove,
   onReject,
   onPay,
+  onDelete,
 }: ReimbursementTableProps) {
   const allSelected = reimbursements.length > 0 && 
     reimbursements.filter(r => r.status === "APPROVED").every(r => selectedItems.has(r.id));
@@ -77,6 +80,7 @@ export const ReimbursementTable = memo(function ReimbursementTable({
             const isFlagged = reimbursement.status === "FLAGGED";
             const canApprove = reimbursement.status === "PENDING" || reimbursement.status === "FLAGGED";
             const canPay = reimbursement.status === "APPROVED";
+            const canDelete = ["PENDING", "FLAGGED", "REJECTED"].includes(reimbursement.status);
             const isProcessing = processingIds.has(reimbursement.id);
             const isSelected = selectedItems.has(reimbursement.id);
 
@@ -186,7 +190,20 @@ export const ReimbursementTable = memo(function ReimbursementTable({
                       </Button>
                     )}
 
-                    {!canApprove && !canPay && (
+                    {canDelete && onDelete && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                        onClick={() => onDelete(reimbursement.id)}
+                        disabled={isProcessing}
+                        title="ลบรายการ"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {!canApprove && !canPay && !canDelete && (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>

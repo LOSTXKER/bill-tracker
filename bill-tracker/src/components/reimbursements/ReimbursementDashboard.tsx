@@ -10,6 +10,16 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/shared/PageHeader";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Search,
   Clock,
@@ -22,6 +32,7 @@ import {
   BarChart3,
   Link as LinkIcon,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import type { ReimbursementTab } from "@/types/reimbursement";
 import { useReimbursementDashboard } from "@/hooks/use-reimbursement-dashboard";
@@ -37,6 +48,8 @@ interface ReimbursementDashboardProps {
 export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardProps) {
   const router = useRouter();
   const [batchPayDialogOpen, setBatchPayDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const {
     reimbursements,
@@ -57,6 +70,7 @@ export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardPr
     approve,
     reject,
     pay,
+    deleteRequest,
     batchPay,
   } = useReimbursementDashboard({
     companyCode,
@@ -79,6 +93,25 @@ export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardPr
     const success = await batchPay(Array.from(selectedItems), paymentRef, paymentMethod);
     if (success) {
       setBatchPayDialogOpen(false);
+    }
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+    
+    const success = await deleteRequest(deleteTargetId);
+    if (success) {
+      setDeleteDialogOpen(false);
+      setDeleteTargetId(null);
+      // Close sheet if viewing the deleted item
+      if (selectedId === deleteTargetId) {
+        setSelectedId(null);
+      }
     }
   };
 
@@ -338,6 +371,7 @@ export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardPr
           onApprove={handleApprove}
           onReject={(id) => setSelectedId(id)}
           onPay={(id) => setSelectedId(id)}
+          onDelete={handleDeleteClick}
         />
       )}
 
@@ -363,6 +397,37 @@ export function ReimbursementDashboard({ companyCode }: ReimbursementDashboardPr
         isProcessing={processingIds.size > 0}
         onConfirm={handleBatchPay}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              ยืนยันลบรายการเบิกจ่าย
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้? 
+              <br />
+              การดำเนินการนี้ไม่สามารถยกเลิกได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {processingIds.has(deleteTargetId || "") ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              ลบรายการ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

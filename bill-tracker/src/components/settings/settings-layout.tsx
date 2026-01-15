@@ -11,7 +11,6 @@ import {
   MessageSquare,
   Palette,
   Settings,
-  Brain,
   DollarSign,
   ChevronRight,
   Receipt,
@@ -23,7 +22,6 @@ import { UserInfoSection } from "./sections/user-info";
 import { LineBotSection } from "./sections/line-bot-section";
 import { NotificationSection } from "./sections/notification-section";
 import { AppearanceSection } from "./sections/appearance-section";
-import { AiTrainingSection } from "./sections/ai-training-section";
 import { ExchangeRatesSection } from "./sections/exchange-rates";
 import { WhtSettingsSection } from "./sections/wht-settings-section";
 
@@ -63,8 +61,7 @@ type SettingSection =
   | "user"
   | "appearance"
   | "line-bot"
-  | "notifications"
-  | "ai-training";
+  | "notifications";
 
 interface NavItem {
   id: SettingSection;
@@ -141,18 +138,6 @@ const navGroups: NavGroup[] = [
       },
     ],
   },
-  {
-    id: "automation",
-    label: "ระบบอัตโนมัติ",
-    items: [
-      {
-        id: "ai-training",
-        label: "สอน AI",
-        icon: <Brain className="h-4 w-4" />,
-        description: "สอน AI ให้จดจำร้านค้าและการตั้งค่า",
-      },
-    ],
-  },
 ];
 
 // Flatten for easy lookup
@@ -187,8 +172,6 @@ export function SettingsLayout({
         return <LineBotSection companyId={company.id} companyCode={company.code} />;
       case "notifications":
         return <NotificationSection companyId={company.id} />;
-      case "ai-training":
-        return <AiTrainingSection companyId={company.id} companyCode={company.code} />;
       default:
         return null;
     }

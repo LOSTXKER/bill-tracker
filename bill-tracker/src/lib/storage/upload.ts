@@ -25,9 +25,81 @@ export async function compressImage(file: File, options?: UploadOptions): Promis
 
 export function generateUniqueFilename(originalName: string): string {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 9);
+  // Sanitize filename: remove special chars but keep Thai characters
+  const baseName = originalName.replace(/\.[^/.]+$/, ""); // Remove extension
   const extension = originalName.split(".").pop();
-  return `${timestamp}-${random}.${extension}`;
+  // Clean the name: replace spaces with underscore, keep alphanumeric and Thai
+  const cleanName = baseName
+    .replace(/[^\u0E00-\u0E7Fa-zA-Z0-9_\-]/g, "_") // Keep Thai, alphanumeric, underscore, hyphen
+    .replace(/_+/g, "_") // Replace multiple underscores with single
+    .substring(0, 50); // Limit length
+  return `${timestamp}_${cleanName}.${extension}`;
+}
+
+/**
+ * Extract original filename from stored filename
+ * Handles multiple formats:
+ * - New (base64): "1768505912582_c-OquOC4seC4meC4kuC4sg.pdf" → "สัญญาเช่า.pdf"
+ * - Old: "1768505912582-abc123.jpg" → "รูปภาพ.jpg"
+ */
+export function extractDisplayName(storedFilename: string): string {
+  if (!storedFilename) return "ไฟล์";
+  
+  // Get extension
+  const extMatch = storedFilename.match(/\.([^.]+)$/);
+  const extension = extMatch ? extMatch[1] : "";
+  
+  // Check if it's the old format: timestamp-random.ext (13 digits + hyphen + random chars)
+  const oldFormatMatch = storedFilename.match(/^(\d{13})-([a-z0-9]+)\.(\w+)$/i);
+  if (oldFormatMatch) {
+    // Old format - just show generic name with extension
+    const extName = extension.toLowerCase();
+    if (["jpg", "jpeg", "png", "webp", "gif"].includes(extName)) {
+      return `รูปภาพ.${extension}`;
+    } else if (extName === "pdf") {
+      return `เอกสาร.${extension}`;
+    }
+    return `ไฟล์.${extension}`;
+  }
+  
+  // New format: timestamp_base64name.ext
+  // Try to decode base64
+  const newFormatMatch = storedFilename.match(/^(\d+)_(.+)\.(\w+)$/);
+  if (newFormatMatch) {
+    const [, , encodedPart, ext] = newFormatMatch;
+    
+    try {
+      // Restore base64 padding and decode
+      const base64 = encodedPart
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+      
+      // Add padding if needed
+      const paddedBase64 = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+      
+      // Try to decode - works in browser with atob
+      let decodedName: string;
+      if (typeof window !== "undefined") {
+        // Browser
+        decodedName = decodeURIComponent(escape(atob(paddedBase64)));
+      } else {
+        // Node.js
+        decodedName = Buffer.from(paddedBase64, "base64").toString("utf-8");
+      }
+      
+      // Check if decoded successfully
+      if (decodedName && decodedName.length > 0 && !decodedName.includes("\ufffd")) {
+        return `${decodedName}.${ext}`;
+      }
+    } catch {
+      // If decode fails, it might be an older format with underscores
+      // Replace underscores with spaces
+      const withSpaces = encodedPart.replace(/_/g, " ");
+      return `${withSpaces}.${ext}`;
+    }
+  }
+  
+  return storedFilename;
 }
 
 export function validateFile(file: File): boolean {

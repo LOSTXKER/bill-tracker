@@ -8,9 +8,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,25 +20,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Loader2,
   LucideIcon,
-  GraduationCap,
-  Sparkles,
-  Brain,
   ArrowLeft,
   Edit,
   Save,
   X,
-  ChevronRight,
-  ChevronLeft,
   Trash2,
   Receipt,
   FileText,
@@ -49,12 +34,6 @@ import {
   User,
   AlertCircle,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 
@@ -70,16 +49,18 @@ import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } fr
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionFieldsSection, TransactionFieldsConfig } from "./shared/TransactionFieldsSection";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
-import { DatePicker } from "./shared/DatePicker";
 
 // Transaction components
 import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper } from "@/components/transactions";
 import { CommentSection } from "@/components/comments/CommentSection";
-// AuditHistorySection is now part of CombinedHistorySection
 
 // Types & Constants
 import type { ContactSummary } from "@/types";
 import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
+
+// Import and re-export BaseTransaction type from hooks
+import type { BaseTransaction } from "./hooks/useTransactionForm";
+export type { BaseTransaction };
 
 // =============================================================================
 // Types
@@ -184,65 +165,7 @@ interface UnifiedTransactionFormProps {
   currentUserId?: string; // For comment section
 }
 
-interface BaseTransaction {
-  id: string;
-  companyId: string;
-  contact: { id: string; name: string; taxId: string | null } | null;
-  account?: { id: string; code: string; name: string } | null;
-  accountId?: string | null;
-  amount: number;
-  vatRate: number;
-  vatAmount: number | null;
-  whtRate: number | null;
-  whtAmount: number | null;
-  whtType: string | null;
-  paymentMethod: string;
-  status: string;
-  notes: string | null;
-  invoiceNumber: string | null;
-  referenceNo: string | null;
-  company: { code: string; name: string };
-  creator?: { name: string; email: string } | null;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string | null;
-  deletedByUser?: { name: string } | null;
-  // Workflow fields
-  workflowStatus?: string;
-  hasTaxInvoice?: boolean;
-  hasWhtCert?: boolean;
-  hasInvoice?: boolean;
-  isWht?: boolean;
-  isWhtDeducted?: boolean;
-  [key: string]: unknown;
-}
-
-// =============================================================================
-// Auto-Learn Types & Logic
-// =============================================================================
-
-const AUTO_LEARN_THRESHOLD = 80;
-const MIN_LEARN_THRESHOLD = 50;
-
-function decideToLearn(
-  confidence: number,
-  hasVendorIdentifier: boolean,
-  existingMappingId: string | null
-) {
-  if (existingMappingId) {
-    return { shouldLearn: false, confidence, reason: "มี mapping อยู่แล้ว", suggestAsk: false };
-  }
-  if (!hasVendorIdentifier) {
-    return { shouldLearn: false, confidence: 0, reason: "ไม่มีข้อมูลร้านค้า", suggestAsk: false };
-  }
-  if (confidence < MIN_LEARN_THRESHOLD) {
-    return { shouldLearn: false, confidence, reason: "ความมั่นใจต่ำเกินไป", suggestAsk: false };
-  }
-  if (confidence >= AUTO_LEARN_THRESHOLD) {
-    return { shouldLearn: true, confidence, reason: "ความมั่นใจสูง - เรียนรู้อัตโนมัติ", suggestAsk: false };
-  }
-  return { shouldLearn: true, confidence, reason: "ความมั่นใจปานกลาง - ควรถามผู้ใช้ก่อน", suggestAsk: true };
-}
+// BaseTransaction is now imported from hooks/useTransactionForm
 
 // =============================================================================
 // Component
@@ -285,8 +208,6 @@ export function UnifiedTransactionForm({
   // AI Analysis State
   const [aiResult, setAiResult] = useState<MultiDocAnalysisResult | null>(null);
   const [aiApplied, setAiApplied] = useState(false);
-  const [showTrainDialog, setShowTrainDialog] = useState(false);
-  const [isTraining, setIsTraining] = useState(false);
 
   // Merge Dialog State
   const [showMergeDialog, setShowMergeDialog] = useState(false);
@@ -327,8 +248,14 @@ export function UnifiedTransactionForm({
     accountName: string | null;
     confidence: number;
     reason: string;
+    alternatives?: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      confidence: number;
+      reason: string;
+    }>;
   } | null>(null);
-  const [isSuggestingAccount, setIsSuggestingAccount] = useState(false);
   
   // Reference URLs (for external links to products, orders, etc.)
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
@@ -510,6 +437,8 @@ export function UnifiedTransactionForm({
       amount: watchAmount ? Number(watchAmount) : null,
       vatAmount: calculation.vatAmount || null,
       vatRate: watchVatRate || null,
+      whtAmount: calculation.whtAmount || null,
+      whtRate: watchWhtRate || null,
       vendorName: selectedContact?.name || null,
       vendorTaxId: selectedContact?.taxId || null,
       contactId: selectedContact?.id || null,
@@ -519,9 +448,10 @@ export function UnifiedTransactionForm({
         ? (watch(config.fields.descriptionField.name) as string) || null
         : null,
       accountId: selectedAccount || null,
+      accountName: accountSuggestion?.accountName || null,
       paymentMethod: (watch("paymentMethod") as string) || null,
     };
-  }, [watchAmount, calculation.vatAmount, watchVatRate, selectedContact, watchDate, watch, config, selectedAccount]);
+  }, [watchAmount, calculation.vatAmount, calculation.whtAmount, watchVatRate, watchWhtRate, selectedContact, watchDate, watch, config, selectedAccount, accountSuggestion]);
 
   // Extract AI result as MergeData
   const extractAiData = useCallback(
@@ -531,6 +461,8 @@ export function UnifiedTransactionForm({
           amount: null,
           vatAmount: null,
           vatRate: null,
+          whtAmount: null,
+          whtRate: null,
           vendorName: null,
           vendorTaxId: null,
           contactId: null,
@@ -538,6 +470,7 @@ export function UnifiedTransactionForm({
           invoiceNumber: null,
           description: null,
           accountId: null,
+          accountName: null,
           paymentMethod: null,
         };
       }
@@ -580,6 +513,8 @@ export function UnifiedTransactionForm({
         amount,
         vatAmount: combined.vatAmount || (suggested.vatAmount as number) || null,
         vatRate: (suggested.vatRate as number) ?? extendedCombined.vatRate ?? null,
+        whtAmount: (suggested.whtAmount as number) || null,
+        whtRate: (suggested.whtRate as number) || null,
         vendorName,
         vendorTaxId: combined.vendorTaxId || (suggested.vendorTaxId as string) || null,
         contactId: (suggested.contactId as string) || null,
@@ -587,6 +522,7 @@ export function UnifiedTransactionForm({
         invoiceNumber: combined.invoiceNumbers?.[0] || null,
         description,
         accountId: (suggested.accountId as string) || null,
+        accountName: (suggested.accountName as string) || null,
         paymentMethod: (suggested.paymentMethod as string) || extendedCombined.paymentMethod || null,
       };
     },
@@ -760,36 +696,72 @@ export function UnifiedTransactionForm({
         });
       }
 
-      // Apply account
-      if (suggested.accountId) {
-        setSelectedAccount(suggested.accountId as string);
-      } else if (
-        result.smart?.aiAccountSuggestion?.accountId &&
-        result.smart.aiAccountSuggestion.confidence >= 70
-      ) {
-        setSelectedAccount(result.smart.aiAccountSuggestion.accountId);
-        setPendingAccountId(result.smart.aiAccountSuggestion.accountId);
+      // ไม่ auto-fill บัญชี - ให้ผู้ใช้เลือกเอง
+      // แต่เก็บ suggestion พร้อม alternatives ไว้แสดงใน UI
+      if (result.aiAccountSuggestion?.accountId) {
+        setAccountSuggestion({
+          accountId: result.aiAccountSuggestion.accountId,
+          accountCode: result.aiAccountSuggestion.accountCode,
+          accountName: result.aiAccountSuggestion.accountName,
+          confidence: result.aiAccountSuggestion.confidence,
+          reason: result.aiAccountSuggestion.reason || "AI วิเคราะห์จากเอกสาร",
+          alternatives: result.aiAccountSuggestion.alternatives || [],
+        });
+      }
+
+      // แสดงคำเตือนจาก AI (ถ้ามี)
+      if (result.warnings && Array.isArray(result.warnings)) {
+        for (const warning of result.warnings) {
+          if (warning.severity === "warning") {
+            toast.warning(warning.message, {
+              duration: 8000, // แสดงนานขึ้นให้อ่าน
+            });
+          } else {
+            toast.info(warning.message, {
+              duration: 5000,
+            });
+          }
+        }
       }
 
       // Apply WHT (Withholding Tax) from AI
       const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
+      const whtAmount = extendedCombined.whtAmount;
       const whtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
       
       // Debug: Log WHT data from AI
       console.log("[AI WHT Debug]", {
         "suggested.whtRate": suggested.whtRate,
         "extendedCombined.whtRate": extendedCombined.whtRate,
+        "extendedCombined.whtAmount": whtAmount,
         "whtRate (final)": whtRate,
         "whtType": whtType,
-        "fullSuggested": suggested,
-        "fullCombined": extendedCombined,
       });
       
-      if (whtRate !== null && whtRate !== undefined && whtRate > 0) {
+      // Enable WHT if we have rate OR amount
+      const hasWht = (whtRate !== null && whtRate !== undefined && whtRate > 0) || 
+                     (whtAmount !== null && whtAmount !== undefined && whtAmount > 0);
+      
+      if (hasWht) {
         // Enable WHT toggle
-        console.log("[AI WHT] Enabling WHT with rate:", whtRate, "type:", whtType);
+        console.log("[AI WHT] Enabling WHT - rate:", whtRate, "amount:", whtAmount, "type:", whtType);
         setValue(config.fields.whtField.name, true);
-        setValue("whtRate", whtRate);
+        
+        // Set rate (calculate from amount if not provided)
+        if (whtRate && whtRate > 0) {
+          setValue("whtRate", whtRate);
+        } else if (whtAmount) {
+          // Calculate rate from amount: rate = (whtAmount / baseAmount) * 100
+          const aiAmount = extendedCombined.amount || (suggested.amount as number | null);
+          if (aiAmount && aiAmount > 0) {
+            const calculatedRate = Math.round((whtAmount / aiAmount) * 100);
+            if ([1, 2, 3, 5].includes(calculatedRate)) {
+              setValue("whtRate", calculatedRate);
+              console.log("[AI WHT] Calculated rate from amount:", calculatedRate, "%");
+            }
+          }
+        }
+        
         if (whtType) {
           setValue("whtType", whtType);
         }
@@ -818,79 +790,6 @@ export function UnifiedTransactionForm({
   );
 
   // AI Account Suggestion
-  const suggestAccount = useCallback(async () => {
-    const vendorName = selectedContact?.name || null;
-    const descFieldName = config.fields.descriptionField?.name || "description";
-    const description = (watch(descFieldName) as string) || null;
-
-    const allFileUrls = [
-      ...categorizedFiles.invoice,
-      ...categorizedFiles.slip,
-      ...categorizedFiles.whtCert,
-      ...categorizedFiles.uncategorized,
-    ].filter(Boolean);
-
-    if (!vendorName && !description && allFileUrls.length === 0) {
-      toast.error("กรุณาเลือกผู้ติดต่อ กรอกรายละเอียด หรือแนบไฟล์ก่อน");
-      return;
-    }
-
-    setIsSuggestingAccount(true);
-    setAccountSuggestion(null);
-
-    try {
-      // Gather all available context for AI
-      const selectedContactData = selectedContact ? contacts?.find(c => c.id === selectedContact.id) : null;
-      
-      const response = await fetch(`/api/${companyCode.toLowerCase()}/ai/suggest-account`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactionType: config.type.toUpperCase(),
-          vendorName,
-          vendorTaxId: selectedContactData?.taxId || aiVendorSuggestion?.taxId,
-          description, // Description includes AI-extracted items
-          imageUrls: allFileUrls.slice(0, 1),
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "ไม่สามารถแนะนำบัญชีได้");
-      }
-
-      const suggestion = result.data;
-      setAccountSuggestion(suggestion);
-
-      if (suggestion.accountId && suggestion.confidence >= 70) {
-        setSelectedAccount(suggestion.accountId);
-
-        if (suggestion.source === "learned") {
-          toast.success(`🤖 AI จำได้! "${suggestion.accountCode} ${suggestion.accountName}"`, {
-            description: `เคยใช้งาน ${suggestion.useCount || 0} ครั้ง`,
-          });
-        } else {
-          toast.success(`✨ AI วิเคราะห์: "${suggestion.accountCode} ${suggestion.accountName}"`, {
-            description: suggestion.reason,
-          });
-        }
-      } else if (suggestion.accountId) {
-        toast.info("AI แนะนำบัญชี", {
-          description: `${suggestion.accountCode} ${suggestion.accountName} (${suggestion.confidence}%) - ${suggestion.reason}`,
-        });
-      } else {
-        toast.warning("AI ไม่พบบัญชีที่เหมาะสม", {
-          description: suggestion.reason || "กรุณาเลือกบัญชีเอง",
-        });
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsSuggestingAccount(false);
-    }
-  }, [selectedContact, config, companyCode, watch, categorizedFiles]);
-
   // Handle merge decision
   const handleMergeDecision = useCallback(
     (decision: MergeDecision) => {
@@ -1413,11 +1312,10 @@ export function UnifiedTransactionForm({
                     onAccountChange={setSelectedAccount}
                     suggestedAccountId={
                       accountSuggestion?.accountId ||
-                      aiResult?.smart?.aiAccountSuggestion?.accountId ||
+                      aiResult?.aiAccountSuggestion?.accountId ||
                       undefined
                     }
-                    onSuggestAccount={suggestAccount}
-                    isSuggestingAccount={isSuggestingAccount}
+                    suggestedAccountAlternatives={accountSuggestion?.alternatives}
                     aiVendorSuggestion={aiVendorSuggestion}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={setReferenceUrls}
@@ -1552,11 +1450,10 @@ export function UnifiedTransactionForm({
                     onAccountChange={setSelectedAccount}
                     suggestedAccountId={
                       accountSuggestion?.accountId ||
-                      aiResult?.smart?.aiAccountSuggestion?.accountId ||
+                      aiResult?.aiAccountSuggestion?.accountId ||
                       undefined
                     }
-                    onSuggestAccount={suggestAccount}
-                    isSuggestingAccount={isSuggestingAccount}
+                    suggestedAccountAlternatives={accountSuggestion?.alternatives}
                     aiVendorSuggestion={aiVendorSuggestion}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={mode === "edit" ? setReferenceUrls : undefined}
@@ -1700,131 +1597,6 @@ export function UnifiedTransactionForm({
         )}
       </form>
 
-      {/* Train AI Dialog */}
-      <Dialog open={showTrainDialog} onOpenChange={setShowTrainDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-amber-500" />
-              สอน AI ให้จดจำร้านค้านี้?
-            </DialogTitle>
-            <DialogDescription>
-              {aiResult?.combined?.vendorName && (
-                <span className="block mt-2">
-                  AI จะจดจำ <strong>&ldquo;{aiResult.combined.vendorName}&rdquo;</strong> เพื่อกรอกข้อมูลอัตโนมัติ
-                  <br />
-                  <span className="text-xs text-muted-foreground">(ผู้ติดต่อ, บัญชี, VAT, วิธีชำระเงิน)</span>
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4 space-y-3 text-sm">
-            <div className="p-3 rounded-lg bg-muted/50 space-y-2">
-              <p className="font-medium">ข้อมูลที่ AI จะจดจำ:</p>
-              <ul className="text-muted-foreground space-y-1 text-xs">
-                {aiResult?.combined?.vendorName && (
-                  <li>• ชื่อร้าน: {aiResult.combined.vendorName}</li>
-                )}
-                {aiResult?.combined?.vendorTaxId && (
-                  <li>• เลขผู้เสียภาษี: {aiResult.combined.vendorTaxId}</li>
-                )}
-                {selectedContact && <li>• ผู้ติดต่อ: {selectedContact.name}</li>}
-                {selectedAccount && <li>• บัญชี: {selectedAccount}</li>}
-                {watchVatRate !== undefined && <li>• VAT: {watchVatRate}%</li>}
-                {(watch("paymentMethod") as string) && <li>• วิธีชำระเงิน: {watch("paymentMethod") as string}</li>}
-              </ul>
-              <p className="text-xs text-green-600 mt-2">
-                ✅ ครั้งหน้าจะกรอกข้อมูลนี้ให้อัตโนมัติ
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowTrainDialog(false);
-                toast.success(`บันทึก${config.title}สำเร็จ`);
-                router.push(config.redirectPath);
-                router.refresh();
-              }}
-              disabled={isTraining}
-            >
-              ข้าม
-            </Button>
-            <Button
-              onClick={async () => {
-                if (!aiResult) return;
-                setIsTraining(true);
-                try {
-                  const { combined } = aiResult;
-                  let descriptionTemplate: string | undefined;
-                  if (config.fields.descriptionField) {
-                    const currentDescription = watch(config.fields.descriptionField.name) as string;
-                    if (currentDescription?.trim()) {
-                      descriptionTemplate = currentDescription.trim();
-                    } else {
-                      const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
-                      descriptionTemplate = `${prefix} {vendorName}`;
-                    }
-                  }
-
-                  const response = await fetch("/api/vendor-mappings", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      companyCode: companyCode.toUpperCase(),
-                      transactionType: config.type.toUpperCase(),
-                      vendorName: combined.vendorName,
-                      vendorTaxId: combined.vendorTaxId,
-                      contactId: selectedContact?.id,
-                      accountId: selectedAccount,
-                      defaultVatRate: watchVatRate,
-                      paymentMethod: watch("paymentMethod"),
-                      descriptionTemplate,
-                      learnSource: "FEEDBACK",
-                    }),
-                  });
-
-                  const result = await response.json();
-                  if (!response.ok) {
-                    throw new Error(result.error || "การสอน AI ล้มเหลว");
-                  }
-
-                  toast.success("สอน AI สำเร็จ!", {
-                    description: `AI จะจดจำผู้ติดต่อ บัญชี VAT และวิธีชำระเงิน`,
-                  });
-
-                  setShowTrainDialog(false);
-                  toast.success(`บันทึก${config.title}สำเร็จ`);
-                  router.push(config.redirectPath);
-                  router.refresh();
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-                } finally {
-                  setIsTraining(false);
-                }
-              }}
-              disabled={isTraining}
-              className="bg-amber-500 hover:bg-amber-600 text-white"
-            >
-              {isTraining ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังบันทึก...
-                </>
-              ) : (
-                <>
-                  <GraduationCap className="mr-2 h-4 w-4" />
-                  สอน AI
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Merge Options Dialog */}
       {existingFormData && newAiData && (
         <MergeOptionsDialog
@@ -1885,100 +1657,3 @@ export function UnifiedTransactionForm({
   );
 }
 
-// =============================================================================
-// Workflow Status Display Component
-// =============================================================================
-
-const EXPENSE_WORKFLOW_LABELS: Record<string, { label: string; color: string; step: number }> = {
-  PAID: { label: "จ่ายเงินแล้ว", color: "bg-blue-500", step: 1 },
-  WAITING_TAX_INVOICE: { label: "รอใบกำกับ", color: "bg-orange-500", step: 1 },
-  TAX_INVOICE_RECEIVED: { label: "ได้ใบกำกับแล้ว", color: "bg-green-500", step: 2 },
-  WHT_PENDING_ISSUE: { label: "รอออกใบ 50 ทวิ", color: "bg-amber-500", step: 3 },
-  WHT_ISSUED: { label: "ออกใบ 50 ทวิแล้ว", color: "bg-green-500", step: 3 },
-  WHT_SENT_TO_VENDOR: { label: "ส่ง 50 ทวิแล้ว", color: "bg-green-500", step: 3 },
-  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "bg-purple-500", step: 4 },
-  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "bg-green-500", step: 5 },
-  COMPLETED: { label: "เสร็จสิ้น", color: "bg-green-600", step: 5 },
-};
-
-const INCOME_WORKFLOW_LABELS: Record<string, { label: string; color: string; step: number }> = {
-  RECEIVED: { label: "รับเงินแล้ว", color: "bg-blue-500", step: 1 },
-  NO_INVOICE_NEEDED: { label: "ไม่ต้องออกบิล", color: "bg-gray-500", step: 2 },
-  WAITING_INVOICE_ISSUE: { label: "รอออกบิล", color: "bg-orange-500", step: 2 },
-  INVOICE_ISSUED: { label: "ออกบิลแล้ว", color: "bg-green-500", step: 2 },
-  INVOICE_SENT: { label: "ส่งบิลแล้ว", color: "bg-green-500", step: 2 },
-  WHT_PENDING_CERT: { label: "รอใบ 50 ทวิ", color: "bg-amber-500", step: 3 },
-  WHT_CERT_RECEIVED: { label: "ได้ใบ 50 ทวิแล้ว", color: "bg-green-500", step: 3 },
-  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "bg-purple-500", step: 4 },
-  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "bg-green-500", step: 5 },
-  COMPLETED: { label: "เสร็จสิ้น", color: "bg-green-600", step: 5 },
-};
-
-interface WorkflowStatusDisplayProps {
-  type: "expense" | "income";
-  status: string;
-  hasTaxInvoice?: boolean;
-  hasWhtCert?: boolean;
-  hasInvoice?: boolean;
-  isWht?: boolean;
-}
-
-function WorkflowStatusDisplay({
-  type,
-  status,
-  hasTaxInvoice,
-  hasWhtCert,
-  hasInvoice,
-  isWht,
-}: WorkflowStatusDisplayProps) {
-  const labels = type === "expense" ? EXPENSE_WORKFLOW_LABELS : INCOME_WORKFLOW_LABELS;
-  const current = labels[status] || { label: status, color: "bg-gray-500", step: 0 };
-
-  // Build checklist based on type
-  const checklist = type === "expense" ? [
-    { label: "ใบกำกับภาษี", checked: hasTaxInvoice },
-    ...(isWht ? [{ label: "ใบ 50 ทวิ (ออกให้ vendor)", checked: hasWhtCert }] : []),
-  ] : [
-    { label: "ใบกำกับภาษี (ออกให้ลูกค้า)", checked: hasInvoice },
-    ...(isWht ? [{ label: "ใบ 50 ทวิ (จากลูกค้า)", checked: hasWhtCert }] : []),
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* Current Status Badge */}
-      <div className="flex items-center gap-3">
-        <Badge className={`${current.color} text-white`}>
-          {current.label}
-        </Badge>
-        {current.step < 5 && (
-          <span className="text-sm text-muted-foreground">
-            ขั้นตอนที่ {current.step} / 5
-          </span>
-        )}
-      </div>
-
-      {/* Document Checklist */}
-      {checklist.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">เอกสาร:</p>
-          <div className="flex flex-wrap gap-2">
-            {checklist.map((item, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm",
-                  item.checked 
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
-                    : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-                )}
-              >
-                {item.checked ? "✓" : "○"}
-                {item.label}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

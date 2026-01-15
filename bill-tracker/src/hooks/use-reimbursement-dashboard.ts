@@ -274,6 +274,37 @@ export function useReimbursementDashboard({
     [refetch]
   );
 
+  // Delete action
+  const deleteRequest = useCallback(
+    async (id: string) => {
+      setProcessingIds((prev) => new Set(prev).add(id));
+      try {
+        const response = await fetch(`/api/reimbursement-requests/${id}`, {
+          method: "DELETE",
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
+
+        toast.success("ลบรายการเบิกจ่ายแล้ว");
+        await refetch();
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+        return false;
+      } finally {
+        setProcessingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [refetch]
+  );
+
   // Batch actions
   const batchPay = useCallback(
     async (ids: string[], paymentRef?: string, paymentMethod?: string) => {
@@ -389,6 +420,7 @@ export function useReimbursementDashboard({
     approve,
     reject,
     pay,
+    deleteRequest,
     batchPay,
     refetch,
   };

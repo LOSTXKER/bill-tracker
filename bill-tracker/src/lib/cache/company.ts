@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { withRetry } from "@/lib/db-utils";
 import { unstable_cache } from "next/cache";
 
 /**
@@ -9,17 +10,19 @@ import { unstable_cache } from "next/cache";
  */
 export const getCompanyByCode = unstable_cache(
   async (code: string) => {
-    const company = await prisma.company.findUnique({
-      where: { code: code.toUpperCase() },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        taxId: true,
-        logoUrl: true,
-      },
+    return withRetry(async () => {
+      const company = await prisma.company.findUnique({
+        where: { code: code.toUpperCase() },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          taxId: true,
+          logoUrl: true,
+        },
+      });
+      return company;
     });
-    return company;
   },
   ["company-by-code"],
   { revalidate: 3600 } // Cache for 1 hour
@@ -30,11 +33,13 @@ export const getCompanyByCode = unstable_cache(
  */
 export const getCompanyId = unstable_cache(
   async (code: string) => {
-    const company = await prisma.company.findUnique({
-      where: { code: code.toUpperCase() },
-      select: { id: true },
+    return withRetry(async () => {
+      const company = await prisma.company.findUnique({
+        where: { code: code.toUpperCase() },
+        select: { id: true },
+      });
+      return company?.id || null;
     });
-    return company?.id || null;
   },
   ["company-id"],
   { revalidate: 3600 }

@@ -5,12 +5,7 @@
 
 import type { LineWebhookEvent, LineCompanyConfig } from "../types";
 import { replyToLine, pushMessageToLine, downloadLineImage } from "../api";
-import {
-  analyzeReceipt,
-  formatReceiptData,
-  validateReceiptData,
-  getDocumentTypeName,
-} from "@/lib/ai/receipt-ocr";
+import { analyzeImage } from "@/lib/ai/gemini";
 
 /**
  * Handle image message (receipt OCR)
@@ -58,10 +53,34 @@ export async function handleImageMessage(
       return;
     }
 
-    // Analyze receipt with AI
-    const result = await analyzeReceipt(imageBuffer, "image/jpeg");
+    // Convert buffer to base64
+    const base64Image = imageBuffer.toString("base64");
+    const dataUrl = `data:image/jpeg;base64,${base64Image}`;
 
-    if ("error" in result) {
+    // Analyze with AI
+    const prompt = `วิเคราะห์ใบเสร็จ/เอกสารนี้ แล้วสรุปข้อมูลสำคัญ:
+
+ตอบเป็นภาษาไทย ในรูปแบบข้อความธรรมดา (ไม่ใช่ JSON) ประมาณ 5-10 บรรทัด
+
+ข้อมูลที่ต้องการ:
+- ชื่อร้าน/บริษัท
+- เลขประจำตัวผู้เสียภาษี (ถ้ามี)
+- วันที่
+- รายการสินค้า/บริการ (ถ้ามี)
+- ยอดก่อน VAT
+- VAT (ถ้ามี)
+- ยอดรวม
+- หัก ณ ที่จ่าย (ถ้ามี)
+- ยอดสุทธิที่ต้องจ่าย
+
+ถ้าไม่มีข้อมูลใดให้ข้ามไป`;
+
+    const result = await analyzeImage(dataUrl, prompt, {
+      temperature: 0.2,
+      maxTokens: 1024,
+    });
+
+    if (result.error) {
       await pushMessageToLine(
         recipient,
         [
@@ -75,41 +94,20 @@ export async function handleImageMessage(
       return;
     }
 
-    // Validate data completeness
-    const validation = validateReceiptData(result);
-
-    // Format result for LINE
-    let responseText = formatReceiptData(result);
-
-    // Add validation warnings if any
-    if (validation.missingFields.length > 0) {
-      responseText += `\n\n⚠️ ข้อมูลที่ขาด: ${validation.missingFields.join(", ")}`;
-    }
-    if (validation.warnings.length > 0 && validation.warnings.length <= 3) {
-      responseText += `\n\n💡 หมายเหตุ: ${validation.warnings.join(", ")}`;
-    }
-
-    // Add document type info
-    if (result.documentType) {
-      responseText = `📑 ${getDocumentTypeName(result.documentType)}\n${"━".repeat(20)}\n${responseText}`;
-    }
-
     // Send OCR result
     await pushMessageToLine(
       recipient,
       [
         {
           type: "text",
-          text: responseText,
+          text: `✅ ผลการวิเคราะห์\n${"━".repeat(20)}\n${result.data}`,
         },
       ],
       channelAccessToken
     );
 
     // Log OCR analysis
-    console.log(
-      `[LINE OCR] Company ${company.id}: analyzed receipt, confidence=${result.confidence.overall}%`
-    );
+    console.log(`[LINE OCR] Company ${company.id}: analyzed receipt via LINE`);
   } catch (error) {
     console.error("LINE OCR error:", error);
     await pushMessageToLine(

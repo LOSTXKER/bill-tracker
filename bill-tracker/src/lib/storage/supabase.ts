@@ -24,6 +24,62 @@ function getSupabaseClient(): SupabaseClient {
 export { getSupabaseClient as supabase };
 
 /**
+ * Sanitize filename for storage - Supabase requires URL-safe characters only
+ * We encode the original name in base64 to preserve it for display
+ */
+function sanitizeFilename(originalName: string): string {
+  const timestamp = Date.now();
+  const extension = originalName.split(".").pop() || "file";
+  const baseName = originalName.replace(/\.[^/.]+$/, ""); // Remove extension
+  
+  // Encode original name to base64 (URL-safe)
+  const encodedName = Buffer.from(baseName, "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, ""); // Remove padding
+  
+  // Limit encoded name length
+  const shortEncoded = encodedName.substring(0, 60);
+  
+  // Return format: timestamp_base64name.ext
+  return `${timestamp}_${shortEncoded}.${extension}`;
+}
+
+/**
+ * Decode original filename from stored filename
+ * Format: timestamp_base64name.ext → original name
+ */
+export function decodeOriginalFilename(storedFilename: string): string {
+  try {
+    // Extract base64 part: remove timestamp prefix and extension
+    const match = storedFilename.match(/^\d+_(.+)\.(\w+)$/);
+    if (!match) return storedFilename;
+    
+    const [, encodedPart, extension] = match;
+    
+    // Restore base64 padding and decode
+    const base64 = encodedPart
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+    
+    // Add padding if needed
+    const paddedBase64 = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    
+    const decodedName = Buffer.from(paddedBase64, "base64").toString("utf-8");
+    
+    // Check if decoded successfully (contains valid characters)
+    if (decodedName && decodedName.length > 0) {
+      return `${decodedName}.${extension}`;
+    }
+    
+    return storedFilename;
+  } catch {
+    return storedFilename;
+  }
+}
+
+/**
  * Upload a file to Supabase Storage
  */
 export async function uploadToSupabase(
@@ -32,10 +88,8 @@ export async function uploadToSupabase(
 ): Promise<{ url: string; path: string }> {
   const supabase = getSupabaseClient();
   
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 9);
-  const extension = file.name.split(".").pop();
-  const filename = `${timestamp}-${random}.${extension}`;
+  // Generate filename that preserves original name
+  const filename = sanitizeFilename(file.name);
   const path = `${folder}/${filename}`;
 
   // Upload file

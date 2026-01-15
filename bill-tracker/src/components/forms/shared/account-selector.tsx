@@ -28,6 +28,14 @@ export interface Account {
   isSystem: boolean;
 }
 
+interface AlternativeAccount {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  confidence: number;
+  reason: string;
+}
+
 interface AccountSelectorProps {
   value?: string | null;
   onValueChange: (value: string | null) => void;
@@ -35,6 +43,7 @@ interface AccountSelectorProps {
   className?: string;
   placeholder?: string;
   suggestedAccountId?: string; // From AI
+  alternatives?: AlternativeAccount[]; // Alternative suggestions from AI
   disabled?: boolean;
   label?: string;
 }
@@ -57,6 +66,7 @@ export function AccountSelector({
   className,
   placeholder = "เลือกบัญชี...",
   suggestedAccountId,
+  alternatives = [],
   disabled = false,
   label,
 }: AccountSelectorProps) {
@@ -184,9 +194,10 @@ export function AccountSelector({
                 </div>
               </CommandEmpty>
               
-              {/* AI Suggestion */}
-              {suggestedAccount && !value && (
+              {/* AI Suggestion + Alternatives - แสดงเสมอเมื่อมี suggestion */}
+              {suggestedAccount && (
                 <CommandGroup heading="✨ AI แนะนำ">
+                  {/* Main Suggestion */}
                   <CommandItem
                     key={suggestedAccount.id}
                     value={`${suggestedAccount.code}-${suggestedAccount.name}`}
@@ -194,7 +205,10 @@ export function AccountSelector({
                       onValueChange(suggestedAccount.id);
                       setOpen(false);
                     }}
-                    className="bg-primary/5 border-l-2 border-primary"
+                    className={cn(
+                      "border-l-2 border-primary",
+                      value === suggestedAccount.id ? "bg-primary/10" : "bg-primary/5"
+                    )}
                   >
                     <div className="flex items-center gap-2 flex-1">
                       <span className="font-mono text-xs font-semibold">
@@ -204,9 +218,50 @@ export function AccountSelector({
                       <Sparkles className="h-3 w-3 text-primary" />
                     </div>
                     {value === suggestedAccount.id && (
-                      <Check className="ml-2 h-4 w-4" />
+                      <Check className="ml-2 h-4 w-4 text-primary" />
                     )}
                   </CommandItem>
+                  
+                  {/* Alternative Suggestions */}
+                  {alternatives.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground border-t mt-1">
+                        ทางเลือกอื่น:
+                      </div>
+                      {alternatives.map((alt) => {
+                        const altAccount = accounts.find(a => a.id === alt.accountId);
+                        if (!altAccount) return null;
+                        const isSelected = value === alt.accountId;
+                        return (
+                          <CommandItem
+                            key={alt.accountId}
+                            value={`${altAccount.code}-${altAccount.name}-alt`}
+                            onSelect={() => {
+                              onValueChange(alt.accountId);
+                              setOpen(false);
+                            }}
+                            className={cn(
+                              "border-l-2 border-muted-foreground/30",
+                              isSelected && "bg-muted border-l-primary"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {altAccount.code}
+                              </span>
+                              <span className="flex-1 text-sm">{altAccount.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {alt.confidence}%
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <Check className="ml-2 h-4 w-4 text-primary" />
+                            )}
+                          </CommandItem>
+                        );
+                      })}
+                    </>
+                  )}
                 </CommandGroup>
               )}
 

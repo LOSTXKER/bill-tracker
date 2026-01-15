@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
+import { deleteFile } from "@/lib/storage/upload";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -46,3 +48,59 @@ export async function GET(
     return apiResponse.error("Failed to fetch reimbursement request");
   }
 }
+
+/**
+ * DELETE /api/reimbursement-requests/[id]
+ * Delete a reimbursement request
+ * Only allowed for PENDING, FLAGGED, or REJECTED status
+ */
+export const DELETE = withAuth<RouteParams>(async (request, { session }, routeContext) => {
+  try {
+    const { id } = await routeContext!.params;
+
+    // Find the request first
+    const reimbursementRequest = await prisma.reimbursementRequest.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        receiptUrls: true,
+        linkedExpenseId: true,
+        companyId: true,
+      },
+    });
+
+    if (!reimbursementRequest) {
+      return apiResponse.notFound("ไม่พบรายการเบิกจ่าย");
+    }
+
+    // Check if can delete (only PENDING, FLAGGED, or REJECTED)
+    const allowedStatuses = ["PENDING", "FLAGGED", "REJECTED"];
+    if (!allowedStatuses.includes(reimbursementRequest.status)) {
+      return apiResponse.forbidden(
+        `ไม่สามารถลบรายการที่มีสถานะ "${reimbursementRequest.status}" ได้ (อนุญาตเฉพาะรอดำเนินการ, ต้องตรวจสอบ, หรือถูกปฏิเสธ)`
+      );
+    }
+
+    // Delete associated files from storage
+    const receiptUrls = reimbursementRequest.receiptUrls as string[] | null;
+    if (receiptUrls && receiptUrls.length > 0) {
+      await Promise.allSettled(
+        receiptUrls.map((url: string) => deleteFile(url))
+      );
+    }
+
+    // Delete the request
+    await prisma.reimbursementRequest.delete({
+      where: { id },
+    });
+
+    return apiResponse.success({ 
+      message: "ลบรายการเบิกจ่ายสำเร็จ",
+      deletedId: id,
+    });
+  } catch (error) {
+    console.error("Error deleting reimbursement request:", error);
+    return apiResponse.error("เกิดข้อผิดพลาดในการลบรายการ");
+  }
+});

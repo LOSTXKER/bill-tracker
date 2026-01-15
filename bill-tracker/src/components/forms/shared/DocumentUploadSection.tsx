@@ -24,7 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { uploadFile, deleteFile } from "@/lib/storage/upload";
+import { uploadFile, deleteFile, extractDisplayName } from "@/lib/storage/upload";
 
 // =============================================================================
 // Types
@@ -45,9 +45,9 @@ export interface FileClassification {
   confidence: number;
 }
 
-// Re-export from smart-ocr.ts - single source of truth
-import type { MultiDocAnalysisResult } from "@/lib/ai/smart-ocr";
-export type { MultiDocAnalysisResult } from "@/lib/ai/smart-ocr";
+// Re-export AI types
+import type { MultiDocAnalysisResult } from "@/lib/ai/types";
+export type { MultiDocAnalysisResult } from "@/lib/ai/types";
 
 // Legacy type for backward compatibility
 export interface OcrAnalysisResult {
@@ -69,6 +69,7 @@ export interface OcrAnalysisResult {
     };
   };
   smart: MultiDocAnalysisResult["smart"];
+  aiAccountSuggestion?: MultiDocAnalysisResult["aiAccountSuggestion"];
   validation: {
     isValid: boolean;
     missingFields: string[];
@@ -586,8 +587,10 @@ function FilePreviewChip({
   disabled = false,
 }: FilePreviewChipProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const fileName = url?.split("/").pop() || `ไฟล์ ${index + 1}`;
-  const shortName = fileName.length > 20 ? fileName.slice(0, 17) + "..." : fileName;
+  const rawFileName = url?.split("/").pop() || `ไฟล์ ${index + 1}`;
+  // Use extractDisplayName to show original filename instead of timestamp ID
+  const displayName = extractDisplayName(rawFileName);
+  const shortName = displayName.length > 20 ? displayName.slice(0, 17) + "..." : displayName;
   const isImage = url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(url) : false;
 
   return (
@@ -623,7 +626,9 @@ function FilePreviewChip({
         )}
 
         {/* File Name */}
-        <span className="text-sm truncate max-w-[120px]">{shortName}</span>
+        <span className="text-sm truncate max-w-[120px]" title={displayName}>
+          {shortName}
+        </span>
 
         {/* Remove Button */}
         <button

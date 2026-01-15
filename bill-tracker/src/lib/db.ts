@@ -19,9 +19,9 @@ function createPrismaClient() {
     ssl: process.env.NODE_ENV === "production" 
       ? { rejectUnauthorized: false } 
       : undefined,
-    max: 10, // Maximum connections
+    max: 5, // Reduced max connections to avoid pool exhaustion
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000, // Increased timeout for cold starts/paused DBs
   });
   
   const adapter = new PrismaPg(pool);
