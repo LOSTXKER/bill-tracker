@@ -42,20 +42,21 @@ export const GET = withCompanyAccessFromParams(
 
     // Expense: รอใบกำกับภาษี
     if (type === "all" || type === "expense") {
-      const pendingTaxInvoice = await prisma.expense.findMany({
+      const pendingTaxInvoiceRaw = await prisma.expense.findMany({
         where: {
           companyId: company.id,
           deletedAt: null,
           workflowStatus: { in: ["PAID", "WAITING_TAX_INVOICE"] },
           hasTaxInvoice: false,
         },
-        include: { contact: true },
+        include: { Contact: true },
         orderBy: { billDate: "desc" },
         take: 50,
       });
+      const pendingTaxInvoice = pendingTaxInvoiceRaw.map((e) => ({ ...e, contact: e.Contact }));
 
       // Expense: รอออกใบ 50 ทวิ (เราหักเขา)
-      const pendingWhtIssue = await prisma.expense.findMany({
+      const pendingWhtIssueRaw = await prisma.expense.findMany({
         where: {
           companyId: company.id,
           deletedAt: null,
@@ -63,22 +64,24 @@ export const GET = withCompanyAccessFromParams(
           workflowStatus: { in: ["TAX_INVOICE_RECEIVED", "WHT_PENDING_ISSUE"] },
           hasWhtCert: false,
         },
-        include: { contact: true },
+        include: { Contact: true },
         orderBy: { billDate: "desc" },
         take: 50,
       });
+      const pendingWhtIssue = pendingWhtIssueRaw.map((e) => ({ ...e, contact: e.Contact }));
 
       // Expense: รอส่งบัญชี
-      const pendingAccounting = await prisma.expense.findMany({
+      const pendingAccountingRaw = await prisma.expense.findMany({
         where: {
           companyId: company.id,
           deletedAt: null,
           workflowStatus: "READY_FOR_ACCOUNTING",
         },
-        include: { contact: true },
+        include: { Contact: true },
         orderBy: { billDate: "desc" },
         take: 50,
       });
+      const pendingAccounting = pendingAccountingRaw.map((e) => ({ ...e, contact: e.Contact }));
 
       results.expenses = [
         ...pendingTaxInvoice.map(e => ({ ...e, pendingType: "TAX_INVOICE" })),
@@ -92,7 +95,7 @@ export const GET = withCompanyAccessFromParams(
 
     // Income: รอใบ 50 ทวิจากลูกค้า (เขาหักเรา)
     if (type === "all" || type === "income") {
-      const pendingWhtCert = await prisma.income.findMany({
+      const pendingWhtCertRaw = await prisma.income.findMany({
         where: {
           companyId: company.id,
           deletedAt: null,
@@ -100,26 +103,28 @@ export const GET = withCompanyAccessFromParams(
           workflowStatus: "WHT_PENDING_CERT",
           hasWhtCert: false,
         },
-        include: { contact: true },
+        include: { Contact: true },
         orderBy: { receiveDate: "desc" },
         take: 50,
       });
+      const pendingWhtCert = pendingWhtCertRaw.map((i) => ({ ...i, contact: i.Contact }));
 
       // Income: รอส่งบัญชี
-      const pendingAccounting = await prisma.income.findMany({
+      const pendingAccountingIncomeRaw = await prisma.income.findMany({
         where: {
           companyId: company.id,
           deletedAt: null,
           workflowStatus: "READY_FOR_ACCOUNTING",
         },
-        include: { contact: true },
+        include: { Contact: true },
         orderBy: { receiveDate: "desc" },
         take: 50,
       });
+      const pendingAccountingIncome = pendingAccountingIncomeRaw.map((i) => ({ ...i, contact: i.Contact }));
 
       results.incomes = [
         ...pendingWhtCert.map(i => ({ ...i, pendingType: "WHT_CERT" })),
-        ...pendingAccounting.map(i => ({ ...i, pendingType: "ACCOUNTING" })),
+        ...pendingAccountingIncome.map(i => ({ ...i, pendingType: "ACCOUNTING" })),
       ];
 
       results.summary.pendingWhtCert = pendingWhtCert.length;
@@ -220,6 +225,7 @@ export const POST = withCompanyAccessFromParams(
         if (eventType) {
           await tx.documentEvent.create({
             data: {
+              id: crypto.randomUUID(),
               expenseId: transactionId,
               eventType,
               eventDate: now,
@@ -306,6 +312,7 @@ export const POST = withCompanyAccessFromParams(
         if (eventType) {
           await tx.documentEvent.create({
             data: {
+              id: crypto.randomUUID(),
               incomeId: transactionId,
               eventType,
               eventDate: now,

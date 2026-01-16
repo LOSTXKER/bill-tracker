@@ -60,6 +60,7 @@ export const POST = withCompanyAccess(
 
     const contact = await prisma.contact.create({
       data: {
+        id: crypto.randomUUID(),
         companyId: company.id,
         peakCode: body.peakCode || null,
         contactCategory: body.contactCategory || "VENDOR",
@@ -86,6 +87,7 @@ export const POST = withCompanyAccess(
         creditLimit: body.creditLimit,
         paymentTerms: body.paymentTerms,
         notes: body.notes || null,
+        updatedAt: new Date(),
       },
     });
 

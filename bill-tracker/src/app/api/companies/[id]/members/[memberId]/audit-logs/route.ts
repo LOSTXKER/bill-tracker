@@ -54,11 +54,11 @@ export async function GET(
     }
 
     // Fetch audit logs
-    const [logs, total] = await Promise.all([
+    const [logsRaw, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,
         include: {
-          user: {
+          User: {
             select: {
               id: true,
               name: true,
@@ -75,6 +75,7 @@ export async function GET(
       }),
       prisma.auditLog.count({ where }),
     ]);
+    const logs = logsRaw.map((l) => ({ ...l, user: l.User }));
 
     return apiResponse.success({
       logs,

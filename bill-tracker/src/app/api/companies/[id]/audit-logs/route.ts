@@ -80,11 +80,11 @@ export const GET = withCompanyAccessFromParams(
     }
 
     // Execute queries in parallel
-    const [logs, total] = await Promise.all([
+    const [logsRaw, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,
         include: {
-          user: {
+          User: {
             select: {
               id: true,
               name: true,
@@ -101,6 +101,7 @@ export const GET = withCompanyAccessFromParams(
       }),
       prisma.auditLog.count({ where }),
     ]);
+    const logs = logsRaw.map((l) => ({ ...l, user: l.User }));
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / limit);

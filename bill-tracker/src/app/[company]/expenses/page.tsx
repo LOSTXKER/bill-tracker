@@ -125,14 +125,15 @@ async function ExpensesData({ companyCode }: { companyCode: string }) {
     ],
   };
 
-  const [expenses, total] = await Promise.all([
+  const [expensesRaw, total] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
       orderBy: { billDate: "desc" },
       take: 20,
       include: {
-        contact: true,
-        creator: {
+        Contact: true,
+        Account: true,
+        User_Expense_createdByToUser: {
           select: {
             id: true,
             name: true,
@@ -144,6 +145,17 @@ async function ExpensesData({ companyCode }: { companyCode: string }) {
     }),
     prisma.expense.count({ where: whereClause }),
   ]);
+
+  // Map Prisma relation names to what the client expects
+  const expenses = expensesRaw.map((expense) => {
+    const { Contact, Account, User_Expense_createdByToUser, ...rest } = expense;
+    return {
+      ...rest,
+      contact: Contact,
+      account: Account,
+      creator: User_Expense_createdByToUser,
+    };
+  });
 
   // Serialize expenses for client component
   const serializedExpenses = serializeExpenses(expenses);

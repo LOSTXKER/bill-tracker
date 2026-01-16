@@ -4,6 +4,8 @@ import { ThemeProvider } from "next-themes";
 import { SessionProvider } from "next-auth/react";
 import { SWRConfig } from "swr";
 import { swrConfig } from "@/lib/swr-config";
+import { NavigationProgressProvider } from "./navigation-progress-provider";
+import { NavigationProgress } from "@/components/navigation";
 
 /**
  * Combined Providers Component
@@ -19,7 +21,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           enableSystem
           disableTransitionOnChange={false}
         >
-          {children}
+          <NavigationProgressProvider>
+            <NavigationProgress />
+            {children}
+          </NavigationProgressProvider>
         </ThemeProvider>
       </SWRConfig>
     </SessionProvider>

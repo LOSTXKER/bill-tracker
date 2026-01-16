@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +28,6 @@ import {
   Send,
   CheckCircle,
   Bell,
-  Loader2,
 } from "lucide-react";
 
 interface WorkflowActionsProps {
@@ -151,6 +151,8 @@ export function WorkflowActions({
 
   const executeAction = async (action: string, actionNotes?: string) => {
     setLoading(true);
+    const toastId = toast.loading("กำลังดำเนินการ...");
+    
     try {
       const res = await fetch(`/api/${companyCode}/document-workflow`, {
         method: "POST",
@@ -168,12 +170,12 @@ export function WorkflowActions({
         throw new Error(error.error || "เกิดข้อผิดพลาด");
       }
 
-      toast.success("อัปเดตสถานะสำเร็จ");
+      toast.success("อัปเดตสถานะสำเร็จ", { id: toastId });
       setConfirmDialog(null);
       setNotes("");
       onActionComplete?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด", { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -192,15 +194,15 @@ export function WorkflowActions({
       <>
         <div className="flex items-center gap-2">
           {primaryAction && (
-            <Button
+            <LoadingButton
               onClick={() => handleAction(primaryAction)}
-              disabled={loading}
+              loading={loading}
               size="sm"
               className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : primaryAction.icon}
+              {primaryAction.icon}
               {primaryAction.label}
-            </Button>
+            </LoadingButton>
           )}
           {secondaryActions.length > 0 && (
             <DropdownMenu>
@@ -213,7 +215,7 @@ export function WorkflowActions({
                 {secondaryActions.map((action, index) => (
                   <div key={action.action}>
                     {index > 0 && <DropdownMenuSeparator />}
-                    <DropdownMenuItem onClick={() => handleAction(action)}>
+                    <DropdownMenuItem onClick={() => handleAction(action)} disabled={loading}>
                       {action.icon}
                       <span className="ml-2">{action.label}</span>
                     </DropdownMenuItem>
@@ -245,14 +247,14 @@ export function WorkflowActions({
     const action = filteredActions[0];
     return (
       <>
-        <Button
+        <LoadingButton
           onClick={() => handleAction(action)}
-          disabled={loading}
+          loading={loading}
           className="gap-2"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : action.icon}
+          {action.icon}
           {action.label}
-        </Button>
+        </LoadingButton>
 
         <ConfirmDialog
           action={confirmDialog}
@@ -273,16 +275,16 @@ export function WorkflowActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button disabled={loading} className="gap-2">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "ดำเนินการ"}
+          <LoadingButton loading={loading} className="gap-2">
+            ดำเนินการ
             <ChevronDown className="h-4 w-4" />
-          </Button>
+          </LoadingButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           {filteredActions.map((action, index) => (
             <div key={action.action}>
               {index > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuItem onClick={() => handleAction(action)}>
+              <DropdownMenuItem onClick={() => handleAction(action)} disabled={loading}>
                 {action.icon}
                 <span className="ml-2">{action.label}</span>
               </DropdownMenuItem>
@@ -351,10 +353,9 @@ function ConfirmDialog({
           <Button variant="outline" onClick={onCancel} disabled={loading}>
             ยกเลิก
           </Button>
-          <Button onClick={onConfirm} disabled={loading}>
-            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <LoadingButton onClick={onConfirm} loading={loading}>
             ยืนยัน
-          </Button>
+          </LoadingButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

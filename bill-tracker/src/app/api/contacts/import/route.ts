@@ -309,8 +309,8 @@ async function handleImport(
         where: {
           companyId: company.id,
           OR: [
-            { expenses: { some: {} } },
-            { incomes: { some: {} } },
+            { Expense: { some: {} } },
+            { Income: { some: {} } },
           ],
         },
         select: { id: true, peakCode: true, source: true },
@@ -353,6 +353,7 @@ async function handleImport(
       for (const contact of contactsToCreate) {
         await tx.contact.create({
           data: {
+            id: crypto.randomUUID(),
             companyId: company.id,
             peakCode: contact.peakCode,
             name: contact.name,
@@ -375,6 +376,7 @@ async function handleImport(
             email: contact.email,
             contactPerson: contact.contactPerson,
             source: DataSource.PEAK, // ระบุว่ามาจาก Peak
+            updatedAt: new Date(),
           },
         });
         created++;
@@ -468,6 +470,7 @@ async function handleImport(
     for (const contact of toCreate) {
       const newContact = await tx.contact.create({
         data: {
+          id: crypto.randomUUID(),
           companyId: company.id,
           peakCode: contact.peakCode,
           name: contact.name,
@@ -490,6 +493,7 @@ async function handleImport(
           email: contact.email,
           contactPerson: contact.contactPerson,
           source: DataSource.PEAK, // ระบุว่ามาจาก Peak
+          updatedAt: new Date(),
         },
       });
 

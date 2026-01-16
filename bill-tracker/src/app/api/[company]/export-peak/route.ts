@@ -42,16 +42,16 @@ async function handlePost(
     }
 
     // Fetch expenses with account and contact info
-    const expenses = await prisma.expense.findMany({
+    const expensesRaw = await prisma.expense.findMany({
       where,
       include: {
-        account: {
+        Account: {
           select: {
             code: true,
             name: true,
           },
         },
-        contact: {
+        Contact: {
           select: {
             name: true,
             taxId: true,
@@ -62,6 +62,7 @@ async function handlePost(
       },
       orderBy: { billDate: "asc" },
     });
+    const expenses = expensesRaw.map((e) => ({ ...e, account: e.Account, contact: e.Contact }));
 
     if (expenses.length === 0) {
       return apiResponse.notFound("ไม่พบข้อมูลรายจ่ายในช่วงเวลาที่เลือก");

@@ -95,9 +95,9 @@ async function handlePost(
       prisma.expense.findMany({
         where: { companyId: context.company.id, deletedAt: null },
         include: {
-          contact: { select: { id: true, name: true, taxId: true } },
-          account: { select: { id: true, code: true, name: true } },
-          creator: { select: { id: true, name: true, email: true } },
+          Contact: { select: { id: true, name: true, taxId: true } },
+          Account: { select: { id: true, code: true, name: true } },
+          User_Expense_createdByToUser: { select: { id: true, name: true, email: true } },
         },
         orderBy: { billDate: "desc" },
       }),
@@ -106,9 +106,9 @@ async function handlePost(
       prisma.income.findMany({
         where: { companyId: context.company.id, deletedAt: null },
         include: {
-          contact: { select: { id: true, name: true, taxId: true } },
-          account: { select: { id: true, code: true, name: true } },
-          creator: { select: { id: true, name: true, email: true } },
+          Contact: { select: { id: true, name: true, taxId: true } },
+          Account: { select: { id: true, code: true, name: true } },
+          User: { select: { id: true, name: true, email: true } },
         },
         orderBy: { receiveDate: "desc" },
       }),
@@ -129,7 +129,7 @@ async function handlePost(
       prisma.companyAccess.findMany({
         where: { companyId: context.company.id },
         include: {
-          user: { select: { id: true, name: true, email: true, role: true } },
+          User: { select: { id: true, name: true, email: true, role: true } },
         },
       }),
 
@@ -144,7 +144,7 @@ async function handlePost(
         orderBy: { createdAt: "desc" },
         take: 1000,
         include: {
-          user: { select: { id: true, name: true, email: true } },
+          User: { select: { id: true, name: true, email: true } },
         },
       }),
     ]);
@@ -183,17 +183,17 @@ async function handlePost(
         })),
         accounts,
         users: companyAccess.map((ca) => ({
-          userId: ca.user.id,
-          name: ca.user.name,
-          email: ca.user.email,
-          role: ca.user.role,
+          userId: ca.User.id,
+          name: ca.User.name,
+          email: ca.User.email,
+          role: ca.User.role,
           isOwner: ca.isOwner,
           permissions: ca.permissions,
         })),
         vendorMappings,
         auditLogs: auditLogs.map((log) => ({
           ...log,
-          user: log.user ? { name: log.user.name, email: log.user.email } : null,
+          user: log.User ? { name: log.User.name, email: log.User.email } : null,
         })),
       },
       stats: {

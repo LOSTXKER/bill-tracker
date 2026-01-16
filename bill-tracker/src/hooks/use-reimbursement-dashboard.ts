@@ -171,10 +171,12 @@ export function useReimbursementDashboard({
     await Promise.all([mutate(requestsKey), mutate(summaryKey)]);
   }, [requestsKey, summaryKey]);
 
-  // Actions
+  // Actions with optimistic toast feedback
   const approve = useCallback(
     async (id: string) => {
       setProcessingIds((prev) => new Set(prev).add(id));
+      const toastId = toast.loading("กำลังอนุมัติ...");
+      
       try {
         const response = await fetch(`/api/reimbursement-requests/${id}/approve`, {
           method: "POST",
@@ -185,11 +187,11 @@ export function useReimbursementDashboard({
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
 
-        toast.success("อนุมัติเบิกจ่ายแล้ว");
+        toast.success("อนุมัติเบิกจ่ายแล้ว", { id: toastId });
         await refetch();
         return true;
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด", { id: toastId });
         return false;
       } finally {
         setProcessingIds((prev) => {
@@ -210,6 +212,8 @@ export function useReimbursementDashboard({
       }
 
       setProcessingIds((prev) => new Set(prev).add(id));
+      const toastId = toast.loading("กำลังปฏิเสธ...");
+      
       try {
         const response = await fetch(`/api/reimbursement-requests/${id}/reject`, {
           method: "POST",
@@ -222,11 +226,11 @@ export function useReimbursementDashboard({
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
 
-        toast.success("ปฏิเสธเบิกจ่ายแล้ว");
+        toast.success("ปฏิเสธเบิกจ่ายแล้ว", { id: toastId });
         await refetch();
         return true;
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด", { id: toastId });
         return false;
       } finally {
         setProcessingIds((prev) => {
@@ -242,6 +246,8 @@ export function useReimbursementDashboard({
   const pay = useCallback(
     async ({ id, paymentRef, paymentMethod }: ReimbursementActionParams) => {
       setProcessingIds((prev) => new Set(prev).add(id));
+      const toastId = toast.loading("กำลังบันทึกการจ่ายเงิน...");
+      
       try {
         const response = await fetch(`/api/reimbursement-requests/${id}/pay`, {
           method: "POST",
@@ -257,11 +263,11 @@ export function useReimbursementDashboard({
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
 
-        toast.success("จ่ายเงินสำเร็จ");
+        toast.success("จ่ายเงินสำเร็จ", { id: toastId });
         await refetch();
         return true;
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด", { id: toastId });
         return false;
       } finally {
         setProcessingIds((prev) => {
@@ -274,10 +280,12 @@ export function useReimbursementDashboard({
     [refetch]
   );
 
-  // Delete action
+  // Delete action with optimistic toast feedback
   const deleteRequest = useCallback(
     async (id: string) => {
       setProcessingIds((prev) => new Set(prev).add(id));
+      const toastId = toast.loading("กำลังลบ...");
+      
       try {
         const response = await fetch(`/api/reimbursement-requests/${id}`, {
           method: "DELETE",
@@ -288,11 +296,11 @@ export function useReimbursementDashboard({
           throw new Error(data.error || "เกิดข้อผิดพลาด");
         }
 
-        toast.success("ลบรายการเบิกจ่ายแล้ว");
+        toast.success("ลบรายการเบิกจ่ายแล้ว", { id: toastId });
         await refetch();
         return true;
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+        toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด", { id: toastId });
         return false;
       } finally {
         setProcessingIds((prev) => {
@@ -305,7 +313,7 @@ export function useReimbursementDashboard({
     [refetch]
   );
 
-  // Batch actions
+  // Batch actions with optimistic toast feedback
   const batchPay = useCallback(
     async (ids: string[], paymentRef?: string, paymentMethod?: string) => {
       if (ids.length === 0) {
@@ -314,6 +322,7 @@ export function useReimbursementDashboard({
       }
 
       ids.forEach((id) => setProcessingIds((prev) => new Set(prev).add(id)));
+      const toastId = toast.loading(`กำลังจ่ายเงิน ${ids.length} รายการ...`);
 
       try {
         const promises = ids.map((id) =>
@@ -331,18 +340,19 @@ export function useReimbursementDashboard({
         const successCount = results.filter((r) => r.status === "fulfilled").length;
         const failCount = results.filter((r) => r.status === "rejected").length;
 
-        if (successCount > 0) {
-          toast.success(`จ่ายเงินสำเร็จ ${successCount} รายการ`);
-        }
-        if (failCount > 0) {
-          toast.error(`จ่ายเงินไม่สำเร็จ ${failCount} รายการ`);
+        if (successCount > 0 && failCount === 0) {
+          toast.success(`จ่ายเงินสำเร็จ ${successCount} รายการ`, { id: toastId });
+        } else if (successCount > 0 && failCount > 0) {
+          toast.warning(`จ่ายเงินสำเร็จ ${successCount} รายการ, ไม่สำเร็จ ${failCount} รายการ`, { id: toastId });
+        } else {
+          toast.error(`จ่ายเงินไม่สำเร็จ ${failCount} รายการ`, { id: toastId });
         }
 
         await refetch();
         setSelectedItems(new Set());
         return successCount > 0;
       } catch (error) {
-        toast.error("เกิดข้อผิดพลาด");
+        toast.error("เกิดข้อผิดพลาด", { id: toastId });
         return false;
       } finally {
         ids.forEach((id) =>

@@ -52,7 +52,7 @@ export async function fetchIncomes(params: FetchIncomesParams) {
     where.OR = [
       { source: { contains: search, mode: "insensitive" } },
       { invoiceNumber: { contains: search, mode: "insensitive" } },
-      { contact: { name: { contains: search, mode: "insensitive" } } },
+      { Contact: { name: { contains: search, mode: "insensitive" } } },
     ];
   }
 
@@ -94,25 +94,25 @@ export async function fetchIncomes(params: FetchIncomesParams) {
   } else if (sortBy === "amount") {
     orderBy.netReceived = sortOrder;
   } else if (sortBy === "creator") {
-    orderBy.creator = { name: sortOrder };
+    orderBy.User = { name: sortOrder };
   } else if (sortBy === "contact") {
-    orderBy.contact = { name: sortOrder };
+    orderBy.Contact = { name: sortOrder };
   } else if (sortBy === "updatedAt") {
     orderBy.updatedAt = sortOrder;
   } else {
     orderBy.receiveDate = "desc";
   }
 
-  const [incomes, total] = await Promise.all([
+  const [incomesRaw, total] = await Promise.all([
     prisma.income.findMany({
       where,
       orderBy,
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        contact: true,
-        account: true,
-        creator: {
+        Contact: true,
+        Account: true,
+        User: {
           select: {
             id: true,
             name: true,
@@ -124,6 +124,17 @@ export async function fetchIncomes(params: FetchIncomesParams) {
     }),
     prisma.income.count({ where }),
   ]);
+
+  // Map Prisma relation names to what the client expects
+  const incomes = incomesRaw.map((income) => {
+    const { Contact, Account, User, ...rest } = income;
+    return {
+      ...rest,
+      contact: Contact,
+      account: Account,
+      creator: User,
+    };
+  });
 
   return {
     incomes: serializeIncomes(incomes),

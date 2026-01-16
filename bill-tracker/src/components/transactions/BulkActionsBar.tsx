@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Select,
   SelectContent,
@@ -8,8 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Trash2, Send, FileDown } from "lucide-react";
+import { X, Trash2, Send, FileDown, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,10 +48,14 @@ export function BulkActionsBar({
   const handleDelete = async () => {
     if (!onDelete) return;
     setIsLoading(true);
+    const toastId = toast.loading(`กำลังลบ ${selectedCount} รายการ...`);
     try {
       await onDelete();
+      toast.success(`ลบ ${selectedCount} รายการสำเร็จ`, { id: toastId });
       setShowDeleteConfirm(false);
       onClearSelection();
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการลบ", { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -58,9 +64,13 @@ export function BulkActionsBar({
   const handleStatusChange = async (status: string) => {
     if (!onStatusChange) return;
     setIsLoading(true);
+    const toastId = toast.loading(`กำลังเปลี่ยนสถานะ ${selectedCount} รายการ...`);
     try {
       await onStatusChange(status);
+      toast.success(`เปลี่ยนสถานะ ${selectedCount} รายการสำเร็จ`, { id: toastId });
       onClearSelection();
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการเปลี่ยนสถานะ", { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -69,8 +79,12 @@ export function BulkActionsBar({
   const handleSendNotification = async () => {
     if (!onSendNotification) return;
     setIsLoading(true);
+    const toastId = toast.loading("กำลังส่งแจ้งเตือน...");
     try {
       await onSendNotification();
+      toast.success("ส่งแจ้งเตือนสำเร็จ", { id: toastId });
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการส่งแจ้งเตือน", { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -105,16 +119,16 @@ export function BulkActionsBar({
           )}
 
           {onSendNotification && (
-            <Button
+            <LoadingButton
               variant="outline"
               size="sm"
               onClick={handleSendNotification}
-              disabled={isLoading}
+              loading={isLoading}
               className="h-8"
             >
               <Send className="h-4 w-4 mr-2" />
               ส่งแจ้งเตือน
-            </Button>
+            </LoadingButton>
           )}
 
           {onExport && (
@@ -131,16 +145,16 @@ export function BulkActionsBar({
           )}
 
           {onDelete && (
-            <Button
+            <LoadingButton
               variant="outline"
               size="sm"
               onClick={() => setShowDeleteConfirm(true)}
-              disabled={isLoading}
+              loading={isLoading}
               className="h-8 text-destructive hover:text-destructive"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               ลบ
-            </Button>
+            </LoadingButton>
           )}
 
           <div className="h-6 w-px bg-border" />
@@ -173,7 +187,14 @@ export function BulkActionsBar({
               disabled={isLoading}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {isLoading ? "กำลังลบ..." : "ลบ"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังลบ...
+                </>
+              ) : (
+                "ลบ"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

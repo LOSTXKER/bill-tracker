@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       return apiResponse.badRequest("Tracking code is required");
     }
 
-    const reimbursementRequest = await prisma.reimbursementRequest.findUnique({
+    const reimbursementRequestRaw = await prisma.reimbursementRequest.findUnique({
       where: { trackingCode: code },
       select: {
         id: true,
@@ -35,21 +35,29 @@ export async function GET(request: Request, { params }: RouteParams) {
         approvedBy: true,
         paidAt: true,
         paidBy: true,
-        approver: {
+        User_ReimbursementRequest_approvedByToUser: {
           select: { name: true },
         },
-        payer: {
+        User_ReimbursementRequest_paidByToUser: {
           select: { name: true },
         },
-        company: {
+        Company: {
           select: { name: true, logoUrl: true },
         },
       },
     });
 
-    if (!reimbursementRequest) {
+    if (!reimbursementRequestRaw) {
       return apiResponse.notFound("Tracking code not found");
     }
+
+    // Map Prisma relation names to client-expected names
+    const reimbursementRequest = {
+      ...reimbursementRequestRaw,
+      approver: reimbursementRequestRaw.User_ReimbursementRequest_approvedByToUser,
+      payer: reimbursementRequestRaw.User_ReimbursementRequest_paidByToUser,
+      company: reimbursementRequestRaw.Company,
+    };
 
     // Build timeline
     const timeline: Array<{

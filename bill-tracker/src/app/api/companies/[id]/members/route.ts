@@ -18,10 +18,10 @@ import { logMemberInvite } from "@/lib/audit/logger";
 export const GET = withCompanyAccessFromParams(
   async (request, { company }) => {
     // Get all company access records with user details
-    const members = await prisma.companyAccess.findMany({
+    const membersRaw = await prisma.companyAccess.findMany({
       where: { companyId: company.id },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -37,6 +37,7 @@ export const GET = withCompanyAccessFromParams(
         { createdAt: "asc" }, // Then by join date
       ],
     });
+    const members = membersRaw.map((m) => ({ ...m, user: m.User }));
 
     return apiResponse.success({ members });
   }
@@ -105,24 +106,27 @@ export const POST = withCompanyAccessFromParams(
 
     const user = await prisma.user.create({
       data: {
+        id: crypto.randomUUID(),
         email,
         name,
         password: hashedPassword,
         role: "STAFF",
         isActive: true, // Active immediately
+        updatedAt: new Date(),
       },
     });
 
     // Create company access
-    const access = await prisma.companyAccess.create({
+    const accessRaw = await prisma.companyAccess.create({
       data: {
+        id: crypto.randomUUID(),
         userId: user.id,
         companyId: company.id,
         isOwner,
         permissions,
       },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -132,6 +136,7 @@ export const POST = withCompanyAccessFromParams(
         },
       },
     });
+    const access = { ...accessRaw, user: accessRaw.User };
 
     // Log the member creation
     await logMemberInvite(email, permissions, session.user.id, company.id);

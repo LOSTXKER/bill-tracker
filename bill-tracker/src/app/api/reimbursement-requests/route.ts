@@ -30,22 +30,31 @@ export const GET = withCompanyAccess(
       where.status = status;
     }
 
-    const requests = await prisma.reimbursementRequest.findMany({
+    const requestsRaw = await prisma.reimbursementRequest.findMany({
       where,
       include: {
-        approver: {
+        User_ReimbursementRequest_approvedByToUser: {
           select: { id: true, name: true },
         },
-        payer: {
+        User_ReimbursementRequest_paidByToUser: {
           select: { id: true, name: true },
         },
-        contact: true,
-        linkedExpense: {
+        Contact: true,
+        Expense: {
           select: { id: true, status: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    // Map Prisma relation names to client-expected names
+    const requests = requestsRaw.map((r) => ({
+      ...r,
+      approver: r.User_ReimbursementRequest_approvedByToUser,
+      payer: r.User_ReimbursementRequest_paidByToUser,
+      contact: r.Contact,
+      linkedExpense: r.Expense,
+    }));
 
     return apiResponse.success({ requests });
   },
@@ -115,7 +124,8 @@ export async function POST(request: Request) {
     // Create reimbursement request (Anonymous)
     const reimbursementRequest = await prisma.reimbursementRequest.create({
       data: {
-        company: { connect: { id: company.id } },
+        id: crypto.randomUUID(),
+        Company: { connect: { id: company.id } },
         trackingCode,
         requesterName: requesterName.trim(),
         requesterPhone: requesterPhone?.trim() || null,
@@ -128,12 +138,13 @@ export async function POST(request: Request) {
         vatAmount: vatAmount || calculatedVatAmount,
         netAmount,
         description: description?.trim() || null,
-        contact: contactId ? { connect: { id: contactId } } : undefined,
+        Contact: contactId ? { connect: { id: contactId } } : undefined,
         invoiceNumber: invoiceNumber || null,
         billDate: billDate ? new Date(billDate) : new Date(),
         paymentMethod,
         receiptUrls,
         status: "PENDING",
+        updatedAt: new Date(),
       },
       select: {
         id: true,

@@ -123,9 +123,9 @@ async function handlePost(
           where: {
             companyId: context.company.id,
             OR: [
-              { expenses: { some: {} } },
-              { incomes: { some: {} } },
-              { vendorMappings: { some: {} } },
+              { Expense: { some: {} } },
+              { Income: { some: {} } },
+              { VendorMapping: { some: {} } },
             ],
           },
           select: { id: true, code: true, source: true },
@@ -165,8 +165,10 @@ async function handlePost(
         
         // สร้างบัญชีใหม่ (source = PEAK)
         if (accountsToCreate.length > 0) {
+          const now = new Date();
           await tx.account.createMany({
             data: accountsToCreate.map(a => ({
+              id: crypto.randomUUID(),
               companyId: context.company.id,
               code: a.code,
               name: a.nameTh,
@@ -176,6 +178,7 @@ async function handlePost(
               isSystem: false,
               isActive: true,
               source: DataSource.PEAK, // ระบุว่ามาจาก Peak
+              updatedAt: now,
             })),
             skipDuplicates: true,
           });
@@ -253,8 +256,10 @@ async function handlePost(
       
       // Create new accounts (source = PEAK)
       if (toCreate.length > 0) {
+        const now = new Date();
         await tx.account.createMany({
           data: toCreate.map(a => ({
+            id: crypto.randomUUID(),
             companyId: context.company.id,
             code: a.code,
             name: a.nameTh,
@@ -264,6 +269,7 @@ async function handlePost(
             isSystem: false,
             isActive: true,
             source: DataSource.PEAK, // ระบุว่ามาจาก Peak
+            updatedAt: now,
           })),
           skipDuplicates: true,
         });

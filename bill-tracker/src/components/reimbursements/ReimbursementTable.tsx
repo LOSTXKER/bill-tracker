@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   CheckCircle2,
   XCircle,
   CreditCard,
   ChevronRight,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import type { Reimbursement } from "@/types/reimbursement";
 import { getStatusConfig } from "@/types/reimbursement";
@@ -155,56 +156,62 @@ export const ReimbursementTable = memo(function ReimbursementTable({
                 {/* Actions */}
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-center gap-1">
-                    {canApprove && (
+                    {isProcessing ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : (
                       <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => onReject(reimbursement.id)}
-                          disabled={isProcessing}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                          onClick={() => onApprove(reimbursement.id)}
-                          disabled={isProcessing}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </Button>
+                        {canApprove && (
+                          <>
+                            <LoadingButton
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => onReject(reimbursement.id)}
+                              loading={isProcessing}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </LoadingButton>
+                            <LoadingButton
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                              onClick={() => onApprove(reimbursement.id)}
+                              loading={isProcessing}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </LoadingButton>
+                          </>
+                        )}
+
+                        {canPay && (
+                          <LoadingButton
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                            onClick={() => onPay(reimbursement.id)}
+                            loading={isProcessing}
+                          >
+                            <CreditCard className="h-4 w-4" />
+                          </LoadingButton>
+                        )}
+
+                        {canDelete && onDelete && (
+                          <LoadingButton
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                            onClick={() => onDelete(reimbursement.id)}
+                            loading={isProcessing}
+                            title="ลบรายการ"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </LoadingButton>
+                        )}
+
+                        {!canApprove && !canPay && !canDelete && (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </>
-                    )}
-
-                    {canPay && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 px-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        onClick={() => onPay(reimbursement.id)}
-                        disabled={isProcessing}
-                      >
-                        <CreditCard className="h-4 w-4" />
-                      </Button>
-                    )}
-
-                    {canDelete && onDelete && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 px-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                        onClick={() => onDelete(reimbursement.id)}
-                        disabled={isProcessing}
-                        title="ลบรายการ"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-
-                    {!canApprove && !canPay && !canDelete && (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
                 </TableCell>

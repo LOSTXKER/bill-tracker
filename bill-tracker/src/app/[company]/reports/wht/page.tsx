@@ -68,7 +68,7 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   // Get expenses with WHT (เราหักเขา - ต้องนำส่ง)
-  const expensesWithWHT = await prisma.expense.findMany({
+  const expensesWithWHTRaw = await prisma.expense.findMany({
     where: {
       companyId: company.id,
       billDate: { gte: startOfMonth, lte: endOfMonth },
@@ -76,12 +76,13 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { billDate: "asc" },
     include: {
-      contact: true,
+      Contact: true,
     },
   });
+  const expensesWithWHT = expensesWithWHTRaw.map((e) => ({ ...e, contact: e.Contact }));
 
   // Get incomes with WHT deducted (เขาหักเรา - เครดิตภาษี)
-  const incomesWithWHT = await prisma.income.findMany({
+  const incomesWithWHTRaw = await prisma.income.findMany({
     where: {
       companyId: company.id,
       receiveDate: { gte: startOfMonth, lte: endOfMonth },
@@ -89,9 +90,10 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { receiveDate: "asc" },
     include: {
-      contact: true,
+      Contact: true,
     },
   });
+  const incomesWithWHT = incomesWithWHTRaw.map((i) => ({ ...i, contact: i.Contact }));
 
   // Calculate totals
   const totalWHTpaid = expensesWithWHT.reduce(

@@ -18,14 +18,14 @@ async function handleGet(
       companyId: context.company.id,
     },
     include: {
-      parent: {
+      Account: {
         select: {
           id: true,
           code: true,
           name: true,
         },
       },
-      children: {
+      other_Account: {
         select: {
           id: true,
           code: true,
@@ -39,7 +39,9 @@ async function handleGet(
     return apiResponse.notFound("ไม่พบบัญชีนี้");
   }
 
-  return apiResponse.success({ account });
+  // Map Prisma relation names to client-expected names
+  const { Account: parent, other_Account: children, ...rest } = account;
+  return apiResponse.success({ account: { ...rest, parent, children } });
 }
 
 // PATCH /api/[company]/accounts/[id]

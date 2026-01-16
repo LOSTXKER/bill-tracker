@@ -45,7 +45,7 @@ export const GET = withCompanyAccessFromParams(
     const isReminder = daysUntilDeadline <= whtReminderDays && daysUntilDeadline >= 0;
 
     // WHT ที่เราหักเขา (Expense) - ต้องนำส่ง
-    const expensesWithWht = await prisma.expense.findMany({
+    const expensesWithWhtRaw = await prisma.expense.findMany({
       where: {
         companyId: company.id,
         deletedAt: null,
@@ -53,13 +53,14 @@ export const GET = withCompanyAccessFromParams(
         billDate: { gte: startOfMonth, lte: endOfMonth },
       },
       include: {
-        contact: { select: { name: true, taxId: true } },
+        Contact: { select: { name: true, taxId: true } },
       },
       orderBy: { billDate: "asc" },
     });
+    const expensesWithWht = expensesWithWhtRaw.map((e) => ({ ...e, contact: e.Contact }));
 
     // WHT ที่เขาหักเรา (Income) - เป็นเครดิตภาษี
-    const incomesWithWht = await prisma.income.findMany({
+    const incomesWithWhtRaw = await prisma.income.findMany({
       where: {
         companyId: company.id,
         deletedAt: null,
@@ -67,10 +68,11 @@ export const GET = withCompanyAccessFromParams(
         receiveDate: { gte: startOfMonth, lte: endOfMonth },
       },
       include: {
-        contact: { select: { name: true, taxId: true } },
+        Contact: { select: { name: true, taxId: true } },
       },
       orderBy: { receiveDate: "asc" },
     });
+    const incomesWithWht = incomesWithWhtRaw.map((i) => ({ ...i, contact: i.Contact }));
 
     // Calculate totals
     const totalWhtToPay = expensesWithWht.reduce(

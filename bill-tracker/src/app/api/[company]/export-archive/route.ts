@@ -105,7 +105,7 @@ export async function GET(
       }
 
       // Fetch expenses with files
-      const expenses = await prisma.expense.findMany({
+      const expensesRaw = await prisma.expense.findMany({
         where: {
           companyId: company.id,
           billDate: {
@@ -115,15 +115,16 @@ export async function GET(
           deletedAt: null,
         },
         include: {
-          contact: {
+          Contact: {
             select: { name: true },
           },
         },
         orderBy: { billDate: "asc" },
       });
+      const expenses = expensesRaw.map((e) => ({ ...e, contact: e.Contact }));
 
       // Fetch incomes with files
-      const incomes = await prisma.income.findMany({
+      const incomesRaw = await prisma.income.findMany({
         where: {
           companyId: company.id,
           receiveDate: {
@@ -133,12 +134,13 @@ export async function GET(
           deletedAt: null,
         },
         include: {
-          contact: {
+          Contact: {
             select: { name: true },
           },
         },
         orderBy: { receiveDate: "asc" },
       });
+      const incomes = incomesRaw.map((i) => ({ ...i, contact: i.Contact }));
 
       // Generate Excel reports
       const monthName = getThaiMonthName(month);

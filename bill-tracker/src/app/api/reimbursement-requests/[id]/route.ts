@@ -20,27 +20,36 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const reimbursementRequest = await prisma.reimbursementRequest.findUnique({
+    const reimbursementRequestRaw = await prisma.reimbursementRequest.findUnique({
       where: { id },
       include: {
-        approver: {
+        User_ReimbursementRequest_approvedByToUser: {
           select: { id: true, name: true },
         },
-        payer: {
+        User_ReimbursementRequest_paidByToUser: {
           select: { id: true, name: true },
         },
-        contact: {
+        Contact: {
           select: { id: true, name: true },
         },
-        linkedExpense: {
+        Expense: {
           select: { id: true, status: true },
         },
       },
     });
 
-    if (!reimbursementRequest) {
+    if (!reimbursementRequestRaw) {
       return apiResponse.notFound("Reimbursement request not found");
     }
+
+    // Map Prisma relation names to client-expected names
+    const reimbursementRequest = {
+      ...reimbursementRequestRaw,
+      approver: reimbursementRequestRaw.User_ReimbursementRequest_approvedByToUser,
+      payer: reimbursementRequestRaw.User_ReimbursementRequest_paidByToUser,
+      contact: reimbursementRequestRaw.Contact,
+      linkedExpense: reimbursementRequestRaw.Expense,
+    };
 
     return apiResponse.success({ request: reimbursementRequest });
   } catch (error) {

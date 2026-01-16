@@ -34,6 +34,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
 
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         userId: params.userId,
         companyId: params.companyId,
         action: params.action,

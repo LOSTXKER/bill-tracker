@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { NavLink, useIsActivePath } from "@/components/navigation";
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -66,8 +66,41 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// NavItem component with optimistic active state
+function NavItemLink({ 
+  href, 
+  icon: Icon, 
+  name, 
+  onClick 
+}: { 
+  href: string; 
+  icon: LucideIcon; 
+  name: string; 
+  onClick?: () => void;
+}) {
+  const isActive = useIsActivePath(href);
+  
+  return (
+    <NavLink
+      href={href}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
+    >
+      <Icon className={cn(
+        "h-5 w-5 transition-colors",
+        isActive ? "text-primary" : ""
+      )} />
+      {name}
+    </NavLink>
+  );
+}
+
 export function DashboardShell({ children, company, user, isOwner, permissions }: DashboardShellProps) {
-  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const companyCode = company.code.toLowerCase();
 
@@ -169,8 +202,6 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
     },
   ];
 
-  const isActive = (href: string) => pathname === href;
-
   const hasPermission = (permission?: string) => {
     if (!permission) return true;
     if (isOwner) return true;
@@ -198,23 +229,13 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           )}
           <div className="space-y-1">
             {group.items.map((item) => (
-              <Link
+              <NavItemLink
                 key={item.name}
                 href={item.href}
+                icon={item.icon}
+                name={item.name}
                 onClick={() => setSidebarOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  isActive(item.href)
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <item.icon className={cn(
-                  "h-5 w-5 transition-colors",
-                  isActive(item.href) ? "text-primary" : ""
-                )} />
-                {item.name}
-              </Link>
+              />
             ))}
           </div>
         </div>
@@ -250,13 +271,13 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
 
             {/* Back to companies */}
             <div className="border-t border-border/50 p-3">
-              <Link
+              <NavLink
                 href="/"
                 className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
                 เปลี่ยนบริษัท
-              </Link>
+              </NavLink>
             </div>
           </div>
         </aside>
@@ -305,16 +326,16 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href={`/${companyCode}/profile`} className="cursor-pointer">
+                  <NavLink href={`/${companyCode}/profile`} className="cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
                     โปรไฟล์
-                  </Link>
+                  </NavLink>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={`/${companyCode}/settings`} className="cursor-pointer">
+                  <NavLink href={`/${companyCode}/settings`} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
                     ตั้งค่า
-                  </Link>
+                  </NavLink>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

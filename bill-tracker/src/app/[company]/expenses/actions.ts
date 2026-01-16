@@ -64,7 +64,7 @@ export async function fetchExpenses(params: FetchExpensesParams) {
         OR: [
           { description: { contains: search, mode: "insensitive" } },
           { invoiceNumber: { contains: search, mode: "insensitive" } },
-          { contact: { name: { contains: search, mode: "insensitive" } } },
+          { Contact: { name: { contains: search, mode: "insensitive" } } },
         ],
       },
     ];
@@ -108,25 +108,25 @@ export async function fetchExpenses(params: FetchExpensesParams) {
   } else if (sortBy === "amount") {
     orderBy.netPaid = sortOrder;
   } else if (sortBy === "creator") {
-    orderBy.creator = { name: sortOrder };
+    orderBy.User_Expense_createdByToUser = { name: sortOrder };
   } else if (sortBy === "contact") {
-    orderBy.contact = { name: sortOrder };
+    orderBy.Contact = { name: sortOrder };
   } else if (sortBy === "updatedAt") {
     orderBy.updatedAt = sortOrder;
   } else {
     orderBy.billDate = "desc";
   }
 
-  const [expenses, total] = await Promise.all([
+  const [expensesRaw, total] = await Promise.all([
     prisma.expense.findMany({
       where,
       orderBy,
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        contact: true,
-        account: true,
-        creator: {
+        Contact: true,
+        Account: true,
+        User_Expense_createdByToUser: {
           select: {
             id: true,
             name: true,
@@ -138,6 +138,17 @@ export async function fetchExpenses(params: FetchExpensesParams) {
     }),
     prisma.expense.count({ where }),
   ]);
+
+  // Map Prisma relation names to what the client expects
+  const expenses = expensesRaw.map((expense) => {
+    const { Contact, Account, User_Expense_createdByToUser, ...rest } = expense;
+    return {
+      ...rest,
+      contact: Contact,
+      account: Account,
+      creator: User_Expense_createdByToUser,
+    };
+  });
 
   return {
     expenses: serializeExpenses(expenses),

@@ -16,16 +16,16 @@ export const GET = withAuth(async (request, { session }) => {
   }
 
   // Otherwise, return only companies user has access to
-  const companyAccess = await prisma.companyAccess.findMany({
+  const companyAccessRaw = await prisma.companyAccess.findMany({
     where: { 
       userId: session.user.id,
-      ...(codeFilter && { company: { code: codeFilter } }),
+      ...(codeFilter && { Company: { code: codeFilter } }),
     },
-    include: { company: true },
+    include: { Company: true },
   });
 
-  const companies = companyAccess.map((ca: typeof companyAccess[number]) => ({
-    ...ca.company,
+  const companies = companyAccessRaw.map((ca) => ({
+    ...ca.Company,
     isOwner: ca.isOwner,
     permissions: ca.permissions,
   }));
@@ -59,13 +59,16 @@ export const POST = withAuth(async (request, { session }) => {
   // Create company and assign user as OWNER
   const company = await prisma.company.create({
     data: {
+      id: crypto.randomUUID(),
       name,
       code: code.toUpperCase(),
       taxId,
       address,
       phone,
-      users: {
+      updatedAt: new Date(),
+      CompanyAccess: {
         create: {
+          id: crypto.randomUUID(),
           userId: session.user.id,
           isOwner: true,
           permissions: [],

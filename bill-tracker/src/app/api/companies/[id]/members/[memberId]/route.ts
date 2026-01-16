@@ -23,10 +23,10 @@ export const PATCH = withCompanyAccessFromParams(
     const { permissions, isOwner } = body;
 
     // Get the current member info
-    const currentAccess = await prisma.companyAccess.findUnique({
+    const currentAccessRaw = await prisma.companyAccess.findUnique({
       where: { id: memberId },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -35,6 +35,7 @@ export const PATCH = withCompanyAccessFromParams(
         },
       },
     });
+    const currentAccess = currentAccessRaw ? { ...currentAccessRaw, user: currentAccessRaw.User } : null;
 
     if (!currentAccess) {
       return apiResponse.notFound("Member not found");
@@ -51,11 +52,11 @@ export const PATCH = withCompanyAccessFromParams(
     if (isOwner !== undefined) updateData.isOwner = isOwner;
 
     // Update the member
-    const updated = await prisma.companyAccess.update({
+    const updatedRaw = await prisma.companyAccess.update({
       where: { id: memberId },
       data: updateData,
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -65,6 +66,7 @@ export const PATCH = withCompanyAccessFromParams(
         },
       },
     });
+    const updated = { ...updatedRaw, user: updatedRaw.User };
 
     // Log the permission change if permissions were updated
     if (permissions !== undefined) {
@@ -95,10 +97,10 @@ export const DELETE = withCompanyAccessFromParams(
     const { memberId } = params;
 
     // Get the member to be removed
-    const memberToRemove = await prisma.companyAccess.findUnique({
+    const memberToRemoveRaw = await prisma.companyAccess.findUnique({
       where: { id: memberId },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -107,6 +109,7 @@ export const DELETE = withCompanyAccessFromParams(
         },
       },
     });
+    const memberToRemove = memberToRemoveRaw ? { ...memberToRemoveRaw, user: memberToRemoveRaw.User } : null;
 
     if (!memberToRemove) {
       return apiResponse.notFound("Member not found");

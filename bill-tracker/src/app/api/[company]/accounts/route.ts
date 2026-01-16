@@ -74,6 +74,7 @@ async function handlePost(
     // Create account
     const account = await prisma.account.create({
       data: {
+        id: crypto.randomUUID(),
         companyId: context.company.id,
         code,
         name,
@@ -83,6 +84,7 @@ async function handlePost(
         parentId: parentId || null,
         isSystem: false,
         isActive: true,
+        updatedAt: new Date(),
       },
     });
 

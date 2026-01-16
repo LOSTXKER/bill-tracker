@@ -94,7 +94,7 @@ async function checkDuplicateReceipt(
 
   // Check by invoice number
   if (data.invoiceNumber) {
-    const existingByInvoice = await prisma.expense.findFirst({
+    const existingByInvoiceRaw = await prisma.expense.findFirst({
       where: {
         companyId,
         invoiceNumber: data.invoiceNumber,
@@ -102,8 +102,9 @@ async function checkDuplicateReceipt(
         deletedAt: null,
         reimbursementStatus: { not: "REJECTED" },
       },
-      select: { id: true, billDate: true, netPaid: true, requester: { select: { name: true } } },
+      select: { id: true, billDate: true, netPaid: true, User_Expense_requesterIdToUser: { select: { name: true } } },
     });
+    const existingByInvoice = existingByInvoiceRaw ? { ...existingByInvoiceRaw, requester: existingByInvoiceRaw.User_Expense_requesterIdToUser } : null;
 
     if (existingByInvoice) {
       flags.push({

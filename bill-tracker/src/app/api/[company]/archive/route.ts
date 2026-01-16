@@ -50,7 +50,7 @@ async function handleGetPreview(
   const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
   // Fetch expenses and incomes
-  const [expenses, incomes] = await Promise.all([
+  const [expensesRaw, incomesRaw] = await Promise.all([
     prisma.expense.findMany({
       where: {
         companyId: context.company.id,
@@ -58,7 +58,7 @@ async function handleGetPreview(
         deletedAt: null,
       },
       include: {
-        contact: { select: { name: true, taxId: true } },
+        Contact: { select: { name: true, taxId: true } },
       },
       orderBy: { billDate: "asc" },
     }),
@@ -69,11 +69,15 @@ async function handleGetPreview(
         deletedAt: null,
       },
       include: {
-        contact: { select: { name: true, taxId: true } },
+        Contact: { select: { name: true, taxId: true } },
       },
       orderBy: { receiveDate: "asc" },
     }),
   ]);
+  
+  // Map Prisma relation names
+  const expenses = expensesRaw.map((e) => ({ ...e, contact: e.Contact }));
+  const incomes = incomesRaw.map((i) => ({ ...i, contact: i.Contact }));
 
   // Transform data
   const expensesWithFiles = expenses.map((e) => ({
@@ -129,7 +133,7 @@ async function handlePost(
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
     // Fetch expenses and incomes with files
-    const [expenses, incomes] = await Promise.all([
+    const [expensesRaw2, incomesRaw2] = await Promise.all([
       prisma.expense.findMany({
         where: {
           companyId: context.company.id,
@@ -137,7 +141,7 @@ async function handlePost(
           deletedAt: null,
         },
         include: {
-          contact: { select: { name: true, taxId: true } },
+          Contact: { select: { name: true, taxId: true } },
         },
         orderBy: { billDate: "asc" },
       }),
@@ -148,17 +152,17 @@ async function handlePost(
           deletedAt: null,
         },
         include: {
-          contact: { select: { name: true, taxId: true } },
+          Contact: { select: { name: true, taxId: true } },
         },
         orderBy: { receiveDate: "asc" },
       }),
     ]);
 
     // Transform data with file arrays
-    const expensesWithFiles = expenses.map((e) => ({
+    const expensesWithFiles = expensesRaw2.map((e) => ({
       id: e.id,
       billDate: e.billDate,
-      contact: e.contact,
+      contact: e.Contact,
       description: e.description,
       accountId: e.accountId,
       amount: Number(e.amount),
@@ -175,10 +179,10 @@ async function handlePost(
       whtCertUrls: parseJsonArray(e.whtCertUrls),
     }));
 
-    const incomesWithFiles = incomes.map((i) => ({
+    const incomesWithFiles = incomesRaw2.map((i) => ({
       id: i.id,
       receiveDate: i.receiveDate,
-      contact: i.contact,
+      contact: i.Contact,
       source: i.source,
       amount: Number(i.amount),
       vatRate: i.vatRate,

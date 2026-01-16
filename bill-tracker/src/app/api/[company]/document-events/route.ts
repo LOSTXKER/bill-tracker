@@ -48,10 +48,10 @@ export const GET = withCompanyAccessFromParams(
       where.incomeId = incomeId;
     }
 
-    const events = await prisma.documentEvent.findMany({
+    const eventsRaw = await prisma.documentEvent.findMany({
       where,
       include: {
-        creator: {
+        User: {
           select: { id: true, name: true, email: true },
         },
       },
@@ -59,6 +59,7 @@ export const GET = withCompanyAccessFromParams(
       take: limit,
     });
 
+    const events = eventsRaw.map((e) => ({ ...e, creator: e.User }));
     return apiResponse.success(events);
   }
 );

@@ -46,19 +46,19 @@ async function handleGet(request: Request, { company }: { company: { id: string 
   }
 
   // Only get top-level comments (no parentId), replies are included via relation
-  const comments = await prisma.comment.findMany({
+  const commentsRaw = await prisma.comment.findMany({
     where: {
       ...where,
       parentId: null,
     },
     include: {
-      author: {
+      User: {
         select: { id: true, name: true, email: true, avatarUrl: true },
       },
-      replies: {
+      other_Comment: {
         where: { deletedAt: null },
         include: {
-          author: {
+          User: {
             select: { id: true, name: true, email: true, avatarUrl: true },
           },
         },
@@ -67,6 +67,13 @@ async function handleGet(request: Request, { company }: { company: { id: string 
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Map Prisma relation names to client-expected names
+  const comments = commentsRaw.map((c) => ({
+    ...c,
+    author: c.User,
+    replies: c.other_Comment.map((r) => ({ ...r, author: r.User })),
+  }));
 
   return apiResponse.success({ comments });
 }
@@ -101,14 +108,15 @@ async function handlePost(request: Request, { session, company }: { session: { u
     return apiResponse.badRequest("Invalid entityType");
   }
 
-  const comment = await prisma.comment.create({
+  const commentRaw = await prisma.comment.create({
     data: data as any,
     include: {
-      author: {
+      User: {
         select: { id: true, name: true, email: true, avatarUrl: true },
       },
     },
   });
+  const comment = { ...commentRaw, author: commentRaw.User };
 
   // Create notification for mentioned users
   if (mentionedUserIds && mentionedUserIds.length > 0) {

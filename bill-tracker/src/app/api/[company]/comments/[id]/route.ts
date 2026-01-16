@@ -62,16 +62,17 @@ async function handlePatch(request: Request, { session }: { session: { user: { i
     }
   }
 
-  const updated = await prisma.comment.update({
+  const updatedRaw = await prisma.comment.update({
     where: { id },
     data: updateData,
     include: {
-      author: {
+      User: {
         select: { id: true, name: true, email: true, avatarUrl: true },
       },
     },
   });
 
+  const updated = { ...updatedRaw, author: updatedRaw.User };
   return apiResponse.success({ comment: updated });
 }
 

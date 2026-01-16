@@ -49,7 +49,7 @@ export async function requireRole(allowedRoles: UserRole[]) {
  * Get user's company access
  */
 export async function getUserCompanyAccess(userId: string, companyId: string) {
-  return await prisma.companyAccess.findUnique({
+  const accessRaw = await prisma.companyAccess.findUnique({
     where: {
       userId_companyId: {
         userId,
@@ -57,9 +57,10 @@ export async function getUserCompanyAccess(userId: string, companyId: string) {
       },
     },
     include: {
-      company: true,
+      Company: true,
     },
   });
+  return accessRaw ? { ...accessRaw, company: accessRaw.Company } : null;
 }
 
 /**
@@ -69,9 +70,9 @@ export async function getUserCompanies(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      companies: {
+      CompanyAccess: {
         include: {
-          company: true,
+          Company: true,
         },
       },
     },
@@ -86,8 +87,8 @@ export async function getUserCompanies(userId: string) {
     });
   }
 
-  return user.companies.map((c: typeof user.companies[number]) => ({
-    ...c.company,
+  return user.CompanyAccess.map((c) => ({
+    ...c.Company,
     access: c,
     isOwner: c.isOwner,
     permissions: c.permissions,

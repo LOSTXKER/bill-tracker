@@ -59,7 +59,7 @@ async function VATReport({ companyCode }: { companyCode: string }) {
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   // Get expenses with VAT (Input VAT - ภาษีซื้อ)
-  const expenses = await prisma.expense.findMany({
+  const expensesRaw = await prisma.expense.findMany({
     where: {
       companyId: company.id,
       billDate: { gte: startOfMonth, lte: endOfMonth },
@@ -67,12 +67,13 @@ async function VATReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { billDate: "asc" },
     include: {
-      contact: true,
+      Contact: true,
     },
   });
+  const expenses = expensesRaw.map((e) => ({ ...e, contact: e.Contact }));
 
   // Get incomes with VAT (Output VAT - ภาษีขาย)
-  const incomes = await prisma.income.findMany({
+  const incomesRaw = await prisma.income.findMany({
     where: {
       companyId: company.id,
       receiveDate: { gte: startOfMonth, lte: endOfMonth },
@@ -80,9 +81,10 @@ async function VATReport({ companyCode }: { companyCode: string }) {
     },
     orderBy: { receiveDate: "asc" },
     include: {
-      contact: true,
+      Contact: true,
     },
   });
+  const incomes = incomesRaw.map((i) => ({ ...i, contact: i.Contact }));
 
   // Calculate totals
   const inputVAT = expenses.reduce(

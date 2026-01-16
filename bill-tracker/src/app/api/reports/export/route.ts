@@ -25,14 +25,14 @@ export const GET = withCompanyAccess(
     const endDate = new Date(parseInt(year), parseInt(month), 0);
     const period = `${month}/${year}`;
 
-    const [expenses, incomes] = await Promise.all([
+    const [expensesRaw, incomesRaw] = await Promise.all([
       prisma.expense.findMany({
         where: {
           companyId: company.id,
           billDate: { gte: startDate, lte: endDate },
         },
         include: {
-          contact: true,
+          Contact: true,
         },
         orderBy: { billDate: "asc" },
       }),
@@ -42,11 +42,15 @@ export const GET = withCompanyAccess(
           receiveDate: { gte: startDate, lte: endDate },
         },
         include: {
-          contact: true,
+          Contact: true,
         },
         orderBy: { receiveDate: "asc" },
       }),
     ]);
+
+    // Map Prisma relation names
+    const expenses = expensesRaw.map((e) => ({ ...e, contact: e.Contact }));
+    const incomes = incomesRaw.map((i) => ({ ...i, contact: i.Contact }));
 
     // Transform data to match export format
     const expenseData = expenses.map((e) => ({

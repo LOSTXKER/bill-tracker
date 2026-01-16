@@ -114,14 +114,15 @@ async function IncomesData({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  const [incomes, total] = await Promise.all([
+  const [incomesRaw, total] = await Promise.all([
     prisma.income.findMany({
       where: { companyId: companyId, deletedAt: null },
       orderBy: { receiveDate: "desc" },
       take: 20,
       include: {
-        contact: true,
-        creator: {
+        Contact: true,
+        Account: true,
+        User: {
           select: {
             id: true,
             name: true,
@@ -133,6 +134,17 @@ async function IncomesData({ companyCode }: { companyCode: string }) {
     }),
     prisma.income.count({ where: { companyId: companyId, deletedAt: null } }),
   ]);
+
+  // Map Prisma relation names to what the client expects
+  const incomes = incomesRaw.map((income) => {
+    const { Contact, Account, User, ...rest } = income;
+    return {
+      ...rest,
+      contact: Contact,
+      account: Account,
+      creator: User,
+    };
+  });
 
   // Serialize incomes for client component
   const serializedIncomes = serializeIncomes(incomes);

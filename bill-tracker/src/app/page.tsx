@@ -16,9 +16,9 @@ export default async function HomePage() {
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     include: {
-      companies: {
+      CompanyAccess: {
         include: {
-          company: true,
+          Company: true,
         },
       },
     },
@@ -28,7 +28,7 @@ export default async function HomePage() {
   const companies =
     session.user.role === "ADMIN"
       ? (await prisma.company.findMany({ orderBy: { name: "asc" } })).map((c) => ({ ...c, isOwner: true, permissions: [] }))
-      : user?.companies.map((c: NonNullable<typeof user>["companies"][number]) => ({ ...c.company, isOwner: c.isOwner, permissions: c.permissions })) ?? [];
+      : user?.CompanyAccess.map((c) => ({ ...c.Company, isOwner: c.isOwner, permissions: c.permissions })) ?? [];
 
   // If no companies, show setup page with create company option
   if (companies.length === 0) {
