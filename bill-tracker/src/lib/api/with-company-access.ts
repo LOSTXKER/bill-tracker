@@ -1,11 +1,13 @@
 /**
  * Company Access Wrapper for API Routes
  * Combines authentication, company access check, and permission verification
+ * 
+ * OPTIMIZED: Uses single combined query for company + access instead of
+ * separate queries, reducing DB round-trips from 3-4 to 1-2 per request.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { hasPermission } from "@/lib/permissions/checker";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { apiResponse } from "./response";
 import { ApiError, ApiErrors } from "./errors";
@@ -15,6 +17,29 @@ import type { Company } from "@prisma/client";
 export interface CompanyAccessContext extends AuthenticatedContext {
   company: Company;
   companyCode: string;
+}
+
+/**
+ * Check if user has a specific permission based on already-fetched access data
+ * This avoids the duplicate DB query that hasPermission() would make
+ */
+function checkPermissionFromAccess(
+  access: { isOwner: boolean; permissions: unknown },
+  permission: string
+): boolean {
+  // OWNER has all permissions
+  if (access.isOwner) return true;
+
+  const permissions = access.permissions as string[];
+  
+  // Check exact match
+  if (permissions.includes(permission)) return true;
+
+  // Check module wildcard (e.g., "expenses:*" covers "expenses:create")
+  const [module] = permission.split(":");
+  if (permissions.includes(`${module}:*`)) return true;
+
+  return false;
 }
 
 interface CompanyAccessOptions {
@@ -95,24 +120,25 @@ export function withCompanyAccess(
         throw ApiErrors.badRequest("Company code required");
       }
 
-      // Find company
-      const company = await prisma.company.findUnique({
+      // OPTIMIZED: Single combined query for company + access
+      // Instead of 2 separate queries + 1 more in hasPermission (3 total),
+      // we now do 1 query that includes both company and access data
+      const companyWithAccess = await prisma.company.findUnique({
         where: { code: companyCode.toUpperCase() },
-      });
-
-      if (!company) {
-        throw ApiErrors.notFound("Company");
-      }
-
-      // Check company access
-      const access = await prisma.companyAccess.findUnique({
-        where: {
-          userId_companyId: {
-            userId: session.user.id,
-            companyId: company.id,
+        include: {
+          CompanyAccess: {
+            where: { userId: session.user.id },
+            select: { isOwner: true, permissions: true },
           },
         },
       });
+
+      if (!companyWithAccess) {
+        throw ApiErrors.notFound("Company");
+      }
+
+      // Extract access from the included data
+      const access = companyWithAccess.CompanyAccess[0];
 
       if (!access) {
         throw ApiErrors.forbidden("You don't have access to this company");
@@ -123,13 +149,10 @@ export function withCompanyAccess(
         throw ApiErrors.forbidden("Owner access required");
       }
 
-      // Check specific permission
+      // Check specific permission using already-fetched access data
+      // This avoids the duplicate DB query that hasPermission() would make
       if (options.permission) {
-        const hasAccess = await hasPermission(
-          session.user.id,
-          company.id,
-          options.permission
-        );
+        const hasAccess = checkPermissionFromAccess(access, options.permission);
 
         if (!hasAccess) {
           throw ApiErrors.forbidden(
@@ -138,9 +161,13 @@ export function withCompanyAccess(
         }
       }
 
+      // Remove CompanyAccess from the company object before passing to handler
+      // to maintain the same Company type interface
+      const { CompanyAccess: _, ...company } = companyWithAccess;
+
       return await handler(request, {
         session,
-        company,
+        company: company as Company,
         companyCode: companyCode.toUpperCase(),
       });
     } catch (error) {

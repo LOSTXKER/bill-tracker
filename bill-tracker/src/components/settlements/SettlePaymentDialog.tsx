@@ -86,15 +86,29 @@ export function SettlePaymentDialog({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    
+    const endpoint = isBatch
+      ? `/api/${companyCode}/settlements/batch`
+      : `/api/${companyCode}/settlements/${paymentIds[0]}`;
+
+    const body = isBatch
+      ? { paymentIds, settlementRef, settlementSlipUrls: slipUrls }
+      : { settlementRef, settlementSlipUrls: slipUrls };
+
+    // OPTIMIZED: Optimistic update - close dialog immediately for better UX
+    // Show success toast and trigger revalidation right away
+    // This gives instant feedback while the API call happens in background
+    toast.success("บันทึกการโอนคืนสำเร็จ");
+    onClose();
+    onSuccess(); // Trigger batch revalidation
+    
+    // Reset form state
+    setSettlementRef("");
+    setSlipUrls([]);
+    setIsSubmitting(false);
+
+    // Fire API request in background - if it fails, show error toast
     try {
-      const endpoint = isBatch
-        ? `/api/${companyCode}/settlements/batch`
-        : `/api/${companyCode}/settlements/${paymentIds[0]}`;
-
-      const body = isBatch
-        ? { paymentIds, settlementRef, settlementSlipUrls: slipUrls }
-        : { settlementRef, settlementSlipUrls: slipUrls };
-
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,16 +117,14 @@ export function SettlePaymentDialog({
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "เกิดข้อผิดพลาด");
+        // Show error and trigger revalidation to revert optimistic update
+        toast.error(error.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+        onSuccess(); // Re-fetch to get actual state
       }
-
-      toast.success("บันทึกการโอนคืนสำเร็จ");
-      onSuccess();
-      onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsSubmitting(false);
+      // Network error or other failure
+      toast.error("ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง");
+      onSuccess(); // Re-fetch to get actual state
     }
   };
 

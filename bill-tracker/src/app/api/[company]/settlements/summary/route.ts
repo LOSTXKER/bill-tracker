@@ -97,21 +97,27 @@ export const GET = withCompanyAccessFromParams(
       .filter((p) => p.paidByType === "USER")
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    return apiResponse.success({
-      pending: {
-        total: {
-          count: totalPendingCount,
-          amount: totalPendingAmount,
+    // OPTIMIZED: Add short-lived cache to reduce DB load
+    // 5 second cache with 30 second stale-while-revalidate for dashboard summary
+    return apiResponse.successWithCache(
+      {
+        pending: {
+          total: {
+            count: totalPendingCount,
+            amount: totalPendingAmount,
+          },
+          topUsers: topPendingUsers,
         },
-        topUsers: topPendingUsers,
+        settledThisMonth: {
+          count: settledThisMonth._count,
+          amount: Number(settledThisMonth._sum.amount) || 0,
+        },
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
       },
-      settledThisMonth: {
-        count: settledThisMonth._count,
-        amount: Number(settledThisMonth._sum.amount) || 0,
-      },
-      month: now.getMonth() + 1,
-      year: now.getFullYear(),
-    });
+      undefined,
+      { maxAge: 5, staleWhileRevalidate: 30 }
+    );
   },
   { permission: "settlements:read" }
 );

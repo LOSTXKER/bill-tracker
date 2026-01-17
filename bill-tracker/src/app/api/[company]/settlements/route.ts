@@ -133,11 +133,17 @@ export const GET = withCompanyAccessFromParams(
       (a, b) => b.totalAmount - a.totalAmount
     );
 
-    return apiResponse.success({
-      groups,
-      totalPending: payments.length,
-      totalAmount: payments.reduce((sum, p) => sum + Number(p.amount), 0),
-    });
+    // OPTIMIZED: Add short-lived cache to reduce DB load
+    // 5 second cache with 30 second stale-while-revalidate for settlements list
+    return apiResponse.successWithCache(
+      {
+        groups,
+        totalPending: payments.length,
+        totalAmount: payments.reduce((sum, p) => sum + Number(p.amount), 0),
+      },
+      undefined,
+      { maxAge: 5, staleWhileRevalidate: 30 }
+    );
   },
   { permission: "settlements:read" }
 );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { SettlementSummaryCards } from "./SettlementSummaryCards";
 import { SettlementGroupCard } from "./SettlementGroupCard";
 import { SettledGroupCard } from "./SettledGroupCard";
@@ -17,21 +17,23 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function SettlementDashboard({ companyCode }: SettlementDashboardProps) {
   const [tab, setTab] = useState<"pending" | "settled">("pending");
+  const { mutate: globalMutate } = useSWRConfig();
+
+  // Settlement API base path for batch revalidation
+  const settlementBasePath = `/api/${companyCode}/settlements`;
 
   // Fetch summary data
   const {
     data: summaryData,
     isLoading: summaryLoading,
-    mutate: mutateSummary,
-  } = useSWR(`/api/${companyCode}/settlements/summary`, fetcher);
+  } = useSWR(`${settlementBasePath}/summary`, fetcher);
 
   // Fetch pending settlements
   const {
     data: pendingData,
     isLoading: pendingLoading,
-    mutate: mutatePending,
   } = useSWR(
-    tab === "pending" ? `/api/${companyCode}/settlements?status=PENDING` : null,
+    tab === "pending" ? `${settlementBasePath}?status=PENDING` : null,
     fetcher
   );
 
@@ -39,26 +41,29 @@ export function SettlementDashboard({ companyCode }: SettlementDashboardProps) {
   const {
     data: settledData,
     isLoading: settledLoading,
-    mutate: mutateSettled,
   } = useSWR(
-    tab === "settled" ? `/api/${companyCode}/settlements?status=SETTLED` : null,
+    tab === "settled" ? `${settlementBasePath}?status=SETTLED` : null,
     fetcher
   );
 
-  const handleRefresh = useCallback(() => {
-    mutateSummary();
-    if (tab === "pending") {
-      mutatePending();
-    } else {
-      mutateSettled();
-    }
-  }, [mutateSummary, mutatePending, mutateSettled, tab]);
+  // OPTIMIZED: Single batch revalidation using global mutate with key matcher
+  // This triggers a single revalidation pass instead of 3 separate API calls
+  const revalidateAllSettlements = useCallback(() => {
+    globalMutate(
+      (key) => typeof key === "string" && key.startsWith(settlementBasePath),
+      undefined,
+      { revalidate: true }
+    );
+  }, [globalMutate, settlementBasePath]);
 
+  const handleRefresh = useCallback(() => {
+    revalidateAllSettlements();
+  }, [revalidateAllSettlements]);
+
+  // OPTIMIZED: Use batch revalidation instead of 3 separate mutate calls
   const handleSettleSuccess = useCallback(() => {
-    mutateSummary();
-    mutatePending();
-    mutateSettled();
-  }, [mutateSummary, mutatePending, mutateSettled]);
+    revalidateAllSettlements();
+  }, [revalidateAllSettlements]);
 
   const pendingGroups = pendingData?.data?.groups || [];
   const settledGroups = settledData?.data?.groups || [];
