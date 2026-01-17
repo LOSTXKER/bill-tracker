@@ -1,11 +1,14 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { ReimbursementDashboard } from "@/components/reimbursements/ReimbursementDashboard";
+import { use } from "react";
+import { SettlementDashboard } from "@/components/settlements/SettlementDashboard";
 
-export default function ReimbursementsPage() {
-  const params = useParams();
-  const companyCode = (params.company as string).toUpperCase();
+interface SettlementsPageProps {
+  params: Promise<{ company: string }>;
+}
 
-  return <ReimbursementDashboard companyCode={companyCode} />;
+export default function SettlementsPage({ params }: SettlementsPageProps) {
+  const { company: companyCode } = use(params);
+
+  return <SettlementDashboard companyCode={companyCode} />;
 }

@@ -14,6 +14,8 @@ import {
   MonthlyTrendChartData,
   ExpenseCategoryChartData,
   ChartSkeleton,
+  SettlementAlert,
+  SettlementAlertSkeleton,
 } from "@/components/dashboard";
 
 interface DashboardPageProps {
@@ -24,7 +26,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   const { company: companyCode } = await params;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -58,6 +60,11 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           <ReadyToSend companyCode={companyCode} />
         </Suspense>
       </div>
+
+      {/* Settlement Alert - shows pending reimbursements for managers */}
+      <Suspense fallback={<SettlementAlertSkeleton />}>
+        <SettlementAlert companyCode={companyCode} />
+      </Suspense>
 
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">

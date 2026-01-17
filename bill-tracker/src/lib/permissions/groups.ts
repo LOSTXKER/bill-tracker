@@ -14,6 +14,7 @@ import {
   History,
   Wallet,
   MessageSquare,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 
@@ -210,6 +211,24 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
         key: "reimbursements:pay",
         label: "จ่ายเงิน",
         description: "บันทึกการจ่ายเงินคืน (สำหรับบัญชี)",
+      },
+    ],
+  },
+  settlements: {
+    key: "settlements",
+    label: "การโอนคืนเงิน (Settlements)",
+    description: "จัดการการโอนเงินคืนพนักงาน",
+    icon: Banknote,
+    permissions: [
+      {
+        key: "settlements:read",
+        label: "ดูรายการ",
+        description: "ดูรายการที่รอโอนคืน",
+      },
+      {
+        key: "settlements:manage",
+        label: "จัดการการโอน",
+        description: "บันทึกการโอนเงินคืนพนักงาน",
       },
     ],
   },

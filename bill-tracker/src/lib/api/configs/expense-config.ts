@@ -3,9 +3,11 @@
  * Used by both /api/expenses and /api/expenses/[id] routes
  */
 
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { notifyExpense } from "@/lib/notifications/line-messaging";
 import type { TransactionRouteConfig } from "../transaction-routes";
+import type { PaidByType, SettlementStatus } from "@prisma/client";
 
 // =============================================================================
 // WHT Change Rules
@@ -119,6 +121,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     }
     
     return {
+      id: randomUUID(), // Generate unique ID for expense
+      updatedAt: new Date(), // Required field without @updatedAt directive
       contactId: data.contactId || null,
       contactName: data.contactName || null, // One-time contact name (not saved)
       amount: data.amount,
@@ -133,7 +137,6 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       accountId: data.accountId || null,
       invoiceNumber: data.invoiceNumber,
       referenceNo: data.referenceNo,
-      paymentMethod: data.paymentMethod,
       billDate: data.billDate ? new Date(data.billDate) : new Date(),
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       // status is legacy field (ExpenseDocStatus enum) - don't override, use schema default
@@ -167,7 +170,6 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
-    if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.billDate !== undefined) updateData.billDate = data.billDate ? new Date(data.billDate) : undefined;
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     // status is legacy field (ExpenseDocStatus enum) - don't update from new workflow values
@@ -255,6 +257,179 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     return updateData;
   },
   
+  afterCreate: async (item, body, context) => {
+    // Handle payers if provided
+    if (body.payers && Array.isArray(body.payers) && body.payers.length > 0) {
+      for (const payer of body.payers as Array<{
+        paidByType: PaidByType;
+        paidByUserId?: string | null;
+        paidByPettyCashFundId?: string | null;
+        paidByName?: string | null;
+        paidByBankName?: string | null;
+        paidByBankAccount?: string | null;
+        amount: number;
+        settlementStatus?: SettlementStatus;
+        settledAt?: string;
+        settlementRef?: string;
+      }>) {
+        // Determine settlement status based on payer type
+        // Only USER type requires settlement (COMPANY and PETTY_CASH don't)
+        let settlementStatus: SettlementStatus = payer.settlementStatus || "NOT_REQUIRED";
+        if (!payer.settlementStatus && payer.paidByType === "USER") {
+          settlementStatus = "PENDING";
+        }
+
+        // Create ExpensePayment record
+        await prisma.expensePayment.create({
+          data: {
+            expenseId: item.id,
+            paidByType: payer.paidByType,
+            paidByUserId: payer.paidByUserId || null,
+            paidByPettyCashFundId: payer.paidByPettyCashFundId || null,
+            paidByName: payer.paidByName || null,
+            paidByBankName: payer.paidByBankName || null,
+            paidByBankAccount: payer.paidByBankAccount || null,
+            amount: payer.amount,
+            settlementStatus,
+            settledAt: payer.settledAt ? new Date(payer.settledAt) : null,
+            settledBy: settlementStatus === "SETTLED" ? context.session.user.id : null,
+            settlementRef: payer.settlementRef || null,
+          },
+        });
+
+        // If paid by PETTY_CASH, deduct from fund and create transaction
+        if (payer.paidByType === "PETTY_CASH" && payer.paidByPettyCashFundId) {
+          // Deduct from fund balance
+          await prisma.pettyCashFund.update({
+            where: { id: payer.paidByPettyCashFundId },
+            data: {
+              currentAmount: {
+                decrement: payer.amount,
+              },
+            },
+          });
+
+          // Create petty cash transaction record
+          await prisma.pettyCashTransaction.create({
+            data: {
+              fundId: payer.paidByPettyCashFundId,
+              type: "EXPENSE",
+              amount: payer.amount,
+              expenseId: item.id,
+              description: item.description || "รายจ่าย",
+              createdBy: context.session.user.id,
+            },
+          });
+        }
+      }
+    }
+  },
+
+  afterUpdate: async (item, body, context) => {
+    // Handle payers if provided
+    if (body.payers && Array.isArray(body.payers)) {
+      // Get existing payments to refund petty cash
+      const existingPayments = await prisma.expensePayment.findMany({
+        where: { expenseId: item.id },
+      });
+
+      // Refund petty cash from existing payments that will be deleted/changed
+      for (const payment of existingPayments) {
+        if (payment.paidByType === "PETTY_CASH" && payment.paidByPettyCashFundId) {
+          // Return money to fund
+          await prisma.pettyCashFund.update({
+            where: { id: payment.paidByPettyCashFundId },
+            data: {
+              currentAmount: {
+                increment: Number(payment.amount),
+              },
+            },
+          });
+
+          // Create adjustment transaction (refund)
+          await prisma.pettyCashTransaction.create({
+            data: {
+              fundId: payment.paidByPettyCashFundId,
+              type: "ADJUSTMENT",
+              amount: Number(payment.amount),
+              description: `คืนเงินจากการแก้ไขรายจ่าย: ${item.description || "ไม่ระบุ"}`,
+              createdBy: context.session.user.id,
+            },
+          });
+        }
+      }
+
+      // Delete existing payments (except SETTLED user payments)
+      await prisma.expensePayment.deleteMany({
+        where: {
+          expenseId: item.id,
+          OR: [
+            { settlementStatus: { not: "SETTLED" } },
+            { paidByType: { not: "USER" } },
+          ],
+        },
+      });
+
+      // Create new payments
+      if (body.payers.length > 0) {
+        for (const payer of body.payers as Array<{
+          paidByType: PaidByType;
+          paidByUserId?: string | null;
+          paidByPettyCashFundId?: string | null;
+          paidByName?: string | null;
+          paidByBankName?: string | null;
+          paidByBankAccount?: string | null;
+          amount: number;
+        }>) {
+          // Determine settlement status based on payer type
+          let settlementStatus: SettlementStatus = "NOT_REQUIRED";
+          if (payer.paidByType === "USER") {
+            settlementStatus = "PENDING";
+          }
+
+          // Create ExpensePayment
+          await prisma.expensePayment.create({
+            data: {
+              expenseId: item.id,
+              paidByType: payer.paidByType,
+              paidByUserId: payer.paidByUserId || null,
+              paidByPettyCashFundId: payer.paidByPettyCashFundId || null,
+              paidByName: payer.paidByName || null,
+              paidByBankName: payer.paidByBankName || null,
+              paidByBankAccount: payer.paidByBankAccount || null,
+              amount: payer.amount,
+              settlementStatus,
+            },
+          });
+
+          // If paid by PETTY_CASH, deduct from fund
+          if (payer.paidByType === "PETTY_CASH" && payer.paidByPettyCashFundId) {
+            await prisma.pettyCashFund.update({
+              where: { id: payer.paidByPettyCashFundId },
+              data: {
+                currentAmount: {
+                  decrement: payer.amount,
+                },
+              },
+            });
+
+            // Create petty cash transaction
+            await prisma.pettyCashTransaction.create({
+              data: {
+                fundId: payer.paidByPettyCashFundId,
+                type: "EXPENSE",
+                amount: payer.amount,
+                expenseId: item.id,
+                description: item.description || "รายจ่าย (แก้ไข)",
+                createdBy: context.session.user.id,
+              },
+            });
+          }
+        }
+      }
+    }
+  },
+
   notifyCreate: async (companyId, data, baseUrl) => {
     await notifyExpense(companyId, {
       id: data.id,

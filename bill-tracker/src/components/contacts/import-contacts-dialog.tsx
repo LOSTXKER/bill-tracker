@@ -388,15 +388,15 @@ export function ImportContactsDialog({
 
               {/* Preview Table */}
               {contactsToShow.length > 0 ? (
-                <div className="border rounded-lg max-h-[400px] overflow-auto">
+                <div className="rounded-lg border bg-card max-h-[400px] overflow-auto">
                   <Table>
-                    <TableHeader className="sticky top-0 bg-background">
-                      <TableRow>
-                        <TableHead className="w-[80px]">สถานะ</TableHead>
-                        <TableHead className="w-[100px]">รหัส Peak</TableHead>
-                        <TableHead>ชื่อ</TableHead>
-                        <TableHead className="w-[120px]">ประเภท</TableHead>
-                        <TableHead className="w-[120px]">ติดต่อ</TableHead>
+                    <TableHeader className="sticky top-0 bg-card">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[80px] text-muted-foreground font-medium">สถานะ</TableHead>
+                        <TableHead className="w-[100px] text-muted-foreground font-medium">รหัส Peak</TableHead>
+                        <TableHead className="text-muted-foreground font-medium">ชื่อ</TableHead>
+                        <TableHead className="w-[120px] text-muted-foreground font-medium">ประเภท</TableHead>
+                        <TableHead className="w-[120px] text-muted-foreground font-medium">ติดต่อ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

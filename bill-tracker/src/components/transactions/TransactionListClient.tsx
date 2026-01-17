@@ -13,7 +13,7 @@ import {
 import { Plus, Loader2, ArrowUpDown, ArrowUp, ArrowDown, LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
-import { Pagination } from "@/components/transactions/Pagination";
+import { Pagination } from "@/components/shared/Pagination";
 import { BulkActionsBar } from "@/components/transactions/BulkActionsBar";
 import { ExportButton } from "@/components/transactions/ExportButton";
 import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-transaction-filters";

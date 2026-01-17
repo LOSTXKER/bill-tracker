@@ -83,6 +83,7 @@ export interface AccountAlternativeResponse {
 export interface ReceiptAnalysisResult {
   vendor: AnalyzedVendor;
   date: string | null;
+  currency: string | null;
   amount: number | null;
   vatAmount: number | null;
   vatRate: number | null;

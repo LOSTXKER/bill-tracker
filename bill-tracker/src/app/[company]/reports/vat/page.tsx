@@ -161,127 +161,133 @@ async function VATReport({ companyCode }: { companyCode: string }) {
       </div>
 
       {/* Input VAT Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>ภาษีซื้อ (Input VAT)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {expenses.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>ผู้ขาย</TableHead>
-                    <TableHead className="text-right">มูลค่าสินค้า</TableHead>
-                    <TableHead className="text-right">VAT 7%</TableHead>
-                    <TableHead className="text-right">รวม</TableHead>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground">ภาษีซื้อ (Input VAT)</h3>
+            <span className="text-xs text-muted-foreground">({expenses.length} รายการ)</span>
+          </div>
+        </div>
+        {expenses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการ</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">มูลค่าสินค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">VAT 7%</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">รวม</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {expenses.map((expense: typeof expenses[number]) => (
+                  <TableRow key={expense.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(expense.billDate).toLocaleDateString("th-TH", {
+                        day: "numeric",
+                        month: "short",
+                        year: "2-digit",
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      {expense.contact?.name || expense.description || "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(expense.amount))}
+                    </TableCell>
+                    <TableCell className="text-right text-blue-600">
+                      {formatCurrency(Number(expense.vatAmount || 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(
+                        Number(expense.amount) + Number(expense.vatAmount || 0)
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.map((expense: typeof expenses[number]) => (
-                    <TableRow key={expense.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {new Date(expense.billDate).toLocaleDateString("th-TH", {
+                ))}
+                <TableRow className="bg-muted/50 font-bold">
+                  <TableCell colSpan={3}>รวมภาษีซื้อ</TableCell>
+                  <TableCell className="text-right text-blue-600 dark:text-blue-400">
+                    {formatCurrency(inputVAT)}
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Output VAT Table */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground">ภาษีขาย (Output VAT)</h3>
+            <span className="text-xs text-muted-foreground">({incomes.length} รายการ)</span>
+          </div>
+        </div>
+        {incomes.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการ</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">มูลค่าสินค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">VAT 7%</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">รวม</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {incomes.map((income: typeof incomes[number]) => (
+                  <TableRow key={income.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(income.receiveDate).toLocaleDateString(
+                        "th-TH",
+                        {
                           day: "numeric",
                           month: "short",
                           year: "2-digit",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        {expense.contact?.name || expense.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(Number(expense.amount))}
-                      </TableCell>
-                      <TableCell className="text-right text-blue-600">
-                        {formatCurrency(Number(expense.vatAmount || 0))}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(
-                          Number(expense.amount) + Number(expense.vatAmount || 0)
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={3}>รวมภาษีซื้อ</TableCell>
-                    <TableCell className="text-right text-blue-600 dark:text-blue-400">
-                      {formatCurrency(inputVAT)}
+                        }
+                      )}
                     </TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Output VAT Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>ภาษีขาย (Output VAT)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {incomes.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>ลูกค้า</TableHead>
-                    <TableHead className="text-right">มูลค่าสินค้า</TableHead>
-                    <TableHead className="text-right">VAT 7%</TableHead>
-                    <TableHead className="text-right">รวม</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {incomes.map((income: typeof incomes[number]) => (
-                    <TableRow key={income.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {new Date(income.receiveDate).toLocaleDateString(
-                          "th-TH",
-                          {
-                            day: "numeric",
-                            month: "short",
-                            year: "2-digit",
-                          }
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {income.contact?.name || income.source || "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(Number(income.amount))}
-                      </TableCell>
-                      <TableCell className="text-right text-primary">
-                        {formatCurrency(Number(income.vatAmount || 0))}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(
-                          Number(income.amount) + Number(income.vatAmount || 0)
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={3}>รวมภาษีขาย</TableCell>
+                    <TableCell>
+                      {income.contact?.name || income.source || "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(income.amount))}
+                    </TableCell>
                     <TableCell className="text-right text-primary">
-                      {formatCurrency(outputVAT)}
+                      {formatCurrency(Number(income.vatAmount || 0))}
                     </TableCell>
-                    <TableCell></TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(
+                        Number(income.amount) + Number(income.vatAmount || 0)
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+                <TableRow className="bg-muted/50 font-bold">
+                  <TableCell colSpan={3}>รวมภาษีขาย</TableCell>
+                  <TableCell className="text-right text-primary">
+                    {formatCurrency(outputVAT)}
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -301,16 +307,16 @@ function ReportSkeleton() {
           </Card>
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b">
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <div className="p-4 space-y-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-12 w-full" />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

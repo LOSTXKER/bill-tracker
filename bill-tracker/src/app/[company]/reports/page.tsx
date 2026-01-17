@@ -29,7 +29,6 @@ import {
   Calculator,
 } from "lucide-react";
 import { formatCurrency, calculateVATSummary, calculateWHTSummary } from "@/lib/utils/tax-calculator";
-import Link from "next/link";
 
 interface ReportsPageProps {
   params: Promise<{ company: string }>;
@@ -253,27 +252,28 @@ async function VATReport({
       </div>
 
       {/* Input VAT Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
             <TrendingDown className="h-5 w-5 text-blue-500" />
-            รายการภาษีซื้อ
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {expenses.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              ไม่มีรายการภาษีซื้อในเดือนนี้
-            </p>
-          ) : (
+            <h3 className="text-sm font-semibold text-foreground">รายการภาษีซื้อ</h3>
+            <span className="text-xs text-muted-foreground">({expenses.length} รายการ)</span>
+          </div>
+        </div>
+        {expenses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการภาษีซื้อในเดือนนี้</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>วันที่</TableHead>
-                  <TableHead>เลขที่ใบกำกับ</TableHead>
-                  <TableHead>ผู้ขาย</TableHead>
-                  <TableHead className="text-right">ยอดก่อน VAT</TableHead>
-                  <TableHead className="text-right">VAT</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">เลขที่ใบกำกับ</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ยอดก่อน VAT</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -294,32 +294,33 @@ async function VATReport({
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* Output VAT Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
-            รายการภาษีขาย
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {incomes.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              ไม่มีรายการภาษีขายในเดือนนี้
-            </p>
-          ) : (
+            <h3 className="text-sm font-semibold text-foreground">รายการภาษีขาย</h3>
+            <span className="text-xs text-muted-foreground">({incomes.length} รายการ)</span>
+          </div>
+        </div>
+        {incomes.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการภาษีขายในเดือนนี้</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>วันที่</TableHead>
-                  <TableHead>เลขที่ใบกำกับ</TableHead>
-                  <TableHead>ลูกค้า</TableHead>
-                  <TableHead className="text-right">ยอดก่อน VAT</TableHead>
-                  <TableHead className="text-right">VAT</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">เลขที่ใบกำกับ</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ยอดก่อน VAT</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -340,9 +341,9 @@ async function VATReport({
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -450,31 +451,32 @@ async function WHTReport({
       </div>
 
       {/* WHT Paid Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-red-500" />
-            หัก ณ ที่จ่ายจากผู้ขาย
-          </CardTitle>
-          <CardDescription>
-            รายการที่ต้องนำส่งสรรพากร (ภ.ง.ด.53)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {expenses.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              ไม่มีรายการในเดือนนี้
-            </p>
-          ) : (
+            <h3 className="text-sm font-semibold text-foreground">หัก ณ ที่จ่ายจากผู้ขาย</h3>
+            <span className="text-xs text-muted-foreground">({expenses.length} รายการ)</span>
+          </div>
+        </div>
+        <p className="px-4 py-2 text-xs text-muted-foreground border-b">
+          รายการที่ต้องนำส่งสรรพากร (ภ.ง.ด.53)
+        </p>
+        {expenses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการในเดือนนี้</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>วันที่</TableHead>
-                  <TableHead>ผู้ขาย</TableHead>
-                  <TableHead>เลขประจำตัวผู้เสียภาษี</TableHead>
-                  <TableHead className="text-right">ยอด</TableHead>
-                  <TableHead className="text-center">อัตรา</TableHead>
-                  <TableHead className="text-right">ภาษีหัก</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">เลขประจำตัวผู้เสียภาษี</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ยอด</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-center">อัตรา</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ภาษีหัก</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -498,36 +500,37 @@ async function WHTReport({
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* WHT Received Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-green-500" />
-            โดนหัก ณ ที่จ่ายจากลูกค้า
-          </CardTitle>
-          <CardDescription>
-            ใช้เป็นเครดิตภาษี (ต้องได้รับใบ 50 ทวิ)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {incomes.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              ไม่มีรายการในเดือนนี้
-            </p>
-          ) : (
+            <h3 className="text-sm font-semibold text-foreground">โดนหัก ณ ที่จ่ายจากลูกค้า</h3>
+            <span className="text-xs text-muted-foreground">({incomes.length} รายการ)</span>
+          </div>
+        </div>
+        <p className="px-4 py-2 text-xs text-muted-foreground border-b">
+          ใช้เป็นเครดิตภาษี (ต้องได้รับใบ 50 ทวิ)
+        </p>
+        {incomes.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการในเดือนนี้</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>วันที่</TableHead>
-                  <TableHead>ลูกค้า</TableHead>
-                  <TableHead className="text-right">ยอด</TableHead>
-                  <TableHead className="text-center">อัตรา</TableHead>
-                  <TableHead className="text-right">ภาษีโดนหัก</TableHead>
-                  <TableHead className="text-center">ใบ 50 ทวิ</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ยอด</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-center">อัตรา</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ภาษีโดนหัก</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-center">ใบ 50 ทวิ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -561,9 +564,9 @@ async function WHTReport({
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -704,11 +707,11 @@ async function MonthlySummary({
       </div>
 
       {/* Expense by Account */}
-      <Card>
-        <CardHeader>
-          <CardTitle>รายจ่ายแยกตามบัญชี</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <h3 className="text-sm font-semibold text-foreground">รายจ่ายแยกตามบัญชี</h3>
+        </div>
+        <CardContent className="pt-4">
           {expenseByAccount.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               ไม่มีรายการในเดือนนี้
@@ -744,7 +747,7 @@ async function MonthlySummary({
             </div>
           )}
         </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -764,14 +767,16 @@ function ReportSkeleton() {
           </Card>
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-40" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-64 w-full" />
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b">
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="p-4 space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

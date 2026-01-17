@@ -228,14 +228,7 @@ export default function MyProfilePage() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={() =>
-            router.push(`/reimburse/${companyCode.toLowerCase()}`)
-          }
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          ขอเบิกจ่าย
-        </Button>
+{/* ปุ่มขอเบิกจ่ายถูกลบออก - ใช้ระบบ Settlement ผ่านหน้ารายจ่ายแทน */}
       </div>
 
       {/* Stats Cards */}
@@ -337,10 +330,10 @@ export default function MyProfilePage() {
                 <Button
                   size="sm"
                   onClick={() =>
-                    router.push(`/${companyCode.toLowerCase()}/reimbursements`)
+                    router.push(`/${companyCode.toLowerCase()}/expenses`)
                   }
                 >
-                  ดูทั้งหมด
+                  ดูรายจ่าย
                 </Button>
               </div>
             </CardHeader>
@@ -359,12 +352,12 @@ export default function MyProfilePage() {
                   <Button
                     onClick={() =>
                       router.push(
-                        `/${companyCode.toLowerCase()}/reimbursements/new`
+                        `/${companyCode.toLowerCase()}/capture?type=expense`
                       )
                     }
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    ขอเบิกจ่าย
+                    บันทึกรายจ่าย
                   </Button>
                 </div>
               ) : (
@@ -375,9 +368,7 @@ export default function MyProfilePage() {
                       className="p-4 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() =>
                         router.push(
-                          `/${companyCode.toLowerCase()}/reimbursements/${
-                            item.id
-                          }`
+                          `/${companyCode.toLowerCase()}/expenses/${item.id}`
                         )
                       }
                     >

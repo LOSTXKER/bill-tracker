@@ -40,7 +40,6 @@ export interface MergeData {
   categoryId?: string | null;
   accountId: string | null;
   accountName?: string | null;
-  paymentMethod: string | null;
 }
 
 export type MergeAction = "merge" | "replace" | "cancel";
@@ -81,17 +80,6 @@ function formatDate(date: string | null): string {
   } catch {
     return date;
   }
-}
-
-function formatPaymentMethod(method: string | null): string {
-  if (!method) return "-";
-  const labels: Record<string, string> = {
-    CASH: "เงินสด",
-    TRANSFER: "โอนเงิน",
-    CREDIT_CARD: "บัตรเครดิต",
-    CHECK: "เช็ค",
-  };
-  return labels[method] || method;
 }
 
 // =============================================================================
@@ -209,16 +197,6 @@ function DataCard({ title, data, variant, className }: DataCardProps) {
             </span>
           </div>
         )}
-
-        {/* Payment Method */}
-        {data.paymentMethod && (
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground flex-shrink-0">ชำระ:</span>
-            <span className="font-medium text-right">
-              {formatPaymentMethod(data.paymentMethod)}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -261,7 +239,6 @@ export function MergeOptionsDialog({
       categoryId: existingData.categoryId || newData.categoryId,
       accountId: existingData.accountId || newData.accountId,
       accountName: existingData.accountName || newData.accountName,
-      paymentMethod: existingData.paymentMethod || newData.paymentMethod,
     };
   };
 

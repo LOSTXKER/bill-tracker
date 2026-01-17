@@ -3,6 +3,7 @@
  * Used by both /api/incomes and /api/incomes/[id] routes
  */
 
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { notifyIncome } from "@/lib/notifications/line-messaging";
 import type { TransactionRouteConfig } from "../transaction-routes";
@@ -119,6 +120,8 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     }
     
     return {
+      id: randomUUID(), // Generate unique ID for income
+      updatedAt: new Date(), // Required field without @updatedAt directive
       contactId: data.contactId || null,
       contactName: data.contactName || null, // One-time contact name (not saved)
       amount: data.amount,
@@ -133,7 +136,6 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       accountId: data.accountId || null,
       invoiceNumber: data.invoiceNumber,
       referenceNo: data.referenceNo,
-      paymentMethod: data.paymentMethod,
       receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
       // status is legacy field (IncomeDocStatus enum) - don't override, use schema default
       workflowStatus: workflowStatus,
@@ -166,7 +168,6 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
-    if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     if (data.receiveDate !== undefined) updateData.receiveDate = data.receiveDate ? new Date(data.receiveDate) : undefined;
     // status is legacy field (IncomeDocStatus enum) - don't update from new workflow values
     if (data.workflowStatus !== undefined) updateData.workflowStatus = data.workflowStatus;

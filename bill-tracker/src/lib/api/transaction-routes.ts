@@ -43,6 +43,10 @@ export interface TransactionRouteConfig<TModel, TCreateData, TUpdateData> {
   transformCreateData: (body: any) => TCreateData;
   transformUpdateData: (body: any, existingData?: any) => TUpdateData;
   
+  // Post-create/update hooks (optional)
+  afterCreate?: (item: TModel, body: any, context: { session: any; company: any }) => Promise<void>;
+  afterUpdate?: (item: TModel, body: any, context: { session: any; company: any; existingItem: any }) => Promise<void>;
+  
   // Notification handler (optional)
   notifyCreate?: (companyId: string, data: any, baseUrl: string) => Promise<void>;
   
@@ -161,8 +165,13 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
           companyId: company.id,
           createdBy: session.user.id,
         },
-        include: { contact: true, account: true },
+        include: { Contact: true, Account: true },
       });
+
+      // Run afterCreate hook if defined
+      if (config.afterCreate) {
+        await config.afterCreate(item, body, { session, company });
+      }
 
       // Create audit log
       await logCreate(config.displayName, item, session.user.id, company.id);
@@ -259,7 +268,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     // Find existing item
     const existingItem = await config.prismaModel.findUnique({
       where: { id },
-      include: { contact: true },
+      include: { Contact: true },
     });
 
     if (!existingItem) {
@@ -275,6 +284,22 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
 
     if (!hasAccess) {
       throw ApiErrors.forbidden();
+    }
+
+    // For expenses: Check if any payment is SETTLED (prevent editing payer-related fields)
+    if (config.modelName === "expense") {
+      const settledPayments = await prisma.expensePayment.findFirst({
+        where: {
+          expenseId: id,
+          settlementStatus: "SETTLED",
+        },
+      });
+
+      if (settledPayments) {
+        throw ApiErrors.badRequest(
+          "ไม่สามารถแก้ไขรายจ่ายนี้ได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
+        );
+      }
     }
 
     const body = await request.json();
@@ -294,6 +319,11 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
         },
       },
     });
+
+    // Run afterUpdate hook if defined
+    if (config.afterUpdate) {
+      await config.afterUpdate(item, body, { session, company: item.company, existingItem });
+    }
 
     // Create audit log
     const statusField = config.fields.statusField;
@@ -397,7 +427,7 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
     // Find existing item
     const existingItem = await config.prismaModel.findUnique({
       where: { id },
-      include: { contact: true },
+      include: { Contact: true },
     });
 
     if (!existingItem) {
@@ -407,6 +437,22 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
     // Check if already deleted
     if (existingItem.deletedAt) {
       throw ApiErrors.badRequest("รายการนี้ถูกลบไปแล้ว");
+    }
+
+    // For expenses: Check if any payment is SETTLED (prevent deletion)
+    if (config.modelName === "expense") {
+      const settledPayments = await prisma.expensePayment.findFirst({
+        where: {
+          expenseId: id,
+          settlementStatus: "SETTLED",
+        },
+      });
+
+      if (settledPayments) {
+        throw ApiErrors.badRequest(
+          "ไม่สามารถลบรายจ่ายนี้ได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
+        );
+      }
     }
 
     // Check access (use delete permission if defined, otherwise use update permission)
@@ -421,6 +467,39 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
       throw ApiErrors.forbidden();
     }
 
+    // For expenses: Refund petty cash if applicable
+    if (config.modelName === "expense") {
+      const payments = await prisma.expensePayment.findMany({
+        where: { expenseId: id },
+      });
+
+      // Refund petty cash funds
+      for (const payment of payments) {
+        if (payment.paidByType === "PETTY_CASH" && payment.paidByPettyCashFundId) {
+          // Return money to fund
+          await prisma.pettyCashFund.update({
+            where: { id: payment.paidByPettyCashFundId },
+            data: {
+              currentAmount: {
+                increment: Number(payment.amount),
+              },
+            },
+          });
+
+          // Create adjustment transaction
+          await prisma.pettyCashTransaction.create({
+            data: {
+              fundId: payment.paidByPettyCashFundId,
+              type: "ADJUSTMENT",
+              amount: Number(payment.amount),
+              description: `คืนเงินจากการลบรายจ่าย: ${existingItem.description || "ไม่ระบุ"}`,
+              createdBy: session.user.id,
+            },
+          });
+        }
+      }
+    }
+
     // Soft delete - update deletedAt and deletedBy
     const item = await config.prismaModel.update({
       where: { id },
@@ -429,8 +508,8 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
         deletedBy: session.user.id,
       },
       include: {
-        contact: true,
-        company: true,
+        Contact: true,
+        Company: true,
       },
     });
 

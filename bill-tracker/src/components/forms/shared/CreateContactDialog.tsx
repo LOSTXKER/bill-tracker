@@ -63,6 +63,7 @@ export interface Contact {
   creditLimit?: number | null;
   paymentTerms?: number | null;
   notes?: string | null;
+  source?: "PEAK" | "MANUAL" | null;
 }
 
 interface CreateContactDialogProps {

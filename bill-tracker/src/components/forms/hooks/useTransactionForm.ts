@@ -294,7 +294,6 @@ export function useTransactionForm({
         : null,
       accountId: selectedAccount || null,
       accountName: accountSuggestion?.accountName || null,
-      paymentMethod: (watch("paymentMethod") as string) || null,
     };
   }, [
     watchAmount,
@@ -327,7 +326,6 @@ export function useTransactionForm({
           description: null,
           accountId: null,
           accountName: null,
-          paymentMethod: null,
         };
       }
 
@@ -345,7 +343,6 @@ export function useTransactionForm({
 
       const extendedCombined = combined as typeof combined & {
         vatRate?: number | null;
-        paymentMethod?: string | null;
         amount?: number | null;
       };
 
@@ -381,8 +378,6 @@ export function useTransactionForm({
         description,
         accountId: (suggested.accountId as string) || null,
         accountName: (suggested.accountName as string) || null,
-        paymentMethod:
-          (suggested.paymentMethod as string) || extendedCombined.paymentMethod || null,
       };
     },
     [config]
@@ -409,7 +404,6 @@ export function useTransactionForm({
 
       const extendedCombined = combined as typeof combined & {
         vatRate?: number | null;
-        paymentMethod?: string | null;
         amount?: number | null;
         whtRate?: number | null;
         whtAmount?: number | null;
@@ -454,13 +448,6 @@ export function useTransactionForm({
           setValue(config.fields.dateField.name, new Date(dateStr));
         }
       }
-
-      // Apply payment method
-      const paymentMethod = suggested.paymentMethod || extendedCombined.paymentMethod;
-      if (paymentMethod) {
-        setValue("paymentMethod", paymentMethod);
-      }
-
       // Apply invoice number
       const invoiceNum =
         combined.invoiceNumbers && combined.invoiceNumbers.length > 0
@@ -646,7 +633,6 @@ export function useTransactionForm({
       if (data.vatRate !== null) setValue("vatRate", data.vatRate);
       if (data.date) setValue(config.fields.dateField.name, new Date(data.date));
       if (data.invoiceNumber) setValue("invoiceNumber", data.invoiceNumber);
-      if (data.paymentMethod) setValue("paymentMethod", data.paymentMethod);
       if (data.description && config.fields.descriptionField) {
         setValue(config.fields.descriptionField.name, data.description);
       }

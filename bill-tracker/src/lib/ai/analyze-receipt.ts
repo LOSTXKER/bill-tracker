@@ -65,6 +65,13 @@ export async function analyzeReceipt(
     }
 
     // 2. สร้าง Prompt ที่ส่ง context ทั้งหมดให้ AI
+    console.log("[AI] Context:", {
+      accountsCount: accounts.length,
+      contactsCount: contacts.length,
+      transactionType,
+      company: company?.name,
+      sampleAccounts: accounts.slice(0, 3).map(a => `${a.code} - ${a.name}`),
+    });
     const prompt = buildSmartPrompt(accounts, contacts, transactionType, company);
 
     // 3. วิเคราะห์ทุกไฟล์
@@ -176,19 +183,38 @@ ${contactList}
 1. **อ่านเอกสาร** - ดูว่าเป็นเอกสารอะไร (ใบกำกับภาษี, ใบเสร็จ, สลิป, ใบหัก ณ ที่จ่าย)
 
 2. **หาผู้ขาย/ผู้ติดต่อ** 
-   - ${transactionType === "EXPENSE" ? "หาชื่อ ผู้ขาย (ร้านที่ออกบิล ไม่ใช่ชื่อบริษัทเรา)" : "หาชื่อ ลูกค้า"}
+   ${transactionType === "EXPENSE" 
+     ? `- **ใบกำกับภาษี/ใบเสร็จ**: หาชื่อ ผู้ขาย (ร้านที่ออกบิล ไม่ใช่ชื่อบริษัทเรา)
+   - **สลิปโอนเงิน (BANK_SLIP)**: 
+     - ผู้ติดต่อคือ "ผู้รับเงิน" หรือดูจาก "หมายเหตุ/ข้อมูลเพิ่มเติม" ที่มักเป็นชื่อร้านค้า/คนที่เรารับเงิน
+     - ⚠️ "ผู้โอน" มักเป็นเจ้าของ/พนักงานของบริษัทเรา ไม่ใช่ผู้ติดต่อ!
+     - ถ้าเห็นชื่อบุคคลเป็นผู้โอน และมีชื่อร้าน/บริษัทในหมายเหตุ → ใช้ชื่อร้าน/บริษัทนั้น
+     - ถ้าไม่มีข้อมูลผู้รับที่ชัดเจน → ใส่ null (อย่าเดา)`
+     : `- **ใบกำกับภาษี/ใบเสร็จ**: หาชื่อ ลูกค้า
+   - **สลิปโอนเงิน (BANK_SLIP)**:
+     - ผู้ติดต่อคือ "ผู้โอน" (ลูกค้าที่จ่ายเงินให้เรา)
+     - ⚠️ "ผู้รับ" คือบริษัทเรา ไม่ใช่ผู้ติดต่อ!
+     - ถ้ามีหมายเหตุที่ระบุชื่อลูกค้า/บริษัท → ใช้ข้อมูลนั้น
+     - ถ้าไม่มีข้อมูลผู้โอนที่ชัดเจน → ใส่ null (อย่าเดา)`}
    - ดึงเลขประจำตัวผู้เสียภาษี (ถ้ามี)
    - **สำคัญ: ตรวจสอบว่าผู้ขาย/ผู้ติดต่อนี้มีในรายชื่อข้างบนหรือไม่**
    - ถ้าพบตรงกัน (ชื่อคล้ายกัน หรือ เลขภาษีตรงกัน) → ใส่ matchedContactId
    - ถ้าไม่พบ → matchedContactId = null
+   - **⚠️ ถ้าไม่แน่ใจว่าใครคือผู้ติดต่อ → ใส่ vendor.name = null และ matchedContactId = null (อย่าเดามัว)**
 
 3. **ดึงข้อมูลการเงิน**
-   - ยอดก่อน VAT (amount)
+   - **สกุลเงิน** (currency) - ตรวจดูว่าเป็นสกุลเงินอะไร (THB, USD, AED, EUR, GBP, JPY, CNY, SGD, HKD, MYR)
+   - ยอดก่อน VAT (amount) - ในสกุลเงินต้นฉบับ
    - VAT (vatAmount, vatRate)
    - หัก ณ ที่จ่าย (whtRate, whtAmount, whtType)
    - ยอดสุทธิที่ต้องจ่าย/รับจริง (netAmount)
 
-4. **เลือกบัญชี** - เลือกบัญชีที่เหมาะสมที่สุด + ทางเลือกอื่นอีก 2 บัญชี
+4. **เลือกบัญชี** (สำคัญมาก!)
+   - **ต้องเลือกบัญชีเสมอ** - แม้ไม่แน่ใจ 100% ก็ต้องเลือกที่เหมาะสมที่สุด
+   - เลือกจากผังบัญชีที่ให้ไว้ข้างบนเท่านั้น
+   - ใส่ทั้ง id, code, name ของบัญชีที่เลือก
+   - ถ้าเป็นสลิปโอนเงิน: ดูจากหมายเหตุ/รายละเอียดว่าค่าอะไร แล้วเลือกบัญชีที่เกี่ยวข้อง
+   - เลือกทางเลือกอื่นอีก 2 บัญชี พร้อมเหตุผล
 
 ## ตอบ JSON เท่านั้น (ห้ามมี text อื่น)
 {
@@ -202,6 +228,7 @@ ${contactList}
     "matchedContactName": "ชื่อผู้ติดต่อที่ match หรือ null"
   },
   "date": "YYYY-MM-DD",
+  "currency": "THB",
   "amount": 8000.00,
   "vatAmount": 560.00,
   "vatRate": 7,
@@ -240,7 +267,15 @@ ${contactList}
 - เลขภาษีของบริษัทเรา (${company?.taxId || ""}) ไม่ใช่ของผู้ขาย
 - VAT rate ในไทยคือ 0% หรือ 7%
 - WHT rate ทั่วไป: 1%, 2%, 3%, 5%
-- ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)`;
+- ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)
+- **สกุลเงิน**: ดูสัญลักษณ์หรือตัวอักษรในเอกสาร เช่น $, USD (ดอลลาร์สหรัฐ), AED, د.إ (เดอร์แฮม), €, EUR (ยูโร), £, GBP (ปอนด์), ¥, JPY (เยน), ฿, THB, บาท (บาท) ถ้าไม่แน่ใจให้ใส่ "THB"
+
+## ⚠️ กฎสำคัญสำหรับสลิปโอนเงิน (BANK_SLIP)
+- สลิปโอนเงินจะมี "ผู้โอน" และ "ผู้รับ" 
+- **รายจ่าย**: ผู้ติดต่อคือร้าน/คนที่เรา**รับเงินให้** → ดูจากชื่อผู้รับหรือหมายเหตุ (เช่น "อินดี้ ทีเชิ้ต" คือร้านค้า)
+- **รายรับ**: ผู้ติดต่อคือคน/บริษัทที่**โอนเงินให้เรา** → ดูจากชื่อผู้โอน
+- ถ้าผู้โอนเป็นชื่อบุคคลทั่วไป (ไม่ใช่ร้าน/บริษัท) และเป็นรายจ่าย → น่าจะเป็นพนักงานเราที่โอนจ่าย
+- **⚠️ ห้ามเดา! ถ้าไม่แน่ใจว่าใครคือผู้ติดต่อ → vendor.name = null**`;
 }
 
 // =============================================================================
@@ -263,40 +298,74 @@ function parseAIResponse(
   try {
     const parsed = JSON.parse(jsonText);
 
+    // Helper: Find account by ID, code, or name (fallback)
+    const findAccount = (aiAccount: { id?: string; code?: string; name?: string } | null) => {
+      if (!aiAccount) return null;
+      
+      // 1. Try match by ID first
+      if (aiAccount.id) {
+        const byId = accounts.find(a => a.id === aiAccount.id);
+        if (byId) return byId;
+      }
+      
+      // 2. Fallback: match by code
+      if (aiAccount.code) {
+        const byCode = accounts.find(a => a.code === aiAccount.code);
+        if (byCode) return byCode;
+      }
+      
+      // 3. Fallback: match by name (fuzzy - contains)
+      if (aiAccount.name) {
+        const normalizedName = aiAccount.name.toLowerCase().trim();
+        const byName = accounts.find(a => 
+          a.name.toLowerCase().includes(normalizedName) || 
+          normalizedName.includes(a.name.toLowerCase())
+        );
+        if (byName) return byName;
+      }
+      
+      return null;
+    };
+
     // Validate account
     let account: AnalyzedAccount = { id: null, code: null, name: null };
-    if (parsed.account?.id) {
-      const matchedAccount = accounts.find(a => a.id === parsed.account.id);
-      if (matchedAccount) {
-        account = {
-          id: matchedAccount.id,
-          code: matchedAccount.code,
-          name: matchedAccount.name,
-          confidence: parsed.account.confidence || parsed.confidence?.account || 0,
-          reason: parsed.account.reason || "AI วิเคราะห์จากเอกสาร",
-        };
-      }
+    const matchedAccount = findAccount(parsed.account);
+    
+    if (matchedAccount) {
+      account = {
+        id: matchedAccount.id,
+        code: matchedAccount.code,
+        name: matchedAccount.name,
+        confidence: parsed.account?.confidence || parsed.confidence?.account || 0,
+        reason: parsed.account?.reason || "AI วิเคราะห์จากเอกสาร",
+      };
+    } else if (parsed.account) {
+      // Log what AI sent that didn't match
+      console.log("[AI] Account NOT MATCHED - AI sent:", {
+        id: parsed.account.id,
+        code: parsed.account.code,
+        name: parsed.account.name,
+      });
+      console.log("[AI] Available accounts:", accounts.slice(0, 5).map(a => ({ id: a.id, code: a.code, name: a.name })));
     }
 
     // Parse account alternatives
     const accountAlternatives: AccountAlternative[] = [];
     if (parsed.accountAlternatives && Array.isArray(parsed.accountAlternatives)) {
       for (const alt of parsed.accountAlternatives) {
-        if (alt?.id) {
-          const matchedAlt = accounts.find(a => a.id === alt.id);
-          if (matchedAlt && matchedAlt.id !== account.id) {
-            accountAlternatives.push({
-              id: matchedAlt.id,
-              code: matchedAlt.code,
-              name: matchedAlt.name,
-              confidence: alt.confidence || 50,
-              reason: alt.reason || "ทางเลือกอื่น",
-            });
-          }
+        const matchedAlt = findAccount(alt);
+        if (matchedAlt && matchedAlt.id !== account.id) {
+          accountAlternatives.push({
+            id: matchedAlt.id,
+            code: matchedAlt.code,
+            name: matchedAlt.name,
+            confidence: alt.confidence || 50,
+            reason: alt.reason || "ทางเลือกอื่น",
+          });
         }
       }
     }
-    console.log("[AI] Account:", account.code, "| Alternatives:", accountAlternatives.map(a => a.code).join(", ") || "none");
+    console.log("[AI] Account:", account.code || "NONE", "| Alternatives:", accountAlternatives.map(a => a.code).join(", ") || "none");
 
     // Validate contact (AI อาจ match ผิด ต้องเช็คอีกที)
     let matchedContactId: string | null = null;
@@ -361,6 +430,13 @@ function parseAIResponse(
       else whtRate = null;
     }
 
+    // Normalize currency
+    const validCurrencies = ["THB", "USD", "AED", "EUR", "GBP", "JPY", "CNY", "SGD", "HKD", "MYR"];
+    let currency = parsed.currency?.toUpperCase() || "THB";
+    if (!validCurrencies.includes(currency)) {
+      currency = "THB";
+    }
+
     return {
       vendor: {
         name: parsed.vendor?.name || null,
@@ -372,6 +448,7 @@ function parseAIResponse(
         matchedContactName,
       },
       date: normalizedDate || null,
+      currency,
       amount: typeof parsed.amount === "number" ? parsed.amount : null,
       vatAmount: typeof parsed.vatAmount === "number" ? parsed.vatAmount : null,
       vatRate,
@@ -418,6 +495,7 @@ function createEmptyResult(rawText?: string): ReceiptAnalysisResult {
       matchedContactName: null,
     },
     date: null,
+    currency: "THB",
     amount: null,
     vatAmount: null,
     vatRate: null,

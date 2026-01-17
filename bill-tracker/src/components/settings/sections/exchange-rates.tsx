@@ -11,22 +11,30 @@ import { useRouter } from "next/navigation";
 
 interface ExchangeRatesProps {
   companyCode: string;
-  initialRates: {
-    USD?: number;
-    AED?: number;
-  };
+  initialRates: Record<string, number>;
 }
 
 const CURRENCIES = [
   { code: "USD", name: "ดอลลาร์สหรัฐ", symbol: "$", flag: "🇺🇸" },
   { code: "AED", name: "เดอแรม UAE", symbol: "د.إ", flag: "🇦🇪" },
+  { code: "EUR", name: "ยูโร", symbol: "€", flag: "🇪🇺" },
+  { code: "GBP", name: "ปอนด์", symbol: "£", flag: "🇬🇧" },
+  { code: "JPY", name: "เยน", symbol: "¥", flag: "🇯🇵" },
+  { code: "CNY", name: "หยวน", symbol: "¥", flag: "🇨🇳" },
+  { code: "SGD", name: "ดอลลาร์สิงคโปร์", symbol: "S$", flag: "🇸🇬" },
+  { code: "HKD", name: "ดอลลาร์ฮ่องกง", symbol: "HK$", flag: "🇭🇰" },
+  { code: "MYR", name: "ริงกิต", symbol: "RM", flag: "🇲🇾" },
 ] as const;
 
 export function ExchangeRatesSection({ companyCode, initialRates }: ExchangeRatesProps) {
   const router = useRouter();
-  const [rates, setRates] = useState<Record<string, string>>({
-    USD: initialRates.USD?.toString() || "",
-    AED: initialRates.AED?.toString() || "",
+  // Initialize rates from all currencies
+  const [rates, setRates] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    CURRENCIES.forEach(currency => {
+      initial[currency.code] = initialRates[currency.code]?.toString() || "";
+    });
+    return initial;
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -73,9 +81,8 @@ export function ExchangeRatesSection({ companyCode, initialRates }: ExchangeRate
   };
 
   const hasChanges = () => {
-    return (
-      rates.USD !== (initialRates.USD?.toString() || "") ||
-      rates.AED !== (initialRates.AED?.toString() || "")
+    return CURRENCIES.some(
+      currency => rates[currency.code] !== (initialRates[currency.code]?.toString() || "")
     );
   };
 
@@ -92,7 +99,7 @@ export function ExchangeRatesSection({ companyCode, initialRates }: ExchangeRate
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Currency Rate Inputs */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CURRENCIES.map((currency) => (
             <div key={currency.code} className="space-y-2">
               <Label htmlFor={`rate-${currency.code}`} className="flex items-center gap-2">

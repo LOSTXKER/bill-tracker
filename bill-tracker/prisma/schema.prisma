@@ -119,6 +119,7 @@ model Company {
   RecurringExpense           RecurringExpense[]
   ReimbursementRequest       ReimbursementRequest[]
   VendorMapping              VendorMapping[]
+  PettyCashFund              PettyCashFund[]
 
   @@index([code])
 }
@@ -267,6 +268,8 @@ model Expense {
   User_Expense_reimbursementPaidByToUser     User?                 @relation("Expense_reimbursementPaidByToUser", fields: [reimbursementPaidBy], references: [id])
   User_Expense_requesterIdToUser             User?                 @relation("Expense_requesterIdToUser", fields: [requesterId], references: [id])
   ReimbursementRequest                       ReimbursementRequest?
+  ExpensePayments                            ExpensePayment[]
+  PettyCashTransactions                      PettyCashTransaction[]
 
   @@index([accountId])
   @@index([companyId, billDate])
@@ -414,12 +417,15 @@ model ReimbursementRequest {
   fraudAnalyzedAt                            DateTime?
   createdAt                                  DateTime            @default(now())
   updatedAt                                  DateTime
+  // User who submitted the request (required)
+  requesterId                                String
   requesterName                              String              @default("")
   requesterPhone                             String?
   requesterEmail                             String?
   bankName                                   String              @default("")
   bankAccountNo                              String              @default("")
   bankAccountName                            String              @default("")
+  // DEPRECATED: trackingCode no longer needed (kept for backward compatibility)
   trackingCode                               String?             @unique
   referenceUrls                              Json                @default("[]")
   Comment                                    Comment[]
@@ -428,10 +434,47 @@ model ReimbursementRequest {
   Contact                                    Contact?            @relation(fields: [contactId], references: [id])
   Expense                                    Expense?            @relation(fields: [linkedExpenseId], references: [id])
   User_ReimbursementRequest_paidByToUser     User?               @relation("ReimbursementRequest_paidByToUser", fields: [paidBy], references: [id])
+  Requester                                  User                @relation("ReimbursementRequest_requester", fields: [requesterId], references: [id])
 
   @@index([companyId, status])
   @@index([createdAt])
   @@index([trackingCode])
+  @@index([requesterId])
+}
+
+model ExpensePayment {
+  id                    String           @id @default(cuid())
+  expenseId             String
+  paidByType            PaidByType
+  paidByUserId          String?          // Required when paidByType = USER
+  paidByPettyCashFundId String?          // Required when paidByType = PETTY_CASH
+  // DEPRECATED: These fields were for EXTERNAL payers (kept for migration compatibility)
+  paidByName            String?
+  paidByBankName        String?
+  paidByBankAccount     String?
+  amount                Decimal          @db.Decimal(12, 2)
+  settlementStatus      SettlementStatus @default(NOT_REQUIRED)
+  settledAt             DateTime?
+  settledBy             String?
+  settlementRef         String?
+  settlementSlipUrls    Json             @default("[]")
+  // Reversal fields (when SETTLED -> REVERSED)
+  reversedAt            DateTime?
+  reversedBy            String?
+  reversalReason        String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  Expense               Expense          @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  PaidByUser            User?            @relation("ExpensePayment_paidBy", fields: [paidByUserId], references: [id])
+  SettledByUser         User?            @relation("ExpensePayment_settledBy", fields: [settledBy], references: [id])
+  ReversedByUser        User?            @relation("ExpensePayment_reversedBy", fields: [reversedBy], references: [id])
+  PettyCashFund         PettyCashFund?   @relation(fields: [paidByPettyCashFundId], references: [id])
+
+  @@index([expenseId])
+  @@index([paidByUserId])
+  @@index([paidByPettyCashFundId])
+  @@index([settlementStatus])
+  @@index([paidByType, settlementStatus])
 }
 
 model User {
@@ -456,6 +499,12 @@ model User {
   Income                                                     Income[]
   ReimbursementRequest_ReimbursementRequest_approvedByToUser ReimbursementRequest[] @relation("ReimbursementRequest_approvedByToUser")
   ReimbursementRequest_ReimbursementRequest_paidByToUser     ReimbursementRequest[] @relation("ReimbursementRequest_paidByToUser")
+  ReimbursementRequest_requester                             ReimbursementRequest[] @relation("ReimbursementRequest_requester")
+  ExpensePayments_paidBy                                     ExpensePayment[]       @relation("ExpensePayment_paidBy")
+  ExpensePayments_settledBy                                  ExpensePayment[]       @relation("ExpensePayment_settledBy")
+  ExpensePayments_reversedBy                                 ExpensePayment[]       @relation("ExpensePayment_reversedBy")
+  PettyCashFunds_custodian                                   PettyCashFund[]        @relation("PettyCashFund_custodian")
+  PettyCashTransactions                                      PettyCashTransaction[] @relation("PettyCashTransaction_createdBy")
 
   @@index([email])
 }
@@ -650,4 +699,68 @@ enum WhtType {
   RENT_5
   ADVERTISING_2
   OTHER
+}
+
+enum PaidByType {
+  COMPANY
+  PETTY_CASH
+  USER
+  // EXTERNAL removed - all payers must have user accounts
+}
+
+enum SettlementStatus {
+  NOT_REQUIRED
+  PENDING
+  SETTLED
+  REVERSED // ยกเลิกการโอนคืน (สำหรับกรณีบันทึกผิด)
+}
+
+// =============================================================================
+// Petty Cash Management
+// =============================================================================
+
+model PettyCashFund {
+  id            String                 @id @default(cuid())
+  companyId     String
+  name          String                 // ชื่อกองทุน เช่น "เงินสดย่อยสำนักงาน"
+  initialAmount Decimal                @db.Decimal(12, 2) // ยอดตั้งต้น
+  currentAmount Decimal                @db.Decimal(12, 2) // ยอดคงเหลือปัจจุบัน
+  lowThreshold  Decimal?               @db.Decimal(12, 2) // ยอดขั้นต่ำที่ต้องเตือน
+  custodianId   String?                // ผู้ดูแลกองทุน
+  isActive      Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  Company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Custodian       User?                  @relation("PettyCashFund_custodian", fields: [custodianId], references: [id])
+  Transactions    PettyCashTransaction[]
+  ExpensePayments ExpensePayment[]
+
+  @@index([companyId])
+  @@index([custodianId])
+}
+
+model PettyCashTransaction {
+  id          String                   @id @default(cuid())
+  fundId      String
+  type        PettyCashTransactionType
+  amount      Decimal                  @db.Decimal(12, 2)
+  expenseId   String?                  // ถ้าเป็นการจ่ายจากรายจ่าย
+  description String?
+  createdBy   String
+  createdAt   DateTime                 @default(now())
+
+  Fund        PettyCashFund            @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  Expense     Expense?                 @relation(fields: [expenseId], references: [id])
+  User        User                     @relation("PettyCashTransaction_createdBy", fields: [createdBy], references: [id])
+
+  @@index([fundId])
+  @@index([expenseId])
+  @@index([createdAt])
+}
+
+enum PettyCashTransactionType {
+  EXPENSE     // จ่ายออก (ตัดจากรายจ่าย)
+  REPLENISH   // เติมเงิน
+  ADJUSTMENT  // ปรับยอด (เช่น นับเงินสดได้ไม่ตรง)
 }

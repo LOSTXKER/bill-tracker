@@ -20,7 +20,7 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
   const { company: companyCode } = await params;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="รายจ่าย"
         description="จัดการรายจ่ายและติดตามสถานะเอกสาร"

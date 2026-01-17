@@ -564,9 +564,7 @@ export default function EmployeeDetailPage() {
                       className="p-4 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() =>
                         router.push(
-                          `/${companyCode.toLowerCase()}/reimbursements/${
-                            item.id
-                          }`
+                          `/${companyCode.toLowerCase()}/reimbursements`
                         )
                       }
                     >

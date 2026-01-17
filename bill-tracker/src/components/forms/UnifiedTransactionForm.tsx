@@ -49,6 +49,7 @@ import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } fr
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionFieldsSection, TransactionFieldsConfig } from "./shared/TransactionFieldsSection";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
+import { PayerSection, PayerInfo } from "./shared/PayerSection";
 
 // Transaction components
 import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper } from "@/components/transactions";
@@ -225,6 +226,42 @@ export function UnifiedTransactionForm({
   const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
   const [oneTimeContactName, setOneTimeContactName] = useState("");
   const [pendingContactId, setPendingContactId] = useState<string | null>(null);
+  
+  // Payers (for expense only)
+  const [payers, setPayers] = useState<PayerInfo[]>([]);
+  const [payersInitialized, setPayersInitialized] = useState(false);
+
+  // Initialize payers from reimbursement data (prefill)
+  useEffect(() => {
+    if (mode === "create" && config.type === "expense" && !payersInitialized) {
+      const requesterInfo = config.defaultValues.requesterInfo as {
+        id?: string;
+        name?: string;
+      } | undefined;
+      
+      const settlementInfo = config.defaultValues.settlementInfo as {
+        settledAt?: string;
+        settlementRef?: string;
+      } | undefined;
+
+      if (requesterInfo?.id || requesterInfo?.name) {
+        // From reimbursement - pre-fill with USER payer (already settled)
+        setPayers([{
+          paidByType: "USER",
+          paidByUserId: requesterInfo.id || null,
+          paidByName: requesterInfo.name || null,
+          amount: Number(config.defaultValues.amount) || 0,
+          // Include settlement info for the API
+          ...(settlementInfo?.settledAt ? {
+            settlementStatus: "SETTLED" as const,
+            settledAt: settlementInfo.settledAt,
+            settlementRef: settlementInfo.settlementRef || null,
+          } : {}),
+        }]);
+      }
+      setPayersInitialized(true);
+    }
+  }, [mode, config.type, config.defaultValues, payersInitialized]);
 
   // AI Vendor Suggestion (for auto-creating contact)
   const [aiVendorSuggestion, setAiVendorSuggestion] = useState<{
@@ -325,7 +362,6 @@ export function UnifiedTransactionForm({
           [config.fields.whtField.name]: data[config.fields.whtField.name],
           whtRate: data.whtRate,
           whtType: data.whtType,
-          paymentMethod: data.paymentMethod,
           status: data.status,
           invoiceNumber: data.invoiceNumber,
           referenceNo: data.referenceNo,
@@ -414,6 +450,39 @@ export function UnifiedTransactionForm({
     }
   }, [fetchTransaction, mode]);
 
+  // Fetch payers for expense (view/edit mode)
+  useEffect(() => {
+    const fetchPayers = async () => {
+      if (config.type !== "expense" || mode === "create" || !transactionId) return;
+      
+      try {
+        const res = await fetch(`/api/expenses/${transactionId}/payments`);
+        if (res.ok) {
+          const result = await res.json();
+          const payments = result.data?.payments || [];
+          if (payments.length > 0) {
+            setPayers(
+              payments.map((p: Record<string, unknown>) => ({
+                paidByType: p.paidByType as PayerInfo["paidByType"],
+                paidByUserId: p.paidByUserId as string | null,
+                paidByName: p.paidByName as string | null,
+                paidByBankName: p.paidByBankName as string | null,
+                paidByBankAccount: p.paidByBankAccount as string | null,
+                amount: Number(p.amount),
+              }))
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching expense payers:", err);
+      }
+    };
+
+    if (transaction && transactionId) {
+      fetchPayers();
+    }
+  }, [config.type, mode, transactionId, transaction]);
+
   // Recalculate when values change
   useEffect(() => {
     const calc = config.calculateTotals(
@@ -449,7 +518,6 @@ export function UnifiedTransactionForm({
         : null,
       accountId: selectedAccount || null,
       accountName: accountSuggestion?.accountName || null,
-      paymentMethod: (watch("paymentMethod") as string) || null,
     };
   }, [watchAmount, calculation.vatAmount, calculation.whtAmount, watchVatRate, watchWhtRate, selectedContact, watchDate, watch, config, selectedAccount, accountSuggestion]);
 
@@ -471,7 +539,6 @@ export function UnifiedTransactionForm({
           description: null,
           accountId: null,
           accountName: null,
-          paymentMethod: null,
         };
       }
       const combined = result.combined || {
@@ -488,7 +555,6 @@ export function UnifiedTransactionForm({
 
       const extendedCombined = combined as typeof combined & {
         vatRate?: number | null;
-        paymentMethod?: string | null;
         amount?: number | null;
       };
 
@@ -523,7 +589,6 @@ export function UnifiedTransactionForm({
         description,
         accountId: (suggested.accountId as string) || null,
         accountName: (suggested.accountName as string) || null,
-        paymentMethod: (suggested.paymentMethod as string) || extendedCombined.paymentMethod || null,
       };
     },
     [config]
@@ -565,7 +630,6 @@ export function UnifiedTransactionForm({
 
       const extendedCombined = combined as typeof combined & {
         vatRate?: number | null;
-        paymentMethod?: string | null;
         amount?: number | null;
         whtRate?: number | null;
         whtAmount?: number | null;
@@ -609,12 +673,6 @@ export function UnifiedTransactionForm({
         if (dateStr) {
           setValue(config.fields.dateField.name, new Date(dateStr));
         }
-      }
-
-      // Apply payment method
-      const paymentMethod = suggested.paymentMethod || extendedCombined.paymentMethod;
-      if (paymentMethod) {
-        setValue("paymentMethod", paymentMethod);
       }
 
       // Apply invoice number (รองรับ invoiceNumbers จาก AI)
@@ -876,9 +934,6 @@ export function UnifiedTransactionForm({
       if (data.invoiceNumber) {
         setValue("invoiceNumber", data.invoiceNumber);
       }
-      if (data.paymentMethod) {
-        setValue("paymentMethod", data.paymentMethod);
-      }
       if (data.description && config.fields.descriptionField) {
         setValue(config.fields.descriptionField.name, data.description);
       }
@@ -913,6 +968,28 @@ export function UnifiedTransactionForm({
       validationErrors.push("กรุณาระบุจำนวนเงิน");
     }
 
+    // Validate payers for expense (บังคับระบุผู้จ่าย)
+    if (config.type === "expense") {
+      if (payers.length === 0) {
+        validationErrors.push("กรุณาระบุผู้จ่ายเงิน");
+      } else {
+        // Check if USER type has user selected
+        const invalidUserPayers = payers.filter(
+          (p) => p.paidByType === "USER" && !p.paidByUserId
+        );
+        if (invalidUserPayers.length > 0) {
+          validationErrors.push("กรุณาเลือกพนักงานสำหรับผู้จ่ายแต่ละราย");
+        }
+        // Check if PETTY_CASH type has fund selected
+        const invalidPettyCashPayers = payers.filter(
+          (p) => p.paidByType === "PETTY_CASH" && !p.paidByPettyCashFundId
+        );
+        if (invalidPettyCashPayers.length > 0) {
+          validationErrors.push("กรุณาเลือกกองทุนเงินสดย่อย");
+        }
+      }
+    }
+
     if (validationErrors.length > 0) {
       toast.error(validationErrors.join(", "));
       return;
@@ -940,6 +1017,8 @@ export function UnifiedTransactionForm({
           whtAmount: calculation.whtAmount,
           [config.fields.netAmountField]: calculation.netAmount,
           referenceUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
+          // Include payers for expense type
+          ...(config.type === "expense" && payers.length > 0 ? { payers } : {}),
           ...fileData,
         }),
       });
@@ -988,6 +1067,8 @@ export function UnifiedTransactionForm({
           whtAmount: whtEnabled ? calc.whtAmount : null,
           [config.fields.netAmountField]: calc.netAmount,
           referenceUrls: referenceUrls.length > 0 ? referenceUrls : [],
+          // Include payers for expense type
+          ...(config.type === "expense" ? { payers } : {}),
         }),
       });
 
@@ -1020,7 +1101,6 @@ export function UnifiedTransactionForm({
         [config.fields.whtField.name]: transaction[config.fields.whtField.name],
         whtRate: transaction.whtRate,
         whtType: transaction.whtType,
-        paymentMethod: transaction.paymentMethod,
         status: transaction.status,
         invoiceNumber: transaction.invoiceNumber,
         referenceNo: transaction.referenceNo,
@@ -1358,6 +1438,17 @@ export function UnifiedTransactionForm({
                     netAmountLabel={config.fields.netAmountLabel}
                   />
 
+                  {/* Payer Section (expense only, create mode) */}
+                  {config.type === "expense" && mode === "create" && (
+                    <PayerSection
+                      companyCode={companyCode}
+                      totalAmount={calculation.netAmount}
+                      mode={mode}
+                      payers={payers}
+                      onPayersChange={setPayers}
+                    />
+                  )}
+
                   {/* Notes (view/edit mode only) */}
                   {mode !== "create" && (
                     <div className="pt-2">
@@ -1488,6 +1579,17 @@ export function UnifiedTransactionForm({
                     netAmount={calculation.netAmount}
                     netAmountLabel={config.fields.netAmountLabel}
                   />
+
+                  {/* Payer Section (expense only, view/edit mode) */}
+                  {config.type === "expense" && (
+                    <PayerSection
+                      companyCode={companyCode}
+                      totalAmount={calculation.netAmount}
+                      mode={mode}
+                      payers={payers}
+                      onPayersChange={setPayers}
+                    />
+                  )}
 
                   <div className="pt-2">
                     <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>

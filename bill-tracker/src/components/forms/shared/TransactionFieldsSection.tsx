@@ -14,7 +14,6 @@ import {
 import { DatePicker } from "./DatePicker";
 import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
 import { AccountSelector } from "./account-selector";
-import { PaymentMethodSelect } from "./PaymentMethodSelect";
 import type { ContactSummary } from "@/types";
 import { Plus, X, ExternalLink, Link2 } from "lucide-react";
 
@@ -183,14 +182,6 @@ export function TransactionFieldsSection({
       }).format(amount);
     };
 
-    const PAYMENT_METHOD_LABELS: Record<string, string> = {
-      CASH: "เงินสด",
-      BANK_TRANSFER: "โอนเงิน",
-      PROMPTPAY: "พร้อมเพย์",
-      CREDIT_CARD: "บัตรเครดิต",
-      CHEQUE: "เช็ค",
-    };
-
     return (
       <div className="space-y-6">
         {/* Row 1: Date & Amount */}
@@ -257,16 +248,8 @@ export function TransactionFieldsSection({
           </div>
         </div>
 
-        {/* Row 5: Due Date & Payment Method */}
-        <div className="grid grid-cols-2 gap-x-12">
-          {renderAdditionalFields?.()}
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">วิธีชำระเงิน</p>
-            <p className="text-base font-semibold text-foreground">
-              {PAYMENT_METHOD_LABELS[(watch("paymentMethod") as string)] || "โอนเงิน"}
-            </p>
-          </div>
-        </div>
+        {/* Row 5: Due Date */}
+        {renderAdditionalFields?.()}
         
         {/* Row 6: Reference URLs */}
         {referenceUrls.length > 0 && (
@@ -397,15 +380,9 @@ export function TransactionFieldsSection({
         </div>
       </div>
 
-      {/* Row 5: Additional fields + Payment Method + Status */}
+      {/* Row 5: Additional fields + Status */}
       <div className="grid sm:grid-cols-2 gap-4">
         {renderAdditionalFields?.()}
-
-        <PaymentMethodSelect
-          value={(watch("paymentMethod") as string) || "BANK_TRANSFER"}
-          onChange={(value) => setValue("paymentMethod", value)}
-          label={config.type === "income" ? "วิธีรับเงิน" : undefined}
-        />
 
         {/* Status Selector - Only in create mode */}
         {mode === "create" && config.statusOptions.length > 0 && (

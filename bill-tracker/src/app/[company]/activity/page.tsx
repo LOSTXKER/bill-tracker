@@ -208,7 +208,7 @@ export default function ActivityPage({ params }: PageProps) {
     } else if (entityType === "Income") {
       path = `/${companyCode}/incomes/${entityId}`;
     } else if (entityType === "ReimbursementRequest") {
-      path = `/${companyCode}/reimbursements/${entityId}`;
+      path = `/${companyCode}/reimbursements`;
     }
 
     if (path) {

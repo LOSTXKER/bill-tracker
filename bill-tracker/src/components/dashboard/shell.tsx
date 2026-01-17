@@ -33,6 +33,8 @@ import {
   Wallet,
   User,
   UserCircle,
+  Banknote,
+  Coins,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -136,22 +138,51 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: ArrowDownCircle,
           permission: "incomes:read",
         },
+      ],
+    },
+    {
+      label: "การเงิน",
+      items: [
         {
-          name: "เบิกจ่าย",
+          name: "โอนคืนพนักงาน",
           href: `/${companyCode}/reimbursements`,
           icon: Wallet,
+          permission: "reimbursements:read",
+        },
+        {
+          name: "เงินสดย่อย",
+          href: `/${companyCode}/petty-cash`,
+          icon: Coins,
+          permission: "expenses:read",
+        },
+      ],
+    },
+    {
+      label: "รายงาน",
+      items: [
+        {
+          name: "รายงานภาพรวม",
+          href: `/${companyCode}/reports`,
+          icon: PieChart,
+          permission: "reports:read",
+        },
+        {
+          name: "ภาพรวมค่าใช้จ่าย",
+          href: `/${companyCode}/reports/expense-overview`,
+          icon: Receipt,
+          permission: "expenses:read",
+        },
+        {
+          name: "รายงานเบิกจ่าย",
+          href: `/${companyCode}/reports/reimbursements`,
+          icon: Banknote,
+          permission: "settlements:read",
         },
       ],
     },
     {
       label: "ข้อมูล",
       items: [
-        {
-          name: "รายงาน",
-          href: `/${companyCode}/reports`,
-          icon: PieChart,
-          permission: "reports:read",
-        },
         {
           name: "ผู้ติดต่อ",
           href: `/${companyCode}/contacts`,
@@ -176,21 +207,16 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       label: "ระบบ",
       items: [
         {
-          name: "การแจ้งเตือน",
-          href: `/${companyCode}/activity`,
-          icon: Activity,
+          name: "ส่งออกข้อมูล",
+          href: `/${companyCode}/exports`,
+          icon: Download,
+          permission: "settings:read",
         },
         {
           name: "บันทึกระบบ",
           href: `/${companyCode}/audit-logs`,
           icon: History,
           permission: "audit:read",
-        },
-        {
-          name: "ส่งออกข้อมูล",
-          href: `/${companyCode}/exports`,
-          icon: Download,
-          permission: "settings:read",
         },
         {
           name: "ตั้งค่า",

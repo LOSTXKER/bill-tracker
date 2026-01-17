@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -13,32 +13,19 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Search,
   CheckCircle2,
   XCircle,
-  Shield,
-  Sparkles,
   RefreshCw,
   AlertTriangle,
   CalendarDays,
   Cloud,
   PenTool,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   Filter,
   X,
   MoreHorizontal,
-  Pencil,
   Trash2,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +43,7 @@ import {
 } from "@/components/ui/select";
 import { CreateAccountDialog } from "./create-account-dialog";
 import { ImportAccountsDialog } from "./import-accounts-dialog";
+import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 
 interface Account {
   id: string;
@@ -120,7 +108,7 @@ export function AccountsPageClient({
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<SortField>("code"); // คอลัมน์แรก = รหัส
+  const [sortField, setSortField] = useState<SortField>("code");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [refreshing, setRefreshing] = useState(false);
   
@@ -129,25 +117,14 @@ export function AccountsPageClient({
   const needsUpdate = importStatus.daysAgo >= 30;
 
   // Handle sort toggle
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
+  const handleSort = (field: string) => {
+    const sortKey = field as SortField;
+    if (sortField === sortKey) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field);
+      setSortField(sortKey);
       setSortOrder("asc");
     }
-  };
-
-  // Sort icon component
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
-    }
-    return sortOrder === "asc" ? (
-      <ArrowUp className="h-4 w-4 ml-1" />
-    ) : (
-      <ArrowDown className="h-4 w-4 ml-1" />
-    );
   };
 
   // Refresh accounts list
@@ -157,7 +134,6 @@ export function AccountsPageClient({
       const response = await fetch(`/api/${companyCode.toLowerCase()}/accounts`);
       if (response.ok) {
         const json = await response.json();
-        // Handle new API format { success, data: { accounts } }
         const accountsData = json.success ? (json.data?.accounts || []) : (Array.isArray(json) ? json : []);
         setAccounts(accountsData);
       }
@@ -202,44 +178,39 @@ export function AccountsPageClient({
   }, [companyCode]);
 
   // Filter accounts
-  const filteredAccounts = accounts.filter((account) => {
-    const matchesSearch =
-      account.code.includes(searchQuery) ||
-      account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (account.keywords || []).some((keyword) =>
-        keyword.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter((account) => {
+      const matchesSearch =
+        account.code.includes(searchQuery) ||
+        account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (account.keywords || []).some((keyword) =>
+          keyword.toLowerCase().includes(searchQuery.toLowerCase())
+        );
 
-    const matchesClass = !selectedClass || account.class === selectedClass;
-    
-    const matchesSource = !selectedSource || 
-      (selectedSource === "PEAK" ? account.source === "PEAK" : account.source !== "PEAK");
-    
-    const matchesStatus = !selectedStatus ||
-      (selectedStatus === "active" ? account.isActive : !account.isActive);
+      const matchesClass = !selectedClass || account.class === selectedClass;
+      
+      const matchesSource = !selectedSource || 
+        (selectedSource === "PEAK" ? account.source === "PEAK" : account.source !== "PEAK");
+      
+      const matchesStatus = !selectedStatus ||
+        (selectedStatus === "active" ? account.isActive : !account.isActive);
 
-    return matchesSearch && matchesClass && matchesSource && matchesStatus;
-  });
+      return matchesSearch && matchesClass && matchesSource && matchesStatus;
+    });
+  }, [accounts, searchQuery, selectedClass, selectedSource, selectedStatus]);
 
   // Sort accounts
-  const sortedAccounts = [...filteredAccounts].sort((a, b) => {
-    let comparison = 0;
-    if (sortField === "code") {
-      comparison = a.code.localeCompare(b.code);
-    } else if (sortField === "name") {
-      comparison = a.name.localeCompare(b.name, "th");
-    }
-    return sortOrder === "asc" ? comparison : -comparison;
-  });
-
-  // Group by class
-  const accountsByClass = filteredAccounts.reduce((acc, account) => {
-    if (!acc[account.class]) {
-      acc[account.class] = [];
-    }
-    acc[account.class].push(account);
-    return acc;
-  }, {} as Record<string, Account[]>);
+  const sortedAccounts = useMemo(() => {
+    return [...filteredAccounts].sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "code") {
+        comparison = a.code.localeCompare(b.code);
+      } else if (sortField === "name") {
+        comparison = a.name.localeCompare(b.name, "th");
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [filteredAccounts, sortField, sortOrder]);
 
   // Stats
   const stats = {
@@ -248,6 +219,107 @@ export function AccountsPageClient({
     fromPeak: accounts.filter((a) => a.source === "PEAK").length,
     manual: accounts.filter((a) => a.source === "MANUAL" || !a.source).length,
   };
+
+  // Define columns for DataTable
+  const columns: ColumnDef<Account>[] = useMemo(() => [
+    {
+      key: "code",
+      label: "รหัส",
+      sortable: true,
+      width: "120px",
+      render: (account) => (
+        <span className="font-mono font-semibold">{account.code}</span>
+      ),
+    },
+    {
+      key: "name",
+      label: "ชื่อบัญชี",
+      sortable: true,
+      render: (account) => (
+        <div>
+          <div className="font-medium">{account.name}</div>
+          {account.description && (
+            <div className="text-xs text-muted-foreground mt-1">
+              {account.description}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "class",
+      label: "ประเภท",
+      width: "150px",
+      render: (account) => {
+        const classInfo = ACCOUNT_CLASS_LABELS[account.class];
+        return (
+          <Badge className={classInfo?.color || ""}>
+            {classInfo?.label || account.class}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "isActive",
+      label: "สถานะ",
+      width: "100px",
+      render: (account) => (
+        account.isActive ? (
+          <Badge variant="outline" className="gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            ใช้งาน
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1 text-muted-foreground">
+            <XCircle className="h-3 w-3" />
+            ปิดใช้งาน
+          </Badge>
+        )
+      ),
+    },
+    {
+      key: "source",
+      label: "แหล่งที่มา",
+      width: "100px",
+      render: (account) => (
+        account.source === "PEAK" ? (
+          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+            <Cloud className="h-3 w-3" />
+            Peak
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <PenTool className="h-3 w-3" />
+            สร้างเอง
+          </Badge>
+        )
+      ),
+    },
+    ...(canEdit ? [{
+      key: "actions",
+      label: "",
+      width: "50px",
+      render: (account: Account) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => handleDelete(account)}
+              disabled={account.isSystem}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              ลบ
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    } as ColumnDef<Account>] : []),
+  ], [canEdit, handleDelete]);
 
   return (
     <div className="space-y-6">
@@ -312,7 +384,6 @@ export function AccountsPageClient({
                 companyCode={companyCode}
                 onImportComplete={() => {
                   handleRefresh();
-                  // Refresh page to get updated lastAccountImportAt
                   router.refresh();
                 }}
               />
@@ -375,10 +446,10 @@ export function AccountsPageClient({
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters Card */}
       <Card>
         <CardHeader>
-          <CardTitle>รายการบัญชี</CardTitle>
+          <CardTitle>ค้นหาและกรอง</CardTitle>
           <CardDescription>
             ค้นหาและกรองบัญชีตามประเภท
           </CardDescription>
@@ -406,7 +477,7 @@ export function AccountsPageClient({
             >
               ทั้งหมด ({accounts.length})
             </Button>
-            {Object.entries(ACCOUNT_CLASS_LABELS).map(([classKey, { label, color }]) => {
+            {Object.entries(ACCOUNT_CLASS_LABELS).map(([classKey, { label }]) => {
               const count = accounts.filter((a) => a.class === classKey).length;
               if (count === 0) return null;
               return (
@@ -422,7 +493,7 @@ export function AccountsPageClient({
             })}
           </div>
 
-          {/* Additional Filters & Sort */}
+          {/* Additional Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
@@ -492,132 +563,32 @@ export function AccountsPageClient({
               </Button>
             )}
           </div>
-
-          {/* Accounts Table */}
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="w-[120px] cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => handleSort("code")}
-                  >
-                    <div className="flex items-center">
-                      รหัส
-                      <SortIcon field="code" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => handleSort("name")}
-                  >
-                    <div className="flex items-center">
-                      ชื่อบัญชี
-                      <SortIcon field="name" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-[150px]">ประเภท</TableHead>
-                  <TableHead className="w-[100px]">สถานะ</TableHead>
-                  <TableHead className="w-[80px]">แหล่งที่มา</TableHead>
-                  {canEdit && <TableHead className="w-[50px]"></TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedAccounts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={canEdit ? 6 : 5} className="text-center py-8 text-muted-foreground">
-                      ไม่พบบัญชีที่ตรงกับเงื่อนไข
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedAccounts.map((account) => {
-                    const classInfo = ACCOUNT_CLASS_LABELS[account.class];
-                    return (
-                      <TableRow key={account.id}>
-                        <TableCell>
-                          <span className="font-mono font-semibold">
-                            {account.code}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{account.name}</div>
-                            {account.description && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {account.description}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={classInfo?.color || ""}>
-                            {classInfo?.label || account.class}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {account.isActive ? (
-                            <Badge variant="outline" className="gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              ใช้งาน
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1 text-muted-foreground">
-                              <XCircle className="h-3 w-3" />
-                              ปิดใช้งาน
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {account.source === "PEAK" ? (
-                            <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                              <Cloud className="h-3 w-3" />
-                              Peak
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1">
-                              <PenTool className="h-3 w-3" />
-                              สร้างเอง
-                            </Badge>
-                          )}
-                        </TableCell>
-                        {canEdit && (
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => handleDelete(account)}
-                                  disabled={account.isSystem}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  ลบ
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Info Box */}
-          <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4">
-            <p className="text-sm text-blue-900 dark:text-blue-100">
-              💡 <strong>หมายเหตุ:</strong> บัญชีเหล่านี้ถูกใช้สำหรับการจำแนกรายรับ-รายจ่าย 
-              และส่งออกข้อมูลไปยัง PEAK Accounting ระบบจะแนะนำบัญชีที่เหมาะสมโดยอัตโนมัติ
-            </p>
-          </div>
         </CardContent>
       </Card>
+
+      {/* Accounts Table - Using DataTable */}
+      <DataTable
+        data={sortedAccounts}
+        columns={columns}
+        keyField="id"
+        title="รายการบัญชี"
+        total={sortedAccounts.length}
+        sortBy={sortField}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        emptyState={{
+          icon: FileSpreadsheet,
+          title: "ไม่พบบัญชีที่ตรงกับเงื่อนไข",
+        }}
+      />
+
+      {/* Info Box */}
+      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4">
+        <p className="text-sm text-blue-900 dark:text-blue-100">
+          <strong>หมายเหตุ:</strong> บัญชีเหล่านี้ถูกใช้สำหรับการจำแนกรายรับ-รายจ่าย 
+          และส่งออกข้อมูลไปยัง PEAK Accounting ระบบจะแนะนำบัญชีที่เหมาะสมโดยอัตโนมัติ
+        </p>
+      </div>
     </div>
   );
 }

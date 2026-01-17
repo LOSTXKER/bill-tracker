@@ -50,7 +50,7 @@ export default async function ExportsPage({ params }: PageProps) {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="space-y-6">
       <DataExportPage
         companyId={company.id}
         companyName={company.name}

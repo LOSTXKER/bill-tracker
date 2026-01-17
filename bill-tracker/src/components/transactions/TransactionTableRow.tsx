@@ -17,7 +17,7 @@ import { Send, Loader2, ShieldAlert } from "lucide-react";
 // =============================================================================
 
 export interface TransactionRowConfig {
-  type: "expense" | "income" | "reimbursement";
+  type: "expense" | "income";
   dateField: "billDate" | "receiveDate";
   amountField: "netPaid" | "netReceived";
   descriptionField: "description" | "source";
@@ -108,23 +108,6 @@ export const incomeRowConfig: TransactionRowConfig = {
   showCreator: true,
   showLineButton: true,
   statusField: "workflowStatus",
-};
-
-// =============================================================================
-// Reimbursement Config
-// =============================================================================
-
-export const reimbursementRowConfig: TransactionRowConfig = {
-  type: "reimbursement",
-  dateField: "billDate",
-  amountField: "netPaid",
-  descriptionField: "description",
-  amountColorClass: "text-blue-600",
-  showFraudScore: true,
-  showRequester: true,
-  showCreator: false,
-  showLineButton: false,
-  statusField: "reimbursementStatus",
 };
 
 // =============================================================================

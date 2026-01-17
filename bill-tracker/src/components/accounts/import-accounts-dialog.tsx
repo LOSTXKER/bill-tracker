@@ -376,14 +376,14 @@ export function ImportAccountsDialog({
 
               {/* Preview Table */}
               {accountsToShow.length > 0 ? (
-                <div className="border rounded-lg max-h-[400px] overflow-auto">
+                <div className="rounded-lg border bg-card max-h-[400px] overflow-auto">
                   <Table>
-                    <TableHeader className="sticky top-0 bg-background">
-                      <TableRow>
-                        <TableHead className="w-[80px]">สถานะ</TableHead>
-                        <TableHead className="w-[100px]">รหัส</TableHead>
-                        <TableHead>ชื่อบัญชี</TableHead>
-                        <TableHead className="w-[120px]">ประเภท</TableHead>
+                    <TableHeader className="sticky top-0 bg-card">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[80px] text-muted-foreground font-medium">สถานะ</TableHead>
+                        <TableHead className="w-[100px] text-muted-foreground font-medium">รหัส</TableHead>
+                        <TableHead className="text-muted-foreground font-medium">ชื่อบัญชี</TableHead>
+                        <TableHead className="w-[120px] text-muted-foreground font-medium">ประเภท</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

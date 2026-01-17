@@ -1,19 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -23,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { UserBadge } from "@/components/shared/UserBadge";
+import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
+import { DataTableSkeleton } from "@/components/shared/DataTableSkeleton";
 import {
   Users,
   UserPlus,
@@ -68,7 +61,6 @@ export default function EmployeesPage() {
       try {
         const response = await fetch(`/api/companies?code=${companyCode}`);
         const result = await response.json();
-        // Handle both old format (data.companies) and new format (data.data.companies)
         const companies = result.data?.companies || result.companies;
         if (companies?.[0]) {
           setCompanyId(companies[0].id);
@@ -88,7 +80,6 @@ export default function EmployeesPage() {
     try {
       const response = await fetch(`/api/companies/${companyId}/members`);
       const result = await response.json();
-      // Handle both old format (data.members) and new format (data.data.members)
       const members = result.data?.members || result.members || [];
       setMembers(members);
     } catch (error) {
@@ -102,18 +93,20 @@ export default function EmployeesPage() {
     fetchMembers();
   }, [companyId]);
 
-  const handleRowClick = (userId: string) => {
-    router.push(`/${companyCode.toLowerCase()}/employees/${userId}`);
+  const handleRowClick = (member: TeamMember) => {
+    router.push(`/${companyCode.toLowerCase()}/employees/${member.userId}`);
   };
 
   // Filter members
-  const filteredMembers = members.filter((member) => {
-    if (statusFilter === "active" && !member.user.isActive) return false;
-    if (statusFilter === "inactive" && member.user.isActive) return false;
-    if (roleFilter === "owner" && !member.isOwner) return false;
-    if (roleFilter === "staff" && member.isOwner) return false;
-    return true;
-  });
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => {
+      if (statusFilter === "active" && !member.user.isActive) return false;
+      if (statusFilter === "inactive" && member.user.isActive) return false;
+      if (roleFilter === "owner" && !member.isOwner) return false;
+      if (roleFilter === "staff" && member.isOwner) return false;
+      return true;
+    });
+  }, [members, statusFilter, roleFilter]);
 
   // Stats
   const stats = {
@@ -122,6 +115,96 @@ export default function EmployeesPage() {
     owners: members.filter((m) => m.isOwner).length,
     staff: members.filter((m) => !m.isOwner).length,
   };
+
+  // Define columns for DataTable
+  const columns: ColumnDef<TeamMember>[] = useMemo(() => [
+    {
+      key: "name",
+      label: "ชื่อ-อีเมล",
+      width: "250px",
+      render: (member) => <UserBadge user={member.user} />,
+    },
+    {
+      key: "role",
+      label: "ตำแหน่ง",
+      width: "150px",
+      render: (member) => (
+        member.isOwner ? (
+          <Badge variant="default" className="gap-1">
+            <Crown className="h-3 w-3" />
+            ผู้จัดการ
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <Users className="h-3 w-3" />
+            พนักงาน
+          </Badge>
+        )
+      ),
+    },
+    {
+      key: "status",
+      label: "สถานะ",
+      width: "120px",
+      render: (member) => (
+        member.user.isActive ? (
+          <Badge
+            variant="outline"
+            className="gap-1 text-emerald-600 border-emerald-600"
+          >
+            <CheckCircle className="h-3 w-3" />
+            ใช้งานอยู่
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="gap-1">
+            <Clock className="h-3 w-3" />
+            รอยืนยัน
+          </Badge>
+        )
+      ),
+    },
+    {
+      key: "permissions",
+      label: "สิทธิ์",
+      width: "150px",
+      render: (member) => (
+        member.isOwner ? (
+          <Badge variant="outline" className="gap-1">
+            <Shield className="h-3 w-3" />
+            สิทธิ์ทั้งหมด
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <Shield className="h-3 w-3" />
+            {member.permissions.length} สิทธิ์
+          </Badge>
+        )
+      ),
+    },
+    {
+      key: "lastLogin",
+      label: "เข้าสู่ระบบล่าสุด",
+      width: "180px",
+      render: (member) => {
+        const lastLogin = member.user.lastLoginAt
+          ? new Date(member.user.lastLoginAt)
+          : null;
+        return (
+          <span className="text-muted-foreground text-sm">
+            {lastLogin ? (
+              lastLogin.toLocaleDateString("th-TH", {
+                day: "numeric",
+                month: "short",
+                year: "2-digit",
+              })
+            ) : (
+              "-"
+            )}
+          </span>
+        );
+      },
+    },
+  ], []);
 
   return (
     <div className="space-y-6">
@@ -201,14 +284,22 @@ export default function EmployeesPage() {
         </Card>
       </div>
 
-      {/* Table */}
-      <Card className="border-border/50">
-        <CardHeader className="pb-4 border-b">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="text-lg">รายชื่อพนักงาน</CardTitle>
+      {/* Table with Filters */}
+      {isLoading ? (
+        <DataTableSkeleton title="รายชื่อพนักงาน" columns={5} rows={5} />
+      ) : (
+        <DataTable
+          data={filteredMembers}
+          columns={columns}
+          keyField="id"
+          title="รายชื่อพนักงาน"
+          total={filteredMembers.length}
+          onRowClick={handleRowClick}
+          rowClassName={() => "cursor-pointer"}
+          headerActions={
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[140px] h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,7 +310,7 @@ export default function EmployeesPage() {
               </Select>
 
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[140px] h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,116 +320,14 @@ export default function EmployeesPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-14 w-full" />
-              ))}
-            </div>
-          ) : filteredMembers.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                <Users className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">ไม่พบพนักงาน</h3>
-              <p className="text-muted-foreground">
-                ไม่มีพนักงานที่ตรงกับเงื่อนไขที่เลือก
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead className="w-[250px]">ชื่อ-อีเมล</TableHead>
-                    <TableHead className="w-[150px]">ตำแหน่ง</TableHead>
-                    <TableHead className="w-[120px]">สถานะ</TableHead>
-                    <TableHead className="w-[150px]">สิทธิ์</TableHead>
-                    <TableHead className="w-[180px]">เข้าสู่ระบบล่าสุด</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMembers.map((member) => {
-                    const lastLogin = member.user.lastLoginAt
-                      ? new Date(member.user.lastLoginAt)
-                      : null;
-
-                    return (
-                      <TableRow
-                        key={member.id}
-                        className="cursor-pointer hover:bg-muted/30 transition-colors"
-                        onClick={() => handleRowClick(member.userId)}
-                      >
-                        <TableCell>
-                          <UserBadge user={member.user} />
-                        </TableCell>
-                        <TableCell>
-                          {member.isOwner ? (
-                            <Badge variant="default" className="gap-1">
-                              <Crown className="h-3 w-3" />
-                              ผู้จัดการ
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1">
-                              <Users className="h-3 w-3" />
-                              พนักงาน
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {member.user.isActive ? (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 text-emerald-600 border-emerald-600"
-                            >
-                              <CheckCircle className="h-3 w-3" />
-                              ใช้งานอยู่
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="gap-1">
-                              <Clock className="h-3 w-3" />
-                              รอยืนยัน
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {member.isOwner ? (
-                            <Badge variant="outline" className="gap-1">
-                              <Shield className="h-3 w-3" />
-                              สิทธิ์ทั้งหมด
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1">
-                              <Shield className="h-3 w-3" />
-                              {member.permissions.length} สิทธิ์
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {lastLogin ? (
-                            <span className="text-sm">
-                              {lastLogin.toLocaleDateString("th-TH", {
-                                day: "numeric",
-                                month: "short",
-                                year: "2-digit",
-                              })}
-                            </span>
-                          ) : (
-                            <span className="text-xs">-</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          }
+          emptyState={{
+            icon: Users,
+            title: "ไม่พบพนักงาน",
+            description: "ไม่มีพนักงานที่ตรงกับเงื่อนไขที่เลือก",
+          }}
+        />
+      )}
 
       {/* Create Member Dialog */}
       {companyId && (

@@ -6,13 +6,8 @@
 
 export type TransactionType = 'expense' | 'income';
 
-export interface TaxCalculation {
-  baseAmount: number;
-  vatAmount: number;
-  whtAmount: number;
-  totalWithVat: number;
-  netAmount: number;
-}
+// Re-export TaxCalculation from main types
+export type { TaxCalculation } from './index';
 
 export interface BaseTransaction {
   id: string;

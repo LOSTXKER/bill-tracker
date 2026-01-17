@@ -231,7 +231,7 @@ export function SettingsLayout({
         </aside>
 
         {/* Mobile Navigation */}
-        <div className="lg:hidden">
+        <div className="lg:hidden space-y-3">
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-2 pb-3">
               {allNavItems.map((item) => (

@@ -1,19 +1,11 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useMemo } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +22,6 @@ import {
   Phone,
   Mail,
   Building2,
-  Loader2,
   Download,
   CalendarDays,
   AlertTriangle,
@@ -38,9 +29,6 @@ import {
   Cloud,
   PenTool,
   Filter,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   X,
   UserCheck,
   Truck,
@@ -62,6 +50,7 @@ import { swrKeys } from "@/lib/swr-config";
 import useSWR from "swr";
 import { formatDistanceToNowStrict } from "date-fns";
 import { th } from "date-fns/locale";
+import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 
 interface ContactsPageProps {
   params: Promise<{ company: string }>;
@@ -100,7 +89,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<SortField>("peakCode"); // คอลัมน์แรก = รหัส Peak
+  const [sortField, setSortField] = useState<SortField>("peakCode");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
   // Use SWR hook for data fetching and caching
@@ -123,25 +112,14 @@ export default function ContactsPage({ params }: ContactsPageProps) {
     (new Date().getTime() - lastContactImportAt.getTime()) > (30 * 24 * 60 * 60 * 1000);
 
   // Handle sort toggle
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
+  const handleSort = (field: string) => {
+    const sortKey = field as SortField;
+    if (sortField === sortKey) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field);
+      setSortField(sortKey);
       setSortOrder("asc");
     }
-  };
-
-  // Sort icon component
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
-    }
-    return sortOrder === "asc" ? (
-      <ArrowUp className="h-4 w-4 ml-1" />
-    ) : (
-      <ArrowDown className="h-4 w-4 ml-1" />
-    );
   };
 
   // Filter contacts based on search and filters
@@ -167,19 +145,21 @@ export default function ContactsPage({ params }: ContactsPageProps) {
   });
 
   // Sort contacts
-  const sortedContacts = [...filteredContacts].sort((a, b) => {
-    let comparison = 0;
-    if (sortField === "peakCode") {
-      const aCode = (a as any).peakCode || "";
-      const bCode = (b as any).peakCode || "";
-      comparison = aCode.localeCompare(bCode);
-    } else if (sortField === "name") {
-      comparison = (a.name || "").localeCompare(b.name || "", "th");
-    } else if (sortField === "taxId") {
-      comparison = (a.taxId || "").localeCompare(b.taxId || "");
-    }
-    return sortOrder === "asc" ? comparison : -comparison;
-  });
+  const sortedContacts = useMemo(() => {
+    return [...filteredContacts].sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "peakCode") {
+        const aCode = (a as any).peakCode || "";
+        const bCode = (b as any).peakCode || "";
+        comparison = aCode.localeCompare(bCode);
+      } else if (sortField === "name") {
+        comparison = (a.name || "").localeCompare(b.name || "", "th");
+      } else if (sortField === "taxId") {
+        comparison = (a.taxId || "").localeCompare(b.taxId || "");
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [filteredContacts, sortField, sortOrder]);
 
   const handleOpenDialog = (contact?: Contact) => {
     setEditingContact(contact || null);
@@ -229,13 +209,12 @@ export default function ContactsPage({ params }: ContactsPageProps) {
         `/api/contacts?id=${id}&company=${companyCode.toUpperCase()}`,
         { 
           method: "DELETE",
-          cache: "no-store" // Prevent caching DELETE requests
+          cache: "no-store"
         }
       );
       const data = await res.json();
       if (data.success) {
         toast.success("ลบสำเร็จ");
-        // Immediately revalidate cache
         await mutate(swrKeys.contacts(companyCode));
         refetch();
       } else {
@@ -245,6 +224,130 @@ export default function ContactsPage({ params }: ContactsPageProps) {
       toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
     }
   };
+
+  // Define columns for DataTable
+  const columns: ColumnDef<Contact>[] = useMemo(() => [
+    {
+      key: "peakCode",
+      label: "รหัส Peak",
+      sortable: true,
+      render: (contact) => (
+        <span className="font-mono text-sm text-muted-foreground">
+          {(contact as any).peakCode || "-"}
+        </span>
+      ),
+    },
+    {
+      key: "name",
+      label: "ชื่อ",
+      sortable: true,
+      render: (contact) => (
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+            <Building2 className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="font-medium">{contact.name}</p>
+            {contact.address && (
+              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                {contact.address}
+              </p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "category",
+      label: "ประเภท",
+      render: (contact) => {
+        const category = (contact as any).contactCategory;
+        const info = CATEGORY_LABELS[category];
+        if (!info) return <span className="text-muted-foreground">-</span>;
+        const Icon = info.icon;
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Icon className="h-3 w-3" />
+            {info.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "taxId",
+      label: "เลขภาษี",
+      sortable: true,
+      render: (contact) => (
+        <span className="text-muted-foreground font-mono text-sm">
+          {contact.taxId || "-"}
+        </span>
+      ),
+    },
+    {
+      key: "contact",
+      label: "ติดต่อ",
+      render: (contact) => (
+        <div className="space-y-1">
+          {contact.phone && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Phone className="h-3 w-3" />
+              {contact.phone}
+            </div>
+          )}
+          {contact.email && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Mail className="h-3 w-3" />
+              {contact.email}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "source",
+      label: "แหล่งที่มา",
+      render: (contact) => (
+        contact.source === "PEAK" ? (
+          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+            <Cloud className="h-3 w-3" />
+            Peak
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <PenTool className="h-3 w-3" />
+            สร้างเอง
+          </Badge>
+        )
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      width: "50px",
+      render: (contact) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleOpenDialog(contact)}>
+              <Pencil className="h-4 w-4 mr-2" />
+              แก้ไข
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => handleDelete(contact.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              ลบ
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ], []);
 
   return (
     <div className="space-y-6">
@@ -408,171 +511,30 @@ export default function ContactsPage({ params }: ContactsPageProps) {
         </CardContent>
       </Card>
 
-      {/* Contacts List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            รายชื่อผู้ติดต่อ ({sortedContacts.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : sortedContacts.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">
-                {search || selectedCategory || selectedSource ? "ไม่พบผู้ติดต่อที่ตรงกับเงื่อนไข" : "ยังไม่มีผู้ติดต่อ"}
-              </p>
-              {!search && !selectedCategory && !selectedSource && (
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => handleOpenDialog()}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  เพิ่มผู้ติดต่อแรก
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("peakCode")}
-                    >
-                      <div className="flex items-center">
-                        รหัส Peak
-                        <SortIcon field="peakCode" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center">
-                        ชื่อ
-                        <SortIcon field="name" />
-                      </div>
-                    </TableHead>
-                    <TableHead>ประเภท</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort("taxId")}
-                    >
-                      <div className="flex items-center">
-                        เลขภาษี
-                        <SortIcon field="taxId" />
-                      </div>
-                    </TableHead>
-                    <TableHead>ติดต่อ</TableHead>
-                    <TableHead>แหล่งที่มา</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedContacts.map((contact) => (
-                    <TableRow key={contact.id}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
-                        {(contact as any).peakCode || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{contact.name}</p>
-                            {contact.address && (
-                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                {contact.address}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const category = (contact as any).contactCategory;
-                          const info = CATEGORY_LABELS[category];
-                          if (!info) return <span className="text-muted-foreground">-</span>;
-                          const Icon = info.icon;
-                          return (
-                            <Badge variant="outline" className="gap-1">
-                              <Icon className="h-3 w-3" />
-                              {info.label}
-                            </Badge>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-sm">
-                        {contact.taxId || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {contact.phone && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Phone className="h-3 w-3" />
-                              {contact.phone}
-                            </div>
-                          )}
-                          {contact.email && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Mail className="h-3 w-3" />
-                              {contact.email}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {contact.source === "PEAK" ? (
-                          <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                            <Cloud className="h-3 w-3" />
-                            Peak
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="gap-1">
-                            <PenTool className="h-3 w-3" />
-                            สร้างเอง
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenDialog(contact)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              แก้ไข
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDelete(contact.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              ลบ
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Contacts List - Using DataTable */}
+      <DataTable
+        data={sortedContacts}
+        columns={columns}
+        keyField="id"
+        title="รายชื่อผู้ติดต่อ"
+        total={sortedContacts.length}
+        isLoading={isLoading}
+        sortBy={sortField}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        emptyState={{
+          icon: Users,
+          title: search || selectedCategory || selectedSource 
+            ? "ไม่พบผู้ติดต่อที่ตรงกับเงื่อนไข" 
+            : "ยังไม่มีผู้ติดต่อ",
+          action: !search && !selectedCategory && !selectedSource ? (
+            <Button variant="outline" onClick={() => handleOpenDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              เพิ่มผู้ติดต่อแรก
+            </Button>
+          ) : undefined,
+        }}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { apiResponse } from "@/lib/api/response";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { prisma } from "@/lib/db";
 import { analyzeReceipt, ReceiptAnalysisResult } from "@/lib/ai/analyze-receipt";
+import { convertCurrency, CurrencyDetectionResult } from "@/lib/ai/currency-converter";
 
 /**
  * POST /api/ai/analyze-documents
@@ -32,15 +33,18 @@ export async function POST(request: Request) {
       return apiResponse.badRequest("companyCode is required");
     }
 
-    // Find company
+    // Find company with exchange rates
     const company = await prisma.company.findUnique({
       where: { code: companyCode.toUpperCase() },
-      select: { id: true, name: true },
+      select: { id: true, name: true, exchangeRates: true },
     });
 
     if (!company) {
       return apiResponse.notFound("Company not found");
     }
+
+    // Get exchange rates from company settings
+    const exchangeRates = (company.exchangeRates as Record<string, number>) || {};
 
     const startTime = Date.now();
 
@@ -57,6 +61,22 @@ export async function POST(request: Request) {
 
     const processingTime = Date.now() - startTime;
 
+    // Apply currency conversion if detected foreign currency
+    let currencyConversion: CurrencyDetectionResult | null = null;
+    if (aiResult.currency && aiResult.currency !== "THB" && aiResult.amount) {
+      currencyConversion = convertCurrency(
+        aiResult.amount,
+        aiResult.currency as "USD" | "AED" | "THB",
+        exchangeRates
+      );
+      console.log("💱 Currency conversion:", {
+        originalCurrency: aiResult.currency,
+        originalAmount: aiResult.amount,
+        convertedAmount: currencyConversion.convertedAmount,
+        exchangeRate: currencyConversion.exchangeRate,
+      });
+    }
+
     // Log
     console.log("🧠 AI Analysis:", {
       userId: session.user.id,
@@ -67,10 +87,12 @@ export async function POST(request: Request) {
       account: aiResult.account.name,
       confidence: aiResult.confidence.overall,
       isNewVendor: !aiResult.vendor.matchedContactId,
+      currency: aiResult.currency,
+      hasCurrencyConversion: !!currencyConversion?.convertedAmount,
     });
 
     // Convert to legacy format for frontend
-    const result = convertToLegacyFormat(aiResult, imageUrls);
+    const result = convertToLegacyFormat(aiResult, imageUrls, currencyConversion);
 
     return apiResponse.success({
       ...result,
@@ -88,7 +110,11 @@ export async function POST(request: Request) {
 /**
  * Convert to legacy format for frontend compatibility
  */
-function convertToLegacyFormat(result: ReceiptAnalysisResult, imageUrls: string[]) {
+function convertToLegacyFormat(
+  result: ReceiptAnalysisResult, 
+  imageUrls: string[],
+  currencyConversion: CurrencyDetectionResult | null
+) {
   return {
     combined: {
       vendorName: result.vendor.name,
@@ -108,6 +134,7 @@ function convertToLegacyFormat(result: ReceiptAnalysisResult, imageUrls: string[
       invoiceNumber: result.invoiceNumber,
       items: result.items,
       description: result.description,
+      currency: result.currency,
     },
     suggested: {
       accountId: result.account.id,
@@ -157,6 +184,15 @@ function convertToLegacyFormat(result: ReceiptAnalysisResult, imageUrls: string[
       })),
     } : null,
     detectedTransactionType: null,
+    // Currency conversion info
+    currencyConversion: currencyConversion ? {
+      detected: currencyConversion.detected,
+      currency: currencyConversion.currency,
+      originalAmount: currencyConversion.originalAmount,
+      convertedAmount: currencyConversion.convertedAmount,
+      exchangeRate: currencyConversion.exchangeRate,
+      conversionNote: currencyConversion.conversionNote,
+    } : null,
     // คำเตือนจากการวิเคราะห์
     warnings: result.warnings || [],
   };

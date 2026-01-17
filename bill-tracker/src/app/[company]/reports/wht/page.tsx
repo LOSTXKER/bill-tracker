@@ -175,163 +175,163 @@ async function WHTReport({ companyCode }: { companyCode: string }) {
       </div>
 
       {/* WHT by Type */}
-      <Card>
-        <CardHeader>
-          <CardTitle>สรุปตามประเภทเงินได้</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <h3 className="text-sm font-semibold text-foreground">สรุปตามประเภทเงินได้</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-muted-foreground font-medium">ประเภท</TableHead>
+                <TableHead className="text-center text-muted-foreground font-medium">จำนวนรายการ</TableHead>
+                <TableHead className="text-right text-muted-foreground font-medium">ยอดรวม</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(Object.entries(whtByType) as [string, { count: number; amount: number }][]).map(([type, data]) => (
+                <TableRow key={type}>
+                  <TableCell className="font-medium">
+                    {WHT_TYPE_LABELS[type] || type}
+                  </TableCell>
+                  <TableCell className="text-center">{data.count}</TableCell>
+                  <TableCell className="text-right font-medium text-red-600">
+                    {formatCurrency(data.amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="bg-muted/50 font-bold">
+                <TableCell>รวมทั้งหมด</TableCell>
+                <TableCell className="text-center">
+                  {expensesWithWHT.length}
+                </TableCell>
+                <TableCell className="text-right text-red-600">
+                  {formatCurrency(totalWHTpaid)}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* WHT Paid (เราหักเขา) */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-red-600">รายการหัก ณ ที่จ่าย (เราหักเขา)</h3>
+            <span className="text-xs text-muted-foreground">({expensesWithWHT.length} รายการ)</span>
+          </div>
+        </div>
+        {expensesWithWHT.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการ</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>ประเภท</TableHead>
-                  <TableHead className="text-center">จำนวนรายการ</TableHead>
-                  <TableHead className="text-right">ยอดรวม</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ประเภท</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-medium">มูลค่า</TableHead>
+                  <TableHead className="text-center text-muted-foreground font-medium">%</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-medium">WHT</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(Object.entries(whtByType) as [string, { count: number; amount: number }][]).map(([type, data]) => (
-                  <TableRow key={type}>
-                    <TableCell className="font-medium">
-                      {WHT_TYPE_LABELS[type] || type}
+                {expensesWithWHT.map((expense: typeof expensesWithWHT[number]) => (
+                  <TableRow key={expense.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(expense.billDate).toLocaleDateString("th-TH", {
+                        day: "numeric",
+                        month: "short",
+                        year: "2-digit",
+                      })}
                     </TableCell>
-                    <TableCell className="text-center">{data.count}</TableCell>
-                    <TableCell className="text-right font-medium text-red-600">
-                      {formatCurrency(data.amount)}
+                    <TableCell>
+                      {expense.contact?.name || expense.description || "-"}
                     </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/50 font-bold">
-                  <TableCell>รวมทั้งหมด</TableCell>
-                  <TableCell className="text-center">
-                    {expensesWithWHT.length}
-                  </TableCell>
-                  <TableCell className="text-right text-red-600">
-                    {formatCurrency(totalWHTpaid)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* WHT Paid (เราหักเขา) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-red-600">
-            รายการหัก ณ ที่จ่าย (เราหักเขา)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {expensesWithWHT.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>ผู้ขาย</TableHead>
-                    <TableHead>ประเภท</TableHead>
-                    <TableHead className="text-right">มูลค่า</TableHead>
-                    <TableHead className="text-center">%</TableHead>
-                    <TableHead className="text-right">WHT</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expensesWithWHT.map((expense: typeof expensesWithWHT[number]) => (
-                    <TableRow key={expense.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {new Date(expense.billDate).toLocaleDateString("th-TH", {
-                          day: "numeric",
-                          month: "short",
-                          year: "2-digit",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        {expense.contact?.name || expense.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {WHT_TYPE_LABELS[expense.whtType || "OTHER"]}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(Number(expense.amount))}
-                      </TableCell>
+                    <TableCell className="text-sm">
+                      {WHT_TYPE_LABELS[expense.whtType || "OTHER"]}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(expense.amount))}
+                    </TableCell>
                     <TableCell className="text-center">
                       {Number(expense.whtRate)}%
                     </TableCell>
-                      <TableCell className="text-right font-medium text-red-600">
-                        {formatCurrency(Number(expense.whtAmount || 0))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    <TableCell className="text-right font-medium text-red-600">
+                      {formatCurrency(Number(expense.whtAmount || 0))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       {/* WHT Received (เขาหักเรา) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-blue-600">
-            รายการที่ถูกหัก (เขาหักเรา - เครดิตภาษี)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {incomesWithWHT.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">ไม่มีรายการ</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>ลูกค้า</TableHead>
-                    <TableHead>ประเภท</TableHead>
-                    <TableHead className="text-right">มูลค่า</TableHead>
-                    <TableHead className="text-center">%</TableHead>
-                    <TableHead className="text-right">WHT</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {incomesWithWHT.map((income: typeof incomesWithWHT[number]) => (
-                    <TableRow key={income.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {new Date(income.receiveDate).toLocaleDateString(
-                          "th-TH",
-                          {
-                            day: "numeric",
-                            month: "short",
-                            year: "2-digit",
-                          }
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {income.contact?.name || income.source || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {WHT_TYPE_LABELS[income.whtType || "OTHER"]}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(Number(income.amount))}
-                      </TableCell>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-blue-600">รายการที่ถูกหัก (เขาหักเรา - เครดิตภาษี)</h3>
+            <span className="text-xs text-muted-foreground">({incomesWithWHT.length} รายการ)</span>
+          </div>
+        </div>
+        {incomesWithWHT.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการ</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ประเภท</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-medium">มูลค่า</TableHead>
+                  <TableHead className="text-center text-muted-foreground font-medium">%</TableHead>
+                  <TableHead className="text-right text-muted-foreground font-medium">WHT</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {incomesWithWHT.map((income: typeof incomesWithWHT[number]) => (
+                  <TableRow key={income.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(income.receiveDate).toLocaleDateString(
+                        "th-TH",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "2-digit",
+                        }
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {income.contact?.name || income.source || "-"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {WHT_TYPE_LABELS[income.whtType || "OTHER"]}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(income.amount))}
+                    </TableCell>
                     <TableCell className="text-center">
                       {Number(income.whtRate)}%
                     </TableCell>
-                      <TableCell className="text-right font-medium text-blue-600">
-                        {formatCurrency(Number(income.whtAmount || 0))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    <TableCell className="text-right font-medium text-blue-600">
+                      {formatCurrency(Number(income.whtAmount || 0))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -351,16 +351,16 @@ function ReportSkeleton() {
           </Card>
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b">
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <div className="p-4 space-y-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-12 w-full" />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
