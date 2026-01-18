@@ -418,11 +418,15 @@ async function handleImport(
       return { deleted: deleteResult.count, created, updated };
     }, { timeout: 60000 }); // 60 วินาที timeout สำหรับการ import จำนวนมาก
 
-    // อัปเดตวันที่ import ล่าสุด
-    await prisma.company.update({
-      where: { id: company.id },
-      data: { lastContactImportAt: new Date() },
-    });
+    // อัปเดตวันที่ import ล่าสุด (optional - ไม่ให้ import fail ถ้า column ยังไม่มี)
+    try {
+      await prisma.company.update({
+        where: { id: company.id },
+        data: { lastContactImportAt: new Date() },
+      });
+    } catch (updateError) {
+      console.warn("Could not update lastContactImportAt:", updateError);
+    }
 
     return apiResponse.success({
       message: `Import สำเร็จ: ลบผู้ติดต่อ Peak เดิม ${result.deleted} รายการ, สร้างใหม่ ${result.created} รายการ, อัปเดต ${result.updated} รายการ`,
@@ -539,11 +543,15 @@ async function handleImport(
     return { created, updated };
   }, { timeout: 60000 }); // 60 วินาที timeout สำหรับการ import จำนวนมาก
 
-  // อัปเดตวันที่ import ล่าสุด
-  await prisma.company.update({
-    where: { id: company.id },
-    data: { lastContactImportAt: new Date() },
-  });
+  // อัปเดตวันที่ import ล่าสุด (optional - ไม่ให้ import fail ถ้า column ยังไม่มี)
+  try {
+    await prisma.company.update({
+      where: { id: company.id },
+      data: { lastContactImportAt: new Date() },
+    });
+  } catch (updateError) {
+    console.warn("Could not update lastContactImportAt:", updateError);
+  }
 
   return apiResponse.success({
     message: `Import สำเร็จ: สร้างใหม่ ${result.created} รายการ, อัปเดต ${result.updated} รายการ`,

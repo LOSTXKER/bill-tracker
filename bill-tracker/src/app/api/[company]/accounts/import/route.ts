@@ -205,11 +205,15 @@ async function handlePost(
         return { deleted: deleteResult.count, created, updated };
       }, { timeout: 60000 }); // 60 seconds timeout
       
-      // อัปเดตวันที่ import ล่าสุด
-      await prisma.company.update({
-        where: { id: context.company.id },
-        data: { lastAccountImportAt: new Date() },
-      });
+      // อัปเดตวันที่ import ล่าสุด (optional - ไม่ให้ import fail ถ้า column ยังไม่มี)
+      try {
+        await prisma.company.update({
+          where: { id: context.company.id },
+          data: { lastAccountImportAt: new Date() },
+        });
+      } catch (updateError) {
+        console.warn("Could not update lastAccountImportAt:", updateError);
+      }
       
       return apiResponse.success({
         message: `Import สำเร็จ: ลบบัญชี Peak เดิม ${result.deleted} รายการ, สร้างใหม่ ${result.created} รายการ, อัปเดต ${result.updated} รายการ`,
@@ -295,11 +299,15 @@ async function handlePost(
       return { created, updated };
     }, { timeout: 60000 }); // 60 seconds timeout
     
-    // อัปเดตวันที่ import ล่าสุด
-    await prisma.company.update({
-      where: { id: context.company.id },
-      data: { lastAccountImportAt: new Date() },
-    });
+    // อัปเดตวันที่ import ล่าสุด (optional - ไม่ให้ import fail ถ้า column ยังไม่มี)
+    try {
+      await prisma.company.update({
+        where: { id: context.company.id },
+        data: { lastAccountImportAt: new Date() },
+      });
+    } catch (updateError) {
+      console.warn("Could not update lastAccountImportAt:", updateError);
+    }
     
     return apiResponse.success({
       message: `Import สำเร็จ: สร้างใหม่ ${result.created} รายการ, อัปเดต ${result.updated} รายการ`,
