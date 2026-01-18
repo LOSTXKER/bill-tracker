@@ -120,25 +120,25 @@ export function withCompanyAccess(
         throw ApiErrors.badRequest("Company code required");
       }
 
-      // OPTIMIZED: Single combined query for company + access
-      // Instead of 2 separate queries + 1 more in hasPermission (3 total),
-      // we now do 1 query that includes both company and access data
-      const companyWithAccess = await prisma.company.findUnique({
+      // Find company
+      const company = await prisma.company.findUnique({
         where: { code: companyCode.toUpperCase() },
-        include: {
-          CompanyAccess: {
-            where: { userId: session.user.id },
-            select: { isOwner: true, permissions: true },
-          },
-        },
       });
 
-      if (!companyWithAccess) {
+      if (!company) {
         throw ApiErrors.notFound("Company");
       }
 
-      // Extract access from the included data
-      const access = companyWithAccess.CompanyAccess[0];
+      // Check company access - get permissions in same query to avoid
+      // duplicate query in hasPermission()
+      const access = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: session.user.id,
+            companyId: company.id,
+          },
+        },
+      });
 
       if (!access) {
         throw ApiErrors.forbidden("You don't have access to this company");
@@ -149,7 +149,7 @@ export function withCompanyAccess(
         throw ApiErrors.forbidden("Owner access required");
       }
 
-      // Check specific permission using already-fetched access data
+      // OPTIMIZED: Check permission using already-fetched access data
       // This avoids the duplicate DB query that hasPermission() would make
       if (options.permission) {
         const hasAccess = checkPermissionFromAccess(access, options.permission);
@@ -161,13 +161,9 @@ export function withCompanyAccess(
         }
       }
 
-      // Remove CompanyAccess from the company object before passing to handler
-      // to maintain the same Company type interface
-      const { CompanyAccess: _, ...company } = companyWithAccess;
-
       return await handler(request, {
         session,
-        company: company as Company,
+        company,
         companyCode: companyCode.toUpperCase(),
       });
     } catch (error) {
