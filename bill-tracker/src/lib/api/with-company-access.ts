@@ -30,7 +30,7 @@ function checkPermissionFromAccess(
   // OWNER has all permissions
   if (access.isOwner) return true;
 
-  const permissions = access.permissions as string[];
+  const permissions = (access.permissions as string[]) || [];
   
   // Check exact match
   if (permissions.includes(permission)) return true;

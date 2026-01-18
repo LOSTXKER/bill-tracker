@@ -118,15 +118,19 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         ];
       }
 
+      // Use PascalCase relation names as per Prisma schema
+      // Creator relation differs: Expense uses User_Expense_createdByToUser, Income uses User
+      const creatorInclude = config.modelName === "expense" 
+        ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
+        : { User: { select: { id: true, name: true, email: true } } };
+
       const [items, total] = await Promise.all([
         config.prismaModel.findMany({
           where,
           include: {
-            contact: true,
-            account: true,
-            creator: {
-              select: { id: true, name: true, email: true },
-            },
+            Contact: true,
+            Account: true,
+            ...creatorInclude,
           },
           orderBy: { [config.fields.dateField]: "desc" },
           skip: (page - 1) * limit,
@@ -224,15 +228,19 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
     }
     const { id } = await routeContext.params;
 
+    // Use PascalCase relation names as per Prisma schema
+    // Creator relation differs: Expense uses User_Expense_createdByToUser, Income uses User
+    const creatorInclude = config.modelName === "expense" 
+      ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
+      : { User: { select: { id: true, name: true, email: true } } };
+
     const item = await config.prismaModel.findUnique({
       where: { id },
       include: {
-        contact: true,
-        account: true,
-        company: true,
-        creator: {
-          select: { id: true, name: true, email: true },
-        },
+        Contact: true,
+        Account: true,
+        Company: true,
+        ...creatorInclude,
       },
     });
 
@@ -306,23 +314,26 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     // Pass existingItem to transformUpdateData for conditional logic (e.g., WHT workflow adjustment)
     const updateData = config.transformUpdateData(body, existingItem);
 
+    // Use PascalCase relation names as per Prisma schema
+    const creatorInclude = config.modelName === "expense" 
+      ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
+      : { User: { select: { id: true, name: true, email: true } } };
+
     // Update item
     const item = await config.prismaModel.update({
       where: { id },
       data: updateData,
       include: {
-        contact: true,
-        account: true,
-        company: true,
-        creator: {
-          select: { id: true, name: true, email: true },
-        },
+        Contact: true,
+        Account: true,
+        Company: true,
+        ...creatorInclude,
       },
     });
 
     // Run afterUpdate hook if defined
     if (config.afterUpdate) {
-      await config.afterUpdate(item, body, { session, company: item.company, existingItem });
+      await config.afterUpdate(item, body, { session, company: item.Company, existingItem });
     }
 
     // Create audit log
