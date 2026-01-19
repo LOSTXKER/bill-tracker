@@ -35,14 +35,32 @@ export const POST = (
         return apiResponse.notFound("ไม่พบรายจ่าย");
       }
 
-      // Only DRAFT can be submitted
-      if (expense.workflowStatus !== "DRAFT") {
-        return apiResponse.badRequest("สามารถส่งได้เฉพาะรายการร่างเท่านั้น");
+      // Check current status - be flexible for existing records
+      const currentWorkflowStatus = expense.workflowStatus;
+      const currentApprovalStatus = expense.approvalStatus;
+      
+      // Log for debugging
+      console.log(`[Submit Expense] id=${id}, workflowStatus=${currentWorkflowStatus}, approvalStatus=${currentApprovalStatus}`);
+
+      // Only DRAFT can be submitted (or null for old records before migration)
+      if (currentWorkflowStatus !== "DRAFT" && currentWorkflowStatus !== null) {
+        return apiResponse.badRequest(
+          `สามารถส่งได้เฉพาะรายการร่างเท่านั้น (สถานะปัจจุบัน: ${currentWorkflowStatus})`
+        );
       }
 
       // Check if already submitted
-      if (expense.approvalStatus === "PENDING") {
-        return apiResponse.badRequest("รายการนี้ส่งอนุมัติแล้ว");
+      if (currentApprovalStatus === "PENDING") {
+        return apiResponse.badRequest("รายการนี้ส่งอนุมัติแล้ว กรุณารอการอนุมัติ");
+      }
+      
+      // Allow resubmission if rejected
+      if (currentApprovalStatus === "REJECTED") {
+        // Reset rejected reason when resubmitting
+        await prisma.expense.update({
+          where: { id },
+          data: { rejectedReason: null },
+        });
       }
 
       // Check if user has create-direct permission
