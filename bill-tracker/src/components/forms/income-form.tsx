@@ -67,47 +67,9 @@ export function getIncomeConfig(companyCode: string): UnifiedTransactionConfig {
       referenceNo: "",
     },
 
-    // Status options - NEW Workflow statuses
-    statusOptions: [
-      {
-        value: "NO_INVOICE_NEEDED",
-        label: "ไม่ต้องออกบิล",
-        color: "gray",
-      },
-      {
-        value: "WAITING_INVOICE_ISSUE",
-        label: "รอออกบิล",
-        color: "orange",
-      },
-      {
-        value: "INVOICE_ISSUED",
-        label: "ออกบิลแล้ว",
-        color: "green",
-      },
-      {
-        value: "WHT_PENDING_CERT",
-        label: "รอใบ 50 ทวิ จากลูกค้า",
-        color: "amber",
-        condition: (formData) => formData.isWhtDeducted as boolean,
-      },
-      {
-        value: "WHT_CERT_RECEIVED",
-        label: "ได้ใบ 50 ทวิแล้ว",
-        color: "purple",
-        condition: (formData) => formData.isWhtDeducted as boolean,
-      },
-      {
-        value: "READY_FOR_ACCOUNTING",
-        label: "พร้อมส่งบัญชี",
-        color: "blue",
-      },
-      {
-        value: "SENT_TO_ACCOUNTANT",
-        label: "ส่งบัญชีแล้ว",
-        color: "green",
-        condition: (data: Record<string, unknown>) => data.status === "SENT_TO_ACCOUNTANT",
-      },
-    ],
+    // Status options - Not needed anymore with new DRAFT workflow
+    // All new transactions start as DRAFT and workflow is determined automatically
+    statusOptions: [],
 
     // Calculation function
     calculateTotals: calculateTransactionTotals,

@@ -70,43 +70,10 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
       documentType: "TAX_INVOICE", // Default for VAT 7%
     },
 
-    // Status options - NEW Workflow statuses
-    statusOptions: [
-      {
-        value: "WAITING_TAX_INVOICE",
-        label: "รอใบกำกับภาษี",
-        color: "orange",
-      },
-      {
-        value: "TAX_INVOICE_RECEIVED",
-        label: "ได้ใบกำกับแล้ว",
-        color: "green",
-      },
-      {
-        value: "WHT_PENDING_ISSUE",
-        label: "รอออกใบ 50 ทวิ",
-        color: "amber",
-        // Only show when WHT is enabled
-        condition: (data: Record<string, unknown>) => data.isWht === true,
-      },
-      {
-        value: "WHT_ISSUED",
-        label: "ออกใบ 50 ทวิแล้ว",
-        color: "purple",
-        condition: (data: Record<string, unknown>) => data.isWht === true,
-      },
-      {
-        value: "READY_FOR_ACCOUNTING",
-        label: "พร้อมส่งบัญชี",
-        color: "blue",
-      },
-      {
-        value: "SENT_TO_ACCOUNTANT",
-        label: "ส่งบัญชีแล้ว",
-        color: "green",
-        condition: (data: Record<string, unknown>) => data.status === "SENT_TO_ACCOUNTANT",
-      },
-    ],
+    // Status options - Not needed anymore with new DRAFT workflow
+    // All new transactions start as DRAFT and workflow is determined automatically
+    // based on documentType, hasTaxInvoice, and isWht
+    statusOptions: [],
 
     // Calculation function
     calculateTotals: calculateTransactionTotals,
