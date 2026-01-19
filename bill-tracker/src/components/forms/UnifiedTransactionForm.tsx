@@ -43,7 +43,7 @@ import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 
 // Shared form components
-import { DocumentUploadSection, CategorizedFiles, MultiDocAnalysisResult } from "./shared/DocumentUploadSection";
+import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult } from "./shared/InputMethodSection";
 import { MergeOptionsDialog, MergeData, MergeDecision } from "./shared/MergeOptionsDialog";
 import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } from "./shared/ConflictDialog";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
@@ -1471,7 +1471,7 @@ export function UnifiedTransactionForm({
 
               {/* Right Column for CREATE mode */}
               <div className="lg:col-span-2">
-                <DocumentUploadSection
+                <InputMethodSection
                   key={filesInitialized ? "with-prefill" : "fresh"}
                   companyCode={companyCode}
                   transactionType={config.type}
