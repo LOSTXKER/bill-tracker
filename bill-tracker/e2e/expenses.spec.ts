@@ -54,15 +54,19 @@ test.describe('Expense Form Validation (Mock)', () => {
 
 test.describe('Expense Workflow', () => {
   test('should display workflow statuses', async ({ page }) => {
-    // This tests the workflow status display
+    // This tests the workflow status display (matches ExpenseWorkflowStatus enum)
     // Placeholder until authentication is set up
     const statuses = [
+      'DRAFT',
+      'PAID',
       'WAITING_TAX_INVOICE',
-      'RECEIVED_TAX_INVOICE',
+      'TAX_INVOICE_RECEIVED',
       'WHT_PENDING_ISSUE',
       'WHT_ISSUED',
+      'WHT_SENT_TO_VENDOR',
       'READY_FOR_ACCOUNTING',
       'SENT_TO_ACCOUNTANT',
+      'COMPLETED',
     ];
 
     statuses.forEach(status => {
@@ -71,16 +75,20 @@ test.describe('Expense Workflow', () => {
   });
 
   test('should define valid workflow transitions', async ({ page }) => {
-    // Verify workflow transition logic
+    // Verify workflow transition logic (matches ExpenseWorkflowStatus enum)
     const transitions: Record<string, string[]> = {
-      WAITING_TAX_INVOICE: ['RECEIVED_TAX_INVOICE'],
-      RECEIVED_TAX_INVOICE: ['WHT_PENDING_ISSUE', 'READY_FOR_ACCOUNTING'],
+      DRAFT: ['PAID'],
+      PAID: ['TAX_INVOICE_RECEIVED', 'READY_FOR_ACCOUNTING'], // Ready if no doc required
+      WAITING_TAX_INVOICE: ['TAX_INVOICE_RECEIVED'],
+      TAX_INVOICE_RECEIVED: ['WHT_PENDING_ISSUE', 'READY_FOR_ACCOUNTING'],
       WHT_PENDING_ISSUE: ['WHT_ISSUED'],
-      WHT_ISSUED: ['READY_FOR_ACCOUNTING'],
+      WHT_ISSUED: ['WHT_SENT_TO_VENDOR', 'READY_FOR_ACCOUNTING'],
+      WHT_SENT_TO_VENDOR: ['READY_FOR_ACCOUNTING'],
       READY_FOR_ACCOUNTING: ['SENT_TO_ACCOUNTANT'],
+      SENT_TO_ACCOUNTANT: ['COMPLETED'],
     };
 
-    expect(transitions.WAITING_TAX_INVOICE).toContain('RECEIVED_TAX_INVOICE');
+    expect(transitions.WAITING_TAX_INVOICE).toContain('TAX_INVOICE_RECEIVED');
     expect(transitions.READY_FOR_ACCOUNTING).toContain('SENT_TO_ACCOUNTANT');
   });
 });

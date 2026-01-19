@@ -28,10 +28,14 @@ interface Step {
 // Step Definitions
 // =============================================================================
 
+// =============================================================================
+// Step Definitions (using schema-correct status keys)
+// =============================================================================
+
 // Tax invoice flow (VAT 7%)
 const EXPENSE_STEPS: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
-  { key: "RECEIVED_TAX_INVOICE", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
+  { key: "TAX_INVOICE_RECEIVED", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
   { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
   { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
@@ -39,7 +43,7 @@ const EXPENSE_STEPS: Step[] = [
 
 const EXPENSE_STEPS_NO_WHT: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
-  { key: "RECEIVED_TAX_INVOICE", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
+  { key: "TAX_INVOICE_RECEIVED", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
   { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
@@ -47,7 +51,7 @@ const EXPENSE_STEPS_NO_WHT: Step[] = [
 // Cash receipt flow (VAT 0% with receipt)
 const EXPENSE_STEPS_CASH_RECEIPT: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
-  { key: "RECEIVED_TAX_INVOICE", label: "ได้บิลเงินสด", icon: <Receipt className="h-4 w-4" /> },
+  { key: "TAX_INVOICE_RECEIVED", label: "ได้บิลเงินสด", icon: <Receipt className="h-4 w-4" /> },
   { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
@@ -62,7 +66,7 @@ const EXPENSE_STEPS_NO_DOCUMENT: Step[] = [
 const INCOME_STEPS: Step[] = [
   { key: "RECEIVED", label: "รับเงินแล้ว", icon: <Wallet className="h-4 w-4" /> },
   { key: "INVOICE_ISSUED", label: "ออกบิลแล้ว", icon: <Receipt className="h-4 w-4" /> },
-  { key: "WHT_RECEIVED", label: "ได้ใบ 50 ทวิ", icon: <FileCheck className="h-4 w-4" /> },
+  { key: "WHT_CERT_RECEIVED", label: "ได้ใบ 50 ทวิ", icon: <FileCheck className="h-4 w-4" /> },
   { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
@@ -74,25 +78,27 @@ const INCOME_STEPS_NO_WHT: Step[] = [
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
-// Map intermediate statuses to their parent step
+// Map workflow statuses to their display step (matches schema ExpenseWorkflowStatus/IncomeWorkflowStatus)
 const STATUS_MAP: Record<string, string> = {
-  // Expense
+  // Expense workflow statuses (from ExpenseWorkflowStatus enum in schema)
   DRAFT: "DRAFT",
   PAID: "PAID",
-  WAITING_TAX_INVOICE: "PAID",
-  RECEIVED_TAX_INVOICE: "RECEIVED_TAX_INVOICE",
-  WHT_PENDING_ISSUE: "RECEIVED_TAX_INVOICE",
+  WAITING_TAX_INVOICE: "PAID", // Waiting = still in PAID step
+  TAX_INVOICE_RECEIVED: "TAX_INVOICE_RECEIVED",
+  WHT_PENDING_ISSUE: "TAX_INVOICE_RECEIVED", // Waiting = still in TAX_INVOICE_RECEIVED step
   WHT_ISSUED: "WHT_ISSUED",
+  WHT_SENT_TO_VENDOR: "WHT_ISSUED", // After WHT issued
   READY_FOR_ACCOUNTING: "READY_FOR_ACCOUNTING",
   SENT_TO_ACCOUNTANT: "SENT_TO_ACCOUNTANT",
   COMPLETED: "SENT_TO_ACCOUNTANT",
-  // Income
+  // Income workflow statuses (from IncomeWorkflowStatus enum in schema)
   RECEIVED: "RECEIVED",
-  WAITING_INVOICE_ISSUE: "RECEIVED",
+  NO_INVOICE_NEEDED: "RECEIVED", // Skip invoice step
+  WAITING_INVOICE_ISSUE: "RECEIVED", // Waiting = still in RECEIVED step
   INVOICE_ISSUED: "INVOICE_ISSUED",
-  INVOICE_SENT: "INVOICE_ISSUED",
-  WHT_PENDING_CERT: "INVOICE_ISSUED",
-  WHT_RECEIVED: "WHT_RECEIVED",
+  INVOICE_SENT: "INVOICE_ISSUED", // After invoice sent
+  WHT_PENDING_CERT: "INVOICE_ISSUED", // Waiting for WHT cert
+  WHT_CERT_RECEIVED: "WHT_CERT_RECEIVED",
 };
 
 // =============================================================================
@@ -123,18 +129,21 @@ export function TimelineStepper({
     return isWht ? EXPENSE_STEPS : EXPENSE_STEPS_NO_WHT;
   };
   
-  const baseSteps = type === "expense"
-    ? getExpenseSteps()
-    : (isWht ? INCOME_STEPS : INCOME_STEPS_NO_WHT);
+  const getIncomeSteps = (): Step[] => {
+    return isWht ? INCOME_STEPS : INCOME_STEPS_NO_WHT;
+  };
+  
+  const baseSteps = type === "expense" ? getExpenseSteps() : getIncomeSteps();
 
-  // Add DRAFT step at the beginning if currently in draft
+  // DRAFT step - always shown to display complete workflow history
   const draftStep: Step = {
     key: "DRAFT",
     label: isDraft && approvalStatus === "PENDING" ? "รออนุมัติ" : "ร่าง",
     icon: <FileEdit className="h-4 w-4" />,
   };
   
-  const steps = isDraft ? [draftStep, ...baseSteps] : baseSteps;
+  // Always include DRAFT step at the beginning to show complete timeline
+  const steps = [draftStep, ...baseSteps];
 
   // Map current status to step key
   const mappedStatus = STATUS_MAP[currentStatus] || currentStatus;

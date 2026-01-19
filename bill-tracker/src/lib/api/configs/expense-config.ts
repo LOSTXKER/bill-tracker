@@ -55,7 +55,7 @@ export function validateWhtChange(
       allowed: true,
       requiresConfirmation: true,
       message: "คุณได้ออกหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) แล้ว การยกเลิกจะต้อง void เอกสาร 50 ทวิด้วย",
-      rollbackStatus: "RECEIVED_TAX_INVOICE",
+      rollbackStatus: "TAX_INVOICE_RECEIVED",
     };
   }
 
@@ -65,7 +65,7 @@ export function validateWhtChange(
       allowed: true,
       requiresConfirmation: true,
       message: "คุณมีหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) แนบอยู่ การยกเลิกจะลบเอกสารออกด้วย",
-      rollbackStatus: "RECEIVED_TAX_INVOICE",
+      rollbackStatus: "TAX_INVOICE_RECEIVED",
     };
   }
 
@@ -134,6 +134,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       // status is legacy field (ExpenseDocStatus enum) - don't override, use schema default
       workflowStatus: workflowStatus,
+      // Document type for VAT 0% expenses (determines workflow steps)
+      documentType: data.documentType || "TAX_INVOICE",
       hasTaxInvoice: hasTaxInvoice,
       hasWhtCert: (data.whtCertUrls?.length || 0) > 0,
       notes: data.notes,
@@ -167,6 +169,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     // status is legacy field (ExpenseDocStatus enum) - don't update from new workflow values
     if (data.workflowStatus !== undefined) updateData.workflowStatus = data.workflowStatus;
+    // Document type for VAT 0% expenses
+    if (data.documentType !== undefined) updateData.documentType = data.documentType;
     if (data.notes !== undefined) updateData.notes = data.notes;
     
     // Handle file URLs (array versions only)
@@ -220,7 +224,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
         // Default behavior: auto-adjust status
         if (!wasWht && nowWht) {
           // ไม่หัก → หัก: ต้องออก 50 ทวิ
-          if (currentStatus === "READY_FOR_ACCOUNTING" || currentStatus === "RECEIVED_TAX_INVOICE") {
+          if (currentStatus === "READY_FOR_ACCOUNTING" || currentStatus === "TAX_INVOICE_RECEIVED") {
             if (!hasWhtCert) {
               updateData.workflowStatus = "WHT_PENDING_ISSUE";
             }

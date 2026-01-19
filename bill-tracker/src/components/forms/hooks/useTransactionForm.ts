@@ -726,7 +726,7 @@ export function useTransactionForm({
   // ==========================================================================
 
   const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
-  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_RECEIVED", "READY_FOR_ACCOUNTING"];
+  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"];
 
   const whtChangeInfo = useMemo(() => {
     if (!transaction || mode !== "edit") return undefined;

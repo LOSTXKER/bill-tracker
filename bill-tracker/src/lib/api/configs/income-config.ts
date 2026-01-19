@@ -16,7 +16,7 @@ import type { TransactionRouteConfig } from "../transaction-routes";
 const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
 
 // สถานะที่ต้อง confirm ก่อนเปลี่ยน WHT
-const WHT_CONFIRM_REQUIRED_STATUSES = ["WHT_RECEIVED", "READY_FOR_ACCOUNTING"];
+const WHT_CONFIRM_REQUIRED_STATUSES = ["WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"];
 
 export interface WhtChangeValidation {
   allowed: boolean;
@@ -49,7 +49,7 @@ export function validateIncomeWhtChange(
   }
 
   // เปลี่ยนจาก หัก → ไม่หัก ตอนที่ได้รับ 50 ทวิแล้ว
-  if (wasWht && !nowWht && currentStatus === "WHT_RECEIVED") {
+  if (wasWht && !nowWht && currentStatus === "WHT_CERT_RECEIVED") {
     return {
       allowed: true,
       requiresConfirmation: true,

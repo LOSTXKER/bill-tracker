@@ -1155,7 +1155,7 @@ export function UnifiedTransactionForm({
   // WHT Change Rules (must be before early returns to maintain hooks order)
   // ==========================================================================
   const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
-  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_RECEIVED", "READY_FOR_ACCOUNTING"];
+  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"];
   
   const whtChangeInfo = useMemo(() => {
     if (!transaction || mode !== "edit") {
@@ -1355,6 +1355,7 @@ export function UnifiedTransactionForm({
                   {/* Show DraftActions for DRAFT status */}
                   {transaction?.workflowStatus === "DRAFT" && transaction.approvalStatus && (
                     <DraftActions
+                      companyCode={companyCode}
                       transactionId={transaction.id}
                       transactionType={config.type}
                       workflowStatus={transaction.workflowStatus}

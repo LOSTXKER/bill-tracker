@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { ApprovalStatus, ExpenseWorkflowStatus, IncomeWorkflowStatus } from "@prisma/client";
 
 interface DraftActionsProps {
+  companyCode: string;
   transactionId: string;
   transactionType: "expense" | "income";
   workflowStatus: ExpenseWorkflowStatus | IncomeWorkflowStatus;
@@ -23,6 +24,7 @@ interface DraftActionsProps {
 }
 
 export function DraftActions({
+  companyCode,
   transactionId,
   transactionType,
   workflowStatus,
@@ -40,6 +42,8 @@ export function DraftActions({
     try {
       const res = await fetch(`/api/${transactionType}s/${transactionId}/submit`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyCode }),
       });
 
       const data = await res.json();
@@ -66,6 +70,8 @@ export function DraftActions({
         
       const res = await fetch(endpoint, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyCode }),
       });
 
       const data = await res.json();
@@ -91,24 +97,26 @@ export function DraftActions({
   // Different actions based on approval status
   switch (approvalStatus) {
     case "NOT_REQUIRED":
-      // Fresh draft - can submit or mark as paid directly (if has permission)
+      // Fresh draft - can mark as paid directly (if has permission) or submit for approval
       return (
         <div className="flex gap-2">
-          {canCreateDirect && (
+          {canCreateDirect ? (
+            // User with direct create permission can mark as paid directly
             <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
+              onClick={handleMarkPaid}
+              disabled={isMarkingPaid}
               variant="default"
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
-              {isSubmitting ? (
+              {isMarkingPaid ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Check className="h-4 w-4 mr-2" />
               )}
-              {transactionType === "expense" ? "จ่ายเงินแล้ว" : "รับเงินแล้ว"}
+              {transactionType === "expense" ? "บันทึกจ่ายเงินแล้ว" : "บันทึกรับเงินแล้ว"}
             </Button>
-          )}
-          {!canCreateDirect && (
+          ) : (
+            // User without direct permission must submit for approval
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting}

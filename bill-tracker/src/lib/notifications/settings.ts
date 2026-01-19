@@ -161,22 +161,27 @@ export const TEMPLATE_PLACEHOLDERS = {
   },
 };
 
-// Status labels in Thai (using new workflow statuses)
+// Status labels in Thai (using new workflow statuses - matches Prisma schema enums)
 export const STATUS_LABELS: Record<string, string> = {
-  // Expense workflow statuses
+  // Expense workflow statuses (ExpenseWorkflowStatus enum)
+  DRAFT: "ร่าง",
   PAID: "จ่ายแล้ว",
   WAITING_TAX_INVOICE: "รอใบกำกับภาษี",
-  RECEIVED_TAX_INVOICE: "ได้ใบกำกับแล้ว",
+  TAX_INVOICE_RECEIVED: "ได้ใบกำกับแล้ว",
   WHT_PENDING_ISSUE: "รอออก 50 ทวิ",
   WHT_ISSUED: "ออก 50 ทวิแล้ว",
+  WHT_SENT_TO_VENDOR: "ส่ง 50 ทวิแล้ว",
   READY_FOR_ACCOUNTING: "พร้อมส่งบัญชี",
   SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
-  // Income workflow statuses
+  COMPLETED: "เสร็จสิ้น",
+  // Income workflow statuses (IncomeWorkflowStatus enum)
   RECEIVED: "รับเงินแล้ว",
+  NO_INVOICE_NEEDED: "ไม่ต้องออกบิล",
   WAITING_INVOICE_ISSUE: "รอออกบิล",
   INVOICE_ISSUED: "ออกบิลแล้ว",
+  INVOICE_SENT: "ส่งบิลแล้ว",
   WHT_PENDING_CERT: "รอใบ 50 ทวิ",
-  WHT_RECEIVED: "ได้ใบ 50 ทวิแล้ว",
+  WHT_CERT_RECEIVED: "ได้ใบ 50 ทวิแล้ว",
 };
 
 /**

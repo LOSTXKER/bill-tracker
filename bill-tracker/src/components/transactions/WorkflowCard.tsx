@@ -74,7 +74,7 @@ const NEXT_ACTIONS: Record<string, Record<string, ActionConfig>> = {
       icon: <Receipt className="h-4 w-4" />,
       description: "บันทึกว่าได้รับใบกำกับภาษีจากร้านค้า",
     },
-    RECEIVED_TAX_INVOICE: {
+    TAX_INVOICE_RECEIVED: {
       action: "issue_wht",
       label: "ออกใบ 50 ทวิแล้ว",
       icon: <FileText className="h-4 w-4" />,
@@ -155,7 +155,7 @@ const SECONDARY_ACTIONS: Record<string, ActionConfig[]> = {
       variant: "outline",
     },
   ],
-  RECEIVED_TAX_INVOICE: [
+  TAX_INVOICE_RECEIVED: [
     {
       action: "send_to_accounting",
       label: "ส่งบัญชีเลย (ไม่มี WHT)",
@@ -181,8 +181,9 @@ function getStatusIcon(status: string) {
 }
 
 function getProgressPercentage(type: string, status: string): number {
-  const expenseOrder = ["PAID", "WAITING_TAX_INVOICE", "RECEIVED_TAX_INVOICE", "WHT_PENDING_ISSUE", "WHT_ISSUED", "READY_FOR_ACCOUNTING", "SENT_TO_ACCOUNTANT"];
-  const incomeOrder = ["RECEIVED", "WAITING_INVOICE_ISSUE", "INVOICE_ISSUED", "WHT_PENDING_CERT", "WHT_RECEIVED", "READY_FOR_ACCOUNTING", "SENT_TO_ACCOUNTANT"];
+  // Status order matches schema enums (ExpenseWorkflowStatus/IncomeWorkflowStatus)
+  const expenseOrder = ["DRAFT", "PAID", "WAITING_TAX_INVOICE", "TAX_INVOICE_RECEIVED", "WHT_PENDING_ISSUE", "WHT_ISSUED", "WHT_SENT_TO_VENDOR", "READY_FOR_ACCOUNTING", "SENT_TO_ACCOUNTANT", "COMPLETED"];
+  const incomeOrder = ["DRAFT", "RECEIVED", "WAITING_INVOICE_ISSUE", "INVOICE_ISSUED", "INVOICE_SENT", "WHT_PENDING_CERT", "WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING", "SENT_TO_ACCOUNTANT", "COMPLETED"];
   
   const order = type === "expense" ? expenseOrder : incomeOrder;
   const index = order.indexOf(status);
