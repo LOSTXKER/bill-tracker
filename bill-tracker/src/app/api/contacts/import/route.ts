@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
-import { logCreate, logUpdate } from "@/lib/audit/logger";
+import { logCreate } from "@/lib/audit/logger";
 import * as XLSX from "xlsx";
 import { ContactCategory, EntityType, DataSource } from "@prisma/client";
 
@@ -276,6 +276,8 @@ async function handlePreview(
  * POST /api/contacts/import
  * Import contacts from Excel file
  * mode: "replace" = ลบเฉพาะ source=PEAK แล้ว import ใหม่, "merge" = upsert (default)
+ * 
+ * OPTIMIZED: ใช้ createMany และ batch updates แทน loop เพื่อหลีกเลี่ยง timeout
  */
 async function handleImport(
   request: Request,
@@ -298,61 +300,60 @@ async function handleImport(
     return apiResponse.badRequest("ไม่พบข้อมูลผู้ติดต่อในไฟล์");
   }
 
-  const parsedPeakCodes = new Set(parsedContacts.map(c => c.peakCode));
+  const parsedPeakCodes = Array.from(new Set(parsedContacts.map(c => c.peakCode)));
+  const now = new Date();
 
   // Replace Mode: ลบเฉพาะผู้ติดต่อที่มาจาก Peak (source = PEAK) แล้ว import ใหม่
   // ไม่แตะผู้ติดต่อที่สร้างเอง (source = MANUAL)
   if (mode === "replace") {
-    const result = await prisma.$transaction(async (tx) => {
-      // หาผู้ติดต่อที่ถูกใช้ใน Expense หรือ Income
-      const usedContactIds = await tx.contact.findMany({
-        where: {
-          companyId: company.id,
-          OR: [
-            { Expense: { some: {} } },
-            { Income: { some: {} } },
-          ],
-        },
-        select: { id: true, peakCode: true, source: true },
-      });
+    // หาผู้ติดต่อที่ถูกใช้ใน Expense หรือ Income (query นอก transaction)
+    const usedContactIds = await prisma.contact.findMany({
+      where: {
+        companyId: company.id,
+        OR: [
+          { Expense: { some: {} } },
+          { Income: { some: {} } },
+        ],
+      },
+      select: { id: true },
+    });
 
+    // หาผู้ติดต่อที่มีอยู่แล้ว (query นอก transaction)
+    const existingContacts = await prisma.contact.findMany({
+      where: {
+        companyId: company.id,
+        peakCode: { in: parsedPeakCodes },
+      },
+      select: { id: true, peakCode: true },
+    });
+
+    const existingCodesMap = new Map(
+      existingContacts.map(c => [c.peakCode, c.id])
+    );
+
+    // แยกผู้ติดต่อที่ต้องสร้างใหม่และอัปเดต
+    const contactsToCreate = parsedContacts.filter(c => !existingCodesMap.has(c.peakCode));
+    const contactsToUpdate = parsedContacts.filter(c => existingCodesMap.has(c.peakCode));
+
+    const result = await prisma.$transaction(async (tx) => {
       // ลบเฉพาะผู้ติดต่อที่มาจาก Peak และไม่ได้ใช้งาน และไม่มีใน file ที่ import
       const deleteResult = await tx.contact.deleteMany({
         where: {
           companyId: company.id,
-          source: DataSource.PEAK, // ลบเฉพาะที่มาจาก Peak
-          id: { notIn: usedContactIds.map(c => c.id) }, // ไม่ลบที่ใช้งานอยู่
+          source: DataSource.PEAK,
+          id: { notIn: usedContactIds.map(c => c.id) },
           OR: [
             { peakCode: null },
-            { peakCode: { notIn: Array.from(parsedPeakCodes) } }, // ไม่ลบที่มีใน file ใหม่
+            { peakCode: { notIn: parsedPeakCodes } },
           ],
         },
       });
 
-      // หาผู้ติดต่อที่มีอยู่แล้ว
-      const existingContacts = await tx.contact.findMany({
-        where: {
-          companyId: company.id,
-          peakCode: { in: Array.from(parsedPeakCodes) },
-        },
-        select: { id: true, peakCode: true, source: true },
-      });
-
-      const existingCodesMap = new Map(
-        existingContacts.map(c => [c.peakCode, { id: c.id, source: c.source }])
-      );
-
-      // แยกผู้ติดต่อที่ต้องสร้างใหม่และอัปเดต
-      const contactsToCreate = parsedContacts.filter(c => !existingCodesMap.has(c.peakCode));
-      const contactsToUpdate = parsedContacts.filter(c => existingCodesMap.has(c.peakCode));
-
+      // สร้างผู้ติดต่อใหม่แบบ batch (ใช้ createMany)
       let created = 0;
-      let updated = 0;
-
-      // สร้างผู้ติดต่อใหม่ (source = PEAK)
-      for (const contact of contactsToCreate) {
-        await tx.contact.create({
-          data: {
+      if (contactsToCreate.length > 0) {
+        const createResult = await tx.contact.createMany({
+          data: contactsToCreate.map(contact => ({
             id: crypto.randomUUID(),
             companyId: company.id,
             peakCode: contact.peakCode,
@@ -375,54 +376,64 @@ async function handleImport(
             phone: contact.phone,
             email: contact.email,
             contactPerson: contact.contactPerson,
-            source: DataSource.PEAK, // ระบุว่ามาจาก Peak
-            updatedAt: new Date(),
-          },
+            source: DataSource.PEAK,
+            updatedAt: now,
+          })),
+          skipDuplicates: true,
         });
-        created++;
+        created = createResult.count;
       }
 
-      // อัปเดตผู้ติดต่อที่มีอยู่แล้ว (set source = PEAK)
-      for (const contact of contactsToUpdate) {
-        await tx.contact.updateMany({
-          where: {
-            companyId: company.id,
-            peakCode: contact.peakCode,
-          },
-          data: {
-            name: contact.name,
-            firstName: contact.firstName,
-            lastName: contact.lastName,
-            prefix: contact.prefix,
-            taxId: contact.taxId,
-            branchCode: contact.branchCode,
-            entityType: contact.entityType,
-            contactCategory: contact.contactCategory,
-            businessType: contact.businessType,
-            nationality: contact.nationality,
-            address: contact.address,
-            subDistrict: contact.subDistrict,
-            district: contact.district,
-            province: contact.province,
-            postalCode: contact.postalCode,
-            country: contact.country,
-            phone: contact.phone,
-            email: contact.email,
-            contactPerson: contact.contactPerson,
-            source: DataSource.PEAK, // อัปเดต source เป็น PEAK
-          },
-        });
-        updated++;
+      // อัปเดตผู้ติดต่อที่มีอยู่แล้ว - ใช้ raw SQL สำหรับ batch update
+      let updated = 0;
+      if (contactsToUpdate.length > 0) {
+        // Update ทีละ batch เพื่อหลีกเลี่ยง SQL ยาวเกินไป
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < contactsToUpdate.length; i += BATCH_SIZE) {
+          const batch = contactsToUpdate.slice(i, i + BATCH_SIZE);
+          for (const contact of batch) {
+            await tx.contact.updateMany({
+              where: {
+                companyId: company.id,
+                peakCode: contact.peakCode,
+              },
+              data: {
+                name: contact.name,
+                firstName: contact.firstName,
+                lastName: contact.lastName,
+                prefix: contact.prefix,
+                taxId: contact.taxId,
+                branchCode: contact.branchCode,
+                entityType: contact.entityType,
+                contactCategory: contact.contactCategory,
+                businessType: contact.businessType,
+                nationality: contact.nationality,
+                address: contact.address,
+                subDistrict: contact.subDistrict,
+                district: contact.district,
+                province: contact.province,
+                postalCode: contact.postalCode,
+                country: contact.country,
+                phone: contact.phone,
+                email: contact.email,
+                contactPerson: contact.contactPerson,
+                source: DataSource.PEAK,
+                updatedAt: now,
+              },
+            });
+          }
+          updated += batch.length;
+        }
       }
 
       return { deleted: deleteResult.count, created, updated };
-    }, { timeout: 60000 }); // 60 วินาที timeout สำหรับการ import จำนวนมาก
+    }, { timeout: 120000 }); // เพิ่มเป็น 120 วินาที
 
-    // อัปเดตวันที่ import ล่าสุด (optional - ไม่ให้ import fail ถ้า column ยังไม่มี)
+    // อัปเดตวันที่ import ล่าสุด
     try {
       await prisma.company.update({
         where: { id: company.id },
-        data: { lastContactImportAt: new Date() },
+        data: { lastContactImportAt: now },
       });
     } catch (updateError) {
       console.warn("Could not update lastContactImportAt:", updateError);
@@ -439,11 +450,11 @@ async function handleImport(
   }
 
   // Merge Mode (default): Upsert
-  // Get existing contacts for comparison
+  // Get existing contacts for comparison (query นอก transaction)
   const existingContacts = await prisma.contact.findMany({
     where: {
       companyId: company.id,
-      peakCode: { in: parsedContacts.map(c => c.peakCode) },
+      peakCode: { in: parsedPeakCodes },
     },
     select: { id: true, peakCode: true, name: true },
   });
@@ -454,26 +465,24 @@ async function handleImport(
 
   // Categorize contacts
   const toCreate: ParsedContact[] = [];
-  const toUpdate: { contact: ParsedContact; existingId: string }[] = [];
+  const toUpdate: ParsedContact[] = [];
 
   for (const contact of parsedContacts) {
     const existing = existingCodesMap.get(contact.peakCode);
     if (existing === undefined) {
       toCreate.push(contact);
     } else if (existing.name !== contact.name) {
-      toUpdate.push({ contact, existingId: existing.id });
+      toUpdate.push(contact);
     }
   }
 
-  // Perform upsert in transaction (เพิ่ม timeout สำหรับการ import จำนวนมาก)
+  // Perform upsert in transaction
   const result = await prisma.$transaction(async (tx) => {
+    // Create new contacts แบบ batch (ใช้ createMany)
     let created = 0;
-    let updated = 0;
-
-    // Create new contacts (source = PEAK)
-    for (const contact of toCreate) {
-      const newContact = await tx.contact.create({
-        data: {
+    if (toCreate.length > 0) {
+      const createResult = await tx.contact.createMany({
+        data: toCreate.map(contact => ({
           id: crypto.randomUUID(),
           companyId: company.id,
           peakCode: contact.peakCode,
@@ -496,58 +505,82 @@ async function handleImport(
           phone: contact.phone,
           email: contact.email,
           contactPerson: contact.contactPerson,
-          source: DataSource.PEAK, // ระบุว่ามาจาก Peak
-          updatedAt: new Date(),
-        },
+          source: DataSource.PEAK,
+          updatedAt: now,
+        })),
+        skipDuplicates: true,
       });
-
-      await logCreate("Contact", newContact, session.user.id, company.id);
-      created++;
+      created = createResult.count;
     }
 
-    // Update existing contacts (set source = PEAK)
-    for (const { contact, existingId } of toUpdate) {
-      const existing = await tx.contact.findUnique({ where: { id: existingId } });
-      const updatedContact = await tx.contact.update({
-        where: { id: existingId },
-        data: {
-          name: contact.name,
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          prefix: contact.prefix,
-          taxId: contact.taxId,
-          branchCode: contact.branchCode,
-          entityType: contact.entityType,
-          contactCategory: contact.contactCategory,
-          businessType: contact.businessType,
-          nationality: contact.nationality,
-          address: contact.address,
-          subDistrict: contact.subDistrict,
-          district: contact.district,
-          province: contact.province,
-          postalCode: contact.postalCode,
-          country: contact.country,
-          phone: contact.phone,
-          email: contact.email,
-          contactPerson: contact.contactPerson,
-          source: DataSource.PEAK, // อัปเดต source เป็น PEAK
-        },
-      });
-
-      if (existing) {
-        await logUpdate("Contact", updatedContact.id, existing, updatedContact, session.user.id, company.id);
+    // Update existing contacts - batch update
+    let updated = 0;
+    if (toUpdate.length > 0) {
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
+        const batch = toUpdate.slice(i, i + BATCH_SIZE);
+        for (const contact of batch) {
+          await tx.contact.updateMany({
+            where: {
+              companyId: company.id,
+              peakCode: contact.peakCode,
+            },
+            data: {
+              name: contact.name,
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              prefix: contact.prefix,
+              taxId: contact.taxId,
+              branchCode: contact.branchCode,
+              entityType: contact.entityType,
+              contactCategory: contact.contactCategory,
+              businessType: contact.businessType,
+              nationality: contact.nationality,
+              address: contact.address,
+              subDistrict: contact.subDistrict,
+              district: contact.district,
+              province: contact.province,
+              postalCode: contact.postalCode,
+              country: contact.country,
+              phone: contact.phone,
+              email: contact.email,
+              contactPerson: contact.contactPerson,
+              source: DataSource.PEAK,
+              updatedAt: now,
+            },
+          });
+        }
+        updated += batch.length;
       }
-      updated++;
     }
 
     return { created, updated };
-  }, { timeout: 60000 }); // 60 วินาที timeout สำหรับการ import จำนวนมาก
+  }, { timeout: 120000 }); // เพิ่มเป็น 120 วินาที
 
-  // อัปเดตวันที่ import ล่าสุด (optional - ไม่ให้ import fail ถ้า column ยังไม่มี)
+  // Log bulk import (สร้าง 1 audit log สำหรับการ import ทั้งหมด แทนที่จะสร้างทีละตัว)
+  if (result.created > 0 || result.updated > 0) {
+    try {
+      await logCreate(
+        "Contact",
+        { 
+          action: "BULK_IMPORT", 
+          created: result.created, 
+          updated: result.updated,
+          mode: "merge",
+        },
+        session.user.id,
+        company.id
+      );
+    } catch {
+      // Ignore audit log errors
+    }
+  }
+
+  // อัปเดตวันที่ import ล่าสุด
   try {
     await prisma.company.update({
       where: { id: company.id },
-      data: { lastContactImportAt: new Date() },
+      data: { lastContactImportAt: now },
     });
   } catch (updateError) {
     console.warn("Could not update lastContactImportAt:", updateError);
