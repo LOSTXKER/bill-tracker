@@ -1467,6 +1467,7 @@ export function UnifiedTransactionForm({
                     aiVendorSuggestion={aiVendorSuggestion}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={setReferenceUrls}
+                    vatRate={watchVatRate || 0}
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }
@@ -1618,6 +1619,7 @@ export function UnifiedTransactionForm({
                     aiVendorSuggestion={aiVendorSuggestion}
                     referenceUrls={referenceUrls}
                     onReferenceUrlsChange={mode === "edit" ? setReferenceUrls : undefined}
+                    vatRate={watchVatRate || 0}
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }

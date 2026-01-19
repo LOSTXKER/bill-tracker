@@ -46,6 +46,8 @@ type FormRegister = (name: string) => Record<string, unknown>;
 type FormWatch = (name?: string) => unknown;
 type FormSetValue = (name: string, value: unknown) => void;
 
+export type AmountInputMode = "beforeVat" | "includingVat";
+
 export interface TransactionFieldsSectionProps {
   config: TransactionFieldsConfig;
   companyCode: string;
@@ -84,6 +86,9 @@ export interface TransactionFieldsSectionProps {
   referenceUrls?: string[];
   onReferenceUrlsChange?: (urls: string[]) => void;
   
+  // VAT rate (for amount input conversion)
+  vatRate?: number;
+  
   // Additional fields renderer (e.g., due date for expenses)
   renderAdditionalFields?: () => React.ReactNode;
 }
@@ -113,12 +118,65 @@ export function TransactionFieldsSection({
   aiVendorSuggestion,
   referenceUrls = [],
   onReferenceUrlsChange,
+  vatRate = 0,
   renderAdditionalFields,
 }: TransactionFieldsSectionProps) {
   const isEditable = mode === "create" || mode === "edit";
   const watchStatus = watch("status") as string | undefined;
   const watchDate = watch(config.dateField.name);
   const formData = watch() as Record<string, unknown>;
+  
+  // Amount input mode state
+  const [amountInputMode, setAmountInputMode] = useState<AmountInputMode>("beforeVat");
+  const [displayAmount, setDisplayAmount] = useState<string>("");
+  
+  // Sync display amount with form amount when form changes (e.g., from AI)
+  const formAmount = watch("amount") as number | undefined;
+  useEffect(() => {
+    // Only update if amount changed externally
+    if (formAmount !== undefined && formAmount !== null) {
+      if (amountInputMode === "includingVat" && vatRate > 0) {
+        const includingVat = Math.round(formAmount * (1 + vatRate / 100) * 100) / 100;
+        setDisplayAmount(String(includingVat));
+      } else {
+        setDisplayAmount(String(formAmount));
+      }
+    }
+  }, [formAmount, amountInputMode, vatRate]);
+  
+  // Handle amount input change
+  const handleAmountInput = (value: string) => {
+    setDisplayAmount(value);
+    const numValue = parseFloat(value) || 0;
+    
+    if (amountInputMode === "includingVat" && vatRate > 0) {
+      // Convert from including VAT to before VAT
+      const beforeVat = Math.round((numValue / (1 + vatRate / 100)) * 100) / 100;
+      setValue("amount", beforeVat);
+    } else {
+      setValue("amount", numValue);
+    }
+  };
+  
+  // Handle input mode toggle
+  const handleInputModeToggle = (newMode: AmountInputMode) => {
+    if (newMode === amountInputMode) return;
+    
+    // Convert current display amount to new mode
+    const currentValue = parseFloat(displayAmount) || 0;
+    
+    if (newMode === "includingVat" && vatRate > 0) {
+      // Switching to "including VAT" - multiply by (1 + rate)
+      const includingVat = Math.round(currentValue * (1 + vatRate / 100) * 100) / 100;
+      setDisplayAmount(String(includingVat));
+    } else if (newMode === "beforeVat" && vatRate > 0) {
+      // Switching to "before VAT" - divide by (1 + rate)
+      const beforeVat = Math.round((currentValue / (1 + vatRate / 100)) * 100) / 100;
+      setDisplayAmount(String(beforeVat));
+    }
+    
+    setAmountInputMode(newMode);
+  };
   
   // Reference URL input state
   const [newReferenceUrl, setNewReferenceUrl] = useState("");
@@ -287,9 +345,38 @@ export function TransactionFieldsSection({
           required
         />
         <div className="space-y-2">
-          <Label htmlFor="amount" className="text-foreground font-medium">
-            จำนวนเงิน (ก่อน VAT)
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="amount" className="text-foreground font-medium">
+              จำนวนเงิน
+            </Label>
+            {/* Amount input mode toggle - only show when VAT > 0 */}
+            {vatRate > 0 && (
+              <div className="flex items-center gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => handleInputModeToggle("beforeVat")}
+                  className={`px-2 py-1 rounded transition-all ${
+                    amountInputMode === "beforeVat"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  ก่อน VAT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInputModeToggle("includingVat")}
+                  className={`px-2 py-1 rounded transition-all ${
+                    amountInputMode === "includingVat"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  รวม VAT
+                </button>
+              </div>
+            )}
+          </div>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
               ฿
@@ -301,9 +388,16 @@ export function TransactionFieldsSection({
               min="0"
               className="pl-10 text-2xl h-14 font-semibold bg-muted/30 border-border focus:bg-background transition-colors"
               placeholder="0.00"
-              {...register("amount")}
+              value={displayAmount}
+              onChange={(e) => handleAmountInput(e.target.value)}
             />
           </div>
+          {/* Show hint when in "including VAT" mode */}
+          {amountInputMode === "includingVat" && vatRate > 0 && (
+            <p className="text-xs text-muted-foreground">
+              ยอดก่อน VAT: ฿{((parseFloat(displayAmount) || 0) / (1 + vatRate / 100)).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          )}
         </div>
       </div>
 
