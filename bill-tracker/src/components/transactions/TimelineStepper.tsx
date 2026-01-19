@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Check, Clock, CreditCard, FileText, FileBadge, Send, CheckCircle2, Wallet, Receipt, FileCheck } from "lucide-react";
+import { Check, Clock, CreditCard, FileText, FileBadge, Send, CheckCircle2, Wallet, Receipt, FileCheck, FileEdit } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ApprovalStatus } from "@prisma/client";
 
 // =============================================================================
 // Types
@@ -12,6 +13,7 @@ interface TimelineStepperProps {
   type: "expense" | "income";
   currentStatus: string;
   isWht?: boolean;
+  approvalStatus?: ApprovalStatus;
   className?: string;
 }
 
@@ -58,6 +60,7 @@ const INCOME_STEPS_NO_WHT: Step[] = [
 // Map intermediate statuses to their parent step
 const STATUS_MAP: Record<string, string> = {
   // Expense
+  DRAFT: "DRAFT",
   PAID: "PAID",
   WAITING_TAX_INVOICE: "PAID",
   RECEIVED_TAX_INVOICE: "RECEIVED_TAX_INVOICE",
@@ -83,12 +86,25 @@ export function TimelineStepper({
   type,
   currentStatus,
   isWht = false,
+  approvalStatus,
   className,
 }: TimelineStepperProps) {
-  // Get steps based on type and WHT
-  const steps = type === "expense"
+  // Check if still in DRAFT status
+  const isDraft = currentStatus === "DRAFT";
+  
+  // Get base steps based on type and WHT
+  const baseSteps = type === "expense"
     ? (isWht ? EXPENSE_STEPS : EXPENSE_STEPS_NO_WHT)
     : (isWht ? INCOME_STEPS : INCOME_STEPS_NO_WHT);
+
+  // Add DRAFT step at the beginning if currently in draft
+  const draftStep: Step = {
+    key: "DRAFT",
+    label: isDraft && approvalStatus === "PENDING" ? "รออนุมัติ" : "ร่าง",
+    icon: <FileEdit className="h-4 w-4" />,
+  };
+  
+  const steps = isDraft ? [draftStep, ...baseSteps] : baseSteps;
 
   // Map current status to step key
   const mappedStatus = STATUS_MAP[currentStatus] || currentStatus;
@@ -97,7 +113,10 @@ export function TimelineStepper({
   const currentIndex = steps.findIndex(step => step.key === mappedStatus);
   
   // Check if waiting status (show clock icon)
-  const isWaiting = currentStatus.includes("WAITING") || currentStatus.includes("PENDING");
+  const isWaiting = currentStatus.includes("WAITING") || currentStatus.includes("PENDING") || approvalStatus === "PENDING";
+  
+  // Check if rejected
+  const isRejected = approvalStatus === "REJECTED";
 
   return (
     <div className={cn(
@@ -121,8 +140,9 @@ export function TimelineStepper({
                     className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center transition-all",
                       isCompleted && "bg-emerald-500 text-white",
-                      isCurrent && !isWaiting && "bg-primary text-white ring-2 ring-primary/20",
-                      isCurrent && isWaiting && "bg-amber-500 text-white ring-2 ring-amber-500/20",
+                      isCurrent && !isWaiting && !isRejected && "bg-primary text-white ring-2 ring-primary/20",
+                      isCurrent && isWaiting && !isRejected && "bg-amber-500 text-white ring-2 ring-amber-500/20",
+                      isCurrent && isRejected && "bg-red-500 text-white ring-2 ring-red-500/20",
                       isPending && "bg-muted text-muted-foreground border border-border"
                     )}
                   >
@@ -140,12 +160,13 @@ export function TimelineStepper({
                     className={cn(
                       "text-xs font-medium text-center whitespace-nowrap",
                       isCompleted && "text-emerald-600 dark:text-emerald-400",
-                      isCurrent && !isWaiting && "text-primary font-semibold",
-                      isCurrent && isWaiting && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isCurrent && !isWaiting && !isRejected && "text-primary font-semibold",
+                      isCurrent && isWaiting && !isRejected && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isCurrent && isRejected && "text-red-600 dark:text-red-400 font-semibold",
                       isPending && "text-slate-400 dark:text-slate-500"
                     )}
                   >
-                    {step.label}
+                    {isCurrent && isRejected ? "ถูกปฏิเสธ" : step.label}
                   </span>
                 </div>
 
@@ -175,7 +196,7 @@ export function TimelineStepper({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
-                  isWaiting ? "bg-amber-500" : "bg-emerald-500"
+                  isRejected ? "bg-red-500" : isWaiting ? "bg-amber-500" : "bg-emerald-500"
                 )}
                 style={{
                   width: `${Math.max(0, (currentIndex / (steps.length - 1)) * 100)}%`
@@ -197,8 +218,9 @@ export function TimelineStepper({
                     className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center transition-all",
                       isCompleted && "bg-emerald-500 text-white",
-                      isCurrent && !isWaiting && "bg-primary text-white ring-2 ring-primary/30",
-                      isCurrent && isWaiting && "bg-amber-500 text-white ring-2 ring-amber-500/30",
+                      isCurrent && !isWaiting && !isRejected && "bg-primary text-white ring-2 ring-primary/30",
+                      isCurrent && isWaiting && !isRejected && "bg-amber-500 text-white ring-2 ring-amber-500/30",
+                      isCurrent && isRejected && "bg-red-500 text-white ring-2 ring-red-500/30",
                       isPending && "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500"
                     )}
                   >
@@ -214,12 +236,13 @@ export function TimelineStepper({
                     className={cn(
                       "text-[10px] font-medium text-center leading-tight px-0.5",
                       isCompleted && "text-emerald-600 dark:text-emerald-400",
-                      isCurrent && !isWaiting && "text-primary font-semibold",
-                      isCurrent && isWaiting && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isCurrent && !isWaiting && !isRejected && "text-primary font-semibold",
+                      isCurrent && isWaiting && !isRejected && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isCurrent && isRejected && "text-red-600 dark:text-red-400 font-semibold",
                       isPending && "text-slate-400 dark:text-slate-500"
                     )}
                   >
-                    {step.label.split("แล้ว")[0]}
+                    {isCurrent && isRejected ? "ปฏิเสธ" : step.label.split("แล้ว")[0]}
                   </span>
                 </div>
               );

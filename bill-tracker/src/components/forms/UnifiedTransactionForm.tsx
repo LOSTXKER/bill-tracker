@@ -52,12 +52,16 @@ import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { PayerSection, PayerInfo } from "./shared/PayerSection";
 
 // Transaction components
-import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper } from "@/components/transactions";
+import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge } from "@/components/transactions";
 import { CommentSection } from "@/components/comments/CommentSection";
 
 // Types & Constants
 import type { ContactSummary } from "@/types";
-import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
+import type { ApprovalStatus } from "@prisma/client";
+import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO, APPROVAL_STATUS_INFO } from "@/lib/constants/transaction";
+
+// Permissions
+import { usePermissions } from "@/components/providers/permission-provider";
 
 // Import and re-export BaseTransaction type from hooks
 import type { BaseTransaction } from "./hooks/useTransactionForm";
@@ -181,6 +185,16 @@ export function UnifiedTransactionForm({
   currentUserId,
 }: UnifiedTransactionFormProps) {
   const router = useRouter();
+  
+  // Permissions for draft/approval workflow
+  const { hasPermission } = usePermissions();
+  const canCreateDirect = config.type === "expense" 
+    ? hasPermission("expenses:create-direct") 
+    : hasPermission("incomes:create-direct");
+  const canMarkPaid = config.type === "expense"
+    ? hasPermission("expenses:mark-paid")
+    : hasPermission("incomes:mark-received");
+  
   // Use mode from props directly (controlled by parent)
   const [isLoading, setIsLoading] = useState(false);
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
@@ -1267,12 +1281,16 @@ export function UnifiedTransactionForm({
                 </Button>
               </Link>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
                   {statusInfo && (
                     <Badge className={cn("text-xs", statusInfo.bgColor, statusInfo.color)}>
                       {statusInfo.label}
                     </Badge>
+                  )}
+                  {/* Show approval status badge for draft transactions */}
+                  {transaction.approvalStatus && transaction.workflowStatus === "DRAFT" && (
+                    <ApprovalBadge status={transaction.approvalStatus as ApprovalStatus} size="sm" />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -1304,7 +1322,24 @@ export function UnifiedTransactionForm({
                 </div>
               ) : (
                 <>
-                  {transaction?.workflowStatus && (
+                  {/* Show DraftActions for DRAFT status */}
+                  {transaction?.workflowStatus === "DRAFT" && transaction.approvalStatus && (
+                    <DraftActions
+                      transactionId={transaction.id}
+                      transactionType={config.type}
+                      workflowStatus={transaction.workflowStatus}
+                      approvalStatus={transaction.approvalStatus as ApprovalStatus}
+                      rejectedReason={transaction.rejectedReason as string | null}
+                      canCreateDirect={canCreateDirect}
+                      canMarkPaid={canMarkPaid}
+                      onSuccess={() => {
+                        fetchTransaction();
+                        setAuditRefreshKey((k) => k + 1);
+                      }}
+                    />
+                  )}
+                  {/* Show WorkflowActions for non-DRAFT status */}
+                  {transaction?.workflowStatus && transaction.workflowStatus !== "DRAFT" && (
                     <WorkflowActions
                       companyCode={companyCode}
                       type={config.type}
@@ -1343,6 +1378,7 @@ export function UnifiedTransactionForm({
                 type={config.type}
                 currentStatus={transaction.workflowStatus}
                 isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
+                approvalStatus={transaction.approvalStatus as ApprovalStatus | undefined}
               />
             </div>
           )}

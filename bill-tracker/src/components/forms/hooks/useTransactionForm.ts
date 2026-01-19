@@ -47,6 +47,13 @@ export interface BaseTransaction {
   hasInvoice?: boolean;
   isWht?: boolean;
   isWhtDeducted?: boolean;
+  // Approval workflow fields
+  approvalStatus?: string;
+  rejectedReason?: string | null;
+  submittedAt?: string | null;
+  submittedBy?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
   [key: string]: unknown;
 }
 

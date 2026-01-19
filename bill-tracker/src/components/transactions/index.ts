@@ -17,3 +17,8 @@ export {
   type TransactionRowConfig,
   type TransactionData,
 } from "./TransactionTableRow";
+
+// Draft & Approval workflow components
+export { DraftActions } from "./DraftActions";
+export { ApprovalBadge } from "./ApprovalBadge";
+export { ApprovalActions } from "./ApprovalActions";
