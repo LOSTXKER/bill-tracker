@@ -70,7 +70,14 @@ export function useTransactionFileUpload({
 
       if (!uploadRes.ok) throw new Error("อัปโหลดไฟล์ล้มเหลว");
 
-      const { url } = await uploadRes.json();
+      const uploadResult = await uploadRes.json();
+      // Handle apiResponse wrapper: { success: true, data: { url, ... } }
+      const url = uploadResult.data?.url || uploadResult.url;
+      
+      if (!url) {
+        console.error("Upload response missing URL:", uploadResult);
+        throw new Error("ไม่ได้รับ URL จากการอัปโหลด");
+      }
 
       // Get the appropriate field name for this transaction type
       const fieldName = FILE_URL_FIELDS[transactionType][type];

@@ -11,7 +11,43 @@ import { apiResponse } from "./response";
 import { ApiErrors } from "./errors";
 import { hasPermission } from "@/lib/permissions/checker";
 import { logCreate, logUpdate, logStatusChange, logDelete, logWhtChange } from "@/lib/audit/logger";
+import { DocumentEventType } from "@prisma/client";
 import { notifyTransactionChange } from "@/lib/notifications/in-app";
+
+// =============================================================================
+// Helper: Create Document Event
+// =============================================================================
+
+async function createDocumentEvent(params: {
+  expenseId?: string;
+  incomeId?: string;
+  eventType: DocumentEventType;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  notes?: string | null;
+  metadata?: any;
+  createdBy: string;
+}): Promise<void> {
+  try {
+    await prisma.documentEvent.create({
+      data: {
+        id: crypto.randomUUID(),
+        expenseId: params.expenseId || null,
+        incomeId: params.incomeId || null,
+        eventType: params.eventType,
+        eventDate: new Date(),
+        fromStatus: params.fromStatus || null,
+        toStatus: params.toStatus || null,
+        notes: params.notes || null,
+        metadata: params.metadata || null,
+        createdBy: params.createdBy,
+      },
+    });
+  } catch (error) {
+    // Log error but don't throw - document events should not break the main flow
+    console.error("Failed to create document event:", error);
+  }
+}
 
 // =============================================================================
 // Types
@@ -179,6 +215,16 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
 
       // Create audit log
       await logCreate(config.displayName, item, session.user.id, company.id);
+
+      // Create document event for creation (non-blocking)
+      createDocumentEvent({
+        expenseId: config.modelName === "expense" ? item.id : undefined,
+        incomeId: config.modelName === "income" ? item.id : undefined,
+        eventType: "CREATED",
+        toStatus: item.workflowStatus || item.status,
+        notes: null,
+        createdBy: session.user.id,
+      }).catch((e) => console.error("Failed to create document event:", e));
 
       // Send in-app notification (non-blocking)
       notifyTransactionChange({
@@ -382,6 +428,47 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
         session.user.id,
         item.companyId
       );
+    }
+
+    // Create document events for file changes (non-blocking)
+    const fileFields = config.modelName === "expense"
+      ? { slipUrls: "สลิปโอนเงิน", taxInvoiceUrls: "ใบกำกับภาษี", whtCertUrls: "ใบ 50 ทวิ" }
+      : { customerSlipUrls: "สลิปลูกค้า", myBillCopyUrls: "สำเนาบิล", whtCertUrls: "ใบ 50 ทวิ" };
+
+    for (const [field, label] of Object.entries(fileFields)) {
+      const oldUrls: string[] = existingItem[field] || [];
+      const newUrls: string[] = body[field] || oldUrls;
+      
+      // Check for new files (files in newUrls but not in oldUrls)
+      const addedUrls = newUrls.filter((url: string) => url && !oldUrls.includes(url));
+      // Check for removed files
+      const removedUrls = oldUrls.filter((url: string) => url && !newUrls.includes(url));
+      
+      if (addedUrls.length > 0) {
+        createDocumentEvent({
+          expenseId: config.modelName === "expense" ? item.id : undefined,
+          incomeId: config.modelName === "income" ? item.id : undefined,
+          eventType: "FILE_UPLOADED",
+          fromStatus: existingItem.workflowStatus,
+          toStatus: item.workflowStatus,
+          notes: `อัปโหลด${label} ${addedUrls.length} ไฟล์`,
+          metadata: { fileType: field, addedUrls },
+          createdBy: session.user.id,
+        }).catch((e) => console.error("Failed to create file upload event:", e));
+      }
+      
+      if (removedUrls.length > 0) {
+        createDocumentEvent({
+          expenseId: config.modelName === "expense" ? item.id : undefined,
+          incomeId: config.modelName === "income" ? item.id : undefined,
+          eventType: "FILE_REMOVED",
+          fromStatus: existingItem.workflowStatus,
+          toStatus: item.workflowStatus,
+          notes: `ลบ${label} ${removedUrls.length} ไฟล์`,
+          metadata: { fileType: field, removedUrls },
+          createdBy: session.user.id,
+        }).catch((e) => console.error("Failed to create file removal event:", e));
+      }
     }
 
     // Calculate changed fields for notification
