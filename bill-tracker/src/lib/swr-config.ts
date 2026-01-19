@@ -52,7 +52,7 @@ export const swrKeys = {
   categories: (companyCode: string, type: string) => 
     `/api/${companyCode}/categories?type=${type}`,
   contacts: (companyCode: string) => 
-    `/api/contacts?company=${companyCode.toUpperCase()}`,
+    `/api/contacts?company=${companyCode.toUpperCase()}&limit=10000`,
   expenses: (companyCode: string, params?: string) => 
     `/api/expenses?company=${companyCode}${params ? `&${params}` : ""}`,
   incomes: (companyCode: string, params?: string) => 
