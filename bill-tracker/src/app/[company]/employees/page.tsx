@@ -94,7 +94,8 @@ export default function EmployeesPage() {
   }, [companyId]);
 
   const handleRowClick = (member: TeamMember) => {
-    router.push(`/${companyCode.toLowerCase()}/employees/${member.userId}`);
+    // Use companyAccess.id (member.id) not userId for API routes
+    router.push(`/${companyCode.toLowerCase()}/employees/${member.id}`);
   };
 
   // Filter members

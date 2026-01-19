@@ -12,19 +12,13 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import {
   ArrowLeft,
   User,
-  Mail,
   Shield,
   Activity,
-  Receipt,
   FileText,
   Crown,
   CheckCircle,
   Clock,
-  XCircle,
-  Wallet,
 } from "lucide-react";
-import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
-import { toNumber } from "@/lib/utils/serializers";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { cn } from "@/lib/utils";
 import { EditPermissionsDialog } from "@/components/settings/edit-permissions-dialog";
@@ -43,38 +37,6 @@ interface EmployeeData {
     lastLoginAt?: Date | null;
     isActive: boolean;
   };
-}
-
-interface Stats {
-  reimbursements: {
-    total: number;
-    pending: number;
-    approved: number;
-    paid: number;
-    rejected: number;
-  };
-  amounts: {
-    total: number;
-    pending: number;
-    approved: number;
-    paid: number;
-    rejected: number;
-  };
-  recentActivity: {
-    last30Days: number;
-  };
-}
-
-interface Reimbursement {
-  id: string;
-  description: string;
-  netAmount: number;
-  billDate: string;
-  status: string;
-  account?: { code: string; name: string };
-  approver?: { name: string };
-  payer?: { name: string };
-  rejectedReason?: string;
 }
 
 interface AuditLog {
@@ -199,12 +161,10 @@ export default function EmployeeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const companyCode = (params.company as string).toUpperCase();
-  const userId = params.id as string;
+  const memberId = params.id as string; // This is companyAccess.id
   const isOwner = useIsOwner();
 
   const [employee, setEmployee] = useState<EmployeeData | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -233,33 +193,23 @@ export default function EmployeeDetailPage() {
     setIsLoading(true);
     try {
       // Fetch all data in parallel for faster loading
-      const [membersRes, statsRes, reimbursementsRes, logsRes] = await Promise.all([
+      const [membersRes, logsRes] = await Promise.all([
         fetch(`/api/companies/${companyId}/members`),
-        fetch(`/api/companies/${companyId}/members/${userId}/stats`),
-        fetch(`/api/companies/${companyId}/members/${userId}/reimbursements?limit=20`),
-        fetch(`/api/companies/${companyId}/members/${userId}/audit-logs?limit=20`),
+        fetch(`/api/companies/${companyId}/members/${memberId}/audit-logs?limit=20`),
       ]);
 
       // Parse all responses in parallel
-      const [membersData, statsData, reimbursementsData, logsData] = await Promise.all([
+      const [membersData, logsData] = await Promise.all([
         membersRes.json(),
-        statsRes.json(),
-        reimbursementsRes.json(),
         logsRes.json(),
       ]);
 
-      // Process employee data
+      // Process employee data - find by companyAccess.id (memberId)
       const members = membersData.data?.members || membersData.members || [];
       const employeeData = members.find(
-        (m: EmployeeData) => m.userId === userId
+        (m: EmployeeData) => m.id === memberId
       );
       setEmployee(employeeData);
-
-      // Set stats
-      setStats(statsData.data?.stats || statsData.stats);
-
-      // Set reimbursements
-      setReimbursements(reimbursementsData.data?.reimbursements || reimbursementsData.reimbursements || []);
 
       // Set audit logs
       setAuditLogs(logsData.data?.logs || logsData.logs || []);
@@ -272,7 +222,7 @@ export default function EmployeeDetailPage() {
 
   useEffect(() => {
     fetchEmployeeData();
-  }, [companyId, userId]);
+  }, [companyId, memberId]);
 
   if (isLoading) {
     return (
@@ -296,41 +246,6 @@ export default function EmployeeDetailPage() {
       </div>
     );
   }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <Clock className="h-3 w-3" />
-            รออนุมัติ
-          </Badge>
-        );
-      case "APPROVED":
-        return (
-          <Badge variant="outline" className="gap-1 text-blue-600 border-blue-600">
-            <CheckCircle className="h-3 w-3" />
-            อนุมัติแล้ว
-          </Badge>
-        );
-      case "PAID":
-        return (
-          <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-600">
-            <Wallet className="h-3 w-3" />
-            จ่ายแล้ว
-          </Badge>
-        );
-      case "REJECTED":
-        return (
-          <Badge variant="outline" className="gap-1 text-red-600 border-red-600">
-            <XCircle className="h-3 w-3" />
-            ปฏิเสธ
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
 
   const getActionLabel = (action: string) => {
     const labels: Record<string, string> = {
@@ -386,89 +301,12 @@ export default function EmployeeDetailPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">เบิกจ่ายทั้งหมด</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.reimbursements.total}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(stats.amounts.total)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">รออนุมัติ</p>
-                <p className="text-2xl font-bold text-amber-600">
-                  {stats.reimbursements.pending}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(stats.amounts.pending)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">รอจ่ายเงิน</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {stats.reimbursements.approved}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(stats.amounts.approved)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">จ่ายแล้ว</p>
-                <p className="text-2xl font-bold text-emerald-600">
-                  {stats.reimbursements.paid}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(stats.amounts.paid)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">กิจกรรม 30 วัน</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.recentActivity.last30Days}
-                </p>
-                <p className="text-xs text-muted-foreground">รายการ</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview" className="gap-2">
             <User className="h-4 w-4" />
             ข้อมูลทั่วไป
-          </TabsTrigger>
-          <TabsTrigger value="reimbursements" className="gap-2">
-            <Receipt className="h-4 w-4" />
-            ประวัติเบิกจ่าย
           </TabsTrigger>
           <TabsTrigger value="audit" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -541,60 +379,6 @@ export default function EmployeeDetailPage() {
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Reimbursements Tab */}
-        <TabsContent value="reimbursements" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">ประวัติการเบิกจ่าย</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {reimbursements.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  ยังไม่มีประวัติการเบิกจ่าย
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {reimbursements.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-4 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() =>
-                        router.push(
-                          `/${companyCode.toLowerCase()}/reimbursements`
-                        )
-                      }
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {getStatusBadge(item.status)}
-                            {item.account && (
-                              <span className="text-sm text-muted-foreground">
-                                {item.account.code} {item.account.name}
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-medium text-sm">
-                            {item.description || "ไม่ระบุรายละเอียด"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatThaiDate(new Date(item.billDate))}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-lg text-blue-600">
-                            {formatCurrency(toNumber(item.netAmount))}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
