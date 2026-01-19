@@ -76,7 +76,7 @@ export function DocumentSection({
 
       {urls.length > 0 && (
         <div className="grid gap-2">
-          {urls.map((url, index) => {
+          {urls.filter((u): u is string => u != null && u !== "").map((url, index) => {
             const rawFileName = url.split("/").pop() || `ไฟล์ ${index + 1}`;
             const displayName = extractDisplayName(rawFileName);
             const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
