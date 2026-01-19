@@ -157,7 +157,7 @@ model Contact {
   updatedAt            DateTime
   branchCode           String?                @default("00000")
   type                 ContactType            @default(COMPANY)
-  peakCode             String?                @unique
+  peakCode             String?
   contactCategory      ContactCategory        @default(VENDOR)
   entityType           EntityType             @default(COMPANY)
   businessType         String?
@@ -178,9 +178,9 @@ model Contact {
   ReimbursementRequest ReimbursementRequest[]
   VendorMapping        VendorMapping[]
 
+  @@unique([companyId, peakCode])
   @@index([companyId])
   @@index([name])
-  @@index([peakCode])
   @@index([taxId])
 }
 
