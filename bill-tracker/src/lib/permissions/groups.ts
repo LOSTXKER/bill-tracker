@@ -37,17 +37,20 @@ export const ROLE_PRESETS: RolePreset[] = [
   {
     key: "accountant",
     label: "บัญชี",
-    description: "ดูรายการทั้งหมด, เปลี่ยนสถานะเอกสาร, ส่งออกรายงาน, จัดการโอนคืน",
+    description: "สร้างรายการ (รออนุมัติ), ดูรายการทั้งหมด, เปลี่ยนสถานะเอกสาร, ส่งออกรายงาน, จัดการโอนคืน",
     icon: Calculator,
     permissions: [
-      // Expenses - ดู, เปลี่ยนสถานะ
+      // Expenses - ดู, สร้างร่าง (ต้องรออนุมัติ), เปลี่ยนสถานะ
       "expenses:read",
+      "expenses:create",
       "expenses:change-status",
-      // Incomes - ดู, เปลี่ยนสถานะ
+      // Incomes - ดู, สร้างร่าง (ต้องรออนุมัติ), เปลี่ยนสถานะ
       "incomes:read",
+      "incomes:create",
       "incomes:change-status",
-      // Contacts - ดูอย่างเดียว
+      // Contacts - ดูและสร้าง
       "contacts:read",
+      "contacts:create",
       // Reports - ดูและส่งออก
       "reports:read",
       "reports:export",
@@ -67,14 +70,15 @@ export const ROLE_PRESETS: RolePreset[] = [
   {
     key: "employee",
     label: "พนักงาน",
-    description: "สร้างรายจ่าย (รออนุมัติ), ส่งเบิกจ่าย, ดูรายการของตัวเอง",
+    description: "สร้างรายจ่าย/รายรับ (รออนุมัติ), ส่งเบิกจ่าย, ดูรายการของตัวเอง",
     icon: UserCircle,
     permissions: [
       // Expenses - สร้างร่าง (ต้องรออนุมัติ)
       "expenses:read",
       "expenses:create",
-      // Incomes - ดูอย่างเดียว
+      // Incomes - สร้างร่าง (ต้องรออนุมัติ)
       "incomes:read",
+      "incomes:create",
       // Contacts - ดูและสร้าง
       "contacts:read",
       "contacts:create",
