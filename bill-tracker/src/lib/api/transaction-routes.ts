@@ -100,9 +100,12 @@ export interface TransactionRouteConfig<TModel, TCreateData, TUpdateData> {
  */
 export function createListHandler<TModel>(config: TransactionRouteConfig<TModel, any, any>) {
   return withCompanyAccess(
-    async (request, { company }) => {
+    async (request, { company, session }) => {
       const { searchParams } = new URL(request.url);
       const status = searchParams.get("status");
+      const workflowStatus = searchParams.get("workflowStatus");
+      const approvalStatus = searchParams.get("approvalStatus");
+      const tab = searchParams.get("tab"); // draft | pending | rejected | all
       const category = searchParams.get("category");
       const contact = searchParams.get("contact");
       const search = searchParams.get("search");
@@ -110,6 +113,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const dateTo = searchParams.get("dateTo");
       const includeDeleted = searchParams.get("includeDeleted") === "true";
       const includeReimbursements = searchParams.get("includeReimbursements") === "true";
+      const onlyMine = searchParams.get("onlyMine") === "true"; // Only show items created by current user
       const page = parseInt(searchParams.get("page") || "1");
       const limit = parseInt(searchParams.get("limit") || "20");
 
@@ -117,11 +121,38 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const where: any = {
         companyId: company.id,
         ...(status && { [config.fields.statusField]: status as any }),
+        ...(workflowStatus && { workflowStatus: workflowStatus as any }),
+        ...(approvalStatus && { approvalStatus: approvalStatus as any }),
         ...(category && { accountId: category }),
         ...(contact && { contactId: contact }),
         // Soft delete filter - exclude deleted items unless explicitly requested
         ...(!includeDeleted && { deletedAt: null }),
+        // Only my items filter
+        ...(onlyMine && { createdBy: session.user.id }),
       };
+
+      // Tab-based filtering
+      // These provide convenient preset filters
+      if (tab === "draft") {
+        // Show only drafts created by current user
+        where.workflowStatus = "DRAFT";
+        where.createdBy = session.user.id;
+      } else if (tab === "pending") {
+        // Show items pending approval (for approvers)
+        where.approvalStatus = "PENDING";
+      } else if (tab === "rejected") {
+        // Show rejected items created by current user
+        where.approvalStatus = "REJECTED";
+        where.createdBy = session.user.id;
+      } else if (tab === "active") {
+        // Show active items (not draft, approval is done or not required)
+        where.workflowStatus = { not: "DRAFT" };
+        where.OR = [
+          { approvalStatus: "NOT_REQUIRED" },
+          { approvalStatus: "APPROVED" },
+        ];
+      }
+      // Default (tab === "all" or no tab): show all items based on other filters
 
       // Date range filter
       if (dateFrom || dateTo) {
@@ -136,22 +167,36 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
 
       // Search filter (description)
       if (search) {
-        where.OR = [
-          ...(where.OR || []),
-          { description: { contains: search, mode: "insensitive" } },
-        ];
+        // If we already have an OR filter from tab, we need to handle this differently
+        if (where.OR) {
+          // Wrap existing OR with AND, then add search OR
+          const existingOr = where.OR;
+          delete where.OR;
+          where.AND = [
+            { OR: existingOr },
+            { OR: [{ description: { contains: search, mode: "insensitive" } }] },
+          ];
+        } else {
+          where.OR = [
+            { description: { contains: search, mode: "insensitive" } },
+          ];
+        }
       }
 
       // For expenses, filter out reimbursements that are not PAID
       // Reimbursements should only appear as expenses after they're paid
       // REJECTED reimbursements should never appear as expenses
-      if (config.modelName === "expense" && !includeReimbursements) {
-        where.OR = [
-          // Regular expenses (not reimbursements)
-          { isReimbursement: false },
-          // Reimbursements that have been paid (now part of normal expense flow)
-          { isReimbursement: true, reimbursementStatus: "PAID" },
-        ];
+      if (config.modelName === "expense" && !includeReimbursements && !tab) {
+        // Only apply this filter if not using tab-based filtering
+        // Tab filters might want to show draft reimbursements
+        if (!where.OR) {
+          where.OR = [
+            // Regular expenses (not reimbursements)
+            { isReimbursement: false },
+            // Reimbursements that have been paid (now part of normal expense flow)
+            { isReimbursement: true, reimbursementStatus: "PAID" },
+          ];
+        }
       }
 
       // Use PascalCase relation names as per Prisma schema
@@ -160,6 +205,11 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
         : { User: { select: { id: true, name: true, email: true } } };
 
+      // Include submitter info for approval workflow
+      const submitterInclude = config.modelName === "expense"
+        ? { User_Expense_submittedByToUser: { select: { id: true, name: true, email: true } } }
+        : { User_Income_submittedByToUser: { select: { id: true, name: true, email: true } } };
+
       const [items, total] = await Promise.all([
         config.prismaModel.findMany({
           where,
@@ -167,6 +217,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
             Contact: true,
             Account: true,
             ...creatorInclude,
+            ...submitterInclude,
           },
           orderBy: { [config.fields.dateField]: "desc" },
           skip: (page - 1) * limit,

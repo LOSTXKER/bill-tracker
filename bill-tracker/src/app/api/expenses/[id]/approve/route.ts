@@ -1,0 +1,107 @@
+/**
+ * POST /api/expenses/[id]/approve
+ * Approve an expense that is pending approval
+ */
+
+import { prisma } from "@/lib/db";
+import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
+import { createAuditLog } from "@/lib/audit/logger";
+import { createNotification } from "@/lib/notifications/in-app";
+
+export const POST = (
+  request: Request,
+  routeParams: { params: Promise<{ id: string }> }
+) => {
+  return withCompanyAccess(
+    async (req, { company, session }) => {
+      const { id } = await routeParams.params;
+
+      // Find the expense
+      const expense = await prisma.expense.findFirst({
+        where: {
+          id,
+          companyId: company.id,
+          deletedAt: null,
+        },
+        include: {
+          Contact: true,
+        },
+      });
+
+      if (!expense) {
+        return apiResponse.notFound("ไม่พบรายจ่าย");
+      }
+
+      // Only PENDING can be approved
+      if (expense.approvalStatus !== "PENDING") {
+        return apiResponse.badRequest("สามารถอนุมัติได้เฉพาะรายการที่รออนุมัติเท่านั้น");
+      }
+
+      // Prevent self-approval
+      if (expense.submittedBy === session.user.id) {
+        return apiResponse.badRequest("ไม่สามารถอนุมัติคำขอของตัวเองได้");
+      }
+
+      // Update the expense
+      const updatedExpense = await prisma.expense.update({
+        where: { id },
+        data: {
+          approvalStatus: "APPROVED",
+          approvedBy: session.user.id,
+          approvedAt: new Date(),
+          updatedAt: new Date(),
+        },
+        include: {
+          Contact: true,
+          Account: true,
+        },
+      });
+
+      // Create document event
+      await prisma.documentEvent.create({
+        data: {
+          id: crypto.randomUUID(),
+          expenseId: id,
+          eventType: "APPROVED",
+          createdBy: session.user.id,
+          notes: "อนุมัติรายจ่าย",
+        },
+      });
+
+      await createAuditLog({
+        userId: session.user.id,
+        companyId: company.id,
+        action: "APPROVE",
+        entityType: "Expense",
+        entityId: id,
+        description: `อนุมัติรายจ่าย: ${expense.description || "ไม่ระบุ"} จำนวน ${expense.netPaid} บาท`,
+        changes: {
+          before: { approvalStatus: "PENDING" },
+          after: { approvalStatus: "APPROVED" },
+        },
+      });
+
+      // Notify the requester
+      if (expense.createdBy) {
+        await createNotification({
+          companyId: company.id,
+          targetUserIds: [expense.createdBy],
+          type: "TRANSACTION_APPROVED",
+          entityType: "Expense",
+          entityId: id,
+          title: "รายจ่ายได้รับการอนุมัติ",
+          message: `รายจ่าย "${expense.description || "ไม่ระบุ"}" ได้รับการอนุมัติโดย ${session.user.name}`,
+          actorId: session.user.id,
+          actorName: session.user.name,
+        });
+      }
+
+      return apiResponse.success(
+        { expense: updatedExpense },
+        "อนุมัติรายจ่ายแล้ว"
+      );
+    },
+    { permission: "expenses:approve" }
+  )(request);
+};

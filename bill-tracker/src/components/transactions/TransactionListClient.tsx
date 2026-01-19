@@ -70,11 +70,17 @@ interface StatusTab {
   label: string;
   statuses: string[]; // Statuses to include in this tab
   icon?: string;
+  isTabFilter?: boolean; // Use tab parameter instead of status
+  isApprovalTab?: boolean; // Show pending approval items
+  isRejectedTab?: boolean; // Show rejected items
 }
 
-// Expense workflow: จ่ายแล้ว → รอใบกำกับ → (ออก 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
+// Expense workflow: ร่าง → รออนุมัติ → จ่ายแล้ว → รอใบกำกับ → (ออก 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
 const EXPENSE_STATUS_TABS: StatusTab[] = [
   { key: "all", label: "ทั้งหมด", statuses: [] },
+  { key: "draft", label: "ร่างของฉัน", statuses: ["DRAFT"], isTabFilter: true },
+  { key: "pending", label: "รออนุมัติ", statuses: [], isApprovalTab: true },
+  { key: "rejected", label: "ถูกปฏิเสธ", statuses: [], isRejectedTab: true },
   { key: "waiting_doc", label: "รอเอกสาร", statuses: ["PAID", "WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE"] },
   { key: "doc_received", label: "ได้เอกสารแล้ว", statuses: ["TAX_INVOICE_RECEIVED", "WHT_ISSUED", "WHT_SENT_TO_VENDOR"] },
   { key: "ready", label: "รอส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
@@ -82,9 +88,12 @@ const EXPENSE_STATUS_TABS: StatusTab[] = [
   { key: "recent", label: "แก้ไขล่าสุด", statuses: [] },
 ];
 
-// Income workflow: รับเงินแล้ว → รอออกบิล → (รอ 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
+// Income workflow: ร่าง → รออนุมัติ → รับเงินแล้ว → รอออกบิล → (รอ 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
 const INCOME_STATUS_TABS: StatusTab[] = [
   { key: "all", label: "ทั้งหมด", statuses: [] },
+  { key: "draft", label: "ร่างของฉัน", statuses: ["DRAFT"], isTabFilter: true },
+  { key: "pending", label: "รออนุมัติ", statuses: [], isApprovalTab: true },
+  { key: "rejected", label: "ถูกปฏิเสธ", statuses: [], isRejectedTab: true },
   { key: "waiting_doc", label: "รอออกบิล", statuses: ["RECEIVED", "NO_INVOICE_NEEDED", "WAITING_INVOICE_ISSUE", "WHT_PENDING_CERT"] },
   { key: "doc_issued", label: "ออกบิลแล้ว", statuses: ["INVOICE_ISSUED", "INVOICE_SENT", "WHT_CERT_RECEIVED"] },
   { key: "ready", label: "รอส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
@@ -118,6 +127,12 @@ export function TransactionListClient({
       return;
     }
     
+    // Check for tab filter
+    if (filters.tab) {
+      setActiveTab(filters.tab);
+      return;
+    }
+    
     if (!filters.status) {
       setActiveTab("all");
       return;
@@ -134,7 +149,7 @@ export function TransactionListClient({
     if (matchingTab) {
       setActiveTab(matchingTab.key);
     }
-  }, [filters.status, sortBy, statusTabs]);
+  }, [filters.status, filters.tab, sortBy, statusTabs]);
   
   // Handle tab change - use setFilterWithSort for single navigation
   const handleTabChange = (tabKey: string) => {
@@ -142,12 +157,19 @@ export function TransactionListClient({
     
     if (tabKey === "recent") {
       // Sort by updatedAt desc, clear status filter
+      setFilter("tab", "");
       setFilterWithSort("status", "", "updatedAt", "desc");
+    } else if (tabKey === "draft" || tabKey === "pending" || tabKey === "rejected") {
+      // Use tab-based API filtering
+      setFilter("status", "");
+      setFilter("tab", tabKey);
     } else if (tab && tab.statuses.length > 0) {
       // Filter by statuses in this tab
+      setFilter("tab", "");
       setFilterWithSort("status", tab.statuses.join(","), config.dateField, "desc");
     } else {
       // All: clear filters
+      setFilter("tab", "");
       setFilterWithSort("status", "", config.dateField, "desc");
     }
   };

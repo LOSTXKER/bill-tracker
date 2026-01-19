@@ -256,8 +256,13 @@ model Expense {
   taxInvoiceAt                               DateTime?
   whtCertIssuedAt                            DateTime?
   whtCertSentAt                              DateTime?
-  workflowStatus                             ExpenseWorkflowStatus @default(PAID)
+  workflowStatus                             ExpenseWorkflowStatus @default(DRAFT)
   referenceUrls                              Json                  @default("[]")
+  // Approval workflow fields
+  approvalStatus                             ApprovalStatus        @default(NOT_REQUIRED)
+  rejectedReason                             String?
+  submittedAt                                DateTime?
+  submittedBy                                String?
   Comment                                    Comment[]
   DocumentEvent                              DocumentEvent[]
   Account                                    Account?              @relation(fields: [accountId], references: [id])
@@ -267,6 +272,7 @@ model Expense {
   User_Expense_reimbursementApprovedByToUser User?                 @relation("Expense_reimbursementApprovedByToUser", fields: [reimbursementApprovedBy], references: [id])
   User_Expense_reimbursementPaidByToUser     User?                 @relation("Expense_reimbursementPaidByToUser", fields: [reimbursementPaidBy], references: [id])
   User_Expense_requesterIdToUser             User?                 @relation("Expense_requesterIdToUser", fields: [requesterId], references: [id])
+  User_Expense_submittedByToUser             User?                 @relation("Expense_submittedByToUser", fields: [submittedBy], references: [id])
   ReimbursementRequest                       ReimbursementRequest?
   ExpensePayments                            ExpensePayment[]
   PettyCashTransactions                      PettyCashTransaction[]
@@ -280,6 +286,7 @@ model Expense {
   @@index([requesterId])
   @@index([status])
   @@index([workflowStatus])
+  @@index([approvalStatus])
 }
 
 model Income {
@@ -320,14 +327,23 @@ model Income {
   whtCertReceivedAt  DateTime?
   whtCertRemindCount Int                  @default(0)
   whtCertRemindedAt  DateTime?
-  workflowStatus     IncomeWorkflowStatus @default(RECEIVED)
+  workflowStatus     IncomeWorkflowStatus @default(DRAFT)
   referenceUrls      Json                 @default("[]")
+  // Approval workflow fields
+  approvalStatus     ApprovalStatus       @default(NOT_REQUIRED)
+  rejectedReason     String?
+  submittedAt        DateTime?
+  submittedBy        String?
+  approvedBy         String?
+  approvedAt         DateTime?
   Comment            Comment[]
   DocumentEvent      DocumentEvent[]
   Account            Account?             @relation(fields: [accountId], references: [id])
   Company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Contact            Contact?             @relation(fields: [contactId], references: [id])
-  User               User                 @relation(fields: [createdBy], references: [id])
+  User               User                 @relation("Income_createdByToUser", fields: [createdBy], references: [id])
+  User_Income_submittedByToUser  User?    @relation("Income_submittedByToUser", fields: [submittedBy], references: [id])
+  User_Income_approvedByToUser   User?    @relation("Income_approvedByToUser", fields: [approvedBy], references: [id])
 
   @@index([accountId])
   @@index([companyId, receiveDate])
@@ -336,6 +352,7 @@ model Income {
   @@index([deletedAt])
   @@index([status])
   @@index([workflowStatus])
+  @@index([approvalStatus])
 }
 
 model Integration {
@@ -496,7 +513,10 @@ model User {
   Expense_Expense_reimbursementApprovedByToUser              Expense[]              @relation("Expense_reimbursementApprovedByToUser")
   Expense_Expense_reimbursementPaidByToUser                  Expense[]              @relation("Expense_reimbursementPaidByToUser")
   Expense_Expense_requesterIdToUser                          Expense[]              @relation("Expense_requesterIdToUser")
-  Income                                                     Income[]
+  Expense_Expense_submittedByToUser                          Expense[]              @relation("Expense_submittedByToUser")
+  Income_Income_createdByToUser                              Income[]               @relation("Income_createdByToUser")
+  Income_Income_submittedByToUser                            Income[]               @relation("Income_submittedByToUser")
+  Income_Income_approvedByToUser                             Income[]               @relation("Income_approvedByToUser")
   ReimbursementRequest_ReimbursementRequest_approvedByToUser ReimbursementRequest[] @relation("ReimbursementRequest_approvedByToUser")
   ReimbursementRequest_ReimbursementRequest_paidByToUser     ReimbursementRequest[] @relation("ReimbursementRequest_paidByToUser")
   ReimbursementRequest_requester                             ReimbursementRequest[] @relation("ReimbursementRequest_requester")
@@ -592,6 +612,11 @@ enum DocumentEventType {
   WHT_REMINDER_SENT
   SENT_TO_ACCOUNTANT
   ACCOUNTANT_CONFIRMED
+  // Approval workflow events
+  SUBMITTED_FOR_APPROVAL
+  APPROVED
+  REJECTED
+  MARKED_AS_PAID
 }
 
 enum EntityType {
@@ -607,6 +632,7 @@ enum ExpenseDocStatus {
 }
 
 enum ExpenseWorkflowStatus {
+  DRAFT
   PAID
   WAITING_TAX_INVOICE
   TAX_INVOICE_RECEIVED
@@ -627,6 +653,7 @@ enum IncomeDocStatus {
 }
 
 enum IncomeWorkflowStatus {
+  DRAFT
   RECEIVED
   NO_INVOICE_NEEDED
   WAITING_INVOICE_ISSUE
@@ -652,6 +679,9 @@ enum NotificationType {
   TRANSACTION_UPDATED
   TRANSACTION_DELETED
   TRANSACTION_STATUS_CHANGED
+  TRANSACTION_SUBMITTED       // ส่งคำขออนุมัติ
+  TRANSACTION_APPROVED        // อนุมัติรายการ
+  TRANSACTION_REJECTED        // ปฏิเสธรายการ
   FILE_UPLOADED
   REIMBURSEMENT_SUBMITTED
   REIMBURSEMENT_APPROVED
@@ -683,6 +713,13 @@ enum ReimbursementStatus {
   APPROVED
   REJECTED
   PAID
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED  // ไม่ต้องอนุมัติ (สร้างโดยคนมีสิทธิ์ create-direct)
+  PENDING       // รออนุมัติ
+  APPROVED      // อนุมัติแล้ว
+  REJECTED      // ถูกปฏิเสธ
 }
 
 enum UserRole {

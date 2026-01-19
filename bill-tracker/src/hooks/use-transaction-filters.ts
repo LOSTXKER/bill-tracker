@@ -11,6 +11,7 @@ export interface TransactionFilters {
   creator: string;
   dateFrom: string;
   dateTo: string;
+  tab: string;  // For draft, pending, rejected tabs
 }
 
 export function useTransactionFilters() {
@@ -27,6 +28,7 @@ export function useTransactionFilters() {
     creator: searchParams.get("creator") || "",
     dateFrom: searchParams.get("dateFrom") || "",
     dateTo: searchParams.get("dateTo") || "",
+    tab: searchParams.get("tab") || "",
   }), [searchParams]);
 
   // Update a single filter

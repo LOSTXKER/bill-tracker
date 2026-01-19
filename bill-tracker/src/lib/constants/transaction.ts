@@ -62,6 +62,7 @@ export interface StatusInfo {
 // =============================================================================
 
 export const EXPENSE_WORKFLOW_FLOW = [
+  "DRAFT",
   "PAID",
   "TAX_INVOICE_RECEIVED",
   "WHT_ISSUED",  // ถ้ามี WHT
@@ -70,6 +71,7 @@ export const EXPENSE_WORKFLOW_FLOW = [
 ] as const;
 
 export const EXPENSE_WORKFLOW_FLOW_NO_WHT = [
+  "DRAFT",
   "PAID",
   "TAX_INVOICE_RECEIVED",
   "READY_FOR_ACCOUNTING",
@@ -77,6 +79,13 @@ export const EXPENSE_WORKFLOW_FLOW_NO_WHT = [
 ] as const;
 
 export const EXPENSE_WORKFLOW_INFO: Record<string, StatusInfo> = {
+  DRAFT: {
+    label: "ร่าง",
+    description: "รายการร่าง ยังไม่จ่ายเงิน",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
+    dotColor: "bg-slate-400",
+  },
   PAID: {
     label: "จ่ายเงินแล้ว",
     description: "จ่ายเงินแล้ว รอใบกำกับภาษี",
@@ -147,6 +156,7 @@ export const EXPENSE_WORKFLOW_INFO: Record<string, StatusInfo> = {
 // =============================================================================
 
 export const INCOME_WORKFLOW_FLOW = [
+  "DRAFT",
   "RECEIVED",
   "INVOICE_ISSUED",
   "WHT_CERT_RECEIVED",  // ถ้าลูกค้าหักภาษี
@@ -155,6 +165,7 @@ export const INCOME_WORKFLOW_FLOW = [
 ] as const;
 
 export const INCOME_WORKFLOW_FLOW_NO_WHT = [
+  "DRAFT",
   "RECEIVED",
   "INVOICE_ISSUED",
   "READY_FOR_ACCOUNTING",
@@ -162,6 +173,13 @@ export const INCOME_WORKFLOW_FLOW_NO_WHT = [
 ] as const;
 
 export const INCOME_WORKFLOW_INFO: Record<string, StatusInfo> = {
+  DRAFT: {
+    label: "ร่าง",
+    description: "รายการร่าง ยังไม่รับเงิน",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
+    dotColor: "bg-slate-400",
+  },
   RECEIVED: {
     label: "รับเงินแล้ว",
     description: "รับเงินจากลูกค้าแล้ว",
@@ -290,6 +308,7 @@ export const REIMBURSEMENT_STATUS_INFO: Record<string, StatusInfo> = {
 
 // Expense Status Labels (Workflow)
 export const EXPENSE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  DRAFT: { label: "ร่าง", color: "gray" },
   PAID: { label: "จ่ายเงินแล้ว", color: "blue" },
   WAITING_TAX_INVOICE: { label: "รอใบกำกับ", color: "orange" },
   TAX_INVOICE_RECEIVED: { label: "ได้ใบกำกับแล้ว", color: "green" },
@@ -303,6 +322,7 @@ export const EXPENSE_STATUS_LABELS: Record<string, { label: string; color: strin
 
 // Income Status Labels (Workflow)
 export const INCOME_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  DRAFT: { label: "ร่าง", color: "gray" },
   RECEIVED: { label: "รับเงินแล้ว", color: "blue" },
   NO_INVOICE_NEEDED: { label: "ไม่ต้องออกบิล", color: "gray" },
   WAITING_INVOICE_ISSUE: { label: "รอออกบิล", color: "amber" },
@@ -322,4 +342,53 @@ export const REIMBURSEMENT_STATUS_LABELS: Record<string, { label: string; color:
   APPROVED: { label: "รอจ่ายเงิน", color: "yellow" },
   REJECTED: { label: "ถูกปฏิเสธ", color: "gray" },
   PAID: { label: "จ่ายแล้ว", color: "green" },
+};
+
+// =============================================================================
+// Approval Status Configuration
+// =============================================================================
+
+export const APPROVAL_STATUS_FLOW = [
+  "NOT_REQUIRED",
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+] as const;
+
+export const APPROVAL_STATUS_INFO: Record<string, StatusInfo> = {
+  NOT_REQUIRED: {
+    label: "ไม่ต้องอนุมัติ",
+    description: "สร้างโดยผู้มีสิทธิ์",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
+    dotColor: "bg-slate-400",
+  },
+  PENDING: {
+    label: "รออนุมัติ",
+    description: "รอผู้มีสิทธิ์อนุมัติ",
+    color: "text-amber-600",
+    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
+    dotColor: "bg-amber-500",
+  },
+  APPROVED: {
+    label: "อนุมัติแล้ว",
+    description: "ได้รับการอนุมัติแล้ว",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
+    dotColor: "bg-emerald-500",
+  },
+  REJECTED: {
+    label: "ถูกปฏิเสธ",
+    description: "ถูกปฏิเสธ รอแก้ไขและส่งใหม่",
+    color: "text-red-600",
+    bgColor: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900",
+    dotColor: "bg-red-500",
+  },
+};
+
+export const APPROVAL_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  NOT_REQUIRED: { label: "ไม่ต้องอนุมัติ", color: "gray" },
+  PENDING: { label: "รออนุมัติ", color: "orange" },
+  APPROVED: { label: "อนุมัติแล้ว", color: "green" },
+  REJECTED: { label: "ถูกปฏิเสธ", color: "red" },
 };

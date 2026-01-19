@@ -105,20 +105,13 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
   transformCreateData: (body) => {
     const { vatAmount, whtAmount, netPaid, ...data } = body;
     
-    // Use status selected by user as workflowStatus (new workflow)
-    // If not selected, auto-determine based on document state
     const isWht = data.isWht || false;
     const hasTaxInvoice = (data.taxInvoiceUrls?.length || 0) > 0;
-    let workflowStatus = data.status; // Use user's selection
     
-    // If no status selected, auto-determine
-    if (!workflowStatus) {
-      if (hasTaxInvoice) {
-        workflowStatus = isWht ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
-      } else {
-        workflowStatus = "WAITING_TAX_INVOICE";
-      }
-    }
+    // NEW: Always start as DRAFT - workflowStatus will be updated when submitted
+    // The approvalStatus is set to NOT_REQUIRED by default (schema default)
+    // It will be changed to PENDING when user submits for approval (if required)
+    const workflowStatus = "DRAFT";
     
     return {
       id: randomUUID(), // Generate unique ID for expense

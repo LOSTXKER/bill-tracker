@@ -46,8 +46,13 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
       },
       {
         key: "expenses:create",
-        label: "สร้างใหม่",
-        description: "เพิ่มรายจ่ายใหม่เข้าระบบ",
+        label: "สร้างร่าง",
+        description: "สร้างรายจ่ายใหม่เป็นร่าง (รอส่งอนุมัติ)",
+      },
+      {
+        key: "expenses:create-direct",
+        label: "สร้างโดยตรง",
+        description: "สร้างรายจ่ายและกดจ่ายได้เลยโดยไม่ต้องรออนุมัติ",
       },
       {
         key: "expenses:update",
@@ -63,6 +68,11 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
         key: "expenses:approve",
         label: "อนุมัติ",
         description: "อนุมัติรายจ่ายที่รออนุมัติ",
+      },
+      {
+        key: "expenses:mark-paid",
+        label: "บันทึกจ่ายแล้ว",
+        description: "กดยืนยันว่าจ่ายแล้ว (หลังอนุมัติ)",
       },
       {
         key: "expenses:change-status",
@@ -84,8 +94,13 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
       },
       {
         key: "incomes:create",
-        label: "สร้างใหม่",
-        description: "เพิ่มรายรับใหม่เข้าระบบ",
+        label: "สร้างร่าง",
+        description: "สร้างรายรับใหม่เป็นร่าง (รอส่งอนุมัติ)",
+      },
+      {
+        key: "incomes:create-direct",
+        label: "สร้างโดยตรง",
+        description: "สร้างรายรับและกดรับเงินได้เลยโดยไม่ต้องรออนุมัติ",
       },
       {
         key: "incomes:update",
@@ -96,6 +111,16 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
         key: "incomes:delete",
         label: "ลบ",
         description: "ลบรายรับออกจากระบบ (ระมัดระวัง!)",
+      },
+      {
+        key: "incomes:approve",
+        label: "อนุมัติ",
+        description: "อนุมัติรายรับที่รออนุมัติ",
+      },
+      {
+        key: "incomes:mark-received",
+        label: "บันทึกรับเงินแล้ว",
+        description: "กดยืนยันว่ารับเงินแล้ว (หลังอนุมัติ)",
       },
       {
         key: "incomes:change-status",
