@@ -11,6 +11,7 @@
 
 import { prisma } from "@/lib/db";
 import { analyzeImage } from "./gemini";
+import { findBestMatchingContact } from "@/lib/utils/string-similarity";
 
 // Import types from centralized location
 import type {
@@ -389,6 +390,17 @@ function parseAIResponse(
         matchedContactId = foundByTaxId.id;
         matchedContactName = foundByTaxId.name;
         console.log("[AI] Contact matched by taxId verification:", foundByTaxId.name);
+      }
+    }
+
+    // ถ้ายังไม่ match และมีชื่อ vendor → ลองหาด้วย fuzzy name matching
+    // (รองรับกรณีชื่อมี/ไม่มีคำนำหน้า เช่น "น.ส.กฤติกา ดวงใจ" vs "กฤติกา ดวงใจ")
+    if (!matchedContactId && parsed.vendor?.name) {
+      const foundByName = findBestMatchingContact(parsed.vendor.name, contacts, 0.85);
+      if (foundByName) {
+        matchedContactId = foundByName.id;
+        matchedContactName = foundByName.name;
+        console.log("[AI] Contact matched by fuzzy name:", parsed.vendor.name, "→", foundByName.name);
       }
     }
 

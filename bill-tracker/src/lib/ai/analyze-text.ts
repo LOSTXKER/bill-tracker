@@ -9,6 +9,7 @@
 
 import { prisma } from "@/lib/db";
 import { generateText } from "./gemini";
+import { findBestMatchingContact } from "@/lib/utils/string-similarity";
 import type { ReceiptAnalysisResult } from "./types";
 
 export interface TextAnalysisInput {
@@ -301,6 +302,30 @@ function parseAIResponse(
       if (matchedContact) {
         matchedContactId = matchedContact.id;
         matchedContactName = matchedContact.name;
+      }
+    }
+
+    // ถ้า AI ไม่ match แต่เรามี taxId → ลองหาเอง
+    if (!matchedContactId && parsed.vendor?.taxId) {
+      const normalizedTaxId = parsed.vendor.taxId.replace(/[^0-9]/g, "");
+      const foundByTaxId = contacts.find(c => 
+        c.taxId?.replace(/[^0-9]/g, "") === normalizedTaxId
+      );
+      if (foundByTaxId) {
+        matchedContactId = foundByTaxId.id;
+        matchedContactName = foundByTaxId.name;
+        console.log("[AI Text] Contact matched by taxId:", foundByTaxId.name);
+      }
+    }
+
+    // ถ้ายังไม่ match และมีชื่อ vendor → ลองหาด้วย fuzzy name matching
+    // (รองรับกรณีชื่อมี/ไม่มีคำนำหน้า เช่น "น.ส.กฤติกา ดวงใจ" vs "กฤติกา ดวงใจ")
+    if (!matchedContactId && parsed.vendor?.name) {
+      const foundByName = findBestMatchingContact(parsed.vendor.name, contacts, 0.85);
+      if (foundByName) {
+        matchedContactId = foundByName.id;
+        matchedContactName = foundByName.name;
+        console.log("[AI Text] Contact matched by fuzzy name:", parsed.vendor.name, "→", foundByName.name);
       }
     }
 

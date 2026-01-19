@@ -4,6 +4,52 @@
  */
 
 /**
+ * Thai name prefixes that should be stripped for comparison
+ */
+const THAI_NAME_PREFIXES = [
+  // Personal titles
+  "น.ส.", "นางสาว", "นาย", "นาง", "ด.ช.", "ด.ญ.", "เด็กชาย", "เด็กหญิง",
+  "คุณ", "พระ", "หลวง", "ดร.", "ศ.", "รศ.", "ผศ.", "อ.", "นพ.", "พญ.", "ทพ.", "ทพญ.",
+  "ร.ต.", "ร.ท.", "ร.อ.", "พ.ต.", "พ.ท.", "พ.อ.", "พล.ต.", "พล.ท.", "พล.อ.",
+  // Company prefixes
+  "บริษัท", "บจก.", "บมจ.", "หจก.", "ห้างหุ้นส่วนจำกัด", "ร้าน", "สำนักงาน",
+  // English equivalents
+  "mr.", "mrs.", "ms.", "miss", "dr.", "prof.",
+  "co.,ltd.", "co., ltd.", "ltd.", "inc.", "corp.", "llc",
+];
+
+/**
+ * Strip common Thai/English name prefixes and suffixes for comparison
+ */
+export function normalizeThaiName(name: string): string {
+  if (!name) return "";
+  
+  let normalized = name.trim().toLowerCase();
+  
+  // Remove prefixes
+  for (const prefix of THAI_NAME_PREFIXES) {
+    const prefixLower = prefix.toLowerCase();
+    if (normalized.startsWith(prefixLower)) {
+      normalized = normalized.slice(prefixLower.length).trim();
+    }
+  }
+  
+  // Remove common suffixes
+  const suffixes = ["จำกัด", "(มหาชน)", "มหาชน", "limited", "ltd", "inc", "corp"];
+  for (const suffix of suffixes) {
+    const suffixLower = suffix.toLowerCase();
+    if (normalized.endsWith(suffixLower)) {
+      normalized = normalized.slice(0, -suffixLower.length).trim();
+    }
+  }
+  
+  // Remove extra whitespace
+  normalized = normalized.replace(/\s+/g, " ").trim();
+  
+  return normalized;
+}
+
+/**
  * Tokenize a name into words for comparison
  */
 export function tokenizeName(name: string): string[] {
@@ -111,4 +157,57 @@ export function calculateStringSimilarity(str1: string, str2: string): number {
 
   // Return the higher score
   return Math.max(tokenSim, levenSim);
+}
+
+/**
+ * Calculate similarity between Thai names, ignoring common prefixes
+ * Best for matching contact names where titles may differ
+ * 
+ * @param str1 First name to compare
+ * @param str2 Second name to compare
+ * @returns Similarity score between 0 and 1
+ */
+export function calculateThaiNameSimilarity(str1: string, str2: string): number {
+  if (!str1 || !str2) return 0;
+  if (str1 === str2) return 1;
+
+  // Normalize both names (strip prefixes/suffixes)
+  const normalized1 = normalizeThaiName(str1);
+  const normalized2 = normalizeThaiName(str2);
+
+  // If normalized names are identical, high confidence match
+  if (normalized1 === normalized2) return 0.95;
+
+  // Calculate similarity on normalized names
+  return calculateStringSimilarity(normalized1, normalized2);
+}
+
+/**
+ * Find the best matching contact from a list by name
+ * Uses Thai name normalization for better matching
+ * 
+ * @param vendorName The name to search for
+ * @param contacts List of contacts to search in
+ * @param threshold Minimum similarity score to consider a match (default 0.8)
+ * @returns Best matching contact or null
+ */
+export function findBestMatchingContact<T extends { id: string; name: string }>(
+  vendorName: string,
+  contacts: T[],
+  threshold: number = 0.8
+): T | null {
+  if (!vendorName || contacts.length === 0) return null;
+
+  let bestMatch: T | null = null;
+  let bestScore = threshold;
+
+  for (const contact of contacts) {
+    const similarity = calculateThaiNameSimilarity(vendorName, contact.name);
+    if (similarity > bestScore) {
+      bestScore = similarity;
+      bestMatch = contact;
+    }
+  }
+
+  return bestMatch;
 }
