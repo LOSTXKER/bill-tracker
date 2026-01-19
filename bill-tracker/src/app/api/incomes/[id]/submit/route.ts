@@ -4,9 +4,8 @@
  */
 
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
-import { hasPermission } from "@/lib/permissions/checker";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
 import type { IncomeWorkflowStatus } from "@prisma/client";
@@ -15,24 +14,53 @@ export const POST = (
   request: Request,
   routeParams: { params: Promise<{ id: string }> }
 ) => {
-  return withCompanyAccess(
-    async (req, { company, session }) => {
+  return withAuth(
+    async (req, { session }) => {
       const { id } = await routeParams.params;
 
-      // Find the income
+      // Find the income with company info
       const income = await prisma.income.findFirst({
         where: {
           id,
-          companyId: company.id,
           deletedAt: null,
         },
         include: {
           Contact: true,
+          Company: true,
         },
       });
 
       if (!income) {
         return apiResponse.notFound("ไม่พบรายรับ");
+      }
+
+      const company = income.Company;
+      if (!company) {
+        return apiResponse.badRequest("ไม่พบข้อมูลบริษัท");
+      }
+
+      // Check if user has access to this company
+      const access = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: session.user.id,
+            companyId: company.id,
+          },
+        },
+      });
+
+      if (!access) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้");
+      }
+
+      // Check if user has incomes:create permission
+      const permissions = (access.permissions as string[]) || [];
+      const hasCreatePermission = access.isOwner || 
+        permissions.includes("incomes:create") || 
+        permissions.includes("incomes:*");
+      
+      if (!hasCreatePermission) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์สร้างรายรับ");
       }
 
       // Check current status - be flexible for existing records
@@ -64,11 +92,9 @@ export const POST = (
       }
 
       // Check if user has create-direct permission
-      const canCreateDirect = await hasPermission(
-        session.user.id,
-        company.id,
-        "incomes:create-direct"
-      );
+      const canCreateDirect = access.isOwner ||
+        permissions.includes("incomes:create-direct") ||
+        permissions.includes("incomes:*");
 
       // Determine workflow based on document state
       const isWhtDeducted = income.isWhtDeducted || false;
@@ -206,7 +232,6 @@ export const POST = (
           "ส่งคำขออนุมัติแล้ว"
         );
       }
-    },
-    { permission: "incomes:create" }
+    }
   )(request);
 };

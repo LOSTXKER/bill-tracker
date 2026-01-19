@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
 import { hasPermission } from "@/lib/permissions/checker";
 import { createAuditLog } from "@/lib/audit/logger";
@@ -15,24 +15,53 @@ export const POST = (
   request: Request,
   routeParams: { params: Promise<{ id: string }> }
 ) => {
-  return withCompanyAccess(
-    async (req, { company, session }) => {
+  return withAuth(
+    async (req, { session }) => {
       const { id } = await routeParams.params;
 
-      // Find the expense
+      // Find the expense with company info
       const expense = await prisma.expense.findFirst({
         where: {
           id,
-          companyId: company.id,
           deletedAt: null,
         },
         include: {
           Contact: true,
+          Company: true,
         },
       });
 
       if (!expense) {
         return apiResponse.notFound("ไม่พบรายจ่าย");
+      }
+
+      const company = expense.Company;
+      if (!company) {
+        return apiResponse.badRequest("ไม่พบข้อมูลบริษัท");
+      }
+
+      // Check if user has access to this company
+      const access = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: session.user.id,
+            companyId: company.id,
+          },
+        },
+      });
+
+      if (!access) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้");
+      }
+
+      // Check if user has expenses:create permission
+      const permissions = (access.permissions as string[]) || [];
+      const hasCreatePermission = access.isOwner || 
+        permissions.includes("expenses:create") || 
+        permissions.includes("expenses:*");
+      
+      if (!hasCreatePermission) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์สร้างรายจ่าย");
       }
 
       // Check current status - be flexible for existing records
@@ -64,11 +93,9 @@ export const POST = (
       }
 
       // Check if user has create-direct permission
-      const canCreateDirect = await hasPermission(
-        session.user.id,
-        company.id,
-        "expenses:create-direct"
-      );
+      const canCreateDirect = access.isOwner ||
+        permissions.includes("expenses:create-direct") ||
+        permissions.includes("expenses:*");
 
       // Determine workflow based on document state
       const isWht = expense.isWht || false;
@@ -206,7 +233,6 @@ export const POST = (
           "ส่งคำขออนุมัติแล้ว"
         );
       }
-    },
-    { permission: "expenses:create" }
+    }
   )(request);
 };
