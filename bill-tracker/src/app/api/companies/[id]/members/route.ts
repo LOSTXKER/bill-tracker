@@ -56,19 +56,11 @@ export const POST = withCompanyAccessFromParams(
     const { name, email, password, permissions = [], isOwner = false } = body;
 
     if (!name) {
-      return apiResponse.badRequest("Name is required");
+      return apiResponse.badRequest("กรุณาระบุชื่อ");
     }
 
     if (!email) {
-      return apiResponse.badRequest("Email is required");
-    }
-
-    if (!password) {
-      return apiResponse.badRequest("Password is required");
-    }
-
-    if (password.length < 6) {
-      return apiResponse.badRequest("Password must be at least 6 characters");
+      return apiResponse.badRequest("กรุณาระบุอีเมล");
     }
 
     // Validate email format
@@ -82,6 +74,9 @@ export const POST = withCompanyAccessFromParams(
       where: { email },
     });
 
+    let user;
+    let isNewUser = false;
+
     if (existingUser) {
       // Check if user already has access to this company
       const existingAccess = await prisma.companyAccess.findUnique({
@@ -94,27 +89,37 @@ export const POST = withCompanyAccessFromParams(
       });
 
       if (existingAccess) {
-        return apiResponse.error("User already has access to this company");
+        return apiResponse.badRequest("ผู้ใช้นี้มีสิทธิ์เข้าถึงบริษัทนี้อยู่แล้ว");
       }
 
-      return apiResponse.error("Email already registered. Please use a different email.");
+      // User exists but doesn't have access to this company - add them
+      user = existingUser;
+    } else {
+      // Create new user - password is required
+      if (!password) {
+        return apiResponse.badRequest("Password is required for new users");
+      }
+
+      if (password.length < 6) {
+        return apiResponse.badRequest("Password must be at least 6 characters");
+      }
+
+      const bcrypt = require("bcryptjs");
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      user = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          email,
+          name,
+          password: hashedPassword,
+          role: "STAFF",
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
+      isNewUser = true;
     }
-
-    // Hash password and create new user
-    const bcrypt = require("bcryptjs");
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await prisma.user.create({
-      data: {
-        id: crypto.randomUUID(),
-        email,
-        name,
-        password: hashedPassword,
-        role: "STAFF",
-        isActive: true, // Active immediately
-        updatedAt: new Date(),
-      },
-    });
 
     // Create company access
     const accessRaw = await prisma.companyAccess.create({
@@ -141,10 +146,11 @@ export const POST = withCompanyAccessFromParams(
     // Log the member creation
     await logMemberInvite(email, permissions, session.user.id, company.id);
 
-    return apiResponse.created(
-      { member: access },
-      "Member created successfully"
-    );
+    const message = isNewUser
+      ? "สร้างสมาชิกใหม่สำเร็จ"
+      : `เพิ่ม ${existingUser?.name || email} เข้าบริษัทสำเร็จ`;
+
+    return apiResponse.created({ member: access }, message);
   },
   {
     permission: "settings:manage-team",

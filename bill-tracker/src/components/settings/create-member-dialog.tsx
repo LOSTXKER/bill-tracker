@@ -58,19 +58,17 @@ export function CreateMemberDialog({
             return;
         }
 
-        if (!password) {
-            toast.error("กรุณากรอกรหัสผ่าน");
-            return;
-        }
+        // Password validation only if provided (required for new users, optional for existing)
+        if (password) {
+            if (password.length < 6) {
+                toast.error("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+                return;
+            }
 
-        if (password.length < 6) {
-            toast.error("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            toast.error("รหัสผ่านไม่ตรงกัน");
-            return;
+            if (password !== confirmPassword) {
+                toast.error("รหัสผ่านไม่ตรงกัน");
+                return;
+            }
         }
 
         try {
@@ -163,7 +161,6 @@ export function CreateMemberDialog({
                                 placeholder="อย่างน้อย 6 ตัวอักษร"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                required
                             />
                             <Button
                                 type="button"
@@ -179,20 +176,24 @@ export function CreateMemberDialog({
                                 )}
                             </Button>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                            * ถ้า email มีอยู่ในระบบแล้ว ไม่ต้องกรอกรหัสผ่าน (ใช้รหัสเดิม)
+                        </p>
                     </div>
 
                     {/* Confirm Password Input */}
-                    <div className="space-y-2">
-                        <Label htmlFor="confirmPassword">ยืนยันรหัสผ่าน</Label>
-                        <Input
-                            id="confirmPassword"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="ยืนยันรหัสผ่าน"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                        />
-                    </div>
+                    {password && (
+                        <div className="space-y-2">
+                            <Label htmlFor="confirmPassword">ยืนยันรหัสผ่าน</Label>
+                            <Input
+                                id="confirmPassword"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="ยืนยันรหัสผ่าน"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                            />
+                        </div>
+                    )}
 
                     {/* OWNER Checkbox */}
                     <div className="flex items-center space-x-2">
