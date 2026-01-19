@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { Check, Clock, CreditCard, FileText, FileBadge, Send, CheckCircle2, Wallet, Receipt, FileCheck, FileEdit } from "lucide-react";
+import { Check, Clock, CreditCard, FileText, FileBadge, Send, CheckCircle2, Wallet, Receipt, FileCheck, FileEdit, FileX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ApprovalStatus } from "@prisma/client";
+import type { ApprovalStatus, ExpenseDocumentType } from "@prisma/client";
 
 // =============================================================================
 // Types
@@ -14,6 +14,7 @@ interface TimelineStepperProps {
   currentStatus: string;
   isWht?: boolean;
   approvalStatus?: ApprovalStatus;
+  documentType?: ExpenseDocumentType;
   className?: string;
 }
 
@@ -27,6 +28,7 @@ interface Step {
 // Step Definitions
 // =============================================================================
 
+// Tax invoice flow (VAT 7%)
 const EXPENSE_STEPS: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
   { key: "RECEIVED_TAX_INVOICE", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
@@ -38,6 +40,21 @@ const EXPENSE_STEPS: Step[] = [
 const EXPENSE_STEPS_NO_WHT: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
   { key: "RECEIVED_TAX_INVOICE", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+// Cash receipt flow (VAT 0% with receipt)
+const EXPENSE_STEPS_CASH_RECEIPT: Step[] = [
+  { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
+  { key: "RECEIVED_TAX_INVOICE", label: "ได้บิลเงินสด", icon: <Receipt className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+// No document flow (VAT 0% without receipt)
+const EXPENSE_STEPS_NO_DOCUMENT: Step[] = [
+  { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
   { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
@@ -87,14 +104,27 @@ export function TimelineStepper({
   currentStatus,
   isWht = false,
   approvalStatus,
+  documentType,
   className,
 }: TimelineStepperProps) {
   // Check if still in DRAFT status
   const isDraft = currentStatus === "DRAFT";
   
-  // Get base steps based on type and WHT
+  // Get base steps based on type, WHT, and document type
+  const getExpenseSteps = (): Step[] => {
+    // For expenses, check document type first
+    if (documentType === "NO_DOCUMENT") {
+      return EXPENSE_STEPS_NO_DOCUMENT;
+    }
+    if (documentType === "CASH_RECEIPT") {
+      return EXPENSE_STEPS_CASH_RECEIPT;
+    }
+    // Default: TAX_INVOICE - check WHT
+    return isWht ? EXPENSE_STEPS : EXPENSE_STEPS_NO_WHT;
+  };
+  
   const baseSteps = type === "expense"
-    ? (isWht ? EXPENSE_STEPS : EXPENSE_STEPS_NO_WHT)
+    ? getExpenseSteps()
     : (isWht ? INCOME_STEPS : INCOME_STEPS_NO_WHT);
 
   // Add DRAFT step at the beginning if currently in draft

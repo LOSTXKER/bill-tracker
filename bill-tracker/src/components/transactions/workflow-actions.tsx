@@ -38,6 +38,7 @@ interface WorkflowActionsProps {
   currentStatus?: string; // alias for workflowStatus
   workflowStatus?: string;
   isWht?: boolean;
+  documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
   onActionComplete?: () => void;
   variant?: "default" | "compact";
 }
@@ -118,6 +119,7 @@ export function WorkflowActions({
   currentStatus,
   workflowStatus,
   isWht,
+  documentType = "TAX_INVOICE",
   onActionComplete,
   variant = "default",
 }: WorkflowActionsProps) {
@@ -133,9 +135,31 @@ export function WorkflowActions({
     ? EXPENSE_ACTIONS[status] || []
     : INCOME_ACTIONS[status] || [];
 
-  // Filter WHT actions based on isWht flag
-  const filteredActions = actions.filter((action) => {
+  // Modify action labels based on document type for expenses
+  const getModifiedActions = (baseActions: ActionConfig[]): ActionConfig[] => {
+    if (txType !== "expense") return baseActions;
+    
+    return baseActions.map(action => {
+      // For cash receipt, change the label for tax invoice actions
+      if (documentType === "CASH_RECEIPT" && action.action === "receive_tax_invoice") {
+        return {
+          ...action,
+          label: "ได้รับบิลเงินสด",
+          description: "บันทึกว่าได้รับบิลเงินสด/ใบเสร็จแล้ว"
+        };
+      }
+      return action;
+    });
+  };
+
+  // Filter WHT actions based on isWht flag and document type
+  const filteredActions = getModifiedActions(actions).filter((action) => {
+    // Hide WHT actions if not using WHT
     if (action.action.includes("wht") && !isWht) {
+      return false;
+    }
+    // For NO_DOCUMENT type, hide document-related actions (they shouldn't appear anyway)
+    if (documentType === "NO_DOCUMENT" && action.action === "receive_tax_invoice") {
       return false;
     }
     return true;

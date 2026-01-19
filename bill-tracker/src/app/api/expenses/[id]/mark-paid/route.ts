@@ -54,14 +54,21 @@ export const POST = (
         return apiResponse.badRequest("ไม่สามารถบันทึกจ่ายเงินได้ในสถานะนี้");
       }
 
-      // Determine workflow based on document state
+      // Determine workflow based on document type and state
       const isWht = expense.isWht || false;
       const hasTaxInvoice = expense.hasTaxInvoice || false;
+      const documentType = expense.documentType || "TAX_INVOICE";
       
       let targetWorkflowStatus: ExpenseWorkflowStatus;
-      if (hasTaxInvoice) {
-        targetWorkflowStatus = isWht ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
+      
+      // For NO_DOCUMENT type, skip directly to READY_FOR_ACCOUNTING
+      if (documentType === "NO_DOCUMENT") {
+        targetWorkflowStatus = "READY_FOR_ACCOUNTING";
+      } else if (hasTaxInvoice) {
+        // Has document already - check WHT (only for VAT 7% / TAX_INVOICE type)
+        targetWorkflowStatus = (isWht && documentType === "TAX_INVOICE") ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
       } else {
+        // Waiting for document (tax invoice or cash receipt)
         targetWorkflowStatus = "WAITING_TAX_INVOICE";
       }
 

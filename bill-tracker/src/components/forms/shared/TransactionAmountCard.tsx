@@ -28,6 +28,7 @@ import { formatCurrency, WHT_RATES } from "@/lib/utils/tax-calculator";
 import { VatToggle } from "./VatToggle";
 import { WhtSection } from "./WhtSection";
 import { CalculationSummary } from "./CalculationSummary";
+import { DocumentTypeSelector, ExpenseDocumentType } from "./DocumentTypeSelector";
 
 // =============================================================================
 // Types
@@ -66,6 +67,10 @@ export interface TransactionAmountCardProps {
   // WHT validation (for edit mode)
   whtChangeInfo?: WhtChangeInfo;
   
+  // Document type (for expenses with VAT 0%)
+  documentType?: ExpenseDocumentType;
+  onDocumentTypeChange?: (value: ExpenseDocumentType) => void;
+  
   // Calculated values
   totalWithVat: number;
   netAmount: number;
@@ -93,11 +98,17 @@ export function TransactionAmountCard({
   whtLabel = "หัก ณ ที่จ่าย",
   whtDescription = "หักภาษีผู้ขาย?",
   whtChangeInfo,
+  documentType = "TAX_INVOICE",
+  onDocumentTypeChange,
   totalWithVat,
   netAmount,
   netAmountLabel,
 }: TransactionAmountCardProps) {
   const isEditable = mode === "create" || mode === "edit";
+  
+  // For expenses: VAT 0% means no WHT and needs document type selection
+  const isExpenseNoVat = type === "expense" && vatRate === 0;
+  const showWhtSection = !isExpenseNoVat; // Hide WHT for VAT 0% expenses
   
   // WHT confirmation dialog state
   const [showWhtConfirmDialog, setShowWhtConfirmDialog] = useState(false);
@@ -147,18 +158,29 @@ export function TransactionAmountCard({
         
         <VatToggle value={vatRate} onChange={(value) => onVatRateChange?.(value)} />
 
-        <WhtSection
-          isEnabled={whtEnabled}
-          onToggle={(enabled) => {
-            onWhtToggle?.(enabled);
-          }}
-          selectedRate={whtRate}
-          onRateSelect={(rate, whtTypeValue) => {
-            onWhtRateSelect?.(rate, whtTypeValue);
-          }}
-          label={whtLabel}
-          description={whtDescription}
-        />
+        {/* Show document type selector for VAT 0% expenses */}
+        {isExpenseNoVat && onDocumentTypeChange && (
+          <DocumentTypeSelector
+            value={documentType}
+            onChange={onDocumentTypeChange}
+          />
+        )}
+
+        {/* Only show WHT section for VAT 7% (not for VAT 0% expenses) */}
+        {showWhtSection && (
+          <WhtSection
+            isEnabled={whtEnabled}
+            onToggle={(enabled) => {
+              onWhtToggle?.(enabled);
+            }}
+            selectedRate={whtRate}
+            onRateSelect={(rate, whtTypeValue) => {
+              onWhtRateSelect?.(rate, whtTypeValue);
+            }}
+            label={whtLabel}
+            description={whtDescription}
+          />
+        )}
 
         <Separator />
 
@@ -171,7 +193,7 @@ export function TransactionAmountCard({
           whtAmount={whtAmount}
           netAmount={netAmount}
           type={type}
-          showWhtNote={whtEnabled && !!whtRate}
+          showWhtNote={showWhtSection && whtEnabled && !!whtRate}
         />
       </div>
     );
@@ -272,46 +294,60 @@ export function TransactionAmountCard({
           <span className="font-mono font-medium">{formatCurrency(totalWithVat)}</span>
         </div>
 
-        {/* WHT Toggle */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{whtLabel}</span>
-            <Switch
-              checked={whtEnabled}
-              onCheckedChange={handleWhtToggle}
-              disabled={whtChangeInfo?.isLocked}
+        {/* Document Type Selector for VAT 0% expenses */}
+        {isExpenseNoVat && onDocumentTypeChange && (
+          <div className="pt-2">
+            <DocumentTypeSelector
+              value={documentType}
+              onChange={onDocumentTypeChange}
             />
-            {whtChangeInfo?.isLocked && (
-              <span className="text-xs text-muted-foreground">(ล็อคแล้ว)</span>
-            )}
           </div>
-          {whtEnabled && (
-            <span className="font-mono text-destructive">-{formatCurrency(whtAmount)}</span>
-          )}
-        </div>
+        )}
 
-        {/* WHT Type */}
-        {whtEnabled && (
-          <Select
-            value={whtType}
-            onValueChange={(v) => {
-              const opt = Object.entries(WHT_RATES).find(([key]) => key === v);
-              if (opt) {
-                onWhtRateSelect?.(opt[1].rate, v);
-              }
-            }}
-          >
-            <SelectTrigger className="h-9 bg-background">
-              <SelectValue placeholder="เลือกประเภทหัก ณ ที่จ่าย..." />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(WHT_RATES).map(([key, { rate, description }]) => (
-                <SelectItem key={key} value={key}>
-                  {description} ({rate}%)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* WHT Toggle - only for VAT 7% */}
+        {showWhtSection && (
+          <>
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">{whtLabel}</span>
+                <Switch
+                  checked={whtEnabled}
+                  onCheckedChange={handleWhtToggle}
+                  disabled={whtChangeInfo?.isLocked}
+                />
+                {whtChangeInfo?.isLocked && (
+                  <span className="text-xs text-muted-foreground">(ล็อคแล้ว)</span>
+                )}
+              </div>
+              {whtEnabled && (
+                <span className="font-mono text-destructive">-{formatCurrency(whtAmount)}</span>
+              )}
+            </div>
+
+            {/* WHT Type */}
+            {whtEnabled && (
+              <Select
+                value={whtType}
+                onValueChange={(v) => {
+                  const opt = Object.entries(WHT_RATES).find(([key]) => key === v);
+                  if (opt) {
+                    onWhtRateSelect?.(opt[1].rate, v);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 bg-background">
+                  <SelectValue placeholder="เลือกประเภทหัก ณ ที่จ่าย..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(WHT_RATES).map(([key, { rate, description }]) => (
+                    <SelectItem key={key} value={key}>
+                      {description} ({rate}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </>
         )}
       </div>
 

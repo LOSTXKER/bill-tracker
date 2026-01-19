@@ -252,6 +252,7 @@ model Expense {
   accountId                                  String?
   hasTaxInvoice                              Boolean               @default(false)
   hasWhtCert                                 Boolean               @default(false)
+  documentType                               ExpenseDocumentType   @default(TAX_INVOICE)
   sentToAccountAt                            DateTime?
   taxInvoiceAt                               DateTime?
   whtCertIssuedAt                            DateTime?
@@ -629,6 +630,12 @@ enum ExpenseDocStatus {
   PENDING_PHYSICAL
   READY_TO_SEND
   SENT_TO_ACCOUNT
+}
+
+enum ExpenseDocumentType {
+  TAX_INVOICE   // ใบกำกับภาษี (VAT 7%)
+  CASH_RECEIPT  // บิลเงินสด (VAT 0%)
+  NO_DOCUMENT   // ไม่มีเอกสาร (VAT 0%)
 }
 
 enum ExpenseWorkflowStatus {

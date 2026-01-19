@@ -329,6 +329,7 @@ export function UnifiedTransactionForm({
   const watchWhtRate = watch("whtRate") as number;
   const watchWhtType = watch("whtType") as string;
   const watchDate = watch(config.fields.dateField.name);
+  const watchDocumentType = watch("documentType") as string | undefined;
 
   // Initialize files from prefill data (e.g., from reimbursement)
   const [filesInitialized, setFilesInitialized] = useState(false);
@@ -380,6 +381,7 @@ export function UnifiedTransactionForm({
           invoiceNumber: data.invoiceNumber,
           referenceNo: data.referenceNo,
           notes: data.notes,
+          documentType: data.documentType || "TAX_INVOICE",
           [config.fields.dateField.name]: data[config.fields.dateField.name] ? new Date(data[config.fields.dateField.name]) : undefined,
           ...(config.fields.descriptionField ? { [config.fields.descriptionField.name]: data[config.fields.descriptionField.name] } : {}),
           ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate) : undefined } : {}),
@@ -1119,6 +1121,7 @@ export function UnifiedTransactionForm({
         invoiceNumber: transaction.invoiceNumber,
         referenceNo: transaction.referenceNo,
         notes: transaction.notes,
+        documentType: transaction.documentType || "TAX_INVOICE",
         [config.fields.dateField.name]: transaction[config.fields.dateField.name]
           ? new Date(transaction[config.fields.dateField.name] as string)
           : undefined,
@@ -1203,6 +1206,33 @@ export function UnifiedTransactionForm({
       }
     }
   }, [setValue, config.fields.whtField.name]);
+
+  // Handle document type change (for VAT 0% expenses)
+  const handleDocumentTypeChange = useCallback((docType: string) => {
+    setValue("documentType", docType);
+  }, [setValue]);
+
+  // Auto-disable WHT when VAT changes to 0% for expenses
+  // Also set default document type
+  const prevVatRateRef = useRef(watchVatRate);
+  useEffect(() => {
+    if (config.type === "expense" && prevVatRateRef.current !== watchVatRate) {
+      if (watchVatRate === 0) {
+        // VAT changed to 0% - disable WHT and set default document type
+        setValue(config.fields.whtField.name, false);
+        setValue("whtRate", undefined);
+        setValue("whtType", undefined);
+        // Set default document type to CASH_RECEIPT for VAT 0%
+        if (!watchDocumentType || watchDocumentType === "TAX_INVOICE") {
+          setValue("documentType", "CASH_RECEIPT");
+        }
+      } else {
+        // VAT changed to 7% - set document type to TAX_INVOICE
+        setValue("documentType", "TAX_INVOICE");
+      }
+      prevVatRateRef.current = watchVatRate;
+    }
+  }, [watchVatRate, watchDocumentType, config.type, config.fields.whtField.name, setValue]);
 
   // Loading state for view/edit mode
   if (mode !== "create" && loading) {
@@ -1346,6 +1376,7 @@ export function UnifiedTransactionForm({
                       transactionId={transaction.id}
                       currentStatus={transaction.workflowStatus}
                       isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
+                      documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") : undefined}
                       onActionComplete={() => {
                         fetchTransaction();
                         setAuditRefreshKey((k) => k + 1);
@@ -1379,6 +1410,7 @@ export function UnifiedTransactionForm({
                 currentStatus={transaction.workflowStatus}
                 isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
                 approvalStatus={transaction.approvalStatus as ApprovalStatus | undefined}
+                documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT" | undefined) : undefined}
               />
             </div>
           )}
@@ -1469,6 +1501,8 @@ export function UnifiedTransactionForm({
                     whtLabel={config.fields.whtField.label}
                     whtDescription={config.fields.whtField.description}
                     whtChangeInfo={whtChangeInfo}
+                    documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
+                    onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
                     totalWithVat={calculation.totalWithVat}
                     netAmount={calculation.netAmount}
                     netAmountLabel={config.fields.netAmountLabel}
@@ -1611,6 +1645,8 @@ export function UnifiedTransactionForm({
                     whtLabel={config.fields.whtField.label}
                     whtDescription={config.fields.whtField.description}
                     whtChangeInfo={whtChangeInfo}
+                    documentType={(transaction?.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || (watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
+                    onDocumentTypeChange={config.type === "expense" && mode === "edit" ? handleDocumentTypeChange : undefined}
                     totalWithVat={calculation.totalWithVat}
                     netAmount={calculation.netAmount}
                     netAmountLabel={config.fields.netAmountLabel}

@@ -67,6 +67,7 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
       billDate: new Date(),
       invoiceNumber: "",
       referenceNo: "",
+      documentType: "TAX_INVOICE", // Default for VAT 7%
     },
 
     // Status options - NEW Workflow statuses

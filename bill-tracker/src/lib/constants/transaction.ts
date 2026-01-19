@@ -392,3 +392,63 @@ export const APPROVAL_STATUS_LABELS: Record<string, { label: string; color: stri
   APPROVED: { label: "อนุมัติแล้ว", color: "green" },
   REJECTED: { label: "ถูกปฏิเสธ", color: "red" },
 };
+
+// =============================================================================
+// Expense Document Type Configuration
+// =============================================================================
+
+export const EXPENSE_DOCUMENT_TYPE_OPTIONS = [
+  { value: "TAX_INVOICE", label: "ใบกำกับภาษี", description: "สำหรับรายจ่ายที่มี VAT 7%" },
+  { value: "CASH_RECEIPT", label: "บิลเงินสด", description: "สำหรับรายจ่ายที่ไม่มี VAT" },
+  { value: "NO_DOCUMENT", label: "ไม่มีเอกสาร", description: "ค่าใช้จ่ายเบ็ดเตล็ด" },
+] as const;
+
+export const EXPENSE_DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  TAX_INVOICE: "ใบกำกับภาษี",
+  CASH_RECEIPT: "บิลเงินสด",
+  NO_DOCUMENT: "ไม่มีเอกสาร",
+};
+
+// Dynamic labels based on document type
+export const EXPENSE_WORKFLOW_LABELS_BY_DOC_TYPE: Record<string, Record<string, string>> = {
+  TAX_INVOICE: {
+    WAITING_TAX_INVOICE: "รอใบกำกับ",
+    TAX_INVOICE_RECEIVED: "ได้ใบกำกับแล้ว",
+  },
+  CASH_RECEIPT: {
+    WAITING_TAX_INVOICE: "รอบิลเงินสด",
+    TAX_INVOICE_RECEIVED: "ได้บิลเงินสดแล้ว",
+  },
+  NO_DOCUMENT: {
+    // No document steps - skip directly to READY_FOR_ACCOUNTING
+  },
+};
+
+// Helper function to get workflow label based on document type
+export function getExpenseWorkflowLabel(
+  status: string,
+  documentType: string = "TAX_INVOICE"
+): string {
+  // Check if there's a document-type specific label
+  const docTypeLabels = EXPENSE_WORKFLOW_LABELS_BY_DOC_TYPE[documentType];
+  if (docTypeLabels && docTypeLabels[status]) {
+    return docTypeLabels[status];
+  }
+  // Fall back to default labels
+  return EXPENSE_WORKFLOW_INFO[status]?.label || status;
+}
+
+// Workflow flows based on document type
+export const EXPENSE_WORKFLOW_FLOW_NO_DOC = [
+  "DRAFT",
+  "READY_FOR_ACCOUNTING",
+  "SENT_TO_ACCOUNTANT",
+] as const;
+
+export const EXPENSE_WORKFLOW_FLOW_CASH_RECEIPT = [
+  "DRAFT",
+  "WAITING_TAX_INVOICE",  // Shows as "รอบิลเงินสด"
+  "TAX_INVOICE_RECEIVED", // Shows as "ได้บิลเงินสดแล้ว"
+  "READY_FOR_ACCOUNTING",
+  "SENT_TO_ACCOUNTANT",
+] as const;
