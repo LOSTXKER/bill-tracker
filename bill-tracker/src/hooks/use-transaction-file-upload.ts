@@ -62,6 +62,10 @@ export function useTransactionFileUpload({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", folder);
+      // Pass the original filename to preserve it in storage
+      if (file.name && file.name !== "blob") {
+        formData.append("filename", file.name);
+      }
 
       const uploadRes = await fetch("/api/upload", {
         method: "POST",

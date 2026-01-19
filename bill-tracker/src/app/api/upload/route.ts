@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const folder = (formData.get("folder") as string) || "receipts";
+    const providedFilename = formData.get("filename") as string | null;
 
     if (!file) {
       return apiResponse.badRequest("No file uploaded");
@@ -33,8 +34,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upload to Supabase Storage
-    const { url, path } = await uploadToSupabase(file, folder);
+    // Use provided filename or original file name
+    // If file.name is "blob" (from clipboard/compression), use provided filename or generate based on type
+    let originalFilename = file.name || "file";
+    if (providedFilename) {
+      originalFilename = providedFilename;
+    } else if (originalFilename === "blob" || !originalFilename.includes(".")) {
+      // Generate a proper filename based on mime type
+      const extMap: Record<string, string> = {
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/gif": "gif",
+        "application/pdf": "pdf",
+      };
+      const ext = extMap[file.type] || "file";
+      const timestamp = Date.now();
+      originalFilename = `upload_${timestamp}.${ext}`;
+    }
+
+    // Upload to Supabase Storage with the proper filename
+    const { url, path } = await uploadToSupabase(file, folder, originalFilename);
 
     return apiResponse.success({
       url,

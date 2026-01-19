@@ -81,15 +81,22 @@ export function decodeOriginalFilename(storedFilename: string): string {
 
 /**
  * Upload a file to Supabase Storage
+ * @param file - The file to upload
+ * @param folder - The folder path in storage
+ * @param originalFilename - Optional original filename (if different from file.name)
  */
 export async function uploadToSupabase(
   file: File,
-  folder: string = "receipts"
+  folder: string = "receipts",
+  originalFilename?: string
 ): Promise<{ url: string; path: string }> {
   const supabase = getSupabaseClient();
   
+  // Use provided filename or file.name
+  const nameToUse = originalFilename || file.name;
+  
   // Generate filename that preserves original name
-  const filename = sanitizeFilename(file.name);
+  const filename = sanitizeFilename(nameToUse);
   const path = `${folder}/${filename}`;
 
   // Upload file
