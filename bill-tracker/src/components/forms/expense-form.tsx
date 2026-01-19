@@ -3,7 +3,6 @@
 import { Receipt } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
-import { DatePicker } from "./shared/DatePicker";
 import {
   EXPENSE_WORKFLOW_FLOW,
   EXPENSE_WORKFLOW_INFO,
@@ -95,39 +94,10 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
       wht: { urlsField: "whtCertUrls", label: "หนังสือรับรองหัก ณ ที่จ่าย" },
     },
 
-    // Additional fields renderer (due date for expenses)
-    renderAdditionalFields: ({ register, watch, setValue, mode }) => {
-      const isEditable = mode === "create" || mode === "edit";
-      const dueDate = watch("dueDate");
+    // Additional fields renderer - removed dueDate
+    renderAdditionalFields: undefined,
 
-      if (isEditable) {
-        return (
-          <DatePicker
-            label="วันครบกำหนด (ถ้ามี)"
-            value={dueDate as Date | undefined}
-            onChange={(date) => setValue("dueDate", date)}
-          />
-        );
-      }
-
-      // View mode
-      return (
-        <div className="space-y-2">
-          <label className="text-sm text-muted-foreground">วันครบกำหนด</label>
-          <p className="text-sm font-medium">
-            {dueDate
-              ? new Date(dueDate as string).toLocaleDateString("th-TH", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })
-              : <span className="text-muted-foreground">-</span>}
-          </p>
-        </div>
-      );
-    },
-
-    showDueDate: true,
+    showDueDate: false,
   };
 }
 

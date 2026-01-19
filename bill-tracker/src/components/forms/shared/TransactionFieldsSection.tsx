@@ -290,23 +290,7 @@ export function TransactionFieldsSection({
           </div>
         )}
 
-        {/* Row 4: Invoice & Reference */}
-        <div className="grid grid-cols-2 gap-x-12">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">เลขที่ใบกำกับ</p>
-            <p className="text-base font-semibold text-foreground">
-              {(watch("invoiceNumber") as string) || <span className="text-muted-foreground font-normal">-</span>}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">เลขอ้างอิง</p>
-            <p className="text-base font-semibold text-foreground">
-              {(watch("referenceNo") as string) || <span className="text-muted-foreground font-normal">-</span>}
-            </p>
-          </div>
-        </div>
-
-        {/* Row 5: Due Date */}
+        {/* Row 4: Additional fields (Due Date removed) */}
         {renderAdditionalFields?.()}
         
         {/* Row 6: Reference URLs */}
@@ -448,33 +432,7 @@ export function TransactionFieldsSection({
         </div>
       )}
 
-      {/* Row 4: Invoice Number & Reference No */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="invoiceNumber" className="text-sm text-muted-foreground">
-            เลขที่ใบกำกับ
-          </Label>
-          <Input
-            id="invoiceNumber"
-            placeholder="เลขที่ใบกำกับภาษี (ถ้ามี)"
-            className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-            {...register("invoiceNumber")}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="referenceNo" className="text-sm text-muted-foreground">
-            เลขอ้างอิง
-          </Label>
-          <Input
-            id="referenceNo"
-            placeholder="เลขอ้างอิง (ถ้ามี)"
-            className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-            {...register("referenceNo")}
-          />
-        </div>
-      </div>
-
-      {/* Row 5: Additional fields + Status */}
+      {/* Row 4: Additional fields + Status */}
       <div className="grid sm:grid-cols-2 gap-4">
         {renderAdditionalFields?.()}
 
