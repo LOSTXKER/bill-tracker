@@ -5,6 +5,7 @@
  * 
  * Advanced UI for building custom permission sets
  * Features:
+ * - Role presets for quick setup
  * - Tab groups for each module
  * - Toggle all switch for entire module
  * - Individual permission toggles
@@ -18,9 +19,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { PERMISSION_GROUPS } from "@/lib/permissions/groups";
-import { Info } from "lucide-react";
+import { PERMISSION_GROUPS, ROLE_PRESETS } from "@/lib/permissions/groups";
+import { Info, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PermissionBuilderProps {
   value: string[];
@@ -115,8 +118,85 @@ export function PermissionBuilder({
     }, 0);
   };
 
+  /**
+   * Check if current permissions match a role preset
+   */
+  const matchesPreset = (presetKey: string): boolean => {
+    const preset = ROLE_PRESETS.find((r) => r.key === presetKey);
+    if (!preset) return false;
+    
+    // Check if all preset permissions are present
+    const hasAll = preset.permissions.every((p) => value.includes(p));
+    // Check if no extra permissions
+    const noExtras = value.every((p) => preset.permissions.includes(p));
+    
+    return hasAll && noExtras;
+  };
+
+  /**
+   * Apply a role preset
+   */
+  const applyPreset = (presetKey: string) => {
+    const preset = ROLE_PRESETS.find((r) => r.key === presetKey);
+    if (!preset) return;
+    onChange([...preset.permissions]);
+  };
+
   return (
     <div className="space-y-4">
+      {/* Role Presets */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">เลือก Role สำเร็จรูป:</span>
+          <span className="text-xs text-muted-foreground">(หรือกำหนดเองด้านล่าง)</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {ROLE_PRESETS.map((preset) => {
+            const Icon = preset.icon;
+            const isSelected = matchesPreset(preset.key);
+            
+            return (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => applyPreset(preset.key)}
+                disabled={disabled}
+                className={cn(
+                  "relative flex flex-col items-start gap-2 p-4 rounded-lg border-2 text-left transition-all",
+                  "hover:border-primary/50 hover:bg-primary/5",
+                  isSelected
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-card"
+                )}
+              >
+                {isSelected && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-4 w-4 text-primary" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "p-2 rounded-lg",
+                    isSelected ? "bg-primary/20" : "bg-muted"
+                  )}>
+                    <Icon className={cn(
+                      "h-4 w-4",
+                      isSelected ? "text-primary" : "text-muted-foreground"
+                    )} />
+                  </div>
+                  <span className="font-semibold">{preset.label}</span>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {preset.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Separator />
+
       {/* Summary */}
       <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-2">

@@ -15,8 +15,126 @@ import {
   Wallet,
   MessageSquare,
   Banknote,
+  Calculator,
+  UserCircle,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
+
+// =============================================================================
+// Role Presets - ชุดสิทธิ์สำเร็จรูป
+// =============================================================================
+
+export interface RolePreset {
+  key: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  permissions: string[];
+}
+
+export const ROLE_PRESETS: RolePreset[] = [
+  {
+    key: "accountant",
+    label: "บัญชี",
+    description: "ดูรายการทั้งหมด, เปลี่ยนสถานะเอกสาร, ส่งออกรายงาน, จัดการโอนคืน",
+    icon: Calculator,
+    permissions: [
+      // Expenses - ดู, เปลี่ยนสถานะ
+      "expenses:read",
+      "expenses:change-status",
+      // Incomes - ดู, เปลี่ยนสถานะ
+      "incomes:read",
+      "incomes:change-status",
+      // Contacts - ดูอย่างเดียว
+      "contacts:read",
+      // Reports - ดูและส่งออก
+      "reports:read",
+      "reports:export",
+      // Reimbursements - จ่ายเงินคืน
+      "reimbursements:read",
+      "reimbursements:pay",
+      // Settlements - จัดการโอนคืน
+      "settlements:read",
+      "settlements:manage",
+      // Comments
+      "comments:read",
+      "comments:create",
+      // Audit logs
+      "audit:read",
+    ],
+  },
+  {
+    key: "employee",
+    label: "พนักงาน",
+    description: "สร้างรายจ่าย (รออนุมัติ), ส่งเบิกจ่าย, ดูรายการของตัวเอง",
+    icon: UserCircle,
+    permissions: [
+      // Expenses - สร้างร่าง (ต้องรออนุมัติ)
+      "expenses:read",
+      "expenses:create",
+      // Incomes - ดูอย่างเดียว
+      "incomes:read",
+      // Contacts - ดูและสร้าง
+      "contacts:read",
+      "contacts:create",
+      // Reimbursements - ส่งคำขอเบิก
+      "reimbursements:read",
+      "reimbursements:create",
+      // Comments
+      "comments:read",
+      "comments:create",
+      "comments:delete",
+    ],
+  },
+  {
+    key: "manager",
+    label: "ผู้จัดการ",
+    description: "สิทธิ์เกือบทั้งหมด ยกเว้นจัดการทีมและลบข้อมูล",
+    icon: Shield,
+    permissions: [
+      // Expenses - ทั้งหมดยกเว้นลบ
+      "expenses:read",
+      "expenses:create",
+      "expenses:create-direct",
+      "expenses:update",
+      "expenses:approve",
+      "expenses:mark-paid",
+      "expenses:change-status",
+      // Incomes - ทั้งหมดยกเว้นลบ
+      "incomes:read",
+      "incomes:create",
+      "incomes:create-direct",
+      "incomes:update",
+      "incomes:approve",
+      "incomes:mark-received",
+      "incomes:change-status",
+      // Contacts - ทั้งหมดยกเว้นลบ
+      "contacts:read",
+      "contacts:create",
+      "contacts:update",
+      // Reports
+      "reports:read",
+      "reports:export",
+      // Settings - ดูอย่างเดียว
+      "settings:read",
+      // Reimbursements - อนุมัติได้
+      "reimbursements:read",
+      "reimbursements:create",
+      "reimbursements:approve",
+      // Settlements
+      "settlements:read",
+      "settlements:manage",
+      // Comments
+      "comments:read",
+      "comments:create",
+      "comments:delete",
+      "comments:delete-all",
+      // Audit
+      "audit:read",
+    ],
+  },
+];
 
 export interface PermissionItem {
   key: string;
