@@ -78,41 +78,63 @@ export function TextInputSection({
       // Convert to MultiDocAnalysisResult format for compatibility
       if (onAiResult && result) {
         const aiResult: MultiDocAnalysisResult = {
-          // Smart extracted data
-          smart: {
-            vendor: result.vendor,
-            date: result.date,
-            currency: result.currency || "THB",
+          // Combined extracted data
+          combined: {
+            vendorName: result.vendor?.name || null,
+            vendorTaxId: result.vendor?.taxId || null,
+            vendorBranchNumber: result.vendor?.branchNumber || null,
+            vendorAddress: result.vendor?.address || null,
+            vendorPhone: result.vendor?.phone || null,
             amount: result.amount,
             vatAmount: result.vatAmount,
             vatRate: result.vatRate,
-            wht: result.wht,
+            whtRate: result.wht?.rate || null,
+            whtAmount: result.wht?.amount || null,
+            whtType: result.wht?.type || null,
             netAmount: result.netAmount,
-            documentType: "TEXT_INPUT",
+            date: result.date,
             invoiceNumber: result.invoiceNumber,
-            items: result.items || [],
-            confidence: result.confidence,
+            documentType: "TEXT_INPUT",
             description: result.description,
+            items: result.items || [],
           },
-          // AI account suggestion
-          aiAccountSuggestion: result.account?.id ? {
-            account: {
-              id: result.account.id,
-              code: result.account.code,
-              name: result.account.name,
-            },
-            confidence: result.account.confidence || 0,
-            reason: result.account.reason || "AI วิเคราะห์จากข้อความ",
-            alternatives: result.accountAlternatives || [],
-          } : undefined,
+          // Suggested values
+          suggested: {
+            accountId: result.account?.id || null,
+            accountCode: result.account?.code || null,
+            accountName: result.account?.name || null,
+            contactId: result.vendor?.matchedContactId || null,
+            contactName: result.vendor?.matchedContactName || null,
+            vatRate: result.vatRate,
+            whtRate: result.wht?.rate || null,
+          },
+          // Confidence scores
+          confidence: result.confidence || {
+            overall: 0,
+            vendor: 0,
+            amount: 0,
+            date: 0,
+            account: 0,
+          },
           // No file assignments for text input
           fileAssignments: {},
-          // Empty categorized URLs
-          categorizedUrls: {
-            invoice: [],
-            slip: [],
-            whtCert: [],
-          },
+          // Smart matching info (null for text input)
+          smart: null,
+          // AI account suggestion
+          aiAccountSuggestion: result.account?.id ? {
+            accountId: result.account.id,
+            accountCode: result.account.code,
+            accountName: result.account.name,
+            confidence: result.account.confidence || 0,
+            reason: result.account.reason || "AI วิเคราะห์จากข้อความ",
+            alternatives: (result.accountAlternatives || []).map((alt: any) => ({
+              accountId: alt.id,
+              accountCode: alt.code,
+              accountName: alt.name,
+              confidence: alt.confidence || 50,
+              reason: alt.reason || "ทางเลือกอื่น",
+            })),
+          } : null,
         };
 
         onAiResult(aiResult);
