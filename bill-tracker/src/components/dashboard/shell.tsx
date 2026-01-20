@@ -178,6 +178,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: Banknote,
           permission: "settlements:read",
         },
+        {
+          name: "รายงานผู้ติดต่อ",
+          href: `/${companyCode}/reports/contacts`,
+          icon: Users,
+          permission: "expenses:read",
+        },
       ],
     },
     {
