@@ -32,6 +32,21 @@ function parseJsonArray(value: unknown): string[] {
   return [];
 }
 
+// Helper to parse JSON array that may contain objects (for otherDocUrls)
+function parseJsonArrayOrObject(value: unknown): any[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // GET /api/[company]/archive?month=1&year=2026&preview=true
 // Returns archive stats for preview
 async function handleGetPreview(
@@ -90,6 +105,7 @@ async function handleGetPreview(
     slipUrls: parseJsonArray(e.slipUrls),
     taxInvoiceUrls: parseJsonArray(e.taxInvoiceUrls),
     whtCertUrls: parseJsonArray(e.whtCertUrls),
+    otherDocUrls: parseJsonArrayOrObject(e.otherDocUrls),
   }));
 
   const incomesWithFiles = incomes.map((i) => ({
@@ -102,6 +118,7 @@ async function handleGetPreview(
     customerSlipUrls: parseJsonArray(i.customerSlipUrls),
     myBillCopyUrls: parseJsonArray(i.myBillCopyUrls),
     whtCertUrls: parseJsonArray(i.whtCertUrls),
+    otherDocUrls: parseJsonArrayOrObject(i.otherDocUrls),
   }));
 
   const stats = getArchiveStats(expensesWithFiles, incomesWithFiles);
@@ -177,6 +194,7 @@ async function handlePost(
       slipUrls: parseJsonArray(e.slipUrls),
       taxInvoiceUrls: parseJsonArray(e.taxInvoiceUrls),
       whtCertUrls: parseJsonArray(e.whtCertUrls),
+      otherDocUrls: parseJsonArrayOrObject(e.otherDocUrls),
     }));
 
     const incomesWithFiles = incomesRaw2.map((i) => ({
@@ -196,6 +214,7 @@ async function handlePost(
       customerSlipUrls: parseJsonArray(i.customerSlipUrls),
       myBillCopyUrls: parseJsonArray(i.myBillCopyUrls),
       whtCertUrls: parseJsonArray(i.whtCertUrls),
+      otherDocUrls: parseJsonArrayOrObject(i.otherDocUrls),
     }));
 
     // Generate archive

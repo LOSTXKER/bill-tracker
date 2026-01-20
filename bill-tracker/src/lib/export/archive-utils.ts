@@ -49,7 +49,7 @@ export function sanitizeFilename(filename: string): string {
  * 
  * @param date - Transaction date
  * @param contactName - Name of vendor/customer
- * @param type - Document type (slip, invoice, wht, bill)
+ * @param type - Document type (slip, invoice, wht, bill, other)
  * @param extension - File extension (pdf, jpg, png)
  * @param index - Optional index for duplicate names
  * @returns Formatted filename
@@ -57,7 +57,7 @@ export function sanitizeFilename(filename: string): string {
 export function generateFilename(
   date: Date,
   contactName: string | null,
-  type: "slip" | "invoice" | "wht" | "bill",
+  type: "slip" | "invoice" | "wht" | "bill" | "other",
   extension: string,
   index?: number
 ): string {
@@ -73,11 +73,12 @@ export function generateFilename(
  * @param type - Document type
  * @returns Folder path in Thai
  */
-export function getExpenseFolderPath(type: "slip" | "invoice" | "wht"): string {
+export function getExpenseFolderPath(type: "slip" | "invoice" | "wht" | "other"): string {
   const folderMap = {
     slip: "รายจ่าย/สลิปโอนเงิน",
     invoice: "รายจ่าย/ใบกำกับภาษี",
     wht: "รายจ่าย/หนังสือรับรองหัก ณ ที่จ่าย",
+    other: "รายจ่าย/เอกสารอื่นๆ",
   };
   return folderMap[type];
 }
@@ -87,11 +88,12 @@ export function getExpenseFolderPath(type: "slip" | "invoice" | "wht"): string {
  * @param type - Document type
  * @returns Folder path in Thai
  */
-export function getIncomeFolderPath(type: "slip" | "bill" | "wht"): string {
+export function getIncomeFolderPath(type: "slip" | "bill" | "wht" | "other"): string {
   const folderMap = {
     slip: "รายรับ/สลิปที่ลูกค้าโอน",
     bill: "รายรับ/สำเนาบิลที่ออก",
     wht: "รายรับ/ใบ 50 ทวิที่ได้รับ",
+    other: "รายรับ/เอกสารอื่นๆ",
   };
   return folderMap[type];
 }
@@ -159,12 +161,14 @@ export function generateReadmeContent(
 รายจ่าย/
   ├── ใบกำกับภาษี/          - ใบกำกับภาษีจากผู้ขาย
   ├── สลิปโอนเงิน/          - หลักฐานการโอนเงิน
-  └── หนังสือรับรองหัก ณ ที่จ่าย/ - ภ.ง.ด.3, 53, 54
+  ├── หนังสือรับรองหัก ณ ที่จ่าย/ - ภ.ง.ด.3, 53, 54
+  └── เอกสารอื่นๆ/          - ใบเสนอราคา, สัญญา, เอกสารประกอบอื่นๆ
 
 รายรับ/
   ├── สำเนาบิลที่ออก/       - บิล/ใบกำกับภาษีที่เราออกให้ลูกค้า
   ├── สลิปที่ลูกค้าโอน/     - หลักฐานการรับเงินจากลูกค้า
-  └── ใบ 50 ทวิที่ได้รับ/   - หนังสือรับรองการหักภาษี ณ ที่จ่าย
+  ├── ใบ 50 ทวิที่ได้รับ/   - หนังสือรับรองการหักภาษี ณ ที่จ่าย
+  └── เอกสารอื่นๆ/          - เอกสารประกอบอื่นๆ
 
 รายงานสรุป/
   - ไฟล์ Excel สรุปรายรับ-รายจ่าย

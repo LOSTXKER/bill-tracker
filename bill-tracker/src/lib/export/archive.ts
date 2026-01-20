@@ -29,6 +29,7 @@ interface ExpenseWithFiles {
   slipUrls: string[];
   taxInvoiceUrls: string[];
   whtCertUrls: string[];
+  otherDocUrls?: any[];
 }
 
 interface IncomeWithFiles {
@@ -48,6 +49,7 @@ interface IncomeWithFiles {
   customerSlipUrls: string[];
   myBillCopyUrls: string[];
   whtCertUrls: string[];
+  otherDocUrls?: any[];
 }
 
 export interface ArchiveOptions {
@@ -215,6 +217,24 @@ export async function generateAccountingArchive(
         })
       );
     });
+
+    // Add other document files
+    const otherDocs = expense.otherDocUrls || [];
+    otherDocs.forEach((doc, fileIdx) => {
+      // Handle both string and TypedOtherDoc formats
+      const url = typeof doc === 'string' ? doc : doc.url;
+      if (!url) return;
+      
+      const ext = getExtension(url);
+      const fileName = `เอกสารอื่นๆ_${String(fileIdx + 1).padStart(2, "0")}.${ext}`;
+      downloadPromises.push(
+        downloadFile(url).then((buffer) => {
+          if (buffer) {
+            archive.append(buffer, { name: `${expenseFolder}/${fileName}` });
+          }
+        })
+      );
+    });
   }
 
   // ========== Incomes Folder ==========
@@ -260,6 +280,24 @@ export async function generateAccountingArchive(
     income.whtCertUrls.forEach((url, fileIdx) => {
       const ext = getExtension(url);
       const fileName = `ใบ50ทวิ_${String(fileIdx + 1).padStart(2, "0")}.${ext}`;
+      downloadPromises.push(
+        downloadFile(url).then((buffer) => {
+          if (buffer) {
+            archive.append(buffer, { name: `${incomeFolder}/${fileName}` });
+          }
+        })
+      );
+    });
+
+    // Add other document files
+    const otherDocs = income.otherDocUrls || [];
+    otherDocs.forEach((doc, fileIdx) => {
+      // Handle both string and TypedOtherDoc formats
+      const url = typeof doc === 'string' ? doc : doc.url;
+      if (!url) return;
+      
+      const ext = getExtension(url);
+      const fileName = `เอกสารอื่นๆ_${String(fileIdx + 1).padStart(2, "0")}.${ext}`;
       downloadPromises.push(
         downloadFile(url).then((buffer) => {
           if (buffer) {
@@ -375,18 +413,22 @@ export function getArchiveStats(
   let totalIncomeAmount = 0;
 
   for (const expense of expenses) {
+    const otherDocsCount = (expense.otherDocUrls || []).length;
     totalExpenseFiles +=
       expense.slipUrls.length +
       expense.taxInvoiceUrls.length +
-      expense.whtCertUrls.length;
+      expense.whtCertUrls.length +
+      otherDocsCount;
     totalExpenseAmount += Number(expense.netPaid);
   }
 
   for (const income of incomes) {
+    const otherDocsCount = (income.otherDocUrls || []).length;
     totalIncomeFiles +=
       income.customerSlipUrls.length +
       income.myBillCopyUrls.length +
-      income.whtCertUrls.length;
+      income.whtCertUrls.length +
+      otherDocsCount;
     totalIncomeAmount += Number(income.netReceived);
   }
 

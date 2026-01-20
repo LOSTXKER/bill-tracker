@@ -39,6 +39,7 @@ interface ExpenseWithFiles {
   slipUrls: any;
   taxInvoiceUrls: any;
   whtCertUrls: any;
+  otherDocUrls: any;
 }
 
 interface IncomeWithFiles {
@@ -58,6 +59,7 @@ interface IncomeWithFiles {
   customerSlipUrls: any;
   myBillCopyUrls: any;
   whtCertUrls: any;
+  otherDocUrls: any;
 }
 
 export async function GET(
@@ -412,6 +414,27 @@ export async function GET(
               
               await addFileToArchive(url, getExpenseFolderPath("wht"), filename);
             }
+
+            // Add other document files
+            const otherDocs: any[] = Array.isArray(expense.otherDocUrls)
+              ? expense.otherDocUrls
+              : [];
+            for (const doc of otherDocs) {
+              // Handle both string[] and TypedOtherDoc[] formats
+              const url = typeof doc === 'string' ? doc : doc.url;
+              if (!url) continue;
+              
+              const ext = getFileExtension(url);
+              const baseFilename = generateFilename(expense.billDate, contactName, "other", ext);
+              
+              const key = `${getExpenseFolderPath("other")}/${baseFilename}`;
+              fileNameCounter[key] = (fileNameCounter[key] || 0) + 1;
+              const filename = fileNameCounter[key] > 1
+                ? generateFilename(expense.billDate, contactName, "other", ext, fileNameCounter[key])
+                : baseFilename;
+              
+              await addFileToArchive(url, getExpenseFolderPath("other"), filename);
+            }
           }
 
           // Process income files
@@ -467,6 +490,27 @@ export async function GET(
                 : baseFilename;
               
               await addFileToArchive(url, getIncomeFolderPath("wht"), filename);
+            }
+
+            // Add other document files
+            const otherDocs: any[] = Array.isArray(income.otherDocUrls)
+              ? income.otherDocUrls
+              : [];
+            for (const doc of otherDocs) {
+              // Handle both string[] and TypedOtherDoc[] formats
+              const url = typeof doc === 'string' ? doc : doc.url;
+              if (!url) continue;
+              
+              const ext = getFileExtension(url);
+              const baseFilename = generateFilename(income.receiveDate, contactName, "other", ext);
+              
+              const key = `${getIncomeFolderPath("other")}/${baseFilename}`;
+              fileNameCounter[key] = (fileNameCounter[key] || 0) + 1;
+              const filename = fileNameCounter[key] > 1
+                ? generateFilename(income.receiveDate, contactName, "other", ext, fileNameCounter[key])
+                : baseFilename;
+              
+              await addFileToArchive(url, getIncomeFolderPath("other"), filename);
             }
           }
 
