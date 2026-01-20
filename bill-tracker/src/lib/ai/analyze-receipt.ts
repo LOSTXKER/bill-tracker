@@ -217,12 +217,18 @@ ${contactList}
    - **สกุลเงิน** (currency) - ตรวจดูว่าเป็นสกุลเงินอะไร (THB, USD, AED, EUR, GBP, JPY, CNY, SGD, HKD, MYR)
    - ยอดก่อน VAT (amount) - ในสกุลเงินต้นฉบับ
    - VAT (vatAmount, vatRate)
-   - **หัก ณ ที่จ่าย (WHT)** - ⚠️ สำคัญมาก! ต้องหาให้เจอ:
-     - มองหาคำเหล่านี้ในเอกสาร: "จำนวนเงินที่ถูกหัก ณ ที่จ่าย", "ภาษีหัก ณ ที่จ่าย", "หัก ณ ที่จ่าย", "WHT", "Withholding Tax"
-     - ถ้าเห็นยอดเงินข้างๆ คำเหล่านี้ → ใส่ใน wht.amount
-     - whtRate: คำนวณจาก (whtAmount / amount) * 100 → ปัดเป็น 1%, 2%, 3%, หรือ 5%
-     - whtType: "ค่าบริการ" (ถ้าเป็นบริการ 3%), "ค่าขนส่ง" (1%), "ค่าเช่า" (5%)
-     - ⚠️ ถ้าเจอ "หัก ณ ที่จ่าย" ในเอกสาร ต้องดึงยอดมาใส่ wht.amount เสมอ!
+   - **หัก ณ ที่จ่าย (WHT)** - ⚠️⚠️⚠️ สำคัญที่สุด! ต้องหาให้เจอ:
+     - มองหาคำเหล่านี้ในเอกสาร:
+       * "จำนวนเงินที่ถูกหัก ณ ที่จ่าย" (ภาษาไทย)
+       * "ภาษีหัก ณ ที่จ่าย"
+       * "หัก ณ ที่จ่าย"  
+       * "หักภาษี ณ ที่จ่าย"
+       * "ภาษีถูกหัก"
+       * "WHT" / "Withholding Tax" (ภาษาอังกฤษ)
+     - ⚠️ ถ้าเห็นยอดเงินข้างๆ คำเหล่านี้ → wht.amount = ยอดนั้น
+     - wht.rate: คำนวณจาก (wht.amount / amount) * 100 แล้วปัดเป็น 1%, 2%, 3%, หรือ 5%
+     - wht.type: "ค่าบริการ" (ถ้าเป็นบริการ 3%), "ค่าขนส่ง" (1%), "ค่าเช่า" (5%)
+     - ⚠️ ต้องใส่ wht object เสมอ! ถ้าไม่มี WHT ใส่ { "rate": null, "amount": null, "type": null }
    - ยอดสุทธิที่ต้องจ่าย/รับจริง (netAmount) = "จำนวนเงินที่ชำระ" หรือ ยอดรวม VAT - หัก ณ ที่จ่าย
 
 4. **เลือกบัญชี** (สำคัญมาก!)
@@ -469,6 +475,13 @@ function parseAIResponse(
     }
 
     // Normalize WHT rate
+    console.log("[AI WHT Raw]", {
+      wht: parsed.wht,
+      rawRate: parsed.wht?.rate,
+      rawAmount: parsed.wht?.amount,
+      rawType: parsed.wht?.type,
+    });
+    
     let whtRate = parsed.wht?.rate;
     if (whtRate && ![1, 2, 3, 5, 10, 15].includes(whtRate)) {
       if (whtRate < 2) whtRate = 1;
