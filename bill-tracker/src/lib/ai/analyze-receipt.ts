@@ -85,6 +85,8 @@ export async function analyzeReceipt(
         console.error("[analyzeReceipt] AI error for", url, response.error);
         return null;
       }
+      // Debug: Log raw AI response to check WHT detection
+      console.log("[AI Raw Response]", response.data.substring(0, 500));
       return parseAIResponse(response.data, accounts, contacts, company?.taxId);
     });
 
@@ -217,18 +219,26 @@ ${contactList}
    - **สกุลเงิน** (currency) - ตรวจดูว่าเป็นสกุลเงินอะไร (THB, USD, AED, EUR, GBP, JPY, CNY, SGD, HKD, MYR)
    - ยอดก่อน VAT (amount) - ในสกุลเงินต้นฉบับ
    - VAT (vatAmount, vatRate)
-   - **หัก ณ ที่จ่าย (WHT)** - ⚠️⚠️⚠️ สำคัญที่สุด! ต้องหาให้เจอ:
-     - มองหาคำเหล่านี้ในเอกสาร:
-       * "จำนวนเงินที่ถูกหัก ณ ที่จ่าย" (ภาษาไทย)
-       * "ภาษีหัก ณ ที่จ่าย"
-       * "หัก ณ ที่จ่าย"  
-       * "หักภาษี ณ ที่จ่าย"
-       * "ภาษีถูกหัก"
-       * "WHT" / "Withholding Tax" (ภาษาอังกฤษ)
-     - ⚠️ ถ้าเห็นยอดเงินข้างๆ คำเหล่านี้ → wht.amount = ยอดนั้น
-     - wht.rate: คำนวณจาก (wht.amount / amount) * 100 แล้วปัดเป็น 1%, 2%, 3%, หรือ 5%
-     - wht.type: "ค่าบริการ" (ถ้าเป็นบริการ 3%), "ค่าขนส่ง" (1%), "ค่าเช่า" (5%)
-     - ⚠️ ต้องใส่ wht object เสมอ! ถ้าไม่มี WHT ใส่ { "rate": null, "amount": null, "type": null }
+   
+   ⚠️⚠️⚠️ **หัก ณ ที่จ่าย (WHT) - สำคัญมาก! ต้องตรวจให้ดี!** ⚠️⚠️⚠️
+   มองหาคำและตัวเลขเหล่านี้ในเอกสาร:
+     - "หัก ณ ที่จ่าย" หรือ "หักภาษี ณ ที่จ่าย" หรือ "ภาษีหัก ณ ที่จ่าย"
+     - "จำนวนเงินที่ถูกหัก ณ ที่จ่าย" 
+     - "ภาษีถูกหัก" หรือ "ภาษีหัก"
+     - "WHT" หรือ "Withholding Tax"
+     - ตัวเลข % เช่น "3%" หรือ "1%" ข้างๆ คำว่าหัก
+     - ยอดเงินที่เป็นลบ หรือมีเครื่องหมาย (-) ในส่วนสรุปยอด
+   
+   เมื่อพบ:
+     - wht.amount = ยอดเงินที่หัก (ตัวเลขหลังคำว่า "หัก ณ ที่จ่าย")
+     - wht.rate = คำนวณจาก (wht.amount / amount) * 100 แล้วปัดเป็น 1%, 2%, 3%, หรือ 5%
+     - wht.type = "ค่าบริการ" (3%), "ค่าขนส่ง" (1%), "ค่าเช่า" (5%), "ค่าจ้างทำของ" (3%)
+   
+   ตัวอย่าง: ถ้าเห็น "หัก ณ ที่จ่าย 3% = 240.00 บาท" และ amount = 8000
+   → wht = { "rate": 3, "amount": 240.00, "type": "ค่าบริการ" }
+   
+   ⚠️ ถ้าไม่พบข้อมูล WHT เลย → wht = { "rate": null, "amount": null, "type": null }
+   
    - ยอดสุทธิที่ต้องจ่าย/รับจริง (netAmount) = "จำนวนเงินที่ชำระ" หรือ ยอดรวม VAT - หัก ณ ที่จ่าย
 
 4. **เลือกบัญชี** (สำคัญมาก!)
@@ -288,15 +298,25 @@ ${contactList}
 - ถ้าเอกสารมีชื่อบริษัทเรา (${company?.name || ""}) ให้ข้ามไป มองหาชื่ออีกฝั่ง
 - เลขภาษีของบริษัทเรา (${company?.taxId || ""}) ไม่ใช่ของผู้ขาย
 - VAT rate ในไทยคือ 0% หรือ 7%
-- WHT rate ทั่วไป: 1%, 2%, 3%, 5%
-- **⚠️ WHT สำคัญมาก!** ถ้าเห็นข้อความเหล่านี้ในเอกสาร:
-  - "จำนวนเงินที่ถูกหัก ณ ที่จ่าย: XXX บาท" → wht.amount = XXX
-  - "ภาษีหัก ณ ที่จ่าย: XXX" → wht.amount = XXX  
-  - "หัก ณ ที่จ่าย: XXX" → wht.amount = XXX
-  - แล้วคำนวณ rate = (wht.amount / amount) * 100
-  - ตัวอย่าง: amount=7223.58, หัก ณ ที่จ่าย=216.71 → rate = 3%
 - ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)
-- **สกุลเงิน**: ดูสัญลักษณ์หรือตัวอักษรในเอกสาร เช่น $, USD (ดอลลาร์สหรัฐ), AED, د.إ (เดอร์แฮม), €, EUR (ยูโร), £, GBP (ปอนด์), ¥, JPY (เยน), ฿, THB, บาท (บาท) ถ้าไม่แน่ใจให้ใส่ "THB"
+- **สกุลเงิน**: ดูสัญลักษณ์หรือตัวอักษรในเอกสาร เช่น $, USD, AED, €, EUR, £, GBP, ¥, JPY, ฿, THB, บาท ถ้าไม่แน่ใจให้ใส่ "THB"
+
+## ⚠️⚠️⚠️ WHT (หัก ณ ที่จ่าย) - ต้องตรวจให้ละเอียด! ⚠️⚠️⚠️
+**WHT rate ที่ใช้ในประเทศไทย: 1%, 2%, 3%, 5%, 10%, 15%**
+
+ถ้าเห็นข้อความเหล่านี้ในเอกสาร:
+- "หัก ณ ที่จ่าย XXX บาท" → wht.amount = XXX
+- "ภาษีหัก ณ ที่จ่าย XXX" → wht.amount = XXX
+- "หัก 3%" หรือ "WHT 3%" → wht.rate = 3
+- ยอดเงินที่มีเครื่องหมายลบ (-) ในส่วน "หัก ณ ที่จ่าย"
+
+**ตัวอย่างการวิเคราะห์:**
+- amount = 7,223.58 บาท, เห็น "หัก ณ ที่จ่าย 216.71" 
+  → wht = { "rate": 3, "amount": 216.71, "type": "ค่าบริการ" }
+- amount = 10,000 บาท, เห็น "WHT 3% = 300"
+  → wht = { "rate": 3, "amount": 300, "type": "ค่าบริการ" }
+
+**⚠️ สำคัญ: อ่านเอกสารทั้งหมดให้ละเอียดเพื่อหา WHT อย่าข้ามไป!**
 
 ## ประเภทเอกสาร (documentType)
 - **TAX_INVOICE**: ใบกำกับภาษี (มีคำว่า "ใบกำกับภาษี" และเลขผู้เสียภาษี VAT 7%)
@@ -483,12 +503,61 @@ function parseAIResponse(
     });
     
     let whtRate = parsed.wht?.rate;
+    let whtAmount = parsed.wht?.amount;
+    let whtType = parsed.wht?.type;
+    
+    // Fallback: Try to detect WHT from raw response text if not parsed
+    if (!whtRate && !whtAmount && rawResponse) {
+      // Try to find WHT amount in raw text
+      const whtAmountMatch = rawResponse.match(/หัก\s*(?:ณ\s*)?(?:ที่จ่าย|ภาษี)[^0-9]*([0-9,]+\.?[0-9]*)/i);
+      const whtRateMatch = rawResponse.match(/หัก[^%]*(\d+(?:\.\d+)?)\s*%/i) || 
+                           rawResponse.match(/WHT[^%]*(\d+(?:\.\d+)?)\s*%/i);
+      
+      if (whtAmountMatch) {
+        const extractedAmount = parseFloat(whtAmountMatch[1].replace(/,/g, ''));
+        if (extractedAmount > 0) {
+          whtAmount = extractedAmount;
+          console.log("[AI WHT Fallback] Extracted WHT amount from text:", extractedAmount);
+          
+          // Try to calculate rate if we have amount
+          if (parsed.amount && parsed.amount > 0) {
+            const calculatedRate = (extractedAmount / parsed.amount) * 100;
+            // Round to nearest standard rate
+            if (calculatedRate <= 1.5) whtRate = 1;
+            else if (calculatedRate <= 2.5) whtRate = 2;
+            else if (calculatedRate <= 4) whtRate = 3;
+            else if (calculatedRate <= 7.5) whtRate = 5;
+            else if (calculatedRate <= 12.5) whtRate = 10;
+            else whtRate = 15;
+            console.log("[AI WHT Fallback] Calculated rate:", calculatedRate, "→", whtRate, "%");
+          }
+        }
+      }
+      
+      if (whtRateMatch && !whtRate) {
+        whtRate = parseFloat(whtRateMatch[1]);
+        console.log("[AI WHT Fallback] Extracted WHT rate from text:", whtRate, "%");
+      }
+      
+      // Default type based on rate
+      if (whtRate && !whtType) {
+        if (whtRate === 1) whtType = "ค่าขนส่ง";
+        else if (whtRate === 2) whtType = "ค่าโฆษณา";
+        else if (whtRate === 3) whtType = "ค่าบริการ";
+        else if (whtRate === 5) whtType = "ค่าเช่า";
+        else whtType = "ค่าบริการ";
+      }
+    }
+    
+    // Validate and normalize WHT rate
     if (whtRate && ![1, 2, 3, 5, 10, 15].includes(whtRate)) {
       if (whtRate < 2) whtRate = 1;
       else if (whtRate < 4) whtRate = 3;
       else if (whtRate < 7) whtRate = 5;
       else whtRate = null;
     }
+    
+    console.log("[AI WHT Final]", { whtRate, whtAmount, whtType });
 
     // Normalize currency
     const validCurrencies = ["THB", "USD", "AED", "EUR", "GBP", "JPY", "CNY", "SGD", "HKD", "MYR"];
@@ -514,8 +583,8 @@ function parseAIResponse(
       vatRate,
       wht: {
         rate: whtRate || null,
-        amount: typeof parsed.wht?.amount === "number" ? parsed.wht.amount : null,
-        type: parsed.wht?.type || null,
+        amount: typeof whtAmount === "number" ? whtAmount : null,
+        type: whtType || null,
       },
       netAmount: typeof parsed.netAmount === "number" ? parsed.netAmount : null,
       account,
