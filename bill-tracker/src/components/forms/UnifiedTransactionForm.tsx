@@ -389,12 +389,13 @@ export function UnifiedTransactionForm({
           ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate) : undefined } : {}),
         });
 
-        // Set contact
-        if (data.contact) {
+        // Set contact (Prisma returns Contact with capital C)
+        const contactData = data.Contact || data.contact;
+        if (contactData) {
           setSelectedContact({
-            id: data.contact.id,
-            name: data.contact.name,
-            taxId: data.contact.taxId,
+            id: contactData.id,
+            name: contactData.name,
+            taxId: contactData.taxId,
           });
         }
 
