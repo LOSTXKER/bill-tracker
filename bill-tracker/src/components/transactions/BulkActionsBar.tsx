@@ -2,14 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { X, Trash2, Send, FileDown, Loader2 } from "lucide-react";
+import { X, Trash2, Send, FileDown, Loader2, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -22,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { NextStatusInfo } from "@/lib/workflow/status-rules";
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -30,7 +24,10 @@ interface BulkActionsBarProps {
   onStatusChange?: (status: string) => Promise<void>;
   onExport?: () => void;
   onSendNotification?: () => Promise<void>;
-  statuses?: Array<{ value: string; label: string }>;
+  // New props for workflow validation
+  selectedStatuses?: string[];  // สถานะของรายการที่เลือก (unique values)
+  nextStatus?: NextStatusInfo | null;  // สถานะถัดไปที่เป็นไปได้
+  currentStatusLabel?: string;  // label ของสถานะปัจจุบัน (สำหรับแสดง)
 }
 
 export function BulkActionsBar({
@@ -40,9 +37,12 @@ export function BulkActionsBar({
   onStatusChange,
   onExport,
   onSendNotification,
-  statuses = [],
+  selectedStatuses = [],
+  nextStatus,
+  currentStatusLabel,
 }: BulkActionsBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -61,13 +61,14 @@ export function BulkActionsBar({
     }
   };
 
-  const handleStatusChange = async (status: string) => {
-    if (!onStatusChange) return;
+  const handleStatusChange = async () => {
+    if (!onStatusChange || !nextStatus) return;
     setIsLoading(true);
     const toastId = toast.loading(`กำลังเปลี่ยนสถานะ ${selectedCount} รายการ...`);
     try {
-      await onStatusChange(status);
-      toast.success(`เปลี่ยนสถานะ ${selectedCount} รายการสำเร็จ`, { id: toastId });
+      await onStatusChange(nextStatus.value);
+      toast.success(`เปลี่ยนสถานะ ${selectedCount} รายการเป็น "${nextStatus.label}" สำเร็จ`, { id: toastId });
+      setShowStatusConfirm(false);
       onClearSelection();
     } catch (error) {
       toast.error("เกิดข้อผิดพลาดในการเปลี่ยนสถานะ", { id: toastId });
@@ -90,6 +91,11 @@ export function BulkActionsBar({
     }
   };
 
+  // Determine status change UI state
+  const hasMultipleStatuses = selectedStatuses.length > 1;
+  const isAtFinalStatus = selectedStatuses.length === 1 && !nextStatus;
+  const canChangeStatus = selectedStatuses.length === 1 && nextStatus && onStatusChange;
+
   return (
     <>
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5">
@@ -103,19 +109,35 @@ export function BulkActionsBar({
 
           <div className="h-6 w-px bg-border" />
 
-          {statuses.length > 0 && onStatusChange && (
-            <Select onValueChange={handleStatusChange} disabled={isLoading}>
-              <SelectTrigger className="h-8 w-[150px]">
-                <SelectValue placeholder="เปลี่ยนสถานะ" />
-              </SelectTrigger>
-              <SelectContent>
-                {statuses.map((status) => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Status Change Section */}
+          {onStatusChange && (
+            <>
+              {hasMultipleStatuses ? (
+                // เลือกรายการที่สถานะต่างกัน - แสดงคำเตือน
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-xs">เลือกสถานะเดียวกัน</span>
+                </div>
+              ) : isAtFinalStatus ? (
+                // อยู่ที่สถานะสุดท้ายแล้ว
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span className="text-xs">เสร็จสิ้นแล้ว</span>
+                </div>
+              ) : canChangeStatus ? (
+                // สามารถเปลี่ยนสถานะได้
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowStatusConfirm(true)}
+                  disabled={isLoading}
+                  className="h-8"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  {nextStatus.label}
+                </Button>
+              ) : null}
+            </>
           )}
 
           {onSendNotification && (
@@ -171,6 +193,7 @@ export function BulkActionsBar({
         </div>
       </div>
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -194,6 +217,45 @@ export function BulkActionsBar({
                 </>
               ) : (
                 "ลบ"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Change Confirmation Dialog */}
+      <AlertDialog open={showStatusConfirm} onOpenChange={setShowStatusConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการเปลี่ยนสถานะ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการเปลี่ยนสถานะ {selectedCount} รายการ
+              {currentStatusLabel && (
+                <>
+                  {" "}จาก <strong>"{currentStatusLabel}"</strong>
+                </>
+              )}
+              {nextStatus && (
+                <>
+                  {" "}เป็น <strong>"{nextStatus.label}"</strong>
+                </>
+              )}
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleStatusChange}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังเปลี่ยน...
+                </>
+              ) : (
+                "ยืนยัน"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, ReactNode } from "react";
+import { useState, useTransition, useMemo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -20,6 +20,7 @@ import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-tr
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { StatusInfo } from "@/lib/constants/transaction";
+import { getNextStatus, getStatusLabel } from "@/lib/workflow/status-rules";
 
 // ============================================================================
 // Types
@@ -169,6 +170,28 @@ export function TransactionListClient({
 
   const clearSelection = () => setSelectedIds([]);
 
+  // Calculate unique statuses of selected items for bulk validation
+  const selectedStatuses = useMemo(() => {
+    const statuses = new Set(
+      data
+        .filter(item => selectedIds.includes(item.id))
+        .map(item => item.workflowStatus || item.status)
+    );
+    return Array.from(statuses);
+  }, [data, selectedIds]);
+
+  // Calculate next status (only if all selected items have the same status)
+  const nextStatus = useMemo(() => {
+    if (selectedStatuses.length !== 1) return null;
+    return getNextStatus(selectedStatuses[0], config.type);
+  }, [selectedStatuses, config.type]);
+
+  // Get current status label for display
+  const currentStatusLabel = useMemo(() => {
+    if (selectedStatuses.length !== 1) return undefined;
+    return getStatusLabel(selectedStatuses[0], config.type);
+  }, [selectedStatuses, config.type]);
+
   // Bulk actions - use router.refresh() to get fresh data from server
   const handleBulkDelete = async () => {
     startTransition(async () => {
@@ -186,7 +209,7 @@ export function TransactionListClient({
     });
   };
 
-  const handleBulkStatusChange = async (status: string) => {
+  const handleBulkStatusChange = async (newStatus: string) => {
     startTransition(async () => {
       try {
         await Promise.all(
@@ -194,7 +217,8 @@ export function TransactionListClient({
             fetch(`${config.apiEndpoint}/${id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status }),
+              // Use workflowStatus (new field) instead of status (legacy)
+              body: JSON.stringify({ workflowStatus: newStatus }),
             })
           )
         );
@@ -399,7 +423,9 @@ export function TransactionListClient({
           onClearSelection={clearSelection}
           onDelete={handleBulkDelete}
           onStatusChange={handleBulkStatusChange}
-          statuses={statusOptions}
+          selectedStatuses={selectedStatuses}
+          nextStatus={nextStatus}
+          currentStatusLabel={currentStatusLabel}
         />
       )}
     </div>
