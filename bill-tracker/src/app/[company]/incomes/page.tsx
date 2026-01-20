@@ -122,7 +122,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   if (!companyId) return null;
 
   // Parse URL params
-  const sortBy = (searchParams.sortBy as string) || "receiveDate";
+  const sortBy = (searchParams.sortBy as string) || "createdAt";
   const sortOrder = (searchParams.sortOrder as string) || "desc";
   const page = parseInt((searchParams.page as string) || "1");
   const limit = parseInt((searchParams.limit as string) || "20");
