@@ -260,7 +260,7 @@ ${contactList}
     { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 75, "reason": "เหตุผล" },
     { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 60, "reason": "เหตุผล" }
   ],
-  "documentType": "TAX_INVOICE | RECEIPT | BANK_SLIP | WHT_CERT | OTHER",
+  "documentType": "TAX_INVOICE | RECEIPT | BANK_SLIP | WHT_CERT | QUOTATION | INVOICE | CONTRACT | PURCHASE_ORDER | DELIVERY_NOTE | OTHER",
   "invoiceNumber": "เลขที่เอกสาร หรือ null",
   "items": ["รายการที่ 1", "รายการที่ 2"],
   "description": "สรุปสั้นๆ ว่าค่าใช้จ่าย/รายรับนี้คืออะไร",
@@ -280,6 +280,20 @@ ${contactList}
 - WHT rate ทั่วไป: 1%, 2%, 3%, 5%
 - ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)
 - **สกุลเงิน**: ดูสัญลักษณ์หรือตัวอักษรในเอกสาร เช่น $, USD (ดอลลาร์สหรัฐ), AED, د.إ (เดอร์แฮม), €, EUR (ยูโร), £, GBP (ปอนด์), ¥, JPY (เยน), ฿, THB, บาท (บาท) ถ้าไม่แน่ใจให้ใส่ "THB"
+
+## ประเภทเอกสาร (documentType)
+- **TAX_INVOICE**: ใบกำกับภาษี (มีคำว่า "ใบกำกับภาษี" และเลขผู้เสียภาษี VAT 7%)
+- **RECEIPT**: ใบเสร็จรับเงิน/บิลเงินสด (หลักฐานการชำระเงินแล้ว)
+- **BANK_SLIP**: สลิปโอนเงิน/หลักฐานการโอน
+- **WHT_CERT**: ใบหัก ณ ที่จ่าย (50 ทวิ)
+- **QUOTATION**: ใบเสนอราคา (Quote, Quotation)
+- **INVOICE**: ใบแจ้งหนี้/ใบวางบิล (Invoice, ขอเก็บเงิน - ยังไม่ใช่ใบกำกับภาษี!)
+- **CONTRACT**: สัญญา/ข้อตกลง
+- **PURCHASE_ORDER**: ใบสั่งซื้อ (PO)
+- **DELIVERY_NOTE**: ใบส่งของ/ใบรับสินค้า
+- **OTHER**: เอกสารอื่นๆ ที่ไม่เข้าหมวดข้างต้น
+
+⚠️ **สำคัญ**: "ใบแจ้งหนี้" (INVOICE) ≠ "ใบกำกับภาษี" (TAX_INVOICE) ให้แยกให้ถูกต้อง!
 
 ## ⚠️ กฎสำคัญสำหรับสลิปโอนเงิน (BANK_SLIP)
 - สลิปโอนเงินจะมี "ผู้โอน" และ "ผู้รับ" 

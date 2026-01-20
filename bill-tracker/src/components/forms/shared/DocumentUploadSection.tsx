@@ -358,14 +358,21 @@ export function DocumentUploadSection({
 
       // Apply file assignments from AI
       if (result.fileAssignments) {
-        for (const [url, category] of Object.entries(result.fileAssignments)) {
-          const cat = category as DocumentCategory;
-          if (cat === "other") {
-            // For "other" category, create a typed doc with default type
+        for (const [url, rawCategory] of Object.entries(result.fileAssignments)) {
+          const category = rawCategory as string;
+          // Check if it's an "other" category with subtype (format: "other:SUBTYPE")
+          if (category.startsWith("other:")) {
+            const subtype = category.split(":")[1] as OtherDocType;
+            const validSubtypes: OtherDocType[] = ["QUOTATION", "INVOICE", "CONTRACT", "PURCHASE_ORDER", "DELIVERY_NOTE", "OTHER"];
+            newFiles.other.push({ 
+              url, 
+              type: validSubtypes.includes(subtype) ? subtype : "OTHER" 
+            });
+          } else if (category === "other") {
             newFiles.other.push({ url, type: "OTHER" });
-          } else if (cat === "invoice" || cat === "slip" || cat === "whtCert") {
-            newFiles[cat].push(url);
-          } else if (cat === "uncategorized") {
+          } else if (category === "invoice" || category === "slip" || category === "whtCert") {
+            newFiles[category].push(url);
+          } else if (category === "uncategorized") {
             newFiles.uncategorized.push(url);
           } else {
             newFiles.uncategorized.push(url);

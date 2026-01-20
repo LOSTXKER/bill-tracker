@@ -148,10 +148,20 @@ function convertToLegacyFormat(
     },
     confidence: result.confidence,
     fileAssignments: imageUrls.reduce((acc, url) => {
-      acc[url] = result.documentType === "BANK_SLIP" ? "slip" 
-               : result.documentType === "WHT_CERT" ? "whtCert" 
-               : result.documentType === "OTHER" ? "other"
-               : "invoice";
+      const docType = result.documentType;
+      // Map document types to categories
+      if (docType === "BANK_SLIP") {
+        acc[url] = "slip";
+      } else if (docType === "WHT_CERT") {
+        acc[url] = "whtCert";
+      } else if (docType === "TAX_INVOICE" || docType === "RECEIPT") {
+        acc[url] = "invoice";
+      } else if (["QUOTATION", "INVOICE", "CONTRACT", "PURCHASE_ORDER", "DELIVERY_NOTE", "OTHER"].includes(docType || "")) {
+        // These go to "other" category with subtype
+        acc[url] = `other:${docType}`;
+      } else {
+        acc[url] = "invoice"; // Default fallback
+      }
       return acc;
     }, {} as Record<string, string>),
     smart: {
