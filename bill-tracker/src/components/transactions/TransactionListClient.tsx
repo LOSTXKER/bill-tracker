@@ -200,8 +200,18 @@ export function TransactionListClient({
   }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
 
   // Real-time update: Refetch when window regains focus
+  // Track if user has left the page at least once
+  const hasBlurred = useRef(false);
+  
   useEffect(() => {
+    const handleBlur = () => {
+      hasBlurred.current = true;
+    };
+    
     const handleFocus = () => {
+      // Only refetch if user has actually left and returned to the page
+      if (!hasBlurred.current) return;
+      
       startTransition(async () => {
         const result = await fetchData({
           companyCode,
@@ -216,8 +226,12 @@ export function TransactionListClient({
       });
     };
 
+    window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
 
   // Selection handlers
