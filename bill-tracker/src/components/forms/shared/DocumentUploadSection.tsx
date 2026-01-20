@@ -360,8 +360,13 @@ export function DocumentUploadSection({
       if (result.fileAssignments) {
         for (const [url, category] of Object.entries(result.fileAssignments)) {
           const cat = category as DocumentCategory;
-          if (newFiles[cat]) {
+          if (cat === "other") {
+            // For "other" category, create a typed doc with default type
+            newFiles.other.push({ url, type: "OTHER" });
+          } else if (cat === "invoice" || cat === "slip" || cat === "whtCert") {
             newFiles[cat].push(url);
+          } else if (cat === "uncategorized") {
+            newFiles.uncategorized.push(url);
           } else {
             newFiles.uncategorized.push(url);
           }
