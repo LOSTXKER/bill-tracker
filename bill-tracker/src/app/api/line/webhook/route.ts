@@ -70,6 +70,35 @@ export async function POST(request: NextRequest) {
           lineGroupId: company.lineGroupId,
         };
 
+        // Auto-save Group ID from any event (in case join event wasn't received)
+        const eventGroupId = event.source?.groupId;
+        if (eventGroupId && !company.lineGroupId) {
+          console.log(`[LINE] Auto-saving Group ID: ${eventGroupId} for company: ${company.name}`);
+          await prisma.company.update({
+            where: { id: company.id },
+            data: { lineGroupId: eventGroupId },
+          });
+          // Update local config
+          companyConfig.lineGroupId = eventGroupId;
+          
+          // Send welcome message for newly detected group (only if not a join event, to avoid duplicate)
+          if (event.type !== "join" && event.replyToken) {
+            const { replyToLine } = await import("@/lib/line/api");
+            await replyToLine(
+              event.replyToken,
+              [
+                {
+                  type: "text",
+                  text: `✅ เชื่อมต่อ ${company.name} สำเร็จ!\n\nบอทพร้อมส่งแจ้งเตือนรายรับ-รายจ่ายแล้ว\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้`,
+                },
+              ],
+              company.lineChannelAccessToken
+            );
+            // Skip further processing for this event since we've already replied
+            break;
+          }
+        }
+
         // Process event based on type
         switch (event.type) {
           case "message":
