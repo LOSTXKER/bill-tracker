@@ -117,7 +117,11 @@ async function IncomesData({ companyCode }: { companyCode: string }) {
   const [incomesRaw, total] = await Promise.all([
     prisma.income.findMany({
       where: { companyId: companyId, deletedAt: null },
-      orderBy: { createdAt: "desc" },
+      // Sort by receiveDate first, then createdAt for consistent ordering (same as API)
+      orderBy: [
+        { receiveDate: "desc" },
+        { createdAt: "desc" },
+      ],
       take: 20,
       include: {
         Contact: true,
