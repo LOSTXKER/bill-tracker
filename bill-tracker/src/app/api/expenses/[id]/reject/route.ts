@@ -8,6 +8,7 @@ import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
+import { notifyRejection } from "@/lib/notifications/line-messaging";
 
 export const POST = (
   request: Request,
@@ -100,6 +101,28 @@ export const POST = (
           metadata: { reason: reason.trim() },
         });
       }
+
+      // Send LINE notification
+      const submitter = expense.submittedBy 
+        ? await prisma.user.findUnique({ where: { id: expense.submittedBy }, select: { name: true } })
+        : null;
+      
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : "http://localhost:3000";
+      
+      await notifyRejection(company.id, {
+        id,
+        companyCode: company.code.toLowerCase(),
+        companyName: company.name,
+        type: "expense",
+        description: expense.description || undefined,
+        vendorOrCustomer: expense.Contact?.name || undefined,
+        amount: Number(expense.netPaid),
+        submitterName: submitter?.name || "ไม่ระบุ",
+        approverName: session.user.name || undefined,
+        rejectedReason: reason.trim(),
+      }, baseUrl);
 
       return apiResponse.success(
         { expense: updatedExpense },

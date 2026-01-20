@@ -9,6 +9,7 @@ import { apiResponse } from "@/lib/api/response";
 import { hasPermission } from "@/lib/permissions/checker";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
+import { notifyApprovalRequest } from "@/lib/notifications/line-messaging";
 import type { ExpenseWorkflowStatus } from "@prisma/client";
 
 export const POST = (
@@ -235,6 +236,22 @@ export const POST = (
             actorName: session.user.name,
           });
         }
+
+        // Send LINE notification
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
+          ? `https://${process.env.VERCEL_URL}` 
+          : "http://localhost:3000";
+        
+        await notifyApprovalRequest(company.id, {
+          id,
+          companyCode: company.code.toLowerCase(),
+          companyName: company.name,
+          type: "expense",
+          description: expense.description || undefined,
+          vendorOrCustomer: expense.Contact?.name || undefined,
+          amount: Number(expense.netPaid),
+          submitterName: session.user.name || "ไม่ระบุ",
+        }, baseUrl);
 
         return apiResponse.success(
           { expense: updatedExpense },
