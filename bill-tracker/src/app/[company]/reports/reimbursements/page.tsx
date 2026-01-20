@@ -334,7 +334,8 @@ export default function ReimbursementReportPage({ params }: ReimbursementReportP
         <CardContent>
           <PersonBreakdownTable 
             data={reportData?.byPerson || []} 
-            isLoading={isLoading} 
+            isLoading={isLoading}
+            companyCode={companyCode}
           />
         </CardContent>
       </Card>

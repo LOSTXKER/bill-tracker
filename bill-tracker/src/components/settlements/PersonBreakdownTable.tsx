@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -12,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, User, Mail } from "lucide-react";
+import { ChevronDown, ChevronRight, User, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PersonData {
@@ -29,6 +30,7 @@ interface PersonData {
 interface PersonBreakdownTableProps {
   data: PersonData[];
   isLoading: boolean;
+  companyCode: string;
 }
 
 function formatCurrency(amount: number) {
@@ -39,7 +41,7 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-export function PersonBreakdownTable({ data, isLoading }: PersonBreakdownTableProps) {
+export function PersonBreakdownTable({ data, isLoading, companyCode }: PersonBreakdownTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (id: string) => {
@@ -177,7 +179,7 @@ export function PersonBreakdownTable({ data, isLoading }: PersonBreakdownTablePr
               {expandedRows.has(person.id) && (
                 <TableRow className="bg-muted/20">
                   <TableCell colSpan={5} className="py-3">
-                    <div className="pl-8 space-y-2 text-sm">
+                    <div className="pl-8 space-y-3 text-sm">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
                           <div className="text-xs text-green-600 font-medium">
@@ -219,6 +221,23 @@ export function PersonBreakdownTable({ data, isLoading }: PersonBreakdownTablePr
                           </div>
                         </div>
                       </div>
+                      
+                      {/* View Details Button */}
+                      {(person.pendingCount > 0 || person.settledCount > 0) && (
+                        <div className="pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="gap-2"
+                          >
+                            <Link href={`/${companyCode}/reimbursements?userId=${person.userId}`}>
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              ดูรายการทั้งหมด
+                            </Link>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

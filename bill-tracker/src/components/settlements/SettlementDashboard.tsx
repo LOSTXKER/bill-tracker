@@ -1,21 +1,24 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { SettlementSummaryCards } from "./SettlementSummaryCards";
 import { SettlementGroupCard } from "./SettlementGroupCard";
 import { SettledGroupCard } from "./SettledGroupCard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, Inbox } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RefreshCw, Inbox, User, X } from "lucide-react";
 
 interface SettlementDashboardProps {
   companyCode: string;
+  filterUserId?: string | null;
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export function SettlementDashboard({ companyCode }: SettlementDashboardProps) {
+export function SettlementDashboard({ companyCode, filterUserId }: SettlementDashboardProps) {
   const [tab, setTab] = useState<"pending" | "settled">("pending");
   const { mutate: globalMutate } = useSWRConfig();
 
@@ -28,12 +31,21 @@ export function SettlementDashboard({ companyCode }: SettlementDashboardProps) {
     isLoading: summaryLoading,
   } = useSWR(`${settlementBasePath}/summary`, fetcher);
 
+  // Build URL with optional userId filter
+  const buildUrl = (status: string) => {
+    const params = new URLSearchParams({ status });
+    if (filterUserId) {
+      params.set("userId", filterUserId);
+    }
+    return `${settlementBasePath}?${params.toString()}`;
+  };
+
   // Fetch pending settlements
   const {
     data: pendingData,
     isLoading: pendingLoading,
   } = useSWR(
-    tab === "pending" ? `${settlementBasePath}?status=PENDING` : null,
+    tab === "pending" ? buildUrl("PENDING") : null,
     fetcher
   );
 
@@ -42,7 +54,7 @@ export function SettlementDashboard({ companyCode }: SettlementDashboardProps) {
     data: settledData,
     isLoading: settledLoading,
   } = useSWR(
-    tab === "settled" ? `${settlementBasePath}?status=SETTLED` : null,
+    tab === "settled" ? buildUrl("SETTLED") : null,
     fetcher
   );
 
@@ -70,13 +82,45 @@ export function SettlementDashboard({ companyCode }: SettlementDashboardProps) {
   const isLoading = tab === "pending" ? pendingLoading : settledLoading;
   const groups = tab === "pending" ? pendingGroups : settledGroups;
 
+  // Get filtered user name from groups (if filtering)
+  const filteredUserName = filterUserId && pendingGroups.length > 0 
+    ? pendingGroups[0]?.payerName 
+    : filterUserId && settledGroups.length > 0 
+      ? settledGroups[0]?.payerName 
+      : null;
+
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <SettlementSummaryCards
-        data={summaryData?.data}
-        isLoading={summaryLoading}
-      />
+      {/* Filter Banner */}
+      {filterUserId && (
+        <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+          <User className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-blue-700 dark:text-blue-300">
+              กำลังแสดงรายการของ: <strong>{filteredUserName || "กำลังโหลด..."}</strong>
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="h-7 gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+            >
+              <Link href={`/${companyCode}/reimbursements`}>
+                <X className="h-3.5 w-3.5" />
+                ดูทั้งหมด
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Summary Cards - hide when filtering by user */}
+      {!filterUserId && (
+        <SettlementSummaryCards
+          data={summaryData?.data}
+          isLoading={summaryLoading}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex items-center justify-between">
