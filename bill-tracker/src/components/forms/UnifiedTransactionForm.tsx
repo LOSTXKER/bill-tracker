@@ -1149,21 +1149,33 @@ export function UnifiedTransactionForm({
   };
 
   // File upload wrappers for view/edit mode
-  const handleFileUploadWrapper = async (file: File, type: "slip" | "invoice" | "wht") => {
+  const handleFileUploadWrapper = async (file: File, type: "slip" | "invoice" | "wht" | "other") => {
     if (!transaction) return;
     const currentUrls: Record<string, string[]> = {};
     Object.entries(config.fileFields).forEach(([key, field]) => {
       currentUrls[field.urlsField] = (transaction[field.urlsField] as string[]) || [];
     });
+    // Handle otherDocUrls separately (not in config.fileFields)
+    if (type === "other") {
+      currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as any[]) || []).map((item: any) => 
+        typeof item === 'string' ? item : item.url
+      ).filter(Boolean);
+    }
     await handleFileUpload(file, type, currentUrls, transaction);
   };
 
-  const handleDeleteFileWrapper = async (type: "slip" | "invoice" | "wht", urlToDelete: string) => {
+  const handleDeleteFileWrapper = async (type: "slip" | "invoice" | "wht" | "other", urlToDelete: string) => {
     if (!transaction) return;
     const currentUrls: Record<string, string[]> = {};
     Object.entries(config.fileFields).forEach(([key, field]) => {
       currentUrls[field.urlsField] = (transaction[field.urlsField] as string[]) || [];
     });
+    // Handle otherDocUrls separately (not in config.fileFields)
+    if (type === "other") {
+      currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as any[]) || []).map((item: any) => 
+        typeof item === 'string' ? item : item.url
+      ).filter(Boolean);
+    }
     await handleDeleteFile(type, urlToDelete, currentUrls, transaction);
   };
   
@@ -1753,6 +1765,25 @@ export function UnifiedTransactionForm({
                               icon={<FileText className="h-4 w-4" />}
                             />
                           )}
+
+                          {(() => {
+                            const otherDocs = transaction.otherDocUrls as any[] | undefined;
+                            if (!otherDocs || otherDocs.length === 0) return null;
+                            return (
+                              <DocumentSection
+                                label="เอกสารอื่นๆ"
+                                urls={
+                                  otherDocs.map((item: any) => 
+                                    typeof item === 'string' ? item : item.url
+                                  ).filter(Boolean)
+                                }
+                                onUpload={(file) => handleFileUploadWrapper(file, "other")}
+                                onDelete={(url) => handleDeleteFileWrapper("other", url)}
+                                isUploading={uploadingType === "other"}
+                                icon={<FileText className="h-4 w-4" />}
+                              />
+                            );
+                          })()}
                   </CardContent>
 
                   {/* Meta Info */}

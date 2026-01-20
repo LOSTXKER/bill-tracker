@@ -14,6 +14,7 @@ interface FileUrlFields {
   slip: string;
   invoice: string;
   wht: string;
+  other: string;
 }
 
 const FILE_URL_FIELDS: Record<"expense" | "income", FileUrlFields> = {
@@ -21,11 +22,13 @@ const FILE_URL_FIELDS: Record<"expense" | "income", FileUrlFields> = {
     slip: "slipUrls",
     invoice: "taxInvoiceUrls",
     wht: "whtCertUrls",
+    other: "otherDocUrls",
   },
   income: {
     slip: "customerSlipUrls",
     invoice: "myBillCopyUrls",
     wht: "whtCertUrls",
+    other: "otherDocUrls",
   },
 };
 
@@ -39,7 +42,7 @@ export function useTransactionFileUpload({
 
   const handleFileUpload = async (
     file: File,
-    type: "slip" | "invoice" | "wht",
+    type: "slip" | "invoice" | "wht" | "other",
     currentUrls: Record<string, string[]>,
     transactionData: any
   ) => {
@@ -55,6 +58,8 @@ export function useTransactionFileUpload({
           ? transactionType === "expense"
             ? "invoices"
             : "bills"
+          : type === "other"
+          ? "other-docs"
           : "wht-certs";
 
       const folder = `${companyCode.toUpperCase()}/${transactionType}s/${transactionId}/${typeFolder}`;
@@ -110,7 +115,7 @@ export function useTransactionFileUpload({
   };
 
   const handleDeleteFile = async (
-    type: "slip" | "invoice" | "wht",
+    type: "slip" | "invoice" | "wht" | "other",
     urlToDelete: string,
     currentUrls: Record<string, string[]>,
     transactionData: any
