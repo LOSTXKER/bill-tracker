@@ -303,20 +303,6 @@ export function LineNotificationSettings({
 
   return (
     <div className="space-y-6">
-      {/* Floating Save Button */}
-      {hasChanges && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button onClick={handleSave} disabled={saving} className="shadow-lg gap-2">
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            บันทึกการเปลี่ยนแปลง
-          </Button>
-        </div>
-      )}
-
       <Tabs defaultValue="events" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="events" className="gap-2">
@@ -695,16 +681,25 @@ export function LineNotificationSettings({
           <RefreshCw className="h-4 w-4 mr-2" />
           รีเซ็ตเป็นค่าเริ่มต้น
         </Button>
-        <Button onClick={handleSave} disabled={saving || !hasChanges} size="sm">
+        <Button 
+          onClick={handleSave} 
+          disabled={saving || !hasChanges} 
+          variant={hasChanges ? "default" : "secondary"}
+        >
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               กำลังบันทึก...
             </>
+          ) : hasChanges ? (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              บันทึกการเปลี่ยนแปลง
+            </>
           ) : (
             <>
               <Check className="h-4 w-4 mr-2" />
-              บันทึกการตั้งค่า
+              บันทึกแล้ว
             </>
           )}
         </Button>
