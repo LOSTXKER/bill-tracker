@@ -67,7 +67,9 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
       try {
         const response = await fetch(`/api/companies/${companyId}/line-config`);
         if (response.ok) {
-          const data = await response.json();
+          const result = await response.json();
+          // API returns { success: true, data: {...} }
+          const data = result.data || result;
           setConfig(data);
           setFormData({
             channelSecret: "",
