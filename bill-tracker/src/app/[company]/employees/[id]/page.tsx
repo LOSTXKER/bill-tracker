@@ -18,10 +18,12 @@ import {
   Crown,
   CheckCircle,
   Clock,
+  Key,
 } from "lucide-react";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { cn } from "@/lib/utils";
 import { EditPermissionsDialog } from "@/components/settings/edit-permissions-dialog";
+import { ResetPasswordDialog } from "@/components/settings/reset-password-dialog";
 import { useIsOwner } from "@/components/guards/permission-guard";
 
 interface EmployeeData {
@@ -169,6 +171,7 @@ export default function EmployeeDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [editPermissionsOpen, setEditPermissionsOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
 
   // Fetch company ID
   useEffect(() => {
@@ -286,13 +289,22 @@ export default function EmployeeDetailPage() {
         </div>
         <div className="flex gap-2">
           {isOwner && (
-            <Button
-              variant="outline"
-              onClick={() => setEditPermissionsOpen(true)}
-            >
-              <Shield className="mr-2 h-4 w-4" />
-              จัดการสิทธิ์
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setResetPasswordOpen(true)}
+              >
+                <Key className="mr-2 h-4 w-4" />
+                รีเซ็ตรหัสผ่าน
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setEditPermissionsOpen(true)}
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                จัดการสิทธิ์
+              </Button>
+            </>
           )}
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -525,6 +537,18 @@ export default function EmployeeDetailPage() {
             fetchEmployeeData();
             setEditPermissionsOpen(false);
           }}
+        />
+      )}
+
+      {/* Reset Password Dialog */}
+      {isOwner && companyId && (
+        <ResetPasswordDialog
+          memberId={employee.id}
+          memberName={employee.user.name}
+          memberEmail={employee.user.email}
+          companyId={companyId}
+          open={resetPasswordOpen}
+          onOpenChange={setResetPasswordOpen}
         />
       )}
     </div>
