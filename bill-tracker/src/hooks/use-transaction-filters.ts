@@ -169,7 +169,7 @@ export function useSorting() {
   const router = useRouter();
 
   const sortBy = useMemo(() => {
-    return searchParams.get("sortBy") || "billDate";
+    return searchParams.get("sortBy") || "createdAt";
   }, [searchParams]);
 
   const sortOrder = useMemo(() => {

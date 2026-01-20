@@ -28,7 +28,8 @@ const incomeListConfig: TransactionListConfig = {
   statusInfo: INCOME_WORKFLOW_INFO,
   
   tableHeaders: [
-    { key: "receiveDate", label: "วันที่", sortable: true },
+    { key: "createdAt", label: "สร้างเมื่อ", sortable: true },
+    { key: "receiveDate", label: "วันที่รับ", sortable: true },
     { key: "status", label: "สถานะ", align: "center" },
     { key: "contact", label: "ผู้ติดต่อ", sortable: true },
     { key: "category", label: "บัญชี" },

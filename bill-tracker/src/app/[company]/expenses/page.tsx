@@ -128,7 +128,7 @@ async function ExpensesData({ companyCode }: { companyCode: string }) {
   const [expensesRaw, total] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
-      orderBy: { billDate: "desc" },
+      orderBy: { createdAt: "desc" },
       take: 20,
       include: {
         Contact: true,

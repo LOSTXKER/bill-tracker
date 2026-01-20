@@ -22,6 +22,7 @@ export interface TransactionRowConfig {
   amountField: "netPaid" | "netReceived";
   descriptionField: "description" | "source";
   amountColorClass: string;
+  showCreatedAt?: boolean;
   showWhtBadge?: boolean;
   whtField?: "isWht" | "isWhtDeducted";
   whtRateField?: "whtRate";
@@ -86,6 +87,7 @@ export const expenseRowConfig: TransactionRowConfig = {
   amountField: "netPaid",
   descriptionField: "description",
   amountColorClass: "text-destructive",
+  showCreatedAt: true,
   showWhtBadge: false,
   showCreator: true,
   showLineButton: true,
@@ -102,6 +104,7 @@ export const incomeRowConfig: TransactionRowConfig = {
   amountField: "netReceived",
   descriptionField: "source",
   amountColorClass: "text-primary",
+  showCreatedAt: true,
   showWhtBadge: true,
   whtField: "isWhtDeducted",
   whtRateField: "whtRate",
@@ -205,7 +208,14 @@ export function TransactionTableRow({
         </TableCell>
       )}
 
-      {/* Date */}
+      {/* Created At - when the record was created */}
+      {config.showCreatedAt && (
+        <TableCell className="whitespace-nowrap text-muted-foreground text-sm">
+          {transaction.createdAt ? formatThaiDate(new Date(transaction.createdAt)) : "-"}
+        </TableCell>
+      )}
+
+      {/* Bill/Receive Date */}
       <TableCell className="whitespace-nowrap text-foreground">
         {date ? formatThaiDate(date) : "-"}
       </TableCell>

@@ -28,7 +28,8 @@ const expenseListConfig: TransactionListConfig = {
   statusInfo: EXPENSE_WORKFLOW_INFO,
   
   tableHeaders: [
-    { key: "billDate", label: "วันที่", sortable: true },
+    { key: "createdAt", label: "สร้างเมื่อ", sortable: true },
+    { key: "billDate", label: "วันที่บิล", sortable: true },
     { key: "status", label: "สถานะ", align: "center" },
     { key: "contact", label: "ผู้ติดต่อ", sortable: true },
     { key: "category", label: "บัญชี" },
