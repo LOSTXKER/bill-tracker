@@ -1053,7 +1053,15 @@ export function UnifiedTransactionForm({
       }
 
       toast.success(`บันทึก${config.title}สำเร็จ`);
-      router.push(config.redirectPath);
+      
+      // Redirect to the created item's detail page
+      const createdItem = result.expense || result.income;
+      if (createdItem?.id) {
+        router.push(`/${companyCode.toLowerCase()}/${config.listUrl}/${createdItem.id}`);
+      } else {
+        // Fallback to list page if ID not available
+        router.push(`/${companyCode.toLowerCase()}/${config.listUrl}`);
+      }
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");

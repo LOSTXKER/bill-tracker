@@ -259,7 +259,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       id: data.id,
       companyCode: data.companyCode,
       companyName: data.companyName,
-      customerName: data.customerName || data.source,
+      customerName: data.customerName || data.contactName || data.source,
       source: data.source,
       amount: Number(data.amount),
       vatAmount: data.vatAmount ? Number(data.vatAmount) : undefined,
@@ -267,7 +267,8 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       whtRate: data.whtRate ? Number(data.whtRate) : undefined,
       whtAmount: data.whtAmount ? Number(data.whtAmount) : undefined,
       netReceived: Number(data.netReceived),
-      status: data.status,
+      // Use workflowStatus (new field) or fall back to status/DRAFT
+      status: data.workflowStatus || data.status || "DRAFT",
     }, baseUrl);
   },
   

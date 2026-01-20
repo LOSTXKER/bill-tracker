@@ -109,7 +109,7 @@ export function TransactionListClient({
   const router = useRouter();
   const { filters, setFilter, setFilterWithSort } = useTransactionFilters();
   const { page, limit, setPage, setLimit } = usePagination();
-  const { sortBy, sortOrder, toggleSort } = useSorting(config.dateField);
+  const { sortBy, sortOrder, toggleSort } = useSorting("createdAt");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   

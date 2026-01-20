@@ -300,11 +300,24 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
         const url = new URL(request.url);
         const baseUrl = `${url.protocol}//${url.host}`;
         
+        // Pass actual created item data (not just body) for notification
         config.notifyCreate(company.id, {
           id: item.id,
           companyCode: company.code,
           companyName: company.name,
+          // Include both body (for form data like vendorName) and item (for DB values like status)
           ...body,
+          // Override with actual values from created item
+          status: item.workflowStatus || item.status,
+          workflowStatus: item.workflowStatus,
+          amount: item.amount,
+          vatAmount: item.vatAmount,
+          netPaid: item.netPaid,
+          netReceived: item.netReceived,
+          isWht: item.isWht,
+          isWhtDeducted: item.isWhtDeducted,
+          whtRate: item.whtRate,
+          whtAmount: item.whtAmount,
         }, baseUrl).catch((error) => {
           console.error("Failed to send notification:", error);
         });

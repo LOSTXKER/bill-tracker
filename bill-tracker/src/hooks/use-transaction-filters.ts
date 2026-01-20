@@ -163,7 +163,7 @@ export function usePagination() {
 }
 
 // Hook for sorting
-export function useSorting(defaultSortBy: string = "billDate") {
+export function useSorting(defaultSortBy: string = "createdAt") {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();

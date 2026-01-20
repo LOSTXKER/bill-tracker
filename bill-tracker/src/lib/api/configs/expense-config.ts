@@ -436,7 +436,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       id: data.id,
       companyCode: data.companyCode,
       companyName: data.companyName,
-      vendorName: data.vendorName || data.description,
+      vendorName: data.vendorName || data.contactName || data.description,
       description: data.description,
       amount: Number(data.amount),
       vatAmount: data.vatAmount ? Number(data.vatAmount) : undefined,
@@ -444,7 +444,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       whtRate: data.whtRate ? Number(data.whtRate) : undefined,
       whtAmount: data.whtAmount ? Number(data.whtAmount) : undefined,
       netPaid: Number(data.netPaid),
-      status: data.status,
+      // Use workflowStatus (new field) or fall back to status/DRAFT
+      status: data.workflowStatus || data.status || "DRAFT",
     }, baseUrl);
   },
   

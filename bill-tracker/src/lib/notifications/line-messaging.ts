@@ -45,16 +45,24 @@ export async function getCompanyLineConfig(
       },
     });
 
-    if (
-      !company?.lineChannelAccessToken ||
-      !company?.lineGroupId
-    ) {
+    if (!company) {
+      console.log(`[LINE] getCompanyLineConfig: Company ${companyId} not found`);
+      return null;
+    }
+
+    if (!company.lineChannelAccessToken) {
+      console.log(`[LINE] getCompanyLineConfig: Company ${companyId} missing lineChannelAccessToken`);
+      return null;
+    }
+
+    if (!company.lineGroupId) {
+      console.log(`[LINE] getCompanyLineConfig: Company ${companyId} missing lineGroupId`);
       return null;
     }
 
     // Check if notifications are enabled (unless bypassed)
     if (checkEnabled && !company.lineNotifyEnabled) {
-      console.log(`LINE notifications disabled for company ${companyId}`);
+      console.log(`[LINE] getCompanyLineConfig: Notifications disabled for company ${companyId}`);
       return null;
     }
 
@@ -65,7 +73,7 @@ export async function getCompanyLineConfig(
       notifySettings: mergeSettings(company.lineNotifySettings as Partial<LineNotifySettings> | null),
     };
   } catch (error) {
-    console.error("Failed to get LINE config:", error);
+    console.error("[LINE] getCompanyLineConfig failed:", error);
     return null;
   }
 }
@@ -135,9 +143,11 @@ export async function sendLineMessage({
   messages,
 }: SendMessageOptions): Promise<boolean> {
   if (!channelAccessToken || !to) {
-    console.warn("LINE Messaging API not configured");
+    console.warn("[LINE] sendLineMessage: Missing channelAccessToken or target (to)");
     return false;
   }
+
+  console.log(`[LINE] Sending message to: ${to.substring(0, 10)}...`);
 
   try {
     const response = await fetch(`${LINE_API_URL}/push`, {
@@ -154,13 +164,17 @@ export async function sendLineMessage({
 
     if (!response.ok) {
       const error = await response.json();
-      console.error("LINE Messaging API error:", error);
+      console.error("[LINE] Messaging API error:", {
+        status: response.status,
+        error,
+      });
       return false;
     }
 
+    console.log("[LINE] Message sent successfully!");
     return true;
   } catch (error) {
-    console.error("LINE Messaging API failed:", error);
+    console.error("[LINE] Messaging API failed:", error);
     return false;
   }
 }
@@ -1063,21 +1077,34 @@ export async function notifyExpense(
   baseUrl?: string,
   scenario: NotificationScenario = "onCreate"
 ): Promise<boolean> {
+  console.log(`[LINE] notifyExpense called for company ${companyId}, scenario: ${scenario}`);
+  console.log(`[LINE] Expense data:`, { 
+    id: expense.id, 
+    amount: expense.amount, 
+    netPaid: expense.netPaid,
+    status: expense.status,
+    vendorName: expense.vendorName 
+  });
+  
   const config = await getCompanyLineConfig(companyId);
   
   if (!config) {
-    console.warn(`LINE not configured for company ${companyId}`);
+    console.warn(`[LINE] Not configured for company ${companyId} - check: lineChannelAccessToken, lineGroupId, lineNotifyEnabled`);
     return false;
   }
+
+  console.log(`[LINE] Config found - groupId: ${config.groupId?.substring(0, 10)}..., notifyEnabled: ${config.notifyEnabled}`);
 
   // Check if this scenario is enabled
   const settings = config.notifySettings;
   const scenarioConfig = settings.expenses[scenario];
   
   if (!scenarioConfig?.enabled) {
-    console.log(`Expense notification for scenario "${scenario}" is disabled`);
+    console.log(`[LINE] Expense notification for scenario "${scenario}" is disabled in settings`);
     return false;
   }
+  
+  console.log(`[LINE] Scenario "${scenario}" is enabled, creating message...`);
 
   // Decide message format based on settings
   let message: LineMessage;
@@ -1126,21 +1153,34 @@ export async function notifyIncome(
   baseUrl?: string,
   scenario: NotificationScenario = "onCreate"
 ): Promise<boolean> {
+  console.log(`[LINE] notifyIncome called for company ${companyId}, scenario: ${scenario}`);
+  console.log(`[LINE] Income data:`, { 
+    id: income.id, 
+    amount: income.amount, 
+    netReceived: income.netReceived,
+    status: income.status,
+    customerName: income.customerName 
+  });
+  
   const config = await getCompanyLineConfig(companyId);
   
   if (!config) {
-    console.warn(`LINE not configured for company ${companyId}`);
+    console.warn(`[LINE] Not configured for company ${companyId} - check: lineChannelAccessToken, lineGroupId, lineNotifyEnabled`);
     return false;
   }
+
+  console.log(`[LINE] Config found - groupId: ${config.groupId?.substring(0, 10)}..., notifyEnabled: ${config.notifyEnabled}`);
 
   // Check if this scenario is enabled
   const settings = config.notifySettings;
   const scenarioConfig = settings.incomes[scenario];
   
   if (!scenarioConfig?.enabled) {
-    console.log(`Income notification for scenario "${scenario}" is disabled`);
+    console.log(`[LINE] Income notification for scenario "${scenario}" is disabled in settings`);
     return false;
   }
+  
+  console.log(`[LINE] Scenario "${scenario}" is enabled, creating message...`);
 
   // Decide message format based on settings
   let message: LineMessage;
