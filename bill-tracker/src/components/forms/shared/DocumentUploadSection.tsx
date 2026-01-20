@@ -30,12 +30,13 @@ import { uploadFile, deleteFile, extractDisplayName } from "@/lib/storage/upload
 // Types
 // =============================================================================
 
-export type DocumentCategory = "invoice" | "slip" | "whtCert" | "uncategorized";
+export type DocumentCategory = "invoice" | "slip" | "whtCert" | "other" | "uncategorized";
 
 export interface CategorizedFiles {
   invoice: string[];   // ใบกำกับภาษี/ใบเสร็จ
   slip: string[];      // สลิปโอนเงิน  
   whtCert: string[];   // ใบ 50 ทวิ
+  other: string[];     // เอกสารอื่นๆ (AI ไม่ต้องอ่าน)
   uncategorized: string[]; // ยังไม่จำแนก
 }
 
@@ -118,6 +119,13 @@ const CATEGORY_CONFIG: Record<DocumentCategory, {
     color: "text-amber-600",
     bgColor: "bg-amber-50 dark:bg-amber-950/30",
   },
+  other: {
+    label: "เอกสารอื่นๆ",
+    labelIncome: "เอกสารอื่นๆ",
+    icon: FileText,
+    color: "text-purple-600",
+    bgColor: "bg-purple-50 dark:bg-purple-950/30",
+  },
   uncategorized: {
     label: "ยังไม่จำแนก",
     labelIncome: "ยังไม่จำแนก",
@@ -143,12 +151,16 @@ export function DocumentUploadSection({
   const [files, setFiles] = useState<CategorizedFiles>(() => {
     if (initialFiles) {
       console.log("DocumentUploadSection initializing with files:", initialFiles);
-      return initialFiles;
+      return {
+        ...initialFiles,
+        other: initialFiles.other || [],
+      };
     }
     return {
       invoice: [],
       slip: [],
       whtCert: [],
+      other: [],
       uncategorized: [],
     };
   });
@@ -158,12 +170,14 @@ export function DocumentUploadSection({
   const [error, setError] = useState<string | null>(null);
 
   // Get all files as flat array (filter out null/undefined)
+  // Note: "other" category is excluded from AI analysis
   const getAllFiles = useCallback(() => {
     return [
       ...files.uncategorized,
       ...files.invoice,
       ...files.slip,
       ...files.whtCert,
+      // Note: files.other is intentionally excluded - AI doesn't analyze these
     ].filter((url): url is string => url != null && url !== "");
   }, [files]);
 
@@ -173,7 +187,8 @@ export function DocumentUploadSection({
   const hasAnyFiles = files.uncategorized.length > 0 || 
                       files.invoice.length > 0 || 
                       files.slip.length > 0 || 
-                      files.whtCert.length > 0;
+                      files.whtCert.length > 0 ||
+                      files.other.length > 0;
 
   // Handle file drop
   const onDrop = useCallback(
@@ -287,6 +302,7 @@ export function DocumentUploadSection({
         invoice: [],
         slip: [],
         whtCert: [],
+        other: files.other, // Preserve "other" files - they aren't sent to AI
         uncategorized: [],
       };
 
@@ -328,8 +344,8 @@ export function DocumentUploadSection({
 
   // Get categories to display
   const categoriesToShow: DocumentCategory[] = showWhtCert 
-    ? ["invoice", "slip", "whtCert"]
-    : ["invoice", "slip"];
+    ? ["invoice", "slip", "whtCert", "other"]
+    : ["invoice", "slip", "other"];
 
   // Check if there are any categorized files
   const hasCategorizedFiles = categoriesToShow.some(cat => files[cat].length > 0);

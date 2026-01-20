@@ -138,6 +138,7 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       customerSlipUrls: data.customerSlipUrls || [],
       myBillCopyUrls: data.myBillCopyUrls || [],
       whtCertUrls: data.whtCertUrls || [],
+      otherDocUrls: data.otherDocUrls || [],
       referenceUrls: data.referenceUrls || [],
     };
   },
@@ -184,6 +185,9 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     }
     if (data.referenceUrls !== undefined) {
       updateData.referenceUrls = data.referenceUrls;
+    }
+    if (data.otherDocUrls !== undefined) {
+      updateData.otherDocUrls = data.otherDocUrls;
     }
     
     // ==========================================================================

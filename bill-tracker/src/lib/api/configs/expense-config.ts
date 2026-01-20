@@ -142,6 +142,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       slipUrls: data.slipUrls || [],
       taxInvoiceUrls: data.taxInvoiceUrls || [],
       whtCertUrls: data.whtCertUrls || [],
+      otherDocUrls: data.otherDocUrls || [],
       referenceUrls: data.referenceUrls || [],
     };
   },
@@ -188,6 +189,9 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     }
     if (data.referenceUrls !== undefined) {
       updateData.referenceUrls = data.referenceUrls;
+    }
+    if (data.otherDocUrls !== undefined) {
+      updateData.otherDocUrls = data.otherDocUrls;
     }
     
     // ==========================================================================

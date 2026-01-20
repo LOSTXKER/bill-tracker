@@ -217,6 +217,7 @@ export function UnifiedTransactionForm({
     invoice: [],
     slip: [],
     whtCert: [],
+    other: [],
     uncategorized: [],
   });
 
@@ -348,6 +349,7 @@ export function UnifiedTransactionForm({
           invoice: invoiceUrls || [],
           slip: slipUrls || [],
           whtCert: [],
+          other: [],
           uncategorized: [],
         };
         setCategorizedFiles(initialFiles);
@@ -406,6 +408,7 @@ export function UnifiedTransactionForm({
           invoice: data[config.fileFields.invoice.urlsField] || [],
           slip: data[config.fileFields.slip.urlsField] || [],
           whtCert: data[config.fileFields.wht.urlsField] || [],
+          other: data.otherDocUrls || [],
           uncategorized: [],
         });
         
@@ -1017,6 +1020,7 @@ export function UnifiedTransactionForm({
         [config.documentConfig.fields.slip]: categorizedFiles.slip,
         [config.documentConfig.fields.invoice]: categorizedFiles.invoice,
         [config.documentConfig.fields.whtCert]: categorizedFiles.whtCert,
+        otherDocUrls: categorizedFiles.other,
       };
 
       const response = await fetch(config.apiEndpoint, {

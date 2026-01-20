@@ -234,6 +234,7 @@ model Expense {
   slipUrls                                   Json                  @default("[]")
   taxInvoiceUrls                             Json                  @default("[]")
   whtCertUrls                                Json                  @default("[]")
+  otherDocUrls                               Json                  @default("[]")
   deletedAt                                  DateTime?
   deletedBy                                  String?
   fraudAnalyzedAt                            DateTime?
@@ -316,6 +317,7 @@ model Income {
   customerSlipUrls   Json                 @default("[]")
   myBillCopyUrls     Json                 @default("[]")
   whtCertUrls        Json                 @default("[]")
+  otherDocUrls       Json                 @default("[]")
   deletedAt          DateTime?
   deletedBy          String?
   contactName        String?
