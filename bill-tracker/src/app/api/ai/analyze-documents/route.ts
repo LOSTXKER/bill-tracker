@@ -144,6 +144,7 @@ function convertToLegacyFormat(
       contactName: result.vendor.matchedContactName,
       vatRate: result.vatRate,
       whtRate: result.wht.rate,
+      whtAmount: result.wht.amount,
       whtType: result.wht.type,
     },
     confidence: result.confidence,

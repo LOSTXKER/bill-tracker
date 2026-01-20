@@ -803,7 +803,7 @@ export function UnifiedTransactionForm({
 
       // Apply WHT (Withholding Tax) from AI
       const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
-      const whtAmount = extendedCombined.whtAmount;
+      const whtAmount = (suggested.whtAmount as number | null | undefined) ?? extendedCombined.whtAmount;
       const rawWhtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
       // Normalize AI's whtType to valid enum key (e.g., "ค่าธรรมเนียม" -> "SERVICE_3")
       const whtType = normalizeWhtType(rawWhtType);
