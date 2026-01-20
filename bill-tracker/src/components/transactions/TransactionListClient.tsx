@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, ReactNode } from "react";
+import { useEffect, useState, useTransition, ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -118,7 +118,7 @@ export function TransactionListClient({
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("all");
-  const [isInitialMount, setIsInitialMount] = useState(true);
+  const isInitialMount = useRef(true);
   
   const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
   
@@ -179,8 +179,8 @@ export function TransactionListClient({
   // Fetch data when filters change (skip initial mount since we have initialData)
   useEffect(() => {
     // Skip the first render - we already have data from server
-    if (isInitialMount) {
-      setIsInitialMount(false);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
       return;
     }
     
@@ -197,7 +197,7 @@ export function TransactionListClient({
       setTotal(result.total);
       setSelectedIds([]); // Clear selection when data changes
     });
-  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData, isInitialMount]);
+  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
 
   // Real-time update: Refetch when window regains focus
   useEffect(() => {
