@@ -28,13 +28,17 @@ export function NotificationSection({ companyId }: NotificationSectionProps) {
 
         if (configRes.ok) {
           const configData = await configRes.json();
-          setIsConfigured(configData.isConfigured && configData.groupId);
-          setNotifyEnabled(configData.notifyEnabled);
+          // API response is wrapped: { success: true, data: {...} }
+          const data = configData.data || configData;
+          setIsConfigured(data.isConfigured && data.groupId);
+          setNotifyEnabled(data.notifyEnabled);
         }
 
         if (settingsRes.ok) {
           const settingsData = await settingsRes.json();
-          setSettings(settingsData.settings);
+          // API response is wrapped: { success: true, data: {...} }
+          const data = settingsData.data || settingsData;
+          setSettings(data.settings);
         }
       } catch (error) {
         console.error("Failed to fetch notification settings:", error);
