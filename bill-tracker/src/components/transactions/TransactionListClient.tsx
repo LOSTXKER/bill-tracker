@@ -111,12 +111,14 @@ export function TransactionListClient({
   const router = useRouter();
   const { filters, setFilter, setFilterWithSort } = useTransactionFilters();
   const { page, limit, setPage, setLimit } = usePagination();
-  const { sortBy, sortOrder, toggleSort } = useSorting();
+  // Use the correct default sort field based on transaction type
+  const { sortBy, sortOrder, toggleSort } = useSorting(config.dateField);
   const [data, setData] = useState(initialData);
   const [total, setTotal] = useState(initialTotal);
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("all");
+  const [isInitialMount, setIsInitialMount] = useState(true);
   
   const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
   
@@ -174,8 +176,14 @@ export function TransactionListClient({
     }
   };
 
-  // Fetch data when filters change
+  // Fetch data when filters change (skip initial mount since we have initialData)
   useEffect(() => {
+    // Skip the first render - we already have data from server
+    if (isInitialMount) {
+      setIsInitialMount(false);
+      return;
+    }
+    
     startTransition(async () => {
       const result = await fetchData({
         companyCode,
@@ -189,7 +197,7 @@ export function TransactionListClient({
       setTotal(result.total);
       setSelectedIds([]); // Clear selection when data changes
     });
-  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
+  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData, isInitialMount]);
 
   // Real-time update: Refetch when window regains focus
   useEffect(() => {

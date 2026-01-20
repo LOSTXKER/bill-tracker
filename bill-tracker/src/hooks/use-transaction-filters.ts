@@ -163,14 +163,14 @@ export function usePagination() {
 }
 
 // Hook for sorting
-export function useSorting() {
+export function useSorting(defaultSortBy: string = "billDate") {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
   const sortBy = useMemo(() => {
-    return searchParams.get("sortBy") || "createdAt";
-  }, [searchParams]);
+    return searchParams.get("sortBy") || defaultSortBy;
+  }, [searchParams, defaultSortBy]);
 
   const sortOrder = useMemo(() => {
     return (searchParams.get("sortOrder") || "desc") as "asc" | "desc";
