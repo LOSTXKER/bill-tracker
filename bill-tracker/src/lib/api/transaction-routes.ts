@@ -116,6 +116,8 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const onlyMine = searchParams.get("onlyMine") === "true"; // Only show items created by current user
       const page = parseInt(searchParams.get("page") || "1");
       const limit = parseInt(searchParams.get("limit") || "20");
+      const sortBy = searchParams.get("sortBy") || "createdAt";
+      const sortOrder = (searchParams.get("sortOrder") || "desc") as "asc" | "desc";
 
       // Base where clause
       const where: any = {
@@ -219,10 +221,10 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
             ...creatorInclude,
             ...submitterInclude,
           },
-          // Sort by date field, then by createdAt for consistent ordering
+          // Sort by user-selected field, then by createdAt for consistent ordering
           orderBy: [
-            { [config.fields.dateField]: "desc" },
-            { createdAt: "desc" },
+            { [sortBy]: sortOrder },
+            ...(sortBy !== "createdAt" ? [{ createdAt: "desc" }] : []),
           ],
           skip: (page - 1) * limit,
           take: limit,
