@@ -10,7 +10,7 @@ const prisma = new PrismaClient({ adapter });
 
 // ====== แก้ไขตรงนี้ ======
 const TARGET_EMAIL = "nutya009@gmail.com";  // email ที่ต้องการ reset (ใช้ตัวพิมพ์เล็กทั้งหมด)
-const NEW_PASSWORD = "Nutya@2026";          // รหัสผ่านใหม่
+const NEW_PASSWORD = "Nutya2026";           // รหัสผ่านใหม่ (ไม่มีอักขระพิเศษ)
 // ========================
 
 async function main() {

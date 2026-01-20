@@ -1476,7 +1476,23 @@ export function UnifiedTransactionForm({
 
                   {/* Currency Conversion Note */}
                   {aiResult?.currencyConversion && (
-                    <CurrencyConversionNote currencyConversion={aiResult.currencyConversion} />
+                    <CurrencyConversionNote 
+                      currencyConversion={aiResult.currencyConversion}
+                      onRateChange={(newRate, newConvertedAmount) => {
+                        // Update the amount field with new converted amount
+                        setValue("amount", newConvertedAmount);
+                        // Update the AI result with new rate
+                        setAiResult((prev) => prev ? {
+                          ...prev,
+                          currencyConversion: {
+                            ...prev.currencyConversion!,
+                            exchangeRate: newRate,
+                            convertedAmount: newConvertedAmount,
+                            conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
+                          },
+                        } : null);
+                      }}
+                    />
                   )}
 
                   {/* Divider */}
