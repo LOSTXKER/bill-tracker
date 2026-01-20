@@ -6,6 +6,7 @@ import {
   exportVATReport,
   exportWHTReport,
 } from "./excel";
+import { OTHER_DOC_TYPE_LABELS, type OtherDocType } from "@/lib/constants/transaction";
 
 // ============================================================================
 // Types
@@ -220,13 +221,20 @@ export async function generateAccountingArchive(
 
     // Add other document files
     const otherDocs = expense.otherDocUrls || [];
-    otherDocs.forEach((doc, fileIdx) => {
+    // Group by type to number files correctly within each type
+    const typeCounters: Record<string, number> = {};
+    otherDocs.forEach((doc) => {
       // Handle both string and TypedOtherDoc formats
       const url = typeof doc === 'string' ? doc : doc.url;
+      const docType = (typeof doc === 'object' && doc.type) ? doc.type as OtherDocType : 'OTHER';
       if (!url) return;
       
+      // Get Thai label for the document type
+      const typeLabel = OTHER_DOC_TYPE_LABELS[docType] || "เอกสารอื่นๆ";
+      typeCounters[docType] = (typeCounters[docType] || 0) + 1;
+      
       const ext = getExtension(url);
-      const fileName = `เอกสารอื่นๆ_${String(fileIdx + 1).padStart(2, "0")}.${ext}`;
+      const fileName = `${typeLabel}_${String(typeCounters[docType]).padStart(2, "0")}.${ext}`;
       downloadPromises.push(
         downloadFile(url).then((buffer) => {
           if (buffer) {
@@ -291,13 +299,20 @@ export async function generateAccountingArchive(
 
     // Add other document files
     const otherDocs = income.otherDocUrls || [];
-    otherDocs.forEach((doc, fileIdx) => {
+    // Group by type to number files correctly within each type
+    const typeCounters: Record<string, number> = {};
+    otherDocs.forEach((doc) => {
       // Handle both string and TypedOtherDoc formats
       const url = typeof doc === 'string' ? doc : doc.url;
+      const docType = (typeof doc === 'object' && doc.type) ? doc.type as OtherDocType : 'OTHER';
       if (!url) return;
       
+      // Get Thai label for the document type
+      const typeLabel = OTHER_DOC_TYPE_LABELS[docType] || "เอกสารอื่นๆ";
+      typeCounters[docType] = (typeCounters[docType] || 0) + 1;
+      
       const ext = getExtension(url);
-      const fileName = `เอกสารอื่นๆ_${String(fileIdx + 1).padStart(2, "0")}.${ext}`;
+      const fileName = `${typeLabel}_${String(typeCounters[docType]).padStart(2, "0")}.${ext}`;
       downloadPromises.push(
         downloadFile(url).then((buffer) => {
           if (buffer) {

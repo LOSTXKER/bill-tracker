@@ -20,6 +20,7 @@ import {
   exportVATReport,
   exportWHTReport,
 } from "@/lib/export/excel";
+import { OTHER_DOC_TYPE_LABELS, type OtherDocType } from "@/lib/constants/transaction";
 
 interface ExpenseWithFiles {
   id: string;
@@ -422,15 +423,20 @@ export async function GET(
             for (const doc of otherDocs) {
               // Handle both string[] and TypedOtherDoc[] formats
               const url = typeof doc === 'string' ? doc : doc.url;
+              const docType = (typeof doc === 'object' && doc.type) ? doc.type as OtherDocType : 'OTHER';
               if (!url) continue;
               
+              // Get Thai label for the document type
+              const typeLabel = OTHER_DOC_TYPE_LABELS[docType] || "อื่นๆ";
               const ext = getFileExtension(url);
-              const baseFilename = generateFilename(expense.billDate, contactName, "other", ext);
+              const dateStr = formatThaiDate(expense.billDate);
+              const safeName = contactName.replace(/[<>:"/\\|?*]/g, "").replace(/\s+/g, "-");
+              const baseFilename = `${dateStr}-${safeName}-${typeLabel}.${ext}`;
               
               const key = `${getExpenseFolderPath("other")}/${baseFilename}`;
               fileNameCounter[key] = (fileNameCounter[key] || 0) + 1;
               const filename = fileNameCounter[key] > 1
-                ? generateFilename(expense.billDate, contactName, "other", ext, fileNameCounter[key])
+                ? `${dateStr}-${safeName}-${typeLabel}-${fileNameCounter[key]}.${ext}`
                 : baseFilename;
               
               await addFileToArchive(url, getExpenseFolderPath("other"), filename);
@@ -499,15 +505,20 @@ export async function GET(
             for (const doc of otherDocs) {
               // Handle both string[] and TypedOtherDoc[] formats
               const url = typeof doc === 'string' ? doc : doc.url;
+              const docType = (typeof doc === 'object' && doc.type) ? doc.type as OtherDocType : 'OTHER';
               if (!url) continue;
               
+              // Get Thai label for the document type
+              const typeLabel = OTHER_DOC_TYPE_LABELS[docType] || "อื่นๆ";
               const ext = getFileExtension(url);
-              const baseFilename = generateFilename(income.receiveDate, contactName, "other", ext);
+              const dateStr = formatThaiDate(income.receiveDate);
+              const safeName = contactName.replace(/[<>:"/\\|?*]/g, "").replace(/\s+/g, "-");
+              const baseFilename = `${dateStr}-${safeName}-${typeLabel}.${ext}`;
               
               const key = `${getIncomeFolderPath("other")}/${baseFilename}`;
               fileNameCounter[key] = (fileNameCounter[key] || 0) + 1;
               const filename = fileNameCounter[key] > 1
-                ? generateFilename(income.receiveDate, contactName, "other", ext, fileNameCounter[key])
+                ? `${dateStr}-${safeName}-${typeLabel}-${fileNameCounter[key]}.${ext}`
                 : baseFilename;
               
               await addFileToArchive(url, getIncomeFolderPath("other"), filename);
