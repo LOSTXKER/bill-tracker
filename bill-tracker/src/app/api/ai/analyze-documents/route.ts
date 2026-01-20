@@ -150,6 +150,7 @@ function convertToLegacyFormat(
     fileAssignments: imageUrls.reduce((acc, url) => {
       acc[url] = result.documentType === "BANK_SLIP" ? "slip" 
                : result.documentType === "WHT_CERT" ? "whtCert" 
+               : result.documentType === "OTHER" ? "other"
                : "invoice";
       return acc;
     }, {} as Record<string, string>),
