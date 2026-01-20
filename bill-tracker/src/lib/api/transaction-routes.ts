@@ -219,7 +219,11 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
             ...creatorInclude,
             ...submitterInclude,
           },
-          orderBy: { [config.fields.dateField]: "desc" },
+          // Sort by date field, then by createdAt for consistent ordering
+          orderBy: [
+            { [config.fields.dateField]: "desc" },
+            { createdAt: "desc" },
+          ],
           skip: (page - 1) * limit,
           take: limit,
         }),
