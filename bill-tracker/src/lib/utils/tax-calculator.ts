@@ -123,6 +123,69 @@ export const WHT_RATES = {
   OTHER: { rate: 3, description: "อื่นๆ" },
 } as const;
 
+export type WhtTypeKey = keyof typeof WHT_RATES;
+
+/**
+ * Mapping from Thai descriptions (or variations) to WHT_RATES keys
+ * AI might return different variations, so we handle all possibilities
+ */
+const WHT_TYPE_MAPPINGS: Record<string, WhtTypeKey> = {
+  // Direct matches
+  "ค่าบริการ": "SERVICE_3",
+  "ค่าวิชาชีพ": "PROFESSIONAL_5", 
+  "ค่าขนส่ง": "TRANSPORT_1",
+  "ค่าเช่า": "RENT_5",
+  "ค่าโฆษณา": "ADVERTISING_2",
+  "อื่นๆ": "OTHER",
+  // Common variations
+  "บริการ": "SERVICE_3",
+  "ค่าธรรมเนียม": "SERVICE_3",
+  "ค่าที่ปรึกษา": "PROFESSIONAL_5",
+  "วิชาชีพ": "PROFESSIONAL_5",
+  "ที่ปรึกษา": "PROFESSIONAL_5",
+  "ขนส่ง": "TRANSPORT_1",
+  "ค่าส่ง": "TRANSPORT_1",
+  "เช่า": "RENT_5",
+  "ค่าเช่าอาคาร": "RENT_5",
+  "ค่าเช่าพื้นที่": "RENT_5",
+  "โฆษณา": "ADVERTISING_2",
+  "ค่าประชาสัมพันธ์": "ADVERTISING_2",
+  "อื่น": "OTHER",
+  // English enum names (in case AI returns them)
+  "SERVICE_3": "SERVICE_3",
+  "PROFESSIONAL_5": "PROFESSIONAL_5",
+  "TRANSPORT_1": "TRANSPORT_1",
+  "RENT_5": "RENT_5",
+  "ADVERTISING_2": "ADVERTISING_2",
+  "OTHER": "OTHER",
+};
+
+/**
+ * Convert AI's whtType response to valid enum key
+ * Returns the enum key (e.g., "SERVICE_3") or null if not mappable
+ */
+export function normalizeWhtType(whtType: string | null | undefined): WhtTypeKey | null {
+  if (!whtType) return null;
+  
+  // Direct lookup
+  const direct = WHT_TYPE_MAPPINGS[whtType];
+  if (direct) return direct;
+  
+  // Try lowercase match
+  const lower = whtType.toLowerCase();
+  for (const [key, value] of Object.entries(WHT_TYPE_MAPPINGS)) {
+    if (key.toLowerCase() === lower) return value;
+  }
+  
+  // Try partial match (contains)
+  for (const [key, value] of Object.entries(WHT_TYPE_MAPPINGS)) {
+    if (whtType.includes(key) || key.includes(whtType)) return value;
+  }
+  
+  // Default to SERVICE_3 if we can't determine (most common case)
+  return "SERVICE_3";
+}
+
 /**
  * Get WHT rate by type
  */

@@ -35,7 +35,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatCurrency, normalizeWhtType } from "@/lib/utils/tax-calculator";
 
 // Hooks
 import { useContacts } from "@/hooks/use-contacts";
@@ -804,7 +804,9 @@ export function UnifiedTransactionForm({
       // Apply WHT (Withholding Tax) from AI
       const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
       const whtAmount = extendedCombined.whtAmount;
-      const whtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
+      const rawWhtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
+      // Normalize AI's whtType to valid enum key (e.g., "ค่าธรรมเนียม" -> "SERVICE_3")
+      const whtType = normalizeWhtType(rawWhtType);
       
       // Debug: Log WHT data from AI
       console.log("[AI WHT Debug]", {
@@ -812,7 +814,8 @@ export function UnifiedTransactionForm({
         "extendedCombined.whtRate": extendedCombined.whtRate,
         "extendedCombined.whtAmount": whtAmount,
         "whtRate (final)": whtRate,
-        "whtType": whtType,
+        "rawWhtType": rawWhtType,
+        "whtType (normalized)": whtType,
       });
       
       // Enable WHT if we have rate OR amount
