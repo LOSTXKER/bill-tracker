@@ -43,7 +43,7 @@ import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 
 // Shared form components
-import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult } from "./shared/InputMethodSection";
+import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
 import { MergeOptionsDialog, MergeData, MergeDecision } from "./shared/MergeOptionsDialog";
 import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } from "./shared/ConflictDialog";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
@@ -403,12 +403,12 @@ export function UnifiedTransactionForm({
           setSelectedAccount(data.accountId);
         }
 
-        // Set categorized files
+        // Set categorized files (normalize other docs for backward compatibility)
         setCategorizedFiles({
           invoice: data[config.fileFields.invoice.urlsField] || [],
           slip: data[config.fileFields.slip.urlsField] || [],
           whtCert: data[config.fileFields.wht.urlsField] || [],
-          other: data.otherDocUrls || [],
+          other: normalizeOtherDocs(data.otherDocUrls),
           uncategorized: [],
         });
         

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, MessageSquareText } from "lucide-react";
-import { DocumentUploadSection, CategorizedFiles, MultiDocAnalysisResult } from "./DocumentUploadSection";
+import { DocumentUploadSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs, type OtherDocType, type TypedOtherDoc } from "./DocumentUploadSection";
 import { TextInputSection } from "./TextInputSection";
 
 interface InputMethodSectionProps {
@@ -62,5 +62,6 @@ export function InputMethodSection({
   );
 }
 
-// Re-export types for convenience
-export type { CategorizedFiles, MultiDocAnalysisResult };
+// Re-export types and helpers for convenience
+export type { CategorizedFiles, MultiDocAnalysisResult, OtherDocType, TypedOtherDoc };
+export { normalizeOtherDocs };

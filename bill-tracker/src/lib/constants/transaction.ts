@@ -403,6 +403,37 @@ export const EXPENSE_DOCUMENT_TYPE_OPTIONS = [
   { value: "NO_DOCUMENT", label: "ไม่มีเอกสาร", description: "ค่าใช้จ่ายเบ็ดเตล็ด" },
 ] as const;
 
+// =============================================================================
+// Other Document Type Configuration (เอกสารประกอบ)
+// =============================================================================
+
+export const OTHER_DOC_TYPE_OPTIONS = [
+  { value: "QUOTATION", label: "ใบเสนอราคา", icon: "FileText" },
+  { value: "INVOICE", label: "ใบแจ้งหนี้", icon: "FileText" },
+  { value: "CONTRACT", label: "สัญญา", icon: "FileSignature" },
+  { value: "PURCHASE_ORDER", label: "ใบสั่งซื้อ (PO)", icon: "ClipboardList" },
+  { value: "DELIVERY_NOTE", label: "ใบส่งของ", icon: "Truck" },
+  { value: "OTHER", label: "อื่นๆ", icon: "File" },
+] as const;
+
+export type OtherDocType = typeof OTHER_DOC_TYPE_OPTIONS[number]["value"];
+
+export const OTHER_DOC_TYPE_LABELS: Record<OtherDocType, string> = {
+  QUOTATION: "ใบเสนอราคา",
+  INVOICE: "ใบแจ้งหนี้",
+  CONTRACT: "สัญญา",
+  PURCHASE_ORDER: "ใบสั่งซื้อ (PO)",
+  DELIVERY_NOTE: "ใบส่งของ",
+  OTHER: "อื่นๆ",
+};
+
+// Typed other document structure
+export interface TypedOtherDoc {
+  url: string;
+  type: OtherDocType;
+  name?: string; // Optional custom name
+}
+
 export const EXPENSE_DOCUMENT_TYPE_LABELS: Record<string, string> = {
   TAX_INVOICE: "ใบกำกับภาษี",
   CASH_RECEIPT: "บิลเงินสด",

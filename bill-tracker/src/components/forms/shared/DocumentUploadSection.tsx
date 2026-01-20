@@ -30,15 +30,35 @@ import { uploadFile, deleteFile, extractDisplayName } from "@/lib/storage/upload
 // Types
 // =============================================================================
 
+import { OTHER_DOC_TYPE_OPTIONS, OTHER_DOC_TYPE_LABELS, type OtherDocType, type TypedOtherDoc } from "@/lib/constants/transaction";
+
 export type DocumentCategory = "invoice" | "slip" | "whtCert" | "other" | "uncategorized";
 
 export interface CategorizedFiles {
   invoice: string[];   // ใบกำกับภาษี/ใบเสร็จ
   slip: string[];      // สลิปโอนเงิน  
   whtCert: string[];   // ใบ 50 ทวิ
-  other: string[];     // เอกสารอื่นๆ (AI ไม่ต้องอ่าน)
+  other: TypedOtherDoc[];     // เอกสารอื่นๆ with type
   uncategorized: string[]; // ยังไม่จำแนก
 }
+
+// Helper to convert legacy string[] to TypedOtherDoc[]
+export function normalizeOtherDocs(docs: (string | TypedOtherDoc)[] | undefined): TypedOtherDoc[] {
+  if (!docs) return [];
+  return docs.map(doc => {
+    if (typeof doc === "string") {
+      return { url: doc, type: "OTHER" as OtherDocType };
+    }
+    return doc;
+  });
+}
+
+// Helper to extract URLs from TypedOtherDoc[]
+export function getOtherDocUrls(docs: TypedOtherDoc[]): string[] {
+  return docs.map(d => d.url);
+}
+
+export { type OtherDocType, type TypedOtherDoc };
 
 export interface FileClassification {
   url: string;
@@ -153,7 +173,7 @@ export function DocumentUploadSection({
       console.log("DocumentUploadSection initializing with files:", initialFiles);
       return {
         ...initialFiles,
-        other: initialFiles.other || [],
+        other: normalizeOtherDocs(initialFiles.other as unknown as (string | TypedOtherDoc)[]),
       };
     }
     return {
@@ -237,10 +257,18 @@ export function DocumentUploadSection({
   // Remove file
   const removeFile = async (url: string, category: DocumentCategory) => {
     // Remove from state first (optimistic update)
-    const updatedFiles: CategorizedFiles = {
-      ...files,
-      [category]: files[category].filter((f) => f !== url),
-    };
+    let updatedFiles: CategorizedFiles;
+    if (category === "other") {
+      updatedFiles = {
+        ...files,
+        other: files.other.filter((f) => f.url !== url),
+      };
+    } else {
+      updatedFiles = {
+        ...files,
+        [category]: (files[category] as string[]).filter((f) => f !== url),
+      };
+    }
     setFiles(updatedFiles);
     onFilesChange(updatedFiles);
 
@@ -256,14 +284,36 @@ export function DocumentUploadSection({
   };
 
   // Move file between categories
-  const moveFile = (url: string, fromCategory: DocumentCategory, toCategory: DocumentCategory) => {
+  const moveFile = (url: string, fromCategory: DocumentCategory, toCategory: DocumentCategory, otherDocType?: OtherDocType) => {
     if (fromCategory === toCategory) return;
 
-    const updatedFiles: CategorizedFiles = {
-      ...files,
-      [fromCategory]: files[fromCategory].filter((f) => f !== url),
-      [toCategory]: [...files[toCategory], url],
-    };
+    let updatedFiles: CategorizedFiles;
+    
+    // Remove from source category
+    if (fromCategory === "other") {
+      updatedFiles = {
+        ...files,
+        other: files.other.filter((f) => f.url !== url),
+      };
+    } else {
+      updatedFiles = {
+        ...files,
+        [fromCategory]: (files[fromCategory] as string[]).filter((f) => f !== url),
+      };
+    }
+
+    // Add to destination category
+    if (toCategory === "other") {
+      updatedFiles = {
+        ...updatedFiles,
+        other: [...updatedFiles.other, { url, type: otherDocType || "OTHER" }],
+      };
+    } else {
+      updatedFiles = {
+        ...updatedFiles,
+        [toCategory]: [...(updatedFiles[toCategory] as string[]), url],
+      };
+    }
 
     setFiles(updatedFiles);
     onFilesChange(updatedFiles);
@@ -493,10 +543,10 @@ export function DocumentUploadSection({
       {/* Categorized Files (after analysis) */}
       {(isAnalyzed || hasCategorizedFiles) && (
         <div className="space-y-3">
-          {categoriesToShow.map((category) => {
+          {categoriesToShow.filter(c => c !== "other").map((category) => {
             const config = CATEGORY_CONFIG[category];
             const Icon = config.icon;
-            const categoryFiles = files[category];
+            const categoryFiles = files[category] as string[];
             const label = transactionType === "income" ? config.labelIncome : config.label;
 
             return (
@@ -525,7 +575,7 @@ export function DocumentUploadSection({
                         url={url}
                         index={index}
                         onRemove={() => removeFile(url, category)}
-                        onMove={(toCategory) => moveFile(url, category, toCategory)}
+                        onMove={(toCategory, otherDocType) => moveFile(url, category, toCategory, otherDocType)}
                         currentCategory={category}
                         showMoveOptions
                         availableCategories={categoriesToShow}
@@ -541,6 +591,26 @@ export function DocumentUploadSection({
               </div>
             );
           })}
+
+          {/* Other Documents Section with Types */}
+          {categoriesToShow.includes("other") && (
+            <OtherDocumentsSection
+              files={files.other}
+              onRemove={(url) => removeFile(url, "other")}
+              onMove={(url, toCategory) => moveFile(url, "other", toCategory)}
+              onChangeType={(url, newType) => {
+                const updatedFiles: CategorizedFiles = {
+                  ...files,
+                  other: files.other.map(f => f.url === url ? { ...f, type: newType } : f),
+                };
+                setFiles(updatedFiles);
+                onFilesChange(updatedFiles);
+              }}
+              availableCategories={categoriesToShow.filter(c => c !== "other")}
+              disabled={isAnalyzing}
+              transactionType={transactionType}
+            />
+          )}
 
           {/* Uncategorized after analysis */}
           {files.uncategorized.length > 0 && isAnalyzed && (
@@ -561,7 +631,7 @@ export function DocumentUploadSection({
                     url={url}
                     index={index}
                     onRemove={() => removeFile(url, "uncategorized")}
-                    onMove={(toCategory) => moveFile(url, "uncategorized", toCategory)}
+                    onMove={(toCategory, otherDocType) => moveFile(url, "uncategorized", toCategory, otherDocType)}
                     currentCategory="uncategorized"
                     showMoveOptions
                     availableCategories={categoriesToShow}
@@ -578,6 +648,253 @@ export function DocumentUploadSection({
 }
 
 // =============================================================================
+// Other Documents Section Component
+// =============================================================================
+
+interface OtherDocumentsSectionProps {
+  files: TypedOtherDoc[];
+  onRemove: (url: string) => void;
+  onMove: (url: string, toCategory: DocumentCategory) => void;
+  onChangeType: (url: string, newType: OtherDocType) => void;
+  availableCategories: DocumentCategory[];
+  disabled?: boolean;
+  transactionType: "expense" | "income";
+}
+
+function OtherDocumentsSection({
+  files,
+  onRemove,
+  onMove,
+  onChangeType,
+  availableCategories,
+  disabled = false,
+  transactionType,
+}: OtherDocumentsSectionProps) {
+  const config = CATEGORY_CONFIG.other;
+  const Icon = config.icon;
+  const label = transactionType === "income" ? config.labelIncome : config.label;
+
+  // Group files by type
+  const filesByType = files.reduce((acc, file) => {
+    const type = file.type || "OTHER";
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(file);
+    return acc;
+  }, {} as Record<OtherDocType, TypedOtherDoc[]>);
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-3 transition-colors",
+        files.length > 0 ? config.bgColor : "bg-muted/20"
+      )}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className={cn("h-4 w-4", config.color)} />
+        <span className="text-sm font-medium">{label}</span>
+        {files.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            ({files.length} ไฟล์)
+          </span>
+        )}
+      </div>
+
+      {files.length > 0 ? (
+        <div className="space-y-3">
+          {OTHER_DOC_TYPE_OPTIONS.map((docType) => {
+            const typeFiles = filesByType[docType.value] || [];
+            if (typeFiles.length === 0) return null;
+
+            return (
+              <div key={docType.value} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground bg-background/50 px-2 py-0.5 rounded">
+                    {docType.label}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {typeFiles.map((file, index) => (
+                    <OtherDocFileChip
+                      key={`other-${docType.value}-${index}-${file.url}`}
+                      file={file}
+                      index={index}
+                      onRemove={() => onRemove(file.url)}
+                      onMove={(toCategory) => onMove(file.url, toCategory)}
+                      onChangeType={(newType) => onChangeType(file.url, newType)}
+                      availableCategories={availableCategories}
+                      disabled={disabled}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground py-2">
+          ไม่มีไฟล์
+        </p>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Other Doc File Chip Component
+// =============================================================================
+
+interface OtherDocFileChipProps {
+  file: TypedOtherDoc;
+  index: number;
+  onRemove: () => void;
+  onMove: (category: DocumentCategory) => void;
+  onChangeType: (type: OtherDocType) => void;
+  availableCategories: DocumentCategory[];
+  disabled?: boolean;
+}
+
+function OtherDocFileChip({
+  file,
+  index,
+  onRemove,
+  onMove,
+  onChangeType,
+  availableCategories,
+  disabled = false,
+}: OtherDocFileChipProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const rawFileName = file.url?.split("/").pop() || `ไฟล์ ${index + 1}`;
+  const displayName = extractDisplayName(rawFileName);
+  const shortName = displayName.length > 20 ? displayName.slice(0, 17) + "..." : displayName;
+  const isImage = file.url ? /\.(jpg|jpeg|png|webp|gif)$/i.test(file.url) : false;
+
+  return (
+    <div className="relative group">
+      <div
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-lg border bg-background",
+          "hover:border-primary/50 transition-colors",
+          disabled && "opacity-50"
+        )}
+      >
+        {/* Move Handle */}
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground cursor-pointer"
+          onClick={() => { setShowMenu(!showMenu); setShowTypeMenu(false); }}
+          disabled={disabled}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        {/* Thumbnail */}
+        {isImage ? (
+          <img
+            src={file.url}
+            alt={shortName}
+            className="h-8 w-8 rounded object-cover"
+          />
+        ) : (
+          <FileText className="h-8 w-8 text-muted-foreground" />
+        )}
+
+        {/* File Name */}
+        <span className="text-sm truncate max-w-[100px]" title={displayName}>
+          {shortName}
+        </span>
+
+        {/* Type Badge (clickable) */}
+        <button
+          type="button"
+          onClick={() => { setShowTypeMenu(!showTypeMenu); setShowMenu(false); }}
+          disabled={disabled}
+          className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+        >
+          {OTHER_DOC_TYPE_LABELS[file.type] || "อื่นๆ"}
+        </button>
+
+        {/* Remove Button */}
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={disabled}
+          className="text-muted-foreground hover:text-destructive transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Move Menu */}
+      {showMenu && (
+        <div className="absolute top-full left-0 mt-1 z-10 bg-popover border rounded-lg shadow-lg py-1 min-w-[160px]">
+          <p className="px-3 py-1 text-xs text-muted-foreground">ย้ายไปหมวด:</p>
+          {availableCategories.map((cat) => {
+            const catConfig = CATEGORY_CONFIG[cat];
+            const CatIcon = catConfig.icon;
+            return (
+              <button
+                key={cat}
+                type="button"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+                onClick={() => {
+                  onMove(cat);
+                  setShowMenu(false);
+                }}
+              >
+                <CatIcon className={cn("h-4 w-4", catConfig.color)} />
+                {catConfig.label}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
+            onClick={() => setShowMenu(false)}
+          >
+            ยกเลิก
+          </button>
+        </div>
+      )}
+
+      {/* Type Change Menu */}
+      {showTypeMenu && (
+        <div className="absolute top-full right-0 mt-1 z-10 bg-popover border rounded-lg shadow-lg py-1 min-w-[160px]">
+          <p className="px-3 py-1 text-xs text-muted-foreground">เปลี่ยนประเภท:</p>
+          {OTHER_DOC_TYPE_OPTIONS.map((docType) => (
+            <button
+              key={docType.value}
+              type="button"
+              className={cn(
+                "w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2",
+                file.type === docType.value && "bg-muted"
+              )}
+              onClick={() => {
+                onChangeType(docType.value);
+                setShowTypeMenu(false);
+              }}
+            >
+              <FileText className="h-4 w-4 text-purple-600" />
+              {docType.label}
+              {file.type === docType.value && (
+                <CheckCircle2 className="h-3 w-3 ml-auto text-green-600" />
+              )}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
+            onClick={() => setShowTypeMenu(false)}
+          >
+            ยกเลิก
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // File Preview Chip Component
 // =============================================================================
 
@@ -585,7 +902,7 @@ interface FilePreviewChipProps {
   url: string;
   index: number;
   onRemove: () => void;
-  onMove?: (category: DocumentCategory) => void;
+  onMove?: (category: DocumentCategory, otherDocType?: OtherDocType) => void;
   currentCategory?: DocumentCategory;
   showMoveOptions?: boolean;
   availableCategories?: DocumentCategory[];
@@ -603,6 +920,7 @@ function FilePreviewChip({
   disabled = false,
 }: FilePreviewChipProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [showOtherTypeMenu, setShowOtherTypeMenu] = useState(false);
   const rawFileName = url?.split("/").pop() || `ไฟล์ ${index + 1}`;
   // Use extractDisplayName to show original filename instead of timestamp ID
   const displayName = extractDisplayName(rawFileName);
@@ -623,7 +941,7 @@ function FilePreviewChip({
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground cursor-grab"
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={() => { setShowMenu(!showMenu); setShowOtherTypeMenu(false); }}
             disabled={disabled}
           >
             <GripVertical className="h-4 w-4" />
@@ -659,10 +977,10 @@ function FilePreviewChip({
 
       {/* Move Menu */}
       {showMenu && showMoveOptions && onMove && (
-        <div className="absolute top-full left-0 mt-1 z-10 bg-popover border rounded-lg shadow-lg py-1 min-w-[160px]">
+        <div className="absolute top-full left-0 mt-1 z-10 bg-popover border rounded-lg shadow-lg py-1 min-w-[180px]">
           <p className="px-3 py-1 text-xs text-muted-foreground">ย้ายไปหมวด:</p>
           {availableCategories
-            .filter((cat) => cat !== currentCategory)
+            .filter((cat) => cat !== currentCategory && cat !== "other")
             .map((cat) => {
               const config = CATEGORY_CONFIG[cat];
               const Icon = config.icon;
@@ -681,12 +999,51 @@ function FilePreviewChip({
                 </button>
               );
             })}
+          {/* Other category with submenu */}
+          {availableCategories.includes("other") && currentCategory !== "other" && (
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+              onClick={() => { setShowOtherTypeMenu(true); setShowMenu(false); }}
+            >
+              <FileText className={cn("h-4 w-4", CATEGORY_CONFIG.other.color)} />
+              {CATEGORY_CONFIG.other.label} →
+            </button>
+          )}
           <button
             type="button"
             className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
             onClick={() => setShowMenu(false)}
           >
             ยกเลิก
+          </button>
+        </div>
+      )}
+
+      {/* Other Doc Type Selection Menu */}
+      {showOtherTypeMenu && onMove && (
+        <div className="absolute top-full left-0 mt-1 z-10 bg-popover border rounded-lg shadow-lg py-1 min-w-[180px]">
+          <p className="px-3 py-1 text-xs text-muted-foreground">เลือกประเภทเอกสาร:</p>
+          {OTHER_DOC_TYPE_OPTIONS.map((docType) => (
+            <button
+              key={docType.value}
+              type="button"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+              onClick={() => {
+                onMove("other", docType.value);
+                setShowOtherTypeMenu(false);
+              }}
+            >
+              <FileText className="h-4 w-4 text-purple-600" />
+              {docType.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
+            onClick={() => setShowOtherTypeMenu(false)}
+          >
+            ← กลับ
           </button>
         </div>
       )}
