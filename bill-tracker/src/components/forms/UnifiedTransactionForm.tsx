@@ -1055,7 +1055,7 @@ export function UnifiedTransactionForm({
       toast.success(`บันทึก${config.title}สำเร็จ`);
       
       // Redirect to the created item's detail page
-      const createdItem = result.expense || result.income;
+      const createdItem = result.data?.expense || result.data?.income;
       if (createdItem?.id) {
         router.push(`/${companyCode.toLowerCase()}/${config.listUrl}/${createdItem.id}`);
       } else {
