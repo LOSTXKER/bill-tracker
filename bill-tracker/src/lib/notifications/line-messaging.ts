@@ -1736,6 +1736,13 @@ export async function notifyApprovalRequest(
   const config = await getCompanyLineConfig(companyId);
   if (!config) return false;
 
+  // Check if approval submit notification is enabled
+  const settings = config.notifySettings;
+  if (!settings.approvals?.onSubmit?.enabled) {
+    console.log("Approval submit notification is disabled");
+    return false;
+  }
+
   const message = createApprovalRequestFlexMessage(data, baseUrl);
   return sendLineMessage({
     channelAccessToken: config.channelAccessToken,
@@ -1755,6 +1762,13 @@ export async function notifyApprovalGranted(
   const config = await getCompanyLineConfig(companyId);
   if (!config) return false;
 
+  // Check if approval granted notification is enabled
+  const settings = config.notifySettings;
+  if (!settings.approvals?.onApprove?.enabled) {
+    console.log("Approval granted notification is disabled");
+    return false;
+  }
+
   const message = createApprovalGrantedFlexMessage(data, baseUrl);
   return sendLineMessage({
     channelAccessToken: config.channelAccessToken,
@@ -1773,6 +1787,13 @@ export async function notifyRejection(
 ): Promise<boolean> {
   const config = await getCompanyLineConfig(companyId);
   if (!config) return false;
+
+  // Check if rejection notification is enabled
+  const settings = config.notifySettings;
+  if (!settings.approvals?.onReject?.enabled) {
+    console.log("Rejection notification is disabled");
+    return false;
+  }
 
   const message = createRejectionFlexMessage(data, baseUrl);
   return sendLineMessage({

@@ -282,6 +282,12 @@ export function LineNotificationSettings({
     settings.incomes.onDelete.enabled,
   ].filter(Boolean).length;
 
+  const approvalCount = [
+    settings.approvals?.onSubmit?.enabled,
+    settings.approvals?.onApprove?.enabled,
+    settings.approvals?.onReject?.enabled,
+  ].filter(Boolean).length;
+
   const reimbursementCount = [
     settings.reimbursements.onSubmit.enabled,
     settings.reimbursements.onApprove.enabled,
@@ -425,6 +431,52 @@ export function LineNotificationSettings({
                 description="เมื่อลบรายรับ"
                 checked={settings.incomes.onDelete.enabled}
                 onCheckedChange={(v) => updateSettings("incomes.onDelete.enabled", v)}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Approval Workflow Notifications */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">การอนุมัติ</CardTitle>
+                    <CardDescription>แจ้งเตือนเมื่อมีการขออนุมัติรายจ่าย/รายรับ</CardDescription>
+                  </div>
+                </div>
+                <Badge variant="secondary">
+                  {approvalCount}/3 เปิดอยู่
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              <QuickToggle
+                icon={<Zap className="h-5 w-5" />}
+                title="ส่งอนุมัติ"
+                description="เมื่อมีการส่งขออนุมัติใหม่"
+                checked={settings.approvals?.onSubmit?.enabled ?? true}
+                onCheckedChange={(v) => updateSettings("approvals.onSubmit.enabled", v)}
+                color="primary"
+              />
+              <QuickToggle
+                icon={<CheckCircle className="h-5 w-5" />}
+                title="อนุมัติแล้ว"
+                description="เมื่อรายการได้รับการอนุมัติ"
+                checked={settings.approvals?.onApprove?.enabled ?? true}
+                onCheckedChange={(v) => updateSettings("approvals.onApprove.enabled", v)}
+                color="primary"
+              />
+              <QuickToggle
+                icon={<XCircle className="h-5 w-5" />}
+                title="ถูกปฏิเสธ"
+                description="เมื่อรายการถูกปฏิเสธ"
+                checked={settings.approvals?.onReject?.enabled ?? true}
+                onCheckedChange={(v) => updateSettings("approvals.onReject.enabled", v)}
+                color="primary"
               />
             </CardContent>
           </Card>

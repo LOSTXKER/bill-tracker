@@ -23,6 +23,12 @@ export interface LineNotifySettings {
     onDelete: NotificationScenario;
     onUpdate: NotificationScenario;
   };
+  // Approval Workflow Notifications (for expenses & incomes)
+  approvals: {
+    onSubmit: NotificationScenario;   // เมื่อส่งอนุมัติ
+    onApprove: NotificationScenario;  // เมื่อได้รับการอนุมัติ
+    onReject: NotificationScenario;   // เมื่อถูกปฏิเสธ
+  };
   // Reimbursement Notification Scenarios
   reimbursements: {
     onSubmit: NotificationScenario;
@@ -74,6 +80,11 @@ export const DEFAULT_NOTIFY_SETTINGS: LineNotifySettings = {
     onStatusChange: { enabled: true },
     onDelete: { enabled: true },
     onUpdate: { enabled: true },
+  },
+  approvals: {
+    onSubmit: { enabled: true },
+    onApprove: { enabled: true },
+    onReject: { enabled: true },
   },
   reimbursements: {
     onSubmit: { enabled: true },
@@ -225,6 +236,10 @@ export function mergeSettings(
     incomes: {
       ...DEFAULT_NOTIFY_SETTINGS.incomes,
       ...userSettings.incomes,
+    },
+    approvals: {
+      ...DEFAULT_NOTIFY_SETTINGS.approvals,
+      ...userSettings.approvals,
     },
     reimbursements: {
       ...DEFAULT_NOTIFY_SETTINGS.reimbursements,
