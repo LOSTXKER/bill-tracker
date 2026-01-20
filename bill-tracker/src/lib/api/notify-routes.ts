@@ -85,8 +85,8 @@ export function createNotifyHandler(config: NotifyRouteConfig) {
       const entity = await config.prismaModel.findUnique({
         where: { id },
         include: {
-          contact: true,
-          company: {
+          Contact: true,
+          Company: {
             select: {
               id: true,
               code: true,
@@ -121,10 +121,10 @@ export function createNotifyHandler(config: NotifyRouteConfig) {
       // Build notification data
       const notifyData = {
         id: entity.id,
-        companyCode: entity.company.code,
-        companyName: entity.company.name,
+        companyCode: entity.Company.code,
+        companyName: entity.Company.name,
         [config.entityType === "expense" ? "vendorName" : "customerName"]: 
-          entity.contact?.name || entity[config.fields.descriptionField] || undefined,
+          entity.Contact?.name || entity[config.fields.descriptionField] || undefined,
         [config.fields.descriptionField]: entity[config.fields.descriptionField] || undefined,
         amount: Number(entity[config.fields.amountField]),
         vatAmount: entity[config.fields.vatAmountField] 
@@ -144,7 +144,7 @@ export function createNotifyHandler(config: NotifyRouteConfig) {
       // Send notification based on entity type
       let success: boolean;
       if (config.entityType === "expense") {
-        success = await notifyExpense(entity.company.id, {
+        success = await notifyExpense(entity.Company.id, {
           id: notifyData.id,
           companyCode: notifyData.companyCode,
           companyName: notifyData.companyName,
@@ -159,7 +159,7 @@ export function createNotifyHandler(config: NotifyRouteConfig) {
           status: notifyData.status,
         }, baseUrl);
       } else {
-        success = await notifyIncome(entity.company.id, {
+        success = await notifyIncome(entity.Company.id, {
           id: notifyData.id,
           companyCode: notifyData.companyCode,
           companyName: notifyData.companyName,

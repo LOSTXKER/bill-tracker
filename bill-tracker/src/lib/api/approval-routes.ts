@@ -74,7 +74,7 @@ export function createApproveHandler(config: ApprovalRouteConfig) {
       // Find the entity
       const entity = await config.prismaModel.findUnique({
         where: { id },
-        include: config.findInclude || { company: true },
+        include: config.findInclude || { Company: true },
       });
       
       if (!entity) {
@@ -166,7 +166,7 @@ export function createRejectHandler(config: ApprovalRouteConfig) {
       // Find the entity
       const entity = await config.prismaModel.findUnique({
         where: { id },
-        include: config.findInclude || { company: true },
+        include: config.findInclude || { Company: true },
       });
       
       if (!entity) {
@@ -298,7 +298,7 @@ export function createPayHandler(config: PaymentRouteConfig) {
       // Find the entity
       const entity = await config.prismaModel.findUnique({
         where: { id },
-        include: config.findInclude || { company: true, contact: true },
+        include: config.findInclude || { Company: true, Contact: true },
       });
       
       if (!entity) {

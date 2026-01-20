@@ -51,10 +51,13 @@ export function createTransactionRoutes(config: CreateTransactionRoutesOptions) 
         prismaModel.findMany({
           where,
           include: {
-            contact: true,
-            creator: {
+            Contact: true,
+            User_Expense_createdByToUser: model === 'expense' ? {
               select: { id: true, name: true, email: true },
-            },
+            } : undefined,
+            User: model === 'income' ? {
+              select: { id: true, name: true, email: true },
+            } : undefined,
           },
           orderBy: { [dateField]: "desc" },
           skip: (page - 1) * limit,
@@ -120,7 +123,7 @@ export function createTransactionRoutes(config: CreateTransactionRoutesOptions) 
 
       const item = await prismaModel.create({
         data: createData,
-        include: { contact: true },
+        include: { Contact: true },
       });
 
       // Create audit log
@@ -140,7 +143,7 @@ export function createTransactionRoutes(config: CreateTransactionRoutesOptions) 
         id: item.id,
         companyCode: company.code,
         companyName: company.name,
-        [model === 'expense' ? 'vendorName' : 'customerName']: item.contact?.name || data.description || data.source || undefined,
+        [model === 'expense' ? 'vendorName' : 'customerName']: item.Contact?.name || data.description || data.source || undefined,
         description: data.description || data.source || undefined,
         amount: Number(data.amount),
         vatAmount: vatAmount ? Number(vatAmount) : undefined,
