@@ -14,10 +14,12 @@ import { getExpenseStats } from "@/lib/cache/stats";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function ExpensesPage({ params }: ExpensesPageProps) {
+export default async function ExpensesPage({ params, searchParams }: ExpensesPageProps) {
   const { company: companyCode } = await params;
+  const urlParams = await searchParams;
 
   return (
     <div className="space-y-6">
@@ -42,7 +44,7 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
       </Suspense>
 
       <Suspense fallback={<TableSkeleton />}>
-        <ExpensesData companyCode={companyCode} />
+        <ExpensesData companyCode={companyCode} searchParams={urlParams} />
       </Suspense>
     </div>
   );
@@ -110,13 +112,31 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
   );
 }
 
-async function ExpensesData({ companyCode }: { companyCode: string }) {
+interface ExpensesDataProps {
+  companyCode: string;
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
+  // Parse URL params
+  const sortBy = (searchParams.sortBy as string) || "billDate";
+  const sortOrder = (searchParams.sortOrder as string) || "desc";
+  const page = parseInt((searchParams.page as string) || "1");
+  const limit = parseInt((searchParams.limit as string) || "20");
+  const search = searchParams.search as string | undefined;
+  const status = searchParams.status as string | undefined;
+  const category = searchParams.category as string | undefined;
+  const contact = searchParams.contact as string | undefined;
+  const creator = searchParams.creator as string | undefined;
+  const dateFrom = searchParams.dateFrom as string | undefined;
+  const dateTo = searchParams.dateTo as string | undefined;
+
+  // Build where clause
   // Filter: Only show regular expenses OR reimbursements that have been PAID
-  // REJECTED/PENDING/APPROVED reimbursements should NOT appear in expenses
-  const whereClause = {
+  const whereClause: any = {
     companyId,
     deletedAt: null,
     OR: [
@@ -125,15 +145,77 @@ async function ExpensesData({ companyCode }: { companyCode: string }) {
     ],
   };
 
+  if (search) {
+    whereClause.AND = [
+      {
+        OR: [
+          { description: { contains: search, mode: "insensitive" } },
+          { invoiceNumber: { contains: search, mode: "insensitive" } },
+          { Contact: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      },
+    ];
+  }
+
+  if (status) {
+    if (status.includes(",")) {
+      whereClause.workflowStatus = { in: status.split(",") };
+    } else {
+      whereClause.workflowStatus = status;
+    }
+  }
+
+  if (category) {
+    whereClause.categoryId = category;
+  }
+
+  if (contact) {
+    whereClause.contactId = contact;
+  }
+
+  if (creator) {
+    whereClause.createdBy = creator;
+  }
+
+  if (dateFrom || dateTo) {
+    whereClause.billDate = {};
+    if (dateFrom) {
+      whereClause.billDate.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      whereClause.billDate.lte = new Date(dateTo);
+    }
+  }
+
+  // Build orderBy - always include secondary sort for consistency
+  const orderBy: any[] = [];
+  if (sortBy === "billDate") {
+    orderBy.push({ billDate: sortOrder });
+    orderBy.push({ createdAt: "desc" }); // Secondary sort
+  } else if (sortBy === "createdAt") {
+    orderBy.push({ createdAt: sortOrder });
+  } else if (sortBy === "amount") {
+    orderBy.push({ netPaid: sortOrder });
+    orderBy.push({ createdAt: "desc" });
+  } else if (sortBy === "creator") {
+    orderBy.push({ User_Expense_createdByToUser: { name: sortOrder } });
+    orderBy.push({ createdAt: "desc" });
+  } else if (sortBy === "contact") {
+    orderBy.push({ Contact: { name: sortOrder } });
+    orderBy.push({ createdAt: "desc" });
+  } else if (sortBy === "updatedAt") {
+    orderBy.push({ updatedAt: sortOrder });
+  } else {
+    orderBy.push({ billDate: "desc" });
+    orderBy.push({ createdAt: "desc" });
+  }
+
   const [expensesRaw, total] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
-      // Sort by billDate first, then createdAt for consistent ordering (same as API)
-      orderBy: [
-        { billDate: "desc" },
-        { createdAt: "desc" },
-      ],
-      take: 20,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
       include: {
         Contact: true,
         Account: true,

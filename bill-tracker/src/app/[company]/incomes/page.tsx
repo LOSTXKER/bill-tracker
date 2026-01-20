@@ -14,10 +14,12 @@ import { getIncomeStats } from "@/lib/cache/stats";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function IncomesPage({ params }: IncomesPageProps) {
+export default async function IncomesPage({ params, searchParams }: IncomesPageProps) {
   const { company: companyCode } = await params;
+  const urlParams = await searchParams;
 
   return (
     <div className="space-y-6">
@@ -42,7 +44,7 @@ export default async function IncomesPage({ params }: IncomesPageProps) {
       </Suspense>
 
       <Suspense fallback={<TableSkeleton />}>
-        <IncomesData companyCode={companyCode} />
+        <IncomesData companyCode={companyCode} searchParams={urlParams} />
       </Suspense>
     </div>
   );
@@ -110,19 +112,105 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
   );
 }
 
-async function IncomesData({ companyCode }: { companyCode: string }) {
+interface IncomesDataProps {
+  companyCode: string;
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
+  // Parse URL params
+  const sortBy = (searchParams.sortBy as string) || "receiveDate";
+  const sortOrder = (searchParams.sortOrder as string) || "desc";
+  const page = parseInt((searchParams.page as string) || "1");
+  const limit = parseInt((searchParams.limit as string) || "20");
+  const search = searchParams.search as string | undefined;
+  const status = searchParams.status as string | undefined;
+  const category = searchParams.category as string | undefined;
+  const contact = searchParams.contact as string | undefined;
+  const creator = searchParams.creator as string | undefined;
+  const dateFrom = searchParams.dateFrom as string | undefined;
+  const dateTo = searchParams.dateTo as string | undefined;
+
+  // Build where clause
+  const whereClause: any = {
+    companyId,
+    deletedAt: null,
+  };
+
+  if (search) {
+    whereClause.AND = [
+      {
+        OR: [
+          { description: { contains: search, mode: "insensitive" } },
+          { invoiceNumber: { contains: search, mode: "insensitive" } },
+          { Contact: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      },
+    ];
+  }
+
+  if (status) {
+    if (status.includes(",")) {
+      whereClause.workflowStatus = { in: status.split(",") };
+    } else {
+      whereClause.workflowStatus = status;
+    }
+  }
+
+  if (category) {
+    whereClause.categoryId = category;
+  }
+
+  if (contact) {
+    whereClause.contactId = contact;
+  }
+
+  if (creator) {
+    whereClause.createdBy = creator;
+  }
+
+  if (dateFrom || dateTo) {
+    whereClause.receiveDate = {};
+    if (dateFrom) {
+      whereClause.receiveDate.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      whereClause.receiveDate.lte = new Date(dateTo);
+    }
+  }
+
+  // Build orderBy - always include secondary sort for consistency
+  const orderBy: any[] = [];
+  if (sortBy === "receiveDate") {
+    orderBy.push({ receiveDate: sortOrder });
+    orderBy.push({ createdAt: "desc" }); // Secondary sort
+  } else if (sortBy === "createdAt") {
+    orderBy.push({ createdAt: sortOrder });
+  } else if (sortBy === "amount") {
+    orderBy.push({ netReceived: sortOrder });
+    orderBy.push({ createdAt: "desc" });
+  } else if (sortBy === "creator") {
+    orderBy.push({ User: { name: sortOrder } });
+    orderBy.push({ createdAt: "desc" });
+  } else if (sortBy === "contact") {
+    orderBy.push({ Contact: { name: sortOrder } });
+    orderBy.push({ createdAt: "desc" });
+  } else if (sortBy === "updatedAt") {
+    orderBy.push({ updatedAt: sortOrder });
+  } else {
+    orderBy.push({ receiveDate: "desc" });
+    orderBy.push({ createdAt: "desc" });
+  }
+
   const [incomesRaw, total] = await Promise.all([
     prisma.income.findMany({
-      where: { companyId: companyId, deletedAt: null },
-      // Sort by receiveDate first, then createdAt for consistent ordering (same as API)
-      orderBy: [
-        { receiveDate: "desc" },
-        { createdAt: "desc" },
-      ],
-      take: 20,
+      where: whereClause,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
       include: {
         Contact: true,
         Account: true,
@@ -136,7 +224,7 @@ async function IncomesData({ companyCode }: { companyCode: string }) {
         },
       },
     }),
-    prisma.income.count({ where: { companyId: companyId, deletedAt: null } }),
+    prisma.income.count({ where: whereClause }),
   ]);
 
   // Map Prisma relation names to what the client expects

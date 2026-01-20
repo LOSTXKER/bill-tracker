@@ -7,7 +7,6 @@ import {
   TransactionTableRow,
   expenseRowConfig,
 } from "@/components/transactions";
-import { fetchExpenses } from "@/app/[company]/expenses/actions";
 import { EXPENSE_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 interface ExpensesClientProps {
@@ -54,15 +53,6 @@ const expenseListConfig: TransactionListConfig = {
   ),
 };
 
-// Data fetcher wrapper
-async function fetchExpenseData(params: any) {
-  const result = await fetchExpenses(params);
-  return {
-    data: result.expenses,
-    total: result.total,
-  };
-}
-
 export function ExpensesClient({
   companyCode,
   initialExpenses,
@@ -71,10 +61,9 @@ export function ExpensesClient({
   return (
     <TransactionListClient
       companyCode={companyCode}
-      initialData={initialExpenses}
-      initialTotal={initialTotal}
+      data={initialExpenses}
+      total={initialTotal}
       config={expenseListConfig}
-      fetchData={fetchExpenseData}
     />
   );
 }

@@ -7,7 +7,6 @@ import {
   TransactionTableRow,
   incomeRowConfig,
 } from "@/components/transactions";
-import { fetchIncomes } from "@/app/[company]/incomes/actions";
 import { INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 interface IncomesClientProps {
@@ -55,15 +54,6 @@ const incomeListConfig: TransactionListConfig = {
   ),
 };
 
-// Data fetcher wrapper
-async function fetchIncomeData(params: any) {
-  const result = await fetchIncomes(params);
-  return {
-    data: result.incomes,
-    total: result.total,
-  };
-}
-
 export function IncomesClient({
   companyCode,
   initialIncomes,
@@ -72,10 +62,9 @@ export function IncomesClient({
   return (
     <TransactionListClient
       companyCode={companyCode}
-      initialData={initialIncomes}
-      initialTotal={initialTotal}
+      data={initialIncomes}
+      total={initialTotal}
       config={incomeListConfig}
-      fetchData={fetchIncomeData}
     />
   );
 }

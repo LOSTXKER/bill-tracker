@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, ReactNode, useRef } from "react";
+import { useState, useTransition, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -54,10 +54,9 @@ export interface TableHeaderConfig {
 
 interface TransactionListClientProps {
   companyCode: string;
-  initialData: any[];
-  initialTotal: number;
+  data: any[];
+  total: number;
   config: TransactionListConfig;
-  fetchData: (params: any) => Promise<{ data: any[]; total: number }>;
 }
 
 // ============================================================================
@@ -103,44 +102,25 @@ const INCOME_STATUS_TABS: StatusTab[] = [
 
 export function TransactionListClient({
   companyCode,
-  initialData,
-  initialTotal,
+  data,
+  total,
   config,
-  fetchData,
 }: TransactionListClientProps) {
   const router = useRouter();
   const { filters, setFilter, setFilterWithSort } = useTransactionFilters();
   const { page, limit, setPage, setLimit } = usePagination();
-  // Use the correct default sort field based on transaction type
   const { sortBy, sortOrder, toggleSort } = useSorting(config.dateField);
-  const [data, setData] = useState(initialData);
-  const [total, setTotal] = useState(initialTotal);
-  const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState("all");
-  const isInitialMount = useRef(true);
+  const [isPending, startTransition] = useTransition();
   
   const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
   
-  // Sync activeTab with URL status filter
-  useEffect(() => {
-    if (sortBy === "updatedAt") {
-      setActiveTab("recent");
-      return;
-    }
+  // Determine active tab from URL params
+  const getActiveTab = () => {
+    if (sortBy === "updatedAt") return "recent";
+    if (filters.tab) return filters.tab;
+    if (!filters.status) return "all";
     
-    // Check for tab filter
-    if (filters.tab) {
-      setActiveTab(filters.tab);
-      return;
-    }
-    
-    if (!filters.status) {
-      setActiveTab("all");
-      return;
-    }
-    
-    // Find which tab matches the current status filter
     const currentStatuses = filters.status.split(",");
     const matchingTab = statusTabs.find(tab => 
       tab.statuses.length > 0 && 
@@ -148,91 +128,29 @@ export function TransactionListClient({
       currentStatuses.every(s => tab.statuses.includes(s))
     );
     
-    if (matchingTab) {
-      setActiveTab(matchingTab.key);
-    }
-  }, [filters.status, filters.tab, sortBy, statusTabs]);
+    return matchingTab?.key || "all";
+  };
   
-  // Handle tab change - use setFilterWithSort for single navigation
+  const activeTab = getActiveTab();
+  
+  // Handle tab change - updates URL which triggers server re-render
   const handleTabChange = (tabKey: string) => {
     const tab = statusTabs.find(t => t.key === tabKey);
     
     if (tabKey === "recent") {
-      // Sort by updatedAt desc, clear status filter
       setFilter("tab", "");
       setFilterWithSort("status", "", "updatedAt", "desc");
     } else if (tabKey === "draft" || tabKey === "pending" || tabKey === "rejected") {
-      // Use tab-based API filtering
       setFilter("status", "");
       setFilter("tab", tabKey);
     } else if (tab && tab.statuses.length > 0) {
-      // Filter by statuses in this tab
       setFilter("tab", "");
       setFilterWithSort("status", tab.statuses.join(","), config.dateField, "desc");
     } else {
-      // All: clear filters
       setFilter("tab", "");
       setFilterWithSort("status", "", config.dateField, "desc");
     }
   };
-
-  // Fetch data when filters change (skip initial mount since we have initialData)
-  useEffect(() => {
-    // Skip the first render - we already have data from server
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    
-    startTransition(async () => {
-      const result = await fetchData({
-        companyCode,
-        ...filters,
-        page,
-        limit,
-        sortBy,
-        sortOrder,
-      });
-      setData(result.data);
-      setTotal(result.total);
-      setSelectedIds([]); // Clear selection when data changes
-    });
-  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
-
-  // Real-time update: Refetch when window regains focus
-  // Track if user has left the page at least once
-  const hasBlurred = useRef(false);
-  
-  useEffect(() => {
-    const handleBlur = () => {
-      hasBlurred.current = true;
-    };
-    
-    const handleFocus = () => {
-      // Only refetch if user has actually left and returned to the page
-      if (!hasBlurred.current) return;
-      
-      startTransition(async () => {
-        const result = await fetchData({
-          companyCode,
-          ...filters,
-          page,
-          limit,
-          sortBy,
-          sortOrder,
-        });
-        setData(result.data);
-        setTotal(result.total);
-      });
-    };
-
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [companyCode, filters, page, limit, sortBy, sortOrder, fetchData]);
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -251,64 +169,41 @@ export function TransactionListClient({
 
   const clearSelection = () => setSelectedIds([]);
 
-  // Bulk actions
+  // Bulk actions - use router.refresh() to get fresh data from server
   const handleBulkDelete = async () => {
-    try {
-      await Promise.all(
-        selectedIds.map(id =>
-          fetch(`${config.apiEndpoint}/${id}`, { method: "DELETE" })
-        )
-      );
-      
-      // Real-time update: Refetch immediately
-      router.refresh();
-      startTransition(async () => {
-        const result = await fetchData({
-          companyCode,
-          ...filters,
-          page,
-          limit,
-          sortBy,
-          sortOrder,
-        });
-        setData(result.data);
-        setTotal(result.total);
+    startTransition(async () => {
+      try {
+        await Promise.all(
+          selectedIds.map(id =>
+            fetch(`${config.apiEndpoint}/${id}`, { method: "DELETE" })
+          )
+        );
         setSelectedIds([]);
-      });
-    } catch (error) {
-      console.error("Bulk delete failed:", error);
-    }
+        router.refresh();
+      } catch (error) {
+        console.error("Bulk delete failed:", error);
+      }
+    });
   };
 
   const handleBulkStatusChange = async (status: string) => {
-    try {
-      await Promise.all(
-        selectedIds.map(id =>
-          fetch(`${config.apiEndpoint}/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          })
-        )
-      );
-      
-      // Real-time update: Refetch immediately
-      router.refresh();
-      startTransition(async () => {
-        const result = await fetchData({
-          companyCode,
-          ...filters,
-          page,
-          limit,
-          sortBy,
-          sortOrder,
-        });
-        setData(result.data);
-        setTotal(result.total);
-      });
-    } catch (error) {
-      console.error("Bulk status change failed:", error);
-    }
+    startTransition(async () => {
+      try {
+        await Promise.all(
+          selectedIds.map(id =>
+            fetch(`${config.apiEndpoint}/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status }),
+            })
+          )
+        );
+        setSelectedIds([]);
+        router.refresh();
+      } catch (error) {
+        console.error("Bulk status change failed:", error);
+      }
+    });
   };
 
   const SortableHeader = ({ field, children, align = "left" }: { field: string; children: React.ReactNode; align?: "left" | "center" | "right" }) => (
@@ -346,10 +241,10 @@ export function TransactionListClient({
 
   const EmptyIcon = config.emptyIcon;
 
-  // Count items per tab (for badges)
+  // Count items per tab (for badges) - based on current data
   const getTabCount = (tab: StatusTab) => {
     if (tab.key === "all") return total;
-    if (tab.key === "recent") return null; // Don't show count for recent
+    if (tab.key === "recent") return null;
     return data.filter(item => tab.statuses.includes(item.workflowStatus || item.status)).length;
   };
 
