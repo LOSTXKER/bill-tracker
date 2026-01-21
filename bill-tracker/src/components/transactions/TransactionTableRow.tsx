@@ -45,6 +45,7 @@ export interface TransactionData {
   workflowStatus?: string;
   reimbursementStatus?: string;
   contact?: { name: string } | null;
+  contactName?: string | null; // One-time contact name (not saved as Contact)
   account?: { id: string; code: string; name: string } | null;
   creator?: {
     id: string;
@@ -240,7 +241,7 @@ export function TransactionTableRow({
       ) : (
         <TableCell>
           <p className="font-medium text-foreground">
-            {transaction.contact?.name || "ไม่ระบุผู้ติดต่อ"}
+            {transaction.contact?.name || transaction.contactName || "ไม่ระบุผู้ติดต่อ"}
           </p>
         </TableCell>
       )}

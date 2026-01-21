@@ -397,6 +397,11 @@ export function UnifiedTransactionForm({
             name: contactData.name,
             taxId: contactData.taxId,
           });
+          setOneTimeContactName("");
+        } else if (data.contactName) {
+          // One-time contact name (typed manually, not saved as Contact)
+          setSelectedContact(null);
+          setOneTimeContactName(data.contactName);
         }
 
         // Set account
