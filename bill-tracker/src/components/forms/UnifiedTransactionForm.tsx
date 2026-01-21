@@ -1240,17 +1240,13 @@ export function UnifiedTransactionForm({
     setValue("documentType", docType);
   }, [setValue]);
 
-  // Auto-disable WHT when VAT changes to 0% for expenses
-  // Also set default document type
+  // Auto-set default document type based on VAT (WHT is independent of VAT)
   const prevVatRateRef = useRef(watchVatRate);
   useEffect(() => {
     if (config.type === "expense" && prevVatRateRef.current !== watchVatRate) {
       if (watchVatRate === 0) {
-        // VAT changed to 0% - disable WHT and set default document type
-        setValue(config.fields.whtField.name, false);
-        setValue("whtRate", undefined);
-        setValue("whtType", undefined);
-        // Set default document type to CASH_RECEIPT for VAT 0%
+        // VAT changed to 0% - set default document type to CASH_RECEIPT
+        // NOTE: WHT is NOT disabled - can still withhold tax from non-VAT registered vendors (e.g., freelancers)
         if (!watchDocumentType || watchDocumentType === "TAX_INVOICE") {
           setValue("documentType", "CASH_RECEIPT");
         }
@@ -1260,7 +1256,7 @@ export function UnifiedTransactionForm({
       }
       prevVatRateRef.current = watchVatRate;
     }
-  }, [watchVatRate, watchDocumentType, config.type, config.fields.whtField.name, setValue]);
+  }, [watchVatRate, watchDocumentType, config.type, setValue]);
 
   // Loading state for view/edit mode
   if (mode !== "create" && loading) {

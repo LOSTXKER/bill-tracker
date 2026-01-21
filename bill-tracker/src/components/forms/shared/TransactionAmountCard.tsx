@@ -106,9 +106,10 @@ export function TransactionAmountCard({
 }: TransactionAmountCardProps) {
   const isEditable = mode === "create" || mode === "edit";
   
-  // For expenses: VAT 0% means no WHT and needs document type selection
+  // For expenses: VAT 0% needs document type selection
   const isExpenseNoVat = type === "expense" && vatRate === 0;
-  const showWhtSection = !isExpenseNoVat; // Hide WHT for VAT 0% expenses
+  // WHT can be applied regardless of VAT (e.g., paying freelancers without VAT)
+  const showWhtSection = true;
   
   // WHT confirmation dialog state
   const [showWhtConfirmDialog, setShowWhtConfirmDialog] = useState(false);
@@ -166,7 +167,7 @@ export function TransactionAmountCard({
           />
         )}
 
-        {/* Only show WHT section for VAT 7% (not for VAT 0% expenses) */}
+        {/* WHT section - can apply regardless of VAT (e.g., freelancers without VAT registration) */}
         {showWhtSection && (
           <WhtSection
             isEnabled={whtEnabled}
@@ -304,7 +305,7 @@ export function TransactionAmountCard({
           </div>
         )}
 
-        {/* WHT Toggle - only for VAT 7% */}
+        {/* WHT Toggle - can apply regardless of VAT */}
         {showWhtSection && (
           <>
             <div className="flex items-center justify-between pt-2">
