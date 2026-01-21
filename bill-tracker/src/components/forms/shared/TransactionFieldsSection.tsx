@@ -269,7 +269,7 @@ export function TransactionFieldsSection({
               {config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
             </p>
             <p className="text-base font-semibold text-foreground">
-              {selectedContact?.name || <span className="text-muted-foreground font-normal">-</span>}
+              {selectedContact?.name || oneTimeContactName || <span className="text-muted-foreground font-normal">-</span>}
             </p>
           </div>
           <div>
