@@ -41,6 +41,7 @@ import { formatCurrency, normalizeWhtType } from "@/lib/utils/tax-calculator";
 import { useContacts } from "@/hooks/use-contacts";
 import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
+import { useTransaction } from "@/hooks/use-transaction";
 
 // Shared form components
 import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
@@ -197,9 +198,23 @@ export function UnifiedTransactionForm({
   
   // Use mode from props directly (controlled by parent)
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Use SWR for transaction fetching (provides caching across navigations)
+  const {
+    transaction: swrTransaction,
+    isLoading: swrLoading,
+    error: swrError,
+    mutate: mutateTransaction,
+  } = useTransaction({
+    type: config.type,
+    transactionId,
+    enabled: mode !== "create",
+  });
+  
+  // Local state for transaction (populated from SWR)
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
-  const [loading, setLoading] = useState(mode !== "create");
-  const [error, setError] = useState<string | null>(null);
+  const loading = mode !== "create" && swrLoading && !transaction;
+  const error = swrError?.message || null;
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
@@ -359,82 +374,82 @@ export function UnifiedTransactionForm({
     }
   }, [mode, config.defaultValues]);
 
-  // Fetch transaction for view/edit mode
-  const fetchTransaction = useCallback(async () => {
-    if (mode === "create" || !transactionId) return;
+  // Track if we've already populated the form from SWR data
+  const [formPopulated, setFormPopulated] = useState(false);
+  
+  // Populate form when SWR data arrives (only once per transaction)
+  useEffect(() => {
+    if (mode === "create" || !swrTransaction || formPopulated) return;
     
-    try {
-      setLoading(true);
-      const res = await fetch(`${config.apiEndpoint}/${transactionId}`);
-      if (!res.ok) throw new Error(`Failed to fetch ${config.type}`);
-      const result = await res.json();
-      const data = result.data?.[config.type] || result[config.type];
-      setTransaction(data);
-      
-      // Populate form with transaction data
-      if (data) {
-        reset({
-          amount: data.amount,
-          vatRate: data.vatRate,
-          [config.fields.whtField.name]: data[config.fields.whtField.name],
-          whtRate: data.whtRate,
-          whtType: data.whtType,
-          status: data.status,
-          invoiceNumber: data.invoiceNumber,
-          referenceNo: data.referenceNo,
-          notes: data.notes,
-          documentType: data.documentType || "TAX_INVOICE",
-          [config.fields.dateField.name]: data[config.fields.dateField.name] ? new Date(data[config.fields.dateField.name]) : undefined,
-          ...(config.fields.descriptionField ? { [config.fields.descriptionField.name]: data[config.fields.descriptionField.name] } : {}),
-          ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate) : undefined } : {}),
-        });
+    const data = swrTransaction;
+    setTransaction(data as unknown as BaseTransaction);
+    
+    // Populate form with transaction data
+    reset({
+      amount: data.amount,
+      vatRate: data.vatRate,
+      [config.fields.whtField.name]: data[config.fields.whtField.name],
+      whtRate: data.whtRate,
+      whtType: data.whtType,
+      status: data.status,
+      invoiceNumber: data.invoiceNumber,
+      referenceNo: data.referenceNo,
+      notes: data.notes,
+      documentType: data.documentType || "TAX_INVOICE",
+      [config.fields.dateField.name]: data[config.fields.dateField.name] ? new Date(data[config.fields.dateField.name]) : undefined,
+      ...(config.fields.descriptionField ? { [config.fields.descriptionField.name]: data[config.fields.descriptionField.name] } : {}),
+      ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate) : undefined } : {}),
+    });
 
-        // Set contact (Prisma returns Contact with capital C)
-        const contactData = data.Contact || data.contact;
-        if (contactData) {
-          setSelectedContact({
-            id: contactData.id,
-            name: contactData.name,
-            taxId: contactData.taxId,
-          });
-          setOneTimeContactName("");
-        } else if (data.contactName) {
-          // One-time contact name (typed manually, not saved as Contact)
-          setSelectedContact(null);
-          setOneTimeContactName(data.contactName);
-        }
-
-        // Set account
-        if (data.accountId) {
-          setSelectedAccount(data.accountId);
-        }
-
-        // Set categorized files (normalize other docs for backward compatibility)
-        setCategorizedFiles({
-          invoice: data[config.fileFields.invoice.urlsField] || [],
-          slip: data[config.fileFields.slip.urlsField] || [],
-          whtCert: data[config.fileFields.wht.urlsField] || [],
-          other: normalizeOtherDocs(data.otherDocUrls),
-          uncategorized: [],
-        });
-        
-        // Set reference URLs
-        if (data.referenceUrls && Array.isArray(data.referenceUrls)) {
-          setReferenceUrls(data.referenceUrls);
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setLoading(false);
+    // Set contact (Prisma returns Contact with capital C)
+    const contactData = data.Contact || data.contact;
+    if (contactData) {
+      setSelectedContact({
+        id: contactData.id,
+        name: contactData.name,
+        taxId: contactData.taxId,
+      });
+      setOneTimeContactName("");
+    } else if (data.contactName) {
+      // One-time contact name (typed manually, not saved as Contact)
+      setSelectedContact(null);
+      setOneTimeContactName(data.contactName);
     }
-  }, [config, mode, transactionId, reset]);
 
-  // Refresh all data
+    // Set account
+    if (data.accountId) {
+      setSelectedAccount(data.accountId);
+    }
+
+    // Set categorized files (normalize other docs for backward compatibility)
+    setCategorizedFiles({
+      invoice: data[config.fileFields.invoice.urlsField] || [],
+      slip: data[config.fileFields.slip.urlsField] || [],
+      whtCert: data[config.fileFields.wht.urlsField] || [],
+      other: normalizeOtherDocs(data.otherDocUrls),
+      uncategorized: [],
+    });
+    
+    // Set reference URLs
+    if (data.referenceUrls && Array.isArray(data.referenceUrls)) {
+      setReferenceUrls(data.referenceUrls);
+    }
+    
+    setFormPopulated(true);
+  }, [mode, swrTransaction, formPopulated, config, reset]);
+
+  // Refresh all data (using SWR mutate)
   const refreshAll = useCallback(async () => {
-    await fetchTransaction();
+    // Force SWR to refetch and update local state
+    const result = await mutateTransaction();
+    if (result) {
+      const data = result.data?.[config.type] || result[config.type];
+      if (data) {
+        setTransaction(data as unknown as BaseTransaction);
+      }
+    }
     setAuditRefreshKey((prev) => prev + 1);
-  }, [fetchTransaction]);
+  }, [mutateTransaction, config.type]);
 
   // File upload hooks for view/edit mode
   const { uploadingType, handleFileUpload, handleDeleteFile } = useTransactionFileUpload({
@@ -467,13 +482,6 @@ export function UnifiedTransactionForm({
       }
     }
   }, [pendingContactId, contacts, selectedContact]);
-
-  // Fetch transaction on mount for view/edit mode
-  useEffect(() => {
-    if (mode !== "create") {
-      fetchTransaction();
-    }
-  }, [fetchTransaction, mode]);
 
   // Fetch payers for expense (view/edit mode)
   useEffect(() => {
@@ -1393,8 +1401,7 @@ export function UnifiedTransactionForm({
                       canCreateDirect={canCreateDirect}
                       canMarkPaid={canMarkPaid}
                       onSuccess={() => {
-                        fetchTransaction();
-                        setAuditRefreshKey((k) => k + 1);
+                        refreshAll();
                       }}
                     />
                   )}
@@ -1408,8 +1415,7 @@ export function UnifiedTransactionForm({
                       isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
                       documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") : undefined}
                       onActionComplete={() => {
-                        fetchTransaction();
-                        setAuditRefreshKey((k) => k + 1);
+                        refreshAll();
                       }}
                       variant="compact"
                     />
