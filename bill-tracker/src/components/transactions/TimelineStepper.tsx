@@ -56,9 +56,26 @@ const EXPENSE_STEPS_CASH_RECEIPT: Step[] = [
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
+// Cash receipt flow with WHT (VAT 0% with receipt + withholding tax)
+const EXPENSE_STEPS_CASH_RECEIPT_WHT: Step[] = [
+  { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
+  { key: "TAX_INVOICE_RECEIVED", label: "ได้บิลเงินสด", icon: <Receipt className="h-4 w-4" /> },
+  { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
 // No document flow (VAT 0% without receipt)
 const EXPENSE_STEPS_NO_DOCUMENT: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
+];
+
+// No document flow with WHT (VAT 0% without receipt + withholding tax)
+const EXPENSE_STEPS_NO_DOCUMENT_WHT: Step[] = [
+  { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
+  { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
   { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
@@ -118,12 +135,12 @@ export function TimelineStepper({
   
   // Get base steps based on type, WHT, and document type
   const getExpenseSteps = (): Step[] => {
-    // For expenses, check document type first
+    // For expenses, check document type and WHT
     if (documentType === "NO_DOCUMENT") {
-      return EXPENSE_STEPS_NO_DOCUMENT;
+      return isWht ? EXPENSE_STEPS_NO_DOCUMENT_WHT : EXPENSE_STEPS_NO_DOCUMENT;
     }
     if (documentType === "CASH_RECEIPT") {
-      return EXPENSE_STEPS_CASH_RECEIPT;
+      return isWht ? EXPENSE_STEPS_CASH_RECEIPT_WHT : EXPENSE_STEPS_CASH_RECEIPT;
     }
     // Default: TAX_INVOICE - check WHT
     return isWht ? EXPENSE_STEPS : EXPENSE_STEPS_NO_WHT;
