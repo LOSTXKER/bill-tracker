@@ -90,6 +90,7 @@ export function useTransactionFileUpload({
 
       // Get the appropriate field name for this transaction type
       const fieldName = FILE_URL_FIELDS[transactionType][type];
+      // Only send the file URL field - this allows users with change-status permission to upload
       const updateData: Record<string, any> = {
         [fieldName]: [...(currentUrls[fieldName] || []), url],
       };
@@ -97,10 +98,7 @@ export function useTransactionFileUpload({
       const res = await fetch(`/api/${transactionType}s/${transactionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...transactionData,
-          ...updateData,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (!res.ok) throw new Error("อัปเดตข้อมูลล้มเหลว");
@@ -127,6 +125,7 @@ export function useTransactionFileUpload({
       const updatedUrls = (currentUrls[fieldName] || []).filter(
         (url: string) => url !== urlToDelete
       );
+      // Only send the file URL field - this allows users with change-status permission to delete
       const updateData: Record<string, any> = {
         [fieldName]: updatedUrls,
       };
@@ -134,10 +133,7 @@ export function useTransactionFileUpload({
       const res = await fetch(`/api/${transactionType}s/${transactionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...transactionData,
-          ...updateData,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (!res.ok) throw new Error("ลบไฟล์ล้มเหลว");
