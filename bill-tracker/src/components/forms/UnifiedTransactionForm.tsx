@@ -1773,24 +1773,18 @@ export function UnifiedTransactionForm({
                             />
                           )}
 
-                          {(() => {
-                            const otherDocs = transaction.otherDocUrls as any[] | undefined;
-                            if (!otherDocs || otherDocs.length === 0) return null;
-                            return (
-                              <DocumentSection
-                                label="เอกสารอื่นๆ"
-                                urls={
-                                  otherDocs.map((item: any) => 
-                                    typeof item === 'string' ? item : item.url
-                                  ).filter(Boolean)
-                                }
-                                onUpload={(file) => handleFileUploadWrapper(file, "other")}
-                                onDelete={(url) => handleDeleteFileWrapper("other", url)}
-                                isUploading={uploadingType === "other"}
-                                icon={<FileText className="h-4 w-4" />}
-                              />
-                            );
-                          })()}
+                          <DocumentSection
+                            label="เอกสารอื่นๆ"
+                            urls={
+                              ((transaction.otherDocUrls as any[]) || []).map((item: any) => 
+                                typeof item === 'string' ? item : item.url
+                              ).filter(Boolean)
+                            }
+                            onUpload={(file) => handleFileUploadWrapper(file, "other")}
+                            onDelete={(url) => handleDeleteFileWrapper("other", url)}
+                            isUploading={uploadingType === "other"}
+                            icon={<FileText className="h-4 w-4" />}
+                          />
                   </CardContent>
 
                   {/* Meta Info */}
