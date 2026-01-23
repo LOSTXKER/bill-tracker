@@ -399,12 +399,40 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       throw ApiErrors.notFound(config.displayName);
     }
 
-    // Check access
-    const hasAccess = await hasPermission(
+    // Clone request to read body for permission check
+    const clonedRequest = request.clone();
+    const bodyForCheck = await clonedRequest.json();
+    
+    // Fields that can be updated with change-status permission (workflow-related file uploads)
+    const workflowFileFields = [
+      "slipUrls", "taxInvoiceUrls", "whtCertUrls", "otherDocUrls",
+      "customerSlipUrls", "myBillCopyUrls",
+    ];
+    
+    // Check if update only contains file URL fields
+    const updateKeys = Object.keys(bodyForCheck);
+    const isFileOnlyUpdate = updateKeys.length > 0 && updateKeys.every(
+      key => workflowFileFields.includes(key)
+    );
+    
+    // Check access - allow change-status permission for file-only updates
+    let hasAccess = await hasPermission(
       session.user.id,
       existingItem.companyId,
       config.permissions.update
     );
+    
+    // If no update permission but updating only files, check for change-status permission
+    if (!hasAccess && isFileOnlyUpdate) {
+      const changeStatusPerm = config.modelName === "expense" 
+        ? "expenses:change-status" 
+        : "incomes:change-status";
+      hasAccess = await hasPermission(
+        session.user.id,
+        existingItem.companyId,
+        changeStatusPerm
+      );
+    }
 
     if (!hasAccess) {
       throw ApiErrors.forbidden();
@@ -426,7 +454,8 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       }
     }
 
-    const body = await request.json();
+    // Use the body we already parsed for permission check
+    const body = bodyForCheck;
     // Pass existingItem to transformUpdateData for conditional logic (e.g., WHT workflow adjustment)
     const updateData = config.transformUpdateData(body, existingItem);
 
