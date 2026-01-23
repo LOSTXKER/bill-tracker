@@ -36,6 +36,7 @@ const expenseListConfig: TransactionListConfig = {
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },
     { key: "updatedAt", label: "แก้ไขล่าสุด", sortable: true },
+    { key: "wht", label: "หัก ณ ที่จ่าย", align: "center" },
     { key: "line", label: "LINE", align: "center" },
   ],
   

@@ -10,7 +10,7 @@ import { toNumber } from "@/lib/utils/serializers";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { useTransactionRow } from "@/hooks/use-transaction-row";
-import { Send, Loader2, ShieldAlert } from "lucide-react";
+import { Send, Loader2, ShieldAlert, Receipt } from "lucide-react";
 
 // =============================================================================
 // Types
@@ -89,7 +89,9 @@ export const expenseRowConfig: TransactionRowConfig = {
   descriptionField: "description",
   amountColorClass: "text-destructive",
   showCreatedAt: true,
-  showWhtBadge: false,
+  showWhtBadge: true,
+  whtField: "isWht",
+  whtRateField: "whtRate",
   showCreator: true,
   showLineButton: true,
   statusField: "workflowStatus",
@@ -310,15 +312,19 @@ export function TransactionTableRow({
         )}
       </TableCell>
 
-      {/* WHT Badge (for income only) */}
+      {/* WHT Badge */}
       {config.showWhtBadge && (
         <TableCell className="text-center">
-          {isWhtEnabled && whtRate ? (
-            <Badge variant="outline" className="text-xs">
-              {whtRate}%
+          {isWhtEnabled ? (
+            <Badge 
+              variant="outline" 
+              className="text-xs bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800"
+            >
+              <Receipt className="h-3 w-3 mr-1" />
+              {whtRate ? `${whtRate}%` : "WHT"}
             </Badge>
           ) : (
-            <span className="text-muted-foreground">-</span>
+            <span className="text-muted-foreground/50">-</span>
           )}
         </TableCell>
       )}
