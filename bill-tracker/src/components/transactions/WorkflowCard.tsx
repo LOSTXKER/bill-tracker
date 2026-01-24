@@ -65,15 +65,15 @@ const NEXT_ACTIONS: Record<string, Record<string, ActionConfig>> = {
   expense: {
     PAID: {
       action: "receive_tax_invoice",
-      label: "ได้รับใบกำกับภาษีแล้ว",
+      label: "ได้รับเอกสารแล้ว",
       icon: <Receipt className="h-4 w-4" />,
-      description: "บันทึกว่าได้รับใบกำกับภาษีจากร้านค้า",
+      description: "บันทึกว่าได้รับเอกสารจากร้านค้า",
     },
     WAITING_TAX_INVOICE: {
       action: "receive_tax_invoice",
-      label: "ได้รับใบกำกับภาษีแล้ว",
+      label: "ได้รับเอกสารแล้ว",
       icon: <Receipt className="h-4 w-4" />,
-      description: "บันทึกว่าได้รับใบกำกับภาษีจากร้านค้า",
+      description: "บันทึกว่าได้รับเอกสารจากร้านค้า",
     },
     TAX_INVOICE_RECEIVED: {
       action: "issue_wht",

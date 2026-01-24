@@ -84,7 +84,7 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
           } : undefined,
         },
         {
-          title: "รอใบกำกับ",
+          title: "รอเอกสาร",
           value: stats.waitingTaxInvoice.toString(),
           subtitle: "รายการ",
           icon: "clock",

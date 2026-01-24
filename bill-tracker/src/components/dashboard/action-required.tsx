@@ -61,7 +61,7 @@ export async function ActionRequired({ companyCode }: { companyCode: string }) {
             {waitingDocs.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-foreground mb-2">
-                  รอใบกำกับภาษีจากร้านค้า ({waitingDocs.length})
+                  รอเอกสารจากร้านค้า ({waitingDocs.length})
                 </p>
                 <div className="space-y-2">
                   {waitingDocs.map((expense) => (

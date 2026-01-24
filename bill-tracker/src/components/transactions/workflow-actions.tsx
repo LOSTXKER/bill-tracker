@@ -53,10 +53,10 @@ interface ActionConfig {
 
 const EXPENSE_ACTIONS: Record<string, ActionConfig[]> = {
   PAID: [
-    { action: "receive_tax_invoice", label: "ได้รับใบกำกับภาษี", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับใบกำกับภาษีจากร้านค้าแล้ว" },
+    { action: "receive_tax_invoice", label: "ได้รับเอกสาร", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับเอกสารจากร้านค้าแล้ว" },
   ],
   WAITING_TAX_INVOICE: [
-    { action: "receive_tax_invoice", label: "ได้รับใบกำกับภาษี", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับใบกำกับภาษีจากร้านค้าแล้ว" },
+    { action: "receive_tax_invoice", label: "ได้รับเอกสาร", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับเอกสารจากร้านค้าแล้ว" },
   ],
   TAX_INVOICE_RECEIVED: [
     { action: "issue_wht", label: "ออกใบ 50 ทวิ", icon: <FileText className="h-4 w-4" />, description: "ออกหนังสือรับรองการหักภาษี ณ ที่จ่ายให้ vendor" },

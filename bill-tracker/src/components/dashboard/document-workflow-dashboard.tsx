@@ -76,7 +76,7 @@ interface WhtSummary {
 }
 
 const PENDING_TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  TAX_INVOICE: { label: "รอใบกำกับภาษี", icon: <Receipt className="h-4 w-4" />, color: "bg-orange-500" },
+  TAX_INVOICE: { label: "รอเอกสาร", icon: <Receipt className="h-4 w-4" />, color: "bg-orange-500" },
   WHT_ISSUE: { label: "รอออกใบ 50 ทวิ", icon: <FileText className="h-4 w-4" />, color: "bg-amber-500" },
   WHT_CERT: { label: "รอใบ 50 ทวิจากลูกค้า", icon: <FileMinus className="h-4 w-4" />, color: "bg-purple-500" },
   ACCOUNTING: { label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" />, color: "bg-blue-500" },
@@ -166,7 +166,7 @@ export function DocumentWorkflowDashboard({ companyCode }: DocumentWorkflowDashb
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">รอใบกำกับภาษี</p>
+                <p className="text-sm text-muted-foreground">รอเอกสาร</p>
                 <p className="text-2xl font-bold">{data?.summary.pendingTaxInvoice || 0}</p>
               </div>
               <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full">
