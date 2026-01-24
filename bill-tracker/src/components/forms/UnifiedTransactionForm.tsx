@@ -39,6 +39,7 @@ import { formatCurrency, normalizeWhtType } from "@/lib/utils/tax-calculator";
 
 // Hooks
 import { useContacts } from "@/hooks/use-contacts";
+import { useContactDefaults } from "@/hooks/use-contact-defaults";
 import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 import { useTransaction } from "@/hooks/use-transaction";
@@ -51,6 +52,7 @@ import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionFieldsSection, TransactionFieldsConfig } from "./shared/TransactionFieldsSection";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { PayerSection, PayerInfo } from "./shared/PayerSection";
+import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 
 // Transaction components
 import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge } from "@/components/transactions";
@@ -59,7 +61,7 @@ import { CommentSection } from "@/components/comments/CommentSection";
 // Types & Constants
 import type { ContactSummary } from "@/types";
 import type { ApprovalStatus } from "@prisma/client";
-import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO, APPROVAL_STATUS_INFO } from "@/lib/constants/transaction";
+import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO, APPROVAL_STATUS_INFO, getExpenseWorkflowLabel } from "@/lib/constants/transaction";
 
 // Permissions
 import { usePermissions } from "@/components/providers/permission-provider";
@@ -303,6 +305,18 @@ export function UnifiedTransactionForm({
     email?: string | null;
   } | null>(null);
 
+  // Contact Defaults Suggestion
+  const [defaultsSuggestionDismissed, setDefaultsSuggestionDismissed] = useState(false);
+  const { defaults: contactDefaults, hasDefaults: hasContactDefaults } = useContactDefaults(
+    companyCode,
+    selectedContact?.id || null
+  );
+
+  // Reset defaults suggestion dismissed state when contact changes
+  useEffect(() => {
+    setDefaultsSuggestionDismissed(false);
+  }, [selectedContact?.id]);
+
 
   // Account
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
@@ -532,6 +546,40 @@ export function UnifiedTransactionForm({
     const hasContact = selectedContact !== null;
     return hasAmount || hasContact;
   }, [watchAmount, selectedContact]);
+
+  // Apply contact defaults to form
+  const applyContactDefaults = useCallback(() => {
+    if (!contactDefaults) return;
+
+    // Apply VAT rate
+    if (contactDefaults.defaultVatRate !== null) {
+      setValue("vatRate", contactDefaults.defaultVatRate);
+    }
+
+    // Apply WHT settings
+    if (contactDefaults.defaultWhtEnabled !== null) {
+      const whtField = config.type === "expense" ? "isWht" : "isWhtDeducted";
+      setValue(whtField, contactDefaults.defaultWhtEnabled);
+      
+      if (contactDefaults.defaultWhtEnabled) {
+        if (contactDefaults.defaultWhtRate !== null) {
+          setValue("whtRate", Number(contactDefaults.defaultWhtRate));
+        }
+        if (contactDefaults.defaultWhtType) {
+          setValue("whtType", contactDefaults.defaultWhtType);
+        }
+      }
+    }
+
+    // Apply description template
+    if (contactDefaults.descriptionTemplate && config.fields.descriptionField) {
+      setValue(config.fields.descriptionField.name, contactDefaults.descriptionTemplate);
+    }
+
+    // Dismiss the suggestion after applying
+    setDefaultsSuggestionDismissed(true);
+    toast.success("ใช้ค่าแนะนำจากผู้ติดต่อแล้ว");
+  }, [contactDefaults, setValue, config.type, config.fields.descriptionField]);
 
   // Extract current form data as MergeData
   const extractFormData = useCallback((): MergeData => {
@@ -1352,7 +1400,9 @@ export function UnifiedTransactionForm({
                   <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
                   {statusInfo && (
                     <Badge className={cn("text-xs", statusInfo.bgColor, statusInfo.color)}>
-                      {statusInfo.label}
+                      {config.type === "expense" && transaction.workflowStatus
+                        ? getExpenseWorkflowLabel(transaction.workflowStatus, (transaction.documentType as string) || "TAX_INVOICE")
+                        : statusInfo.label}
                     </Badge>
                   )}
                   {/* Show approval status badge for draft transactions */}
@@ -1508,6 +1558,16 @@ export function UnifiedTransactionForm({
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }
                   />
+
+                  {/* Contact Defaults Suggestion */}
+                  {selectedContact && hasContactDefaults && contactDefaults && !defaultsSuggestionDismissed && (
+                    <ContactDefaultsSuggestion
+                      contactName={selectedContact.name}
+                      defaults={contactDefaults}
+                      onApply={applyContactDefaults}
+                      onDismiss={() => setDefaultsSuggestionDismissed(true)}
+                    />
+                  )}
 
                   {/* Currency Conversion Note */}
                   {aiResult?.currencyConversion && (

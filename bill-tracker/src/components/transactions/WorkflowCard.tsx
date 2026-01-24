@@ -44,6 +44,7 @@ interface WorkflowCardProps {
   transactionId: string;
   currentStatus: string;
   isWht?: boolean;
+  documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
   onActionComplete?: () => void;
   className?: string;
 }
@@ -201,6 +202,7 @@ export function WorkflowCard({
   transactionId,
   currentStatus,
   isWht = false,
+  documentType = "TAX_INVOICE",
   onActionComplete,
   className,
 }: WorkflowCardProps) {
@@ -371,7 +373,9 @@ export function WorkflowCard({
               <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                 <p className="text-sm">
-                  {currentStatus === "WAITING_TAX_INVOICE" && "รอใบกำกับภาษีจากผู้ขาย"}
+                  {currentStatus === "WAITING_TAX_INVOICE" && (
+                    documentType === "CASH_RECEIPT" ? "รอบิลเงินสดจากผู้ขาย" : "รอใบกำกับภาษีจากผู้ขาย"
+                  )}
                   {currentStatus === "WHT_PENDING_ISSUE" && "ต้องออกใบ 50 ทวิให้ผู้ขาย"}
                   {currentStatus === "WHT_PENDING_CERT" && "รอใบ 50 ทวิจากลูกค้า"}
                   {currentStatus === "WAITING_INVOICE_ISSUE" && "ต้องออกใบกำกับภาษีให้ลูกค้า"}

@@ -87,6 +87,17 @@ export const POST = withCompanyAccess(
         creditLimit: body.creditLimit,
         paymentTerms: body.paymentTerms,
         notes: body.notes || null,
+        // Contact defaults for transactions
+        defaultVatRate: body.defaultVatRate ?? null,
+        defaultWhtEnabled: body.defaultWhtEnabled ?? null,
+        defaultWhtRate: body.defaultWhtRate ?? null,
+        defaultWhtType: body.defaultWhtType || null,
+        descriptionTemplate: body.descriptionTemplate || null,
+        defaultsLastUpdatedAt: body.defaultVatRate !== undefined || 
+                               body.defaultWhtEnabled !== undefined ||
+                               body.descriptionTemplate !== undefined
+          ? new Date()
+          : null,
         updatedAt: new Date(),
       },
     });
@@ -124,6 +135,14 @@ export const PATCH = withCompanyAccess(
       return apiResponse.error(new Error("Contact not found"));
     }
 
+    // Check if defaults are being updated
+    const isUpdatingDefaults = 
+      data.defaultVatRate !== undefined ||
+      data.defaultWhtEnabled !== undefined ||
+      data.defaultWhtRate !== undefined ||
+      data.defaultWhtType !== undefined ||
+      data.descriptionTemplate !== undefined;
+
     const contact = await prisma.contact.update({
       where: { id },
       data: {
@@ -152,6 +171,13 @@ export const PATCH = withCompanyAccess(
         creditLimit: data.creditLimit ?? existing.creditLimit,
         paymentTerms: data.paymentTerms ?? existing.paymentTerms,
         notes: data.notes ?? existing.notes,
+        // Contact defaults for transactions
+        defaultVatRate: data.defaultVatRate !== undefined ? data.defaultVatRate : existing.defaultVatRate,
+        defaultWhtEnabled: data.defaultWhtEnabled !== undefined ? data.defaultWhtEnabled : existing.defaultWhtEnabled,
+        defaultWhtRate: data.defaultWhtRate !== undefined ? data.defaultWhtRate : existing.defaultWhtRate,
+        defaultWhtType: data.defaultWhtType !== undefined ? data.defaultWhtType : existing.defaultWhtType,
+        descriptionTemplate: data.descriptionTemplate !== undefined ? data.descriptionTemplate : existing.descriptionTemplate,
+        defaultsLastUpdatedAt: isUpdatingDefaults ? new Date() : existing.defaultsLastUpdatedAt,
       },
     });
 

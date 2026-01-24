@@ -254,6 +254,34 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     return updateData;
   },
   
+  afterCreate: async (item, body, context) => {
+    // Auto-learn: Update contact defaults from this transaction
+    if (item.contactId) {
+      try {
+        const contact = await prisma.contact.findUnique({
+          where: { id: item.contactId },
+          select: { defaultsLastUpdatedAt: true },
+        });
+
+        // Always update defaults to the latest transaction values
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: {
+            defaultVatRate: item.vatRate,
+            defaultWhtEnabled: item.isWhtDeducted,
+            defaultWhtRate: item.whtRate,
+            defaultWhtType: item.whtType,
+            descriptionTemplate: item.source, // Use source field for income description
+            defaultsLastUpdatedAt: new Date(),
+          },
+        });
+      } catch (error) {
+        // Log error but don't throw - defaults update should not break the main flow
+        console.error("Failed to update contact defaults:", error);
+      }
+    }
+  },
+  
   notifyCreate: async (companyId, data, baseUrl) => {
     await notifyIncome(companyId, {
       id: data.id,

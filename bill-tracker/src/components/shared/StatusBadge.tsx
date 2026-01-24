@@ -4,13 +4,15 @@ import { INCOME_STATUS_LABELS } from "@/lib/validations/income";
 import { 
   REIMBURSEMENT_STATUS_LABELS, 
   EXPENSE_WORKFLOW_INFO,
-  INCOME_WORKFLOW_INFO 
+  INCOME_WORKFLOW_INFO,
+  getExpenseWorkflowLabel,
 } from "@/lib/constants/transaction";
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
   status: string;
   type: "expense" | "income" | "reimbursement";
+  documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
 }
 
 // Legacy color map for backward compatibility
@@ -29,18 +31,21 @@ const colorMap: Record<string, string> = {
  * Reusable status badge component for transactions
  * @param status - The status string (workflowStatus or legacy status)
  * @param type - The transaction type (expense, income, or reimbursement)
+ * @param documentType - The document type for expenses (affects label display)
  */
-export function StatusBadge({ status, type }: StatusBadgeProps) {
+export function StatusBadge({ status, type, documentType }: StatusBadgeProps) {
   // First try new workflow statuses (uses full Tailwind classes)
   if (type === "expense") {
     const workflowInfo = EXPENSE_WORKFLOW_INFO[status];
     if (workflowInfo) {
+      // Use document-type aware label for expenses
+      const label = getExpenseWorkflowLabel(status, documentType || "TAX_INVOICE");
       return (
         <Badge
           variant="outline"
           className={cn(workflowInfo.bgColor, workflowInfo.color)}
         >
-          {workflowInfo.label}
+          {label}
         </Badge>
       );
     }

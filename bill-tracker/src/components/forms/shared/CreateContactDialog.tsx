@@ -21,7 +21,26 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Lightbulb } from "lucide-react";
+
+// WHT Types
+const WHT_TYPES = [
+  { value: "SERVICE", label: "ค่าบริการ (3%)" },
+  { value: "RENT", label: "ค่าเช่า (5%)" },
+  { value: "TRANSPORT", label: "ค่าขนส่ง (1%)" },
+  { value: "ADVERTISING", label: "ค่าโฆษณา (2%)" },
+  { value: "OTHER", label: "อื่นๆ" },
+];
+
+// WHT Rates by type
+const WHT_RATES: Record<string, number> = {
+  SERVICE: 3,
+  RENT: 5,
+  TRANSPORT: 1,
+  ADVERTISING: 2,
+  OTHER: 3,
+};
 
 export interface ContactFormData {
   peakCode: string;
@@ -49,6 +68,12 @@ export interface ContactFormData {
   creditLimit: string;
   paymentTerms: string;
   notes: string;
+  // Transaction Defaults
+  defaultVatRate: string;
+  defaultWhtEnabled: boolean;
+  defaultWhtRate: string;
+  defaultWhtType: string;
+  descriptionTemplate: string;
 }
 
 export interface Contact {
@@ -64,6 +89,12 @@ export interface Contact {
   paymentTerms?: number | null;
   notes?: string | null;
   source?: "PEAK" | "MANUAL" | null;
+  // Transaction Defaults
+  defaultVatRate?: number | null;
+  defaultWhtEnabled?: boolean | null;
+  defaultWhtRate?: number | null;
+  defaultWhtType?: string | null;
+  descriptionTemplate?: string | null;
 }
 
 interface CreateContactDialogProps {
@@ -100,6 +131,12 @@ const defaultFormData: ContactFormData = {
   creditLimit: "",
   paymentTerms: "",
   notes: "",
+  // Transaction Defaults
+  defaultVatRate: "",
+  defaultWhtEnabled: false,
+  defaultWhtRate: "",
+  defaultWhtType: "",
+  descriptionTemplate: "",
 };
 
 export function CreateContactDialog({
@@ -138,6 +175,12 @@ export function CreateContactDialog({
           creditLimit: editingContact.creditLimit?.toString() || "",
           paymentTerms: editingContact.paymentTerms?.toString() || "",
           notes: editingContact.notes || "",
+          // Transaction Defaults
+          defaultVatRate: editingContact.defaultVatRate?.toString() || "",
+          defaultWhtEnabled: editingContact.defaultWhtEnabled || false,
+          defaultWhtRate: editingContact.defaultWhtRate?.toString() || "",
+          defaultWhtType: editingContact.defaultWhtType || "",
+          descriptionTemplate: editingContact.descriptionTemplate || "",
         }
       : defaultFormData
   );
@@ -175,6 +218,12 @@ export function CreateContactDialog({
         creditLimit: editingContact.creditLimit?.toString() || "",
         paymentTerms: editingContact.paymentTerms?.toString() || "",
         notes: editingContact.notes || "",
+        // Transaction Defaults
+        defaultVatRate: editingContact.defaultVatRate?.toString() || "",
+        defaultWhtEnabled: editingContact.defaultWhtEnabled || false,
+        defaultWhtRate: editingContact.defaultWhtRate?.toString() || "",
+        defaultWhtType: editingContact.defaultWhtType || "",
+        descriptionTemplate: editingContact.descriptionTemplate || "",
       });
     } else if (open && !editingContact) {
       resetForm();
@@ -196,6 +245,12 @@ export function CreateContactDialog({
         companyCode: companyCode.toUpperCase(),
         creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : null,
         paymentTerms: formData.paymentTerms ? parseInt(formData.paymentTerms) : null,
+        // Transaction Defaults
+        defaultVatRate: formData.defaultVatRate ? parseInt(formData.defaultVatRate) : null,
+        defaultWhtEnabled: formData.defaultWhtEnabled || null,
+        defaultWhtRate: formData.defaultWhtRate ? parseFloat(formData.defaultWhtRate) : null,
+        defaultWhtType: formData.defaultWhtType || null,
+        descriptionTemplate: formData.descriptionTemplate || null,
         ...(editingContact && { id: editingContact.id }),
       };
 
@@ -251,6 +306,12 @@ export function CreateContactDialog({
         creditLimit: editingContact.creditLimit?.toString() || "",
         paymentTerms: editingContact.paymentTerms?.toString() || "",
         notes: editingContact.notes || "",
+        // Transaction Defaults
+        defaultVatRate: editingContact.defaultVatRate?.toString() || "",
+        defaultWhtEnabled: editingContact.defaultWhtEnabled || false,
+        defaultWhtRate: editingContact.defaultWhtRate?.toString() || "",
+        defaultWhtType: editingContact.defaultWhtType || "",
+        descriptionTemplate: editingContact.descriptionTemplate || "",
       });
     } else if (newOpen && !editingContact) {
       resetForm();
@@ -544,6 +605,112 @@ export function CreateContactDialog({
                   className="h-10"
                 />
               </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Transaction Defaults */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-amber-500" />
+              <h3 className="font-medium text-sm">ค่าเริ่มต้นสำหรับธุรกรรม</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ค่าเหล่านี้จะแสดงเป็นคำแนะนำเมื่อเลือกผู้ติดต่อนี้ในฟอร์มรายจ่าย/รายรับ
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-defaultVatRate">อัตรา VAT เริ่มต้น</Label>
+                <Select
+                  value={formData.defaultVatRate}
+                  onValueChange={(value) => setFormData({ ...formData, defaultVatRate: value })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="ไม่ระบุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">ไม่ระบุ</SelectItem>
+                    <SelectItem value="0">0% (ไม่มี VAT)</SelectItem>
+                    <SelectItem value="7">7%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-descriptionTemplate">คำอธิบาย/รายละเอียด</Label>
+                <Input
+                  id="contact-descriptionTemplate"
+                  value={formData.descriptionTemplate}
+                  onChange={(e) => setFormData({ ...formData, descriptionTemplate: e.target.value })}
+                  placeholder="เช่น ค่าบริการรายเดือน"
+                  className="h-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="contact-defaultWhtEnabled"
+                  checked={formData.defaultWhtEnabled}
+                  onCheckedChange={(checked) => {
+                    setFormData({ 
+                      ...formData, 
+                      defaultWhtEnabled: checked,
+                      // Auto-set default WHT type and rate when enabling
+                      defaultWhtType: checked && !formData.defaultWhtType ? "SERVICE" : formData.defaultWhtType,
+                      defaultWhtRate: checked && !formData.defaultWhtRate ? "3" : formData.defaultWhtRate,
+                    });
+                  }}
+                />
+                <Label htmlFor="contact-defaultWhtEnabled" className="cursor-pointer">
+                  หัก ณ ที่จ่ายเป็นค่าเริ่มต้น
+                </Label>
+              </div>
+
+              {formData.defaultWhtEnabled && (
+                <div className="grid grid-cols-2 gap-4 pl-10">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-defaultWhtType">ประเภท WHT</Label>
+                    <Select
+                      value={formData.defaultWhtType}
+                      onValueChange={(value) => {
+                        setFormData({ 
+                          ...formData, 
+                          defaultWhtType: value,
+                          defaultWhtRate: WHT_RATES[value]?.toString() || formData.defaultWhtRate,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="เลือกประเภท" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WHT_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-defaultWhtRate">อัตรา WHT (%)</Label>
+                    <Input
+                      id="contact-defaultWhtRate"
+                      type="number"
+                      value={formData.defaultWhtRate}
+                      onChange={(e) => setFormData({ ...formData, defaultWhtRate: e.target.value })}
+                      placeholder="3"
+                      className="h-10"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

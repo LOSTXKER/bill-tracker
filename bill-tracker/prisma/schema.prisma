@@ -172,6 +172,15 @@ model Contact {
   country              String?                @default("Thailand")
   contactPerson        String?
   source               DataSource             @default(MANUAL)
+  
+  // ค่าเริ่มต้นสำหรับธุรกรรม (Contact Defaults)
+  defaultVatRate         Int?                   // อัตรา VAT เริ่มต้น (0, 7, etc.)
+  defaultWhtEnabled      Boolean?               // เปิด/ปิด หัก ณ ที่จ่าย
+  defaultWhtRate         Decimal?               @db.Decimal(5, 2) // อัตราหัก ณ ที่จ่าย
+  defaultWhtType         String?                // ประเภท WHT (SERVICE, RENT, etc.)
+  descriptionTemplate    String?                // template คำอธิบาย
+  defaultsLastUpdatedAt  DateTime?              // วันที่อัปเดตค่าเริ่มต้นล่าสุด
+  
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Expense              Expense[]
   Income               Income[]

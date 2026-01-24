@@ -259,6 +259,32 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
   },
   
   afterCreate: async (item, body, context) => {
+    // Auto-learn: Update contact defaults from this transaction
+    if (item.contactId) {
+      try {
+        const contact = await prisma.contact.findUnique({
+          where: { id: item.contactId },
+          select: { defaultsLastUpdatedAt: true },
+        });
+
+        // Always update defaults to the latest transaction values
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: {
+            defaultVatRate: item.vatRate,
+            defaultWhtEnabled: item.isWht,
+            defaultWhtRate: item.whtRate,
+            defaultWhtType: item.whtType,
+            descriptionTemplate: item.description,
+            defaultsLastUpdatedAt: new Date(),
+          },
+        });
+      } catch (error) {
+        // Log error but don't throw - defaults update should not break the main flow
+        console.error("Failed to update contact defaults:", error);
+      }
+    }
+
     // Handle payers if provided
     if (body.payers && Array.isArray(body.payers) && body.payers.length > 0) {
       for (const payer of body.payers as Array<{
