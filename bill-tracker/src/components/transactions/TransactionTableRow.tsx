@@ -66,6 +66,8 @@ export interface TransactionData {
   isWht?: boolean;
   isWhtDeducted?: boolean;
   whtRate?: number | null;
+  // Document type for expenses (affects status label)
+  documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT" | null;
   // Fraud score for reimbursement
   fraudScore?: number | null;
 }
@@ -227,7 +229,8 @@ export function TransactionTableRow({
       <TableCell className="text-center">
         <StatusBadge 
           status={status || "PENDING"} 
-          type={config.type} 
+          type={config.type}
+          documentType={config.type === "expense" ? (transaction.documentType || undefined) : undefined}
         />
       </TableCell>
 
