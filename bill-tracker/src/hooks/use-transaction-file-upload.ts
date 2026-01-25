@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { uploadFileDirect } from "@/lib/storage/client-upload";
 
 interface UseTransactionFileUploadOptions {
   transactionType: "expense" | "income";
@@ -64,25 +65,14 @@ export function useTransactionFileUpload({
 
       const folder = `${companyCode.toUpperCase()}/${transactionType}s/${transactionId}/${typeFolder}`;
 
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", folder);
-      // Pass the original filename to preserve it in storage
-      if (file.name && file.name !== "blob") {
-        formData.append("filename", file.name);
-      }
+      // Use direct upload to Supabase to bypass Vercel's 4.5MB limit
+      const uploadResult = await uploadFileDirect(
+        file,
+        folder,
+        file.name && file.name !== "blob" ? file.name : undefined
+      );
 
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!uploadRes.ok) throw new Error("อัปโหลดไฟล์ล้มเหลว");
-
-      const uploadResult = await uploadRes.json();
-      // Handle apiResponse wrapper: { success: true, data: { url, ... } }
-      const url = uploadResult.data?.url || uploadResult.url;
+      const url = uploadResult.url;
       
       if (!url) {
         console.error("Upload response missing URL:", uploadResult);

@@ -143,37 +143,11 @@ export async function uploadFile(
     // Compress only images, not PDF
     const fileToUpload = isImage ? await compressImage(file) : file;
 
-    // Generate unique filename
-    const filename = generateUniqueFilename(file.name);
-
-    // Create form data
-    const formData = new FormData();
-    formData.append("file", fileToUpload);
-    formData.append("folder", folder);
-    formData.append("filename", filename);
-
-    // Upload to server
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || error.error || "การอัพโหลดล้มเหลว");
-    }
-
-    const result = await response.json();
-    // Handle apiResponse wrapper: { success: true, data: { url, ... } }
-    const data = result.data || result;
+    // Use direct upload to Supabase to bypass Vercel's 4.5MB limit
+    const { uploadFileDirect } = await import("@/lib/storage/client-upload");
+    const result = await uploadFileDirect(fileToUpload, folder, file.name);
     
-    if (!data.url) {
-      console.error("Upload response missing URL:", result);
-      throw new Error("ไม่ได้รับ URL จากการอัปโหลด");
-    }
-    
-    return { url: data.url, filename: data.filename || data.path?.split("/").pop() || "" };
+    return { url: result.url, filename: result.filename };
   } catch (error) {
     console.error("Upload error:", error);
     throw error;
@@ -182,17 +156,10 @@ export async function uploadFile(
 
 export async function deleteFile(url: string): Promise<void> {
   try {
-    const response = await fetch("/api/upload", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url }),
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error("การลบไฟล์ล้มเหลว");
+    const { deleteFileDirect, extractPathFromUrl } = await import("@/lib/storage/client-upload");
+    const filePath = extractPathFromUrl(url);
+    if (filePath) {
+      await deleteFileDirect(filePath);
     }
   } catch (error) {
     console.error("Delete error:", error);
