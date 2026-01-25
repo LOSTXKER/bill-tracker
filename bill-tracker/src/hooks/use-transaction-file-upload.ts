@@ -75,6 +75,7 @@ export function useTransactionFileUpload({
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       if (!uploadRes.ok) throw new Error("อัปโหลดไฟล์ล้มเหลว");

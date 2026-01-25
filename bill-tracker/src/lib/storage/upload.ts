@@ -156,6 +156,7 @@ export async function uploadFile(
     const response = await fetch("/api/upload", {
       method: "POST",
       body: formData,
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -187,6 +188,7 @@ export async function deleteFile(url: string): Promise<void> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ url }),
+      credentials: "include",
     });
 
     if (!response.ok) {
