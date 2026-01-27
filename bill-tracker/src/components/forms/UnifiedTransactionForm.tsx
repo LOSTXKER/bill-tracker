@@ -265,8 +265,33 @@ export function UnifiedTransactionForm({
   const [payersInitialized, setPayersInitialized] = useState(false);
   
   // Internal company tracking (expense only)
-  const { companies: accessibleCompanies } = useSafeCompany();
+  const { companies: contextCompanies } = useSafeCompany();
+  const [fetchedCompanies, setFetchedCompanies] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [internalCompanyId, setInternalCompanyId] = useState<string | null>(null);
+  
+  // Use context companies if available, otherwise fetch from API
+  const accessibleCompanies = contextCompanies.length > 0 
+    ? contextCompanies 
+    : fetchedCompanies;
+
+  // Fetch companies from API if context is not available (for internal company selector)
+  useEffect(() => {
+    if (config.type === "expense" && contextCompanies.length === 0) {
+      fetch("/api/companies")
+        .then((res) => res.json())
+        .then((result) => {
+          const companies = result.data?.companies || [];
+          setFetchedCompanies(companies.map((c: { id: string; name: string; code: string }) => ({
+            id: c.id,
+            name: c.name,
+            code: c.code,
+          })));
+        })
+        .catch(() => {
+          // Ignore errors - internal company is optional
+        });
+    }
+  }, [config.type, contextCompanies.length]);
 
   // Initialize payers from reimbursement data (prefill)
   useEffect(() => {
