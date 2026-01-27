@@ -48,6 +48,13 @@ type FormSetValue = (name: string, value: unknown) => void;
 
 export type AmountInputMode = "beforeVat" | "includingVat";
 
+// Internal company option for dropdown
+export interface InternalCompanyOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export interface TransactionFieldsSectionProps {
   config: TransactionFieldsConfig;
   companyCode: string;
@@ -91,6 +98,11 @@ export interface TransactionFieldsSectionProps {
   
   // Additional fields renderer (e.g., due date for expenses)
   renderAdditionalFields?: () => React.ReactNode;
+  
+  // Internal company tracking (expense only)
+  internalCompanyId?: string | null;
+  onInternalCompanyChange?: (id: string | null) => void;
+  accessibleCompanies?: InternalCompanyOption[];
 }
 
 // =============================================================================
@@ -120,6 +132,9 @@ export function TransactionFieldsSection({
   onReferenceUrlsChange,
   vatRate = 0,
   renderAdditionalFields,
+  internalCompanyId,
+  onInternalCompanyChange,
+  accessibleCompanies = [],
 }: TransactionFieldsSectionProps) {
   const isEditable = mode === "create" || mode === "edit";
   const watchStatus = watch("status") as string | undefined;
@@ -280,6 +295,17 @@ export function TransactionFieldsSection({
           </div>
         </div>
 
+        {/* Row 2.5: Internal Company (expense only) */}
+        {config.type === "expense" && internalCompanyId && (
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">บริษัทภายใน (เป็นค่าใช้จ่ายจริงของ)</p>
+            <p className="text-base font-semibold text-foreground">
+              {accessibleCompanies.find(c => c.id === internalCompanyId)?.name || 
+               <span className="text-muted-foreground font-normal">-</span>}
+            </p>
+          </div>
+        )}
+
         {/* Row 3: Description */}
         {config.descriptionField && (
           <div>
@@ -415,6 +441,36 @@ export function TransactionFieldsSection({
           />
         </div>
       </div>
+
+      {/* Row 2.5: Internal Company (expense only) */}
+      {config.type === "expense" && onInternalCompanyChange && accessibleCompanies.length > 1 && (
+        <div className="space-y-1.5">
+          <Label className="text-sm text-muted-foreground">
+            บริษัทภายใน (เป็นค่าใช้จ่ายจริงของ)
+          </Label>
+          <Select
+            value={internalCompanyId || "__none__"}
+            onValueChange={(value) => onInternalCompanyChange(value === "__none__" ? null : value)}
+          >
+            <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
+              <SelectValue placeholder="ไม่ระบุ (ใช้บริษัทที่บันทึก)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                <span className="text-muted-foreground">ไม่ระบุ (ใช้บริษัทที่บันทึก)</span>
+              </SelectItem>
+              {accessibleCompanies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name} ({company.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            ถ้าค่าใช้จ่ายนี้เป็นของบริษัทอื่น (ต่างจากที่บันทึก) ให้เลือกบริษัทจริงที่นี่
+          </p>
+        </div>
+      )}
 
       {/* Row 3: Description */}
       {config.descriptionField && (

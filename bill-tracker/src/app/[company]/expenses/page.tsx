@@ -133,17 +133,31 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const creator = searchParams.creator as string | undefined;
   const dateFrom = searchParams.dateFrom as string | undefined;
   const dateTo = searchParams.dateTo as string | undefined;
+  // View mode: "official" (default - by companyId), "internal" (by internalCompanyId)
+  const viewMode = (searchParams.viewMode as string) || "official";
 
   // Build where clause
   // Filter: Only show regular expenses OR reimbursements that have been PAID
-  const whereClause: any = {
-    companyId,
-    deletedAt: null,
-    OR: [
-      { isReimbursement: false },
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
+  // When viewMode is "internal", filter by internalCompanyId instead of companyId
+  const whereClause: any = viewMode === "internal"
+    ? {
+        // Internal view: Show expenses where this company is the "real" owner
+        internalCompanyId: companyId,
+        deletedAt: null,
+        OR: [
+          { isReimbursement: false },
+          { isReimbursement: true, reimbursementStatus: "PAID" as const },
+        ],
+      }
+    : {
+        // Official view (default): Show expenses recorded under this company
+        companyId,
+        deletedAt: null,
+        OR: [
+          { isReimbursement: false },
+          { isReimbursement: true, reimbursementStatus: "PAID" as const },
+        ],
+      };
 
   if (search) {
     whereClause.AND = [
@@ -219,6 +233,8 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       include: {
         Contact: true,
         Account: true,
+        Company: true,
+        InternalCompany: true,
         User_Expense_createdByToUser: {
           select: {
             id: true,
@@ -234,11 +250,13 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
 
   // Map Prisma relation names to what the client expects
   const expenses = expensesRaw.map((expense) => {
-    const { Contact, Account, User_Expense_createdByToUser, ...rest } = expense;
+    const { Contact, Account, Company, InternalCompany, User_Expense_createdByToUser, ...rest } = expense;
     return {
       ...rest,
       contact: Contact,
       account: Account,
+      company: Company,
+      internalCompany: InternalCompany,
       creator: User_Expense_createdByToUser,
     };
   });
@@ -251,6 +269,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       companyCode={companyCode}
       initialExpenses={serializedExpenses}
       initialTotal={total}
+      viewMode={viewMode as "official" | "internal"}
     />
   );
 }

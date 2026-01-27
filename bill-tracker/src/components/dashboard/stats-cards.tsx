@@ -3,15 +3,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatsGrid } from "@/components/shared/StatsGrid";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { getCompanyId } from "@/lib/cache/company";
-import { getExpenseStats, getIncomeStats } from "@/lib/cache/stats";
+import { getExpenseStats, getIncomeStats, ViewMode } from "@/lib/cache/stats";
 
-export async function StatsCards({ companyCode }: { companyCode: string }) {
+interface StatsCardsProps {
+  companyCode: string;
+  viewMode?: ViewMode;
+}
+
+export async function StatsCards({ companyCode, viewMode = "official" }: StatsCardsProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
   // Use cached stats for better performance
+  // Pass viewMode to expense stats (income doesn't have internal company concept yet)
   const [expenseStats, incomeStats] = await Promise.all([
-    getExpenseStats(companyId),
+    getExpenseStats(companyId, viewMode),
     getIncomeStats(companyId),
   ]);
 

@@ -9,3 +9,4 @@ export {
   ChartSkeleton,
 } from "./chart-data-loaders";
 export { SettlementAlert, SettlementAlertSkeleton } from "./settlement-alert";
+export { ViewModeToggle } from "./ViewModeToggle";

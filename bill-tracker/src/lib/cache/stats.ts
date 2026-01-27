@@ -2,19 +2,29 @@
 
 import { prisma } from "@/lib/db";
 
+export type ViewMode = "official" | "internal";
+
 /**
  * Get expense stats - real-time without caching
  * Stats should always be up-to-date
+ * 
+ * @param companyId - The company ID
+ * @param viewMode - "official" (by companyId) or "internal" (by internalCompanyId)
  */
-export async function getExpenseStats(companyId: string) {
+export async function getExpenseStats(companyId: string, viewMode: ViewMode = "official") {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+  // Build filter based on viewMode
+  const companyFilter = viewMode === "internal"
+    ? { internalCompanyId: companyId }  // Internal view: filter by internalCompanyId
+    : { companyId };                     // Official view: filter by companyId
+
   const expenseFilter = {
-    companyId,
+    ...companyFilter,
     deletedAt: null,
     OR: [
       { isReimbursement: false },

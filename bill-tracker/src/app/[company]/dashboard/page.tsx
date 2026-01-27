@@ -16,14 +16,18 @@ import {
   ChartSkeleton,
   SettlementAlert,
   SettlementAlertSkeleton,
+  ViewModeToggle,
 } from "@/components/dashboard";
 
 interface DashboardPageProps {
   params: Promise<{ company: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function DashboardPage({ params }: DashboardPageProps) {
+export default async function DashboardPage({ params, searchParams }: DashboardPageProps) {
   const { company: companyCode } = await params;
+  const urlParams = await searchParams;
+  const viewMode = (urlParams.viewMode as string) || "official";
 
   return (
     <div className="space-y-6">
@@ -37,17 +41,23 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             ภาพรวมรายรับ-รายจ่ายและเอกสารที่ต้องจัดการ
           </p>
         </div>
-        <Link href={`/${companyCode.toLowerCase()}/capture`}>
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <Plus className="mr-2 h-4 w-4" />
-            บันทึกรายการ
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <ViewModeToggle 
+            companyCode={companyCode} 
+            currentMode={viewMode as "official" | "internal"} 
+          />
+          <Link href={`/${companyCode.toLowerCase()}/capture`}>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="mr-2 h-4 w-4" />
+              บันทึกรายการ
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <Suspense fallback={<StatsSkeleton />}>
-        <StatsCards companyCode={companyCode} />
+        <StatsCards companyCode={companyCode} viewMode={viewMode as "official" | "internal"} />
       </Suspense>
 
       {/* Action Required Section */}

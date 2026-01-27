@@ -212,6 +212,11 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         ? { User_Expense_submittedByToUser: { select: { id: true, name: true, email: true } } }
         : { User_Income_submittedByToUser: { select: { id: true, name: true, email: true } } };
 
+      // Include InternalCompany for expense type
+      const internalCompanyInclude = config.modelName === "expense"
+        ? { InternalCompany: true }
+        : {};
+
       const [items, total] = await Promise.all([
         config.prismaModel.findMany({
           where,
@@ -220,6 +225,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
             Account: true,
             ...creatorInclude,
             ...submitterInclude,
+            ...internalCompanyInclude,
           },
           // Sort by user-selected field, then by createdAt for consistent ordering
           orderBy: [
@@ -255,6 +261,11 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
       const body = await request.json();
       const createData = config.transformCreateData(body);
 
+      // Include InternalCompany for expense type
+      const internalCompanyInclude = config.modelName === "expense"
+        ? { InternalCompany: true }
+        : {};
+
       // Create transaction
       const item = await config.prismaModel.create({
         data: {
@@ -262,7 +273,7 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
           companyId: company.id,
           createdBy: session.user.id,
         },
-        include: { Contact: true, Account: true },
+        include: { Contact: true, Account: true, ...internalCompanyInclude },
       });
 
       // Run afterCreate hook if defined
@@ -349,6 +360,11 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
     const creatorInclude = config.modelName === "expense" 
       ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
       : { User: { select: { id: true, name: true, email: true } } };
+    
+    // Include InternalCompany for expense type
+    const internalCompanyInclude = config.modelName === "expense"
+      ? { InternalCompany: true }
+      : {};
 
     const item = await config.prismaModel.findUnique({
       where: { id },
@@ -357,6 +373,7 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
         Account: true,
         Company: true,
         ...creatorInclude,
+        ...internalCompanyInclude,
       },
     });
 
@@ -463,6 +480,11 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     const creatorInclude = config.modelName === "expense" 
       ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
       : { User: { select: { id: true, name: true, email: true } } };
+    
+    // Include InternalCompany for expense type
+    const internalCompanyInclude = config.modelName === "expense"
+      ? { InternalCompany: true }
+      : {};
 
     // Update item
     const item = await config.prismaModel.update({
@@ -473,6 +495,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
         Account: true,
         Company: true,
         ...creatorInclude,
+        ...internalCompanyInclude,
       },
     });
 

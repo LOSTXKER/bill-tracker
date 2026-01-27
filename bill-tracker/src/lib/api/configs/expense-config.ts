@@ -128,6 +128,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       netPaid: netPaid,
       description: data.description,
       accountId: data.accountId || null,
+      // Internal company tracking (บริษัทจริงภายใน)
+      internalCompanyId: data.internalCompanyId || null,
       invoiceNumber: data.invoiceNumber,
       referenceNo: data.referenceNo,
       billDate: data.billDate ? new Date(data.billDate) : new Date(),
@@ -164,6 +166,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (netPaid !== undefined) updateData.netPaid = netPaid;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
+    // Internal company tracking (บริษัทจริงภายใน)
+    if (data.internalCompanyId !== undefined) updateData.internalCompanyId = data.internalCompanyId || null;
     if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
     if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
     if (data.billDate !== undefined) updateData.billDate = data.billDate ? new Date(data.billDate) : undefined;

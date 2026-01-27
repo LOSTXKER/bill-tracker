@@ -29,21 +29,25 @@ import {
   Calculator,
 } from "lucide-react";
 import { formatCurrency, calculateVATSummary, calculateWHTSummary } from "@/lib/utils/tax-calculator";
+import { ViewModeToggle } from "@/components/dashboard";
 
 interface ReportsPageProps {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ month?: string; year?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; viewMode?: string }>;
 }
+
+type ViewMode = "official" | "internal";
 
 export default async function ReportsPage({ params, searchParams }: ReportsPageProps) {
   const { company: companyCode } = await params;
-  const { month, year } = await searchParams;
+  const { month, year, viewMode: viewModeParam } = await searchParams;
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
   const selectedYear = year ? parseInt(year) : currentYear;
   const selectedMonth = month ? parseInt(month) : currentMonth;
+  const viewMode: ViewMode = (viewModeParam as ViewMode) || "official";
 
   return (
     <div className="space-y-6">
@@ -57,31 +61,34 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
             รายงานภาษีและสรุปรายรับ-รายจ่าย
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select defaultValue={selectedMonth.toString()}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => (
-                <SelectItem key={i + 1} value={(i + 1).toString()}>
-                  {new Date(2000, i).toLocaleDateString("th-TH", { month: "long" })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select defaultValue={selectedYear.toString()}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 5 }, (_, i) => (
-                <SelectItem key={i} value={(currentYear - i).toString()}>
-                  {currentYear - i}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ViewModeToggle companyCode={companyCode} currentMode={viewMode} />
+          <div className="flex items-center gap-2">
+            <Select defaultValue={selectedMonth.toString()}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <SelectItem key={i + 1} value={(i + 1).toString()}>
+                    {new Date(2000, i).toLocaleDateString("th-TH", { month: "long" })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select defaultValue={selectedYear.toString()}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <SelectItem key={i} value={(currentYear - i).toString()}>
+                    {currentYear - i}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -108,6 +115,7 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
               companyCode={companyCode}
               year={selectedYear}
               month={selectedMonth}
+              viewMode={viewMode}
             />
           </Suspense>
         </TabsContent>
@@ -118,6 +126,7 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
               companyCode={companyCode}
               year={selectedYear}
               month={selectedMonth}
+              viewMode={viewMode}
             />
           </Suspense>
         </TabsContent>
@@ -128,6 +137,7 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
               companyCode={companyCode}
               year={selectedYear}
               month={selectedMonth}
+              viewMode={viewMode}
             />
           </Suspense>
         </TabsContent>
@@ -140,10 +150,12 @@ async function VATReport({
   companyCode,
   year,
   month,
+  viewMode = "official",
 }: {
   companyCode: string;
   year: number;
   month: number;
+  viewMode?: ViewMode;
 }) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
@@ -154,16 +166,23 @@ async function VATReport({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
+  // Build company filter based on viewMode
+  const expenseCompanyFilter = viewMode === "internal"
+    ? { internalCompanyId: company.id }
+    : { companyId: company.id };
+
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        companyId: company.id,
+        ...expenseCompanyFilter,
         billDate: { gte: startDate, lte: endDate },
         vatRate: { gt: 0 },
         deletedAt: null,
       },
+      include: { Company: true, InternalCompany: true },
       orderBy: { billDate: "asc" },
     }),
+    // Income doesn't have internalCompanyId yet, always filter by companyId
     prisma.income.findMany({
       where: {
         companyId: company.id,
@@ -352,10 +371,12 @@ async function WHTReport({
   companyCode,
   year,
   month,
+  viewMode = "official",
 }: {
   companyCode: string;
   year: number;
   month: number;
+  viewMode?: ViewMode;
 }) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
@@ -366,16 +387,23 @@ async function WHTReport({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
+  // Build company filter based on viewMode
+  const expenseCompanyFilter = viewMode === "internal"
+    ? { internalCompanyId: company.id }
+    : { companyId: company.id };
+
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        companyId: company.id,
+        ...expenseCompanyFilter,
         billDate: { gte: startDate, lte: endDate },
         isWht: true,
         deletedAt: null,
       },
+      include: { Company: true, InternalCompany: true },
       orderBy: { billDate: "asc" },
     }),
+    // Income doesn't have internalCompanyId yet
     prisma.income.findMany({
       where: {
         companyId: company.id,
@@ -575,10 +603,12 @@ async function MonthlySummary({
   companyCode,
   year,
   month,
+  viewMode = "official",
 }: {
   companyCode: string;
   year: number;
   month: number;
+  viewMode?: ViewMode;
 }) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
@@ -589,16 +619,22 @@ async function MonthlySummary({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
+  // Build company filter based on viewMode
+  const expenseCompanyFilter = viewMode === "internal"
+    ? { internalCompanyId: company.id }
+    : { companyId: company.id };
+
   const [expenseSum, incomeSum, expenseByAccount, accounts] = await Promise.all([
     prisma.expense.aggregate({
       where: {
-        companyId: company.id,
+        ...expenseCompanyFilter,
         billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },
       _sum: { netPaid: true },
       _count: true,
     }),
+    // Income doesn't have internalCompanyId yet
     prisma.income.aggregate({
       where: {
         companyId: company.id,
@@ -611,7 +647,7 @@ async function MonthlySummary({
     prisma.expense.groupBy({
       by: ["accountId"],
       where: {
-        companyId: company.id,
+        ...expenseCompanyFilter,
         billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },

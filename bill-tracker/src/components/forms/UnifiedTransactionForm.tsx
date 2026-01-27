@@ -43,6 +43,7 @@ import { useContactDefaults } from "@/hooks/use-contact-defaults";
 import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 import { useTransaction } from "@/hooks/use-transaction";
+import { useCompany } from "@/hooks/use-company";
 
 // Shared form components
 import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
@@ -262,6 +263,10 @@ export function UnifiedTransactionForm({
   // Payers (for expense only)
   const [payers, setPayers] = useState<PayerInfo[]>([]);
   const [payersInitialized, setPayersInitialized] = useState(false);
+  
+  // Internal company tracking (expense only)
+  const { companies: accessibleCompanies } = useCompany();
+  const [internalCompanyId, setInternalCompanyId] = useState<string | null>(null);
 
   // Initialize payers from reimbursement data (prefill)
   useEffect(() => {
@@ -433,6 +438,11 @@ export function UnifiedTransactionForm({
     // Set account
     if (data.accountId) {
       setSelectedAccount(data.accountId);
+    }
+
+    // Set internal company (expense only)
+    if (data.internalCompanyId) {
+      setInternalCompanyId(data.internalCompanyId);
     }
 
     // Set categorized files (normalize other docs for backward compatibility)
@@ -1102,8 +1112,9 @@ export function UnifiedTransactionForm({
           whtAmount: calculation.whtAmount,
           [config.fields.netAmountField]: calculation.netAmount,
           referenceUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
-          // Include payers for expense type
+          // Include payers and internal company for expense type
           ...(config.type === "expense" && payers.length > 0 ? { payers } : {}),
+          ...(config.type === "expense" && internalCompanyId ? { internalCompanyId } : {}),
           ...fileData,
         }),
       });
@@ -1160,8 +1171,8 @@ export function UnifiedTransactionForm({
           whtAmount: whtEnabled ? calc.whtAmount : null,
           [config.fields.netAmountField]: calc.netAmount,
           referenceUrls: referenceUrls.length > 0 ? referenceUrls : [],
-          // Include payers for expense type
-          ...(config.type === "expense" ? { payers } : {}),
+          // Include payers and internal company for expense type
+          ...(config.type === "expense" ? { payers, internalCompanyId: internalCompanyId || null } : {}),
         }),
       });
 
@@ -1557,6 +1568,9 @@ export function UnifiedTransactionForm({
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }
+                    internalCompanyId={internalCompanyId}
+                    onInternalCompanyChange={config.type === "expense" ? setInternalCompanyId : undefined}
+                    accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
                   />
 
                   {/* Contact Defaults Suggestion */}
@@ -1735,6 +1749,9 @@ export function UnifiedTransactionForm({
                     renderAdditionalFields={() =>
                       config.renderAdditionalFields?.({ register, watch, setValue, mode })
                     }
+                    internalCompanyId={internalCompanyId}
+                    onInternalCompanyChange={config.type === "expense" && mode === "edit" ? setInternalCompanyId : undefined}
+                    accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
                   />
 
                   <div className="border-t border-border" />

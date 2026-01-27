@@ -28,6 +28,9 @@ const expenseBaseSchema = baseTransactionSchema.extend({
     "OTHER",
   ]).optional(), // DEPRECATED: kept for backward compatibility
   
+  // Internal company tracking (บริษัทจริงภายใน)
+  internalCompanyId: z.string().optional(),
+  
   // Dates
   billDate: z.coerce.date(),
   dueDate: z.coerce.date().optional(),

@@ -114,6 +114,7 @@ model Company {
   CompanyAccess              CompanyAccess[]
   Contact                    Contact[]
   Expense                    Expense[]
+  ExpenseInternal            Expense[]              @relation("ExpenseInternalCompany")
   Income                     Income[]
   Integration                Integration[]
   RecurringExpense           RecurringExpense[]
@@ -274,10 +275,13 @@ model Expense {
   rejectedReason                             String?
   submittedAt                                DateTime?
   submittedBy                                String?
+  // Internal company tracking (บริษัทจริงภายใน - ถ้าต่างจากที่บันทึก)
+  internalCompanyId                          String?
   Comment                                    Comment[]
   DocumentEvent                              DocumentEvent[]
   Account                                    Account?              @relation(fields: [accountId], references: [id])
   Company                                    Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  InternalCompany                            Company?              @relation("ExpenseInternalCompany", fields: [internalCompanyId], references: [id])
   Contact                                    Contact?              @relation(fields: [contactId], references: [id])
   User_Expense_createdByToUser               User                  @relation("Expense_createdByToUser", fields: [createdBy], references: [id])
   User_Expense_reimbursementApprovedByToUser User?                 @relation("Expense_reimbursementApprovedByToUser", fields: [reimbursementApprovedBy], references: [id])
@@ -298,6 +302,7 @@ model Expense {
   @@index([status])
   @@index([workflowStatus])
   @@index([approvalStatus])
+  @@index([internalCompanyId])
 }
 
 model Income {

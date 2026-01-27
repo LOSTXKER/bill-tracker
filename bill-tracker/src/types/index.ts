@@ -46,6 +46,7 @@ export interface CompanyWithAccess extends Company {
 // Expense with relations
 export interface ExpenseWithRelations extends Expense {
   company?: Company;
+  internalCompany?: Company | null;
   contact?: Contact | null;
   creator?: User;
 }
@@ -109,9 +110,14 @@ export interface BaseTransactionFilters {
   search?: string;
 }
 
+// View mode for internal company tracking
+export type ExpenseViewMode = "official" | "internal" | "all";
+
 export interface ExpenseFilters extends BaseTransactionFilters {
   status?: ExpenseDocStatus;
   categoryId?: string;
+  internalCompanyId?: string;
+  viewMode?: ExpenseViewMode;
 }
 
 export interface IncomeFilters extends BaseTransactionFilters {
@@ -209,6 +215,7 @@ export interface ExpenseFormData extends BaseTransactionFormData {
   billDate: Date;
   dueDate?: Date;
   status: ExpenseDocStatus;
+  internalCompanyId?: string; // บริษัทภายใน (ถ้าต่างจากบริษัทที่บันทึก)
 }
 
 export interface IncomeFormData extends BaseTransactionFormData {
