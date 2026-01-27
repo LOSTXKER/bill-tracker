@@ -94,3 +94,22 @@ export function useCompany() {
   }
   return context;
 }
+
+/**
+ * Safe version of useCompany that returns default values if used outside CompanyProvider
+ * Useful for components that may be rendered in different contexts
+ */
+export function useSafeCompany() {
+  const context = useContext(CompanyContext);
+  if (!context) {
+    return {
+      companies: [],
+      selectedCompany: null,
+      setSelectedCompany: () => {},
+      isLoading: false,
+      error: null,
+      refreshCompanies: async () => {},
+    };
+  }
+  return context;
+}

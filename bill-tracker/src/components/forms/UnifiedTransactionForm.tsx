@@ -43,7 +43,7 @@ import { useContactDefaults } from "@/hooks/use-contact-defaults";
 import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 import { useTransaction } from "@/hooks/use-transaction";
-import { useCompany } from "@/hooks/use-company";
+import { useSafeCompany } from "@/hooks/use-company";
 
 // Shared form components
 import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
@@ -265,7 +265,7 @@ export function UnifiedTransactionForm({
   const [payersInitialized, setPayersInitialized] = useState(false);
   
   // Internal company tracking (expense only)
-  const { companies: accessibleCompanies } = useCompany();
+  const { companies: accessibleCompanies } = useSafeCompany();
   const [internalCompanyId, setInternalCompanyId] = useState<string | null>(null);
 
   // Initialize payers from reimbursement data (prefill)
