@@ -7,79 +7,11 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { notifyIncome } from "@/lib/notifications/line-messaging";
 import type { TransactionRouteConfig } from "../transaction-routes";
+import { validateIncomeWhtChange } from "@/lib/validations/wht-validator";
 
-// =============================================================================
-// WHT Change Rules for Income
-// =============================================================================
-
-// สถานะที่ห้ามเปลี่ยน WHT โดยเด็ดขาด
-const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
-
-// สถานะที่ต้อง confirm ก่อนเปลี่ยน WHT
-const WHT_CONFIRM_REQUIRED_STATUSES = ["WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"];
-
-export interface WhtChangeValidation {
-  allowed: boolean;
-  requiresConfirmation: boolean;
-  message?: string;
-  rollbackStatus?: string;
-}
-
-/**
- * ตรวจสอบว่าสามารถเปลี่ยน WHT ได้หรือไม่ (Income)
- */
-export function validateIncomeWhtChange(
-  currentStatus: string,
-  wasWht: boolean,
-  nowWht: boolean,
-  hasWhtCert: boolean
-): WhtChangeValidation {
-  // ไม่มีการเปลี่ยน WHT
-  if (wasWht === nowWht) {
-    return { allowed: true, requiresConfirmation: false };
-  }
-
-  // ห้ามเปลี่ยนหลังส่งบัญชี
-  if (WHT_LOCKED_STATUSES.includes(currentStatus)) {
-    return {
-      allowed: false,
-      requiresConfirmation: false,
-      message: "ไม่สามารถเปลี่ยนสถานะหัก ณ ที่จ่ายได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว",
-    };
-  }
-
-  // เปลี่ยนจาก หัก → ไม่หัก ตอนที่ได้รับ 50 ทวิแล้ว
-  if (wasWht && !nowWht && currentStatus === "WHT_CERT_RECEIVED") {
-    return {
-      allowed: true,
-      requiresConfirmation: true,
-      message: "คุณได้รับหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) จากลูกค้าแล้ว การยกเลิกจะต้องลบเอกสารด้วย",
-      rollbackStatus: "INVOICE_ISSUED",
-    };
-  }
-
-  // เปลี่ยนจาก หัก → ไม่หัก ตอนพร้อมส่งบัญชี (มี WHT cert)
-  if (wasWht && !nowWht && currentStatus === "READY_FOR_ACCOUNTING" && hasWhtCert) {
-    return {
-      allowed: true,
-      requiresConfirmation: true,
-      message: "คุณมีหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) แนบอยู่ การยกเลิกจะลบเอกสารออกด้วย",
-      rollbackStatus: "INVOICE_ISSUED",
-    };
-  }
-
-  // เปลี่ยนจาก ไม่หัก → หัก ตอนพร้อมส่งบัญชี
-  if (!wasWht && nowWht && currentStatus === "READY_FOR_ACCOUNTING") {
-    return {
-      allowed: true,
-      requiresConfirmation: true,
-      message: "การเพิ่มหัก ณ ที่จ่ายจะต้องได้รับหนังสือรับรอง (50 ทวิ) จากลูกค้าก่อนส่งบัญชี",
-      rollbackStatus: "WHT_PENDING_CERT",
-    };
-  }
-
-  return { allowed: true, requiresConfirmation: false };
-}
+// Re-export WHT types and validator for backward compatibility
+export { validateIncomeWhtChange } from "@/lib/validations/wht-validator";
+export type { WhtChangeValidation } from "@/lib/validations/wht-validator";
 
 export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "prismaModel"> & {
   prismaModel: typeof prisma.income;
@@ -283,20 +215,23 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
   },
   
   notifyCreate: async (companyId, data, baseUrl) => {
+    // Type assertion for notification data
+    const notifyData = data as Record<string, unknown>;
+    
     await notifyIncome(companyId, {
-      id: data.id,
-      companyCode: data.companyCode,
-      companyName: data.companyName,
-      customerName: data.customerName || data.contactName || data.source,
-      source: data.source,
-      amount: Number(data.amount),
-      vatAmount: data.vatAmount ? Number(data.vatAmount) : undefined,
-      isWhtDeducted: data.isWhtDeducted || false,
-      whtRate: data.whtRate ? Number(data.whtRate) : undefined,
-      whtAmount: data.whtAmount ? Number(data.whtAmount) : undefined,
-      netReceived: Number(data.netReceived),
+      id: notifyData.id as string | undefined,
+      companyCode: notifyData.companyCode as string | undefined,
+      companyName: (notifyData.companyName as string) || "Unknown",
+      customerName: (notifyData.customerName || notifyData.contactName || notifyData.source) as string | undefined,
+      source: notifyData.source as string | undefined,
+      amount: Number(notifyData.amount) || 0,
+      vatAmount: notifyData.vatAmount ? Number(notifyData.vatAmount) : undefined,
+      isWhtDeducted: (notifyData.isWhtDeducted as boolean) || false,
+      whtRate: notifyData.whtRate ? Number(notifyData.whtRate) : undefined,
+      whtAmount: notifyData.whtAmount ? Number(notifyData.whtAmount) : undefined,
+      netReceived: Number(notifyData.netReceived) || 0,
       // Use workflowStatus (new field) or fall back to status/DRAFT
-      status: data.workflowStatus || data.status || "DRAFT",
+      status: (notifyData.workflowStatus || notifyData.status || "DRAFT") as string,
     }, baseUrl);
   },
   

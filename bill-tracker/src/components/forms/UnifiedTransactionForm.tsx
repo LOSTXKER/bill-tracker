@@ -56,13 +56,13 @@ import { PayerSection, PayerInfo } from "./shared/PayerSection";
 import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 
 // Transaction components
-import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge, ApprovalActions } from "@/components/transactions";
+import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge, ApprovalActions, TransactionViewHeader } from "@/components/transactions";
 import { CommentSection } from "@/components/comments/CommentSection";
 
 // Types & Constants
 import type { ContactSummary } from "@/types";
 import type { ApprovalStatus } from "@prisma/client";
-import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO, APPROVAL_STATUS_INFO, getExpenseWorkflowLabel } from "@/lib/constants/transaction";
+import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO, APPROVAL_STATUS_INFO, getExpenseWorkflowLabel, WHT_LOCKED_STATUSES, WHT_CONFIRM_STATUSES_ALL } from "@/lib/constants/transaction";
 
 // Permissions
 import { usePermissions } from "@/components/providers/permission-provider";
@@ -1285,8 +1285,6 @@ export function UnifiedTransactionForm({
   // ==========================================================================
   // WHT Change Rules (must be before early returns to maintain hooks order)
   // ==========================================================================
-  const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
-  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"];
   
   const whtChangeInfo = useMemo(() => {
     if (!transaction || mode !== "edit") {
@@ -1298,7 +1296,7 @@ export function UnifiedTransactionForm({
     const currentWht = config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted;
     
     // Check if locked
-    if (WHT_LOCKED_STATUSES.includes(currentStatus)) {
+    if (WHT_LOCKED_STATUSES.includes(currentStatus as typeof WHT_LOCKED_STATUSES[number])) {
       return {
         isLocked: true,
         requiresConfirmation: false,
@@ -1307,7 +1305,7 @@ export function UnifiedTransactionForm({
     }
     
     // Check if requires confirmation
-    if (WHT_CONFIRM_STATUSES.includes(currentStatus) || hasWhtCert) {
+    if (WHT_CONFIRM_STATUSES_ALL.includes(currentStatus as typeof WHT_CONFIRM_STATUSES_ALL[number]) || hasWhtCert) {
       return {
         isLocked: false,
         requiresConfirmation: true,

@@ -23,3 +23,6 @@ export { DraftActions } from "./DraftActions";
 export { ApprovalBadge } from "./ApprovalBadge";
 export { ApprovalActions } from "./ApprovalActions";
 export { QuickApprovalCell } from "./QuickApprovalCell";
+
+// Transaction view components
+export { TransactionViewHeader, type TransactionViewHeaderProps } from "./TransactionViewHeader";

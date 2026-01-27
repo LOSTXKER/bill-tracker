@@ -143,10 +143,13 @@ export function ResetPasswordDialog({
             <Key className="h-5 w-5" />
             รีเซ็ตรหัสผ่าน
           </DialogTitle>
-          <DialogDescription>
-            ตั้งรหัสผ่านใหม่ให้ <strong>{memberName}</strong>
+          <DialogDescription className="space-y-2">
+            <span>ตั้งรหัสผ่านใหม่ให้ <strong>{memberName}</strong></span>
             <br />
             <span className="text-xs">{memberEmail}</span>
+            <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-800 dark:text-amber-200">
+              ⚠️ รหัสผ่านใหม่จะใช้ได้กับ<strong>ทุกบริษัท</strong>ที่ผู้ใช้คนนี้เข้าถึง (1 คน = 1 รหัสผ่าน)
+            </div>
           </DialogDescription>
         </DialogHeader>
 

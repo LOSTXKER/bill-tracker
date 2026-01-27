@@ -13,6 +13,10 @@ import { hasPermission } from "@/lib/permissions/checker";
 import { logCreate, logUpdate, logStatusChange, logDelete, logWhtChange } from "@/lib/audit/logger";
 import { DocumentEventType } from "@prisma/client";
 import { notifyTransactionChange } from "@/lib/notifications/in-app";
+import { createLogger } from "@/lib/utils/logger";
+
+// Create logger for this module
+const log = createLogger("transaction-routes");
 
 // =============================================================================
 // Helper: Create Document Event
@@ -45,19 +49,163 @@ async function createDocumentEvent(params: {
     });
   } catch (error) {
     // Log error but don't throw - document events should not break the main flow
-    console.error("Failed to create document event:", error);
+    log.error("Failed to create document event", error);
   }
+}
+
+// =============================================================================
+// Helper: Include Builders
+// =============================================================================
+
+const userSelectFields = { id: true, name: true, email: true } as const;
+
+/**
+ * Get the creator include for a transaction model.
+ * Expense uses User_Expense_createdByToUser, Income uses User.
+ */
+function getCreatorInclude(modelName: "expense" | "income") {
+  return modelName === "expense" 
+    ? { User_Expense_createdByToUser: { select: userSelectFields } }
+    : { User: { select: userSelectFields } };
+}
+
+/**
+ * Get the submitter include for a transaction model (for approval workflow).
+ */
+function getSubmitterInclude(modelName: "expense" | "income") {
+  return modelName === "expense"
+    ? { User_Expense_submittedByToUser: { select: userSelectFields } }
+    : { User_Income_submittedByToUser: { select: userSelectFields } };
+}
+
+/**
+ * Get the internal company include (only for expense type).
+ */
+function getInternalCompanyInclude(modelName: "expense" | "income") {
+  return modelName === "expense" ? { InternalCompany: true } : {};
+}
+
+/**
+ * Get base includes for transaction queries.
+ * Includes Contact, Account, and model-specific relations.
+ */
+function getBaseIncludes(modelName: "expense" | "income", options?: { includeSubmitter?: boolean }) {
+  return {
+    Contact: true,
+    Account: true,
+    ...getCreatorInclude(modelName),
+    ...(options?.includeSubmitter ? getSubmitterInclude(modelName) : {}),
+    ...getInternalCompanyInclude(modelName),
+  };
 }
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export interface TransactionRouteConfig<TModel, TCreateData, TUpdateData> {
-  // Model name for Prisma
-  modelName: "expense" | "income";
+import type { Session } from "next-auth";
+import type { Company, Expense, Income, Prisma } from "@prisma/client";
+
+/**
+ * Supported transaction model names
+ */
+export type TransactionModelName = "expense" | "income";
+
+/**
+ * Context provided to hooks after create/update operations
+ */
+export interface TransactionHookContext {
+  session: Session;
+  company: Company;
+}
+
+/**
+ * Context provided to afterUpdate hook (includes existing item)
+ */
+export interface TransactionUpdateHookContext<TModel> extends TransactionHookContext {
+  existingItem: TModel;
+}
+
+/**
+ * Request body type for transactions (used in transform functions)
+ */
+export interface TransactionRequestBody {
+  // Common fields
+  amount?: number;
+  vatRate?: number;
+  vatAmount?: number;
+  netPaid?: number;
+  netReceived?: number;
+  description?: string;
+  source?: string;
+  contactId?: string;
+  contactName?: string;
+  accountId?: string;
+  paymentMethod?: string;
+  invoiceNumber?: string;
+  notes?: string;
+  referenceNo?: string;
   
-  // Permissions
+  // WHT fields (expense)
+  isWht?: boolean;
+  // WHT fields (income)
+  isWhtDeducted?: boolean;
+  // Common WHT fields
+  whtRate?: number;
+  whtAmount?: number;
+  whtType?: string;
+  _whtChangeConfirmed?: boolean;
+  _whtChangeReason?: string;
+  
+  // Document URLs (expense)
+  taxInvoiceUrls?: string[];
+  slipUrls?: string[];
+  // Document URLs (income)
+  customerSlipUrls?: string[];
+  myBillCopyUrls?: string[];
+  // Common document URLs
+  whtCertUrls?: string[];
+  otherDocUrls?: string[];
+  referenceUrls?: string[];
+  
+  // Date fields
+  billDate?: string | Date;
+  incomeDate?: string | Date;
+  receiveDate?: string | Date;
+  dueDate?: string | Date;
+  
+  // Workflow fields
+  documentType?: string;
+  workflowStatus?: string;
+  internalCompanyId?: string;
+  status?: string;
+  
+  // Allow additional fields
+  [key: string]: unknown;
+}
+
+/**
+ * Prisma delegate types for transactions
+ * Note: Using 'any' for TransactionDelegate because union of Prisma delegates
+ * causes TypeScript errors due to incompatible method signatures
+ */
+export type ExpenseDelegate = typeof prisma.expense;
+export type IncomeDelegate = typeof prisma.income;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TransactionDelegate = any;
+
+/**
+ * Configuration for transaction route factory
+ */
+export interface TransactionRouteConfig<
+  TModel = Expense | Income,
+  TCreateData = Prisma.ExpenseCreateInput | Prisma.IncomeCreateInput,
+  TUpdateData = Prisma.ExpenseUpdateInput | Prisma.IncomeUpdateInput
+> {
+  /** Model name for Prisma - "expense" or "income" */
+  modelName: TransactionModelName;
+  
+  /** Permission strings required for each operation */
   permissions: {
     read: string;
     create: string;
@@ -65,30 +213,43 @@ export interface TransactionRouteConfig<TModel, TCreateData, TUpdateData> {
     delete?: string;
   };
   
-  // Field mappings
+  /** Field name mappings */
   fields: {
-    dateField: string; // "billDate" or "receiveDate"
+    dateField: string;      // "billDate" or "receiveDate"
     netAmountField: string; // "netPaid" or "netReceived"
     statusField: string;
   };
   
-  // Prisma model accessor
-  prismaModel: any; // prisma.expense or prisma.income
+  /** Prisma model accessor */
+  prismaModel: TransactionDelegate;
   
-  // Data transformation
-  transformCreateData: (body: any) => TCreateData;
-  transformUpdateData: (body: any, existingData?: any) => TUpdateData;
+  /** Transform request body to create data */
+  transformCreateData: (body: TransactionRequestBody) => TCreateData;
   
-  // Post-create/update hooks (optional)
-  afterCreate?: (item: TModel, body: any, context: { session: any; company: any }) => Promise<void>;
-  afterUpdate?: (item: TModel, body: any, context: { session: any; company: any; existingItem: any }) => Promise<void>;
+  /** Transform request body to update data (optionally using existing data for conditional logic) */
+  transformUpdateData: (body: TransactionRequestBody, existingData?: TModel) => TUpdateData;
   
-  // Notification handler (optional)
-  notifyCreate?: (companyId: string, data: any, baseUrl: string) => Promise<void>;
+  /** Hook called after successful creation */
+  afterCreate?: (item: TModel, body: TransactionRequestBody, context: TransactionHookContext) => Promise<void>;
   
-  // Display name for audit logs
+  /** Hook called after successful update */
+  afterUpdate?: (item: TModel, body: TransactionRequestBody, context: TransactionUpdateHookContext<TModel>) => Promise<void>;
+  
+  /** Handler for LINE notifications on create */
+  notifyCreate?: (companyId: string, data: Record<string, unknown>, baseUrl: string) => Promise<void>;
+  
+  /** Display name for audit logs (e.g., "Expense", "Income") */
   displayName: string;
+  
+  /** Optional function to get entity display name for audit logs */
   getEntityDisplayName?: (entity: TModel) => string | undefined;
+}
+
+/**
+ * Route params context type for dynamic routes
+ */
+export interface RouteParamsContext {
+  params: Promise<{ id: string }>;
 }
 
 // =============================================================================
@@ -98,7 +259,7 @@ export interface TransactionRouteConfig<TModel, TCreateData, TUpdateData> {
 /**
  * Create GET handler for listing transactions
  */
-export function createListHandler<TModel>(config: TransactionRouteConfig<TModel, any, any>) {
+export function createListHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
   return withCompanyAccess(
     async (request, { company, session }) => {
       const { searchParams } = new URL(request.url);
@@ -201,32 +362,13 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         }
       }
 
-      // Use PascalCase relation names as per Prisma schema
-      // Creator relation differs: Expense uses User_Expense_createdByToUser, Income uses User
-      const creatorInclude = config.modelName === "expense" 
-        ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
-        : { User: { select: { id: true, name: true, email: true } } };
-
-      // Include submitter info for approval workflow
-      const submitterInclude = config.modelName === "expense"
-        ? { User_Expense_submittedByToUser: { select: { id: true, name: true, email: true } } }
-        : { User_Income_submittedByToUser: { select: { id: true, name: true, email: true } } };
-
-      // Include InternalCompany for expense type
-      const internalCompanyInclude = config.modelName === "expense"
-        ? { InternalCompany: true }
-        : {};
+      // Get includes using helper functions
+      const includes = getBaseIncludes(config.modelName, { includeSubmitter: true });
 
       const [items, total] = await Promise.all([
         config.prismaModel.findMany({
           where,
-          include: {
-            Contact: true,
-            Account: true,
-            ...creatorInclude,
-            ...submitterInclude,
-            ...internalCompanyInclude,
-          },
+          include: includes,
           // Sort by user-selected field, then by createdAt for consistent ordering
           orderBy: [
             { [sortBy]: sortOrder },
@@ -255,25 +397,24 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
 /**
  * Create POST handler for creating transactions
  */
-export function createCreateHandler<TModel>(config: TransactionRouteConfig<TModel, any, any>) {
+export function createCreateHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
   return withCompanyAccess(
     async (request, { company, session }) => {
       const body = await request.json();
-      const createData = config.transformCreateData(body);
+      const createData = config.transformCreateData(body) as Record<string, unknown>;
 
-      // Include InternalCompany for expense type
-      const internalCompanyInclude = config.modelName === "expense"
-        ? { InternalCompany: true }
-        : {};
-
-      // Create transaction
+      // Create transaction with base includes
       const item = await config.prismaModel.create({
         data: {
           ...createData,
           companyId: company.id,
           createdBy: session.user.id,
         },
-        include: { Contact: true, Account: true, ...internalCompanyInclude },
+        include: {
+          Contact: true,
+          Account: true,
+          ...getInternalCompanyInclude(config.modelName),
+        },
       });
 
       // Run afterCreate hook if defined
@@ -292,7 +433,7 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
         toStatus: item.workflowStatus || item.status,
         notes: null,
         createdBy: session.user.id,
-      }).catch((e) => console.error("Failed to create document event:", e));
+      }).catch((e) => log.error("Failed to create document event", e));
 
       // Send in-app notification (non-blocking)
       notifyTransactionChange({
@@ -305,7 +446,7 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
         transactionDescription: item.description,
         amount: Number(item[config.fields.netAmountField]),
       }).catch((error) => {
-        console.error("Failed to create in-app notification:", error);
+        log.error("Failed to create in-app notification", error);
       });
 
       // Send LINE notification (non-blocking)
@@ -332,7 +473,7 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
           whtRate: item.whtRate,
           whtAmount: item.whtAmount,
         }, baseUrl).catch((error) => {
-          console.error("Failed to send notification:", error);
+          log.error("Failed to send LINE notification", error);
         });
       }
 
@@ -348,32 +489,18 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
 /**
  * Create GET handler for single transaction
  */
-export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, any, any>) {
-  return withAuth(async (request, { session }, routeContext?: any) => {
+export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
+  return withAuth(async (request, { session }, routeContext?: RouteParamsContext) => {
     if (!routeContext) {
       throw ApiErrors.badRequest("Missing route context");
     }
     const { id } = await routeContext.params;
 
-    // Use PascalCase relation names as per Prisma schema
-    // Creator relation differs: Expense uses User_Expense_createdByToUser, Income uses User
-    const creatorInclude = config.modelName === "expense" 
-      ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
-      : { User: { select: { id: true, name: true, email: true } } };
-    
-    // Include InternalCompany for expense type
-    const internalCompanyInclude = config.modelName === "expense"
-      ? { InternalCompany: true }
-      : {};
-
     const item = await config.prismaModel.findUnique({
       where: { id },
       include: {
-        Contact: true,
-        Account: true,
+        ...getBaseIncludes(config.modelName),
         Company: true,
-        ...creatorInclude,
-        ...internalCompanyInclude,
       },
     });
 
@@ -399,8 +526,8 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
 /**
  * Create PUT handler for updating transactions
  */
-export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TModel, any, any>) {
-  return withAuth(async (request, { session }, routeContext?: any) => {
+export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
+  return withAuth(async (request, { session }, routeContext?: RouteParamsContext) => {
     if (!routeContext) {
       throw ApiErrors.badRequest("Missing route context");
     }
@@ -476,26 +603,13 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     // Pass existingItem to transformUpdateData for conditional logic (e.g., WHT workflow adjustment)
     const updateData = config.transformUpdateData(body, existingItem);
 
-    // Use PascalCase relation names as per Prisma schema
-    const creatorInclude = config.modelName === "expense" 
-      ? { User_Expense_createdByToUser: { select: { id: true, name: true, email: true } } }
-      : { User: { select: { id: true, name: true, email: true } } };
-    
-    // Include InternalCompany for expense type
-    const internalCompanyInclude = config.modelName === "expense"
-      ? { InternalCompany: true }
-      : {};
-
-    // Update item
+    // Update item with base includes
     const item = await config.prismaModel.update({
       where: { id },
       data: updateData,
       include: {
-        Contact: true,
-        Account: true,
+        ...getBaseIncludes(config.modelName),
         Company: true,
-        ...creatorInclude,
-        ...internalCompanyInclude,
       },
     });
 
@@ -576,7 +690,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
           notes: `อัปโหลด${label} ${addedUrls.length} ไฟล์`,
           metadata: { fileType: field, addedUrls },
           createdBy: session.user.id,
-        }).catch((e) => console.error("Failed to create file upload event:", e));
+        }).catch((e) => log.error("Failed to create file upload event", e));
       }
       
       if (removedUrls.length > 0) {
@@ -589,7 +703,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
           notes: `ลบ${label} ${removedUrls.length} ไฟล์`,
           metadata: { fileType: field, removedUrls },
           createdBy: session.user.id,
-        }).catch((e) => console.error("Failed to create file removal event:", e));
+        }).catch((e) => log.error("Failed to create file removal event", e));
       }
     }
 
@@ -627,7 +741,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       newStatus: isStatusChange ? body[statusField] : undefined,
       changedFields: changedFields.length > 0 ? changedFields : undefined,
     }).catch((error) => {
-      console.error("Failed to create in-app notification:", error);
+      log.error("Failed to create in-app notification", error);
     });
 
     return apiResponse.success({ [config.modelName]: item });
@@ -637,8 +751,8 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
 /**
  * Create DELETE handler for soft deleting transactions
  */
-export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TModel, any, any>) {
-  return withAuth(async (request, { session }, routeContext?: any) => {
+export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
+  return withAuth(async (request, { session }, routeContext?: RouteParamsContext) => {
     if (!routeContext) {
       throw ApiErrors.badRequest("Missing route context");
     }
@@ -754,7 +868,7 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
       transactionDescription: existingItem.description,
       amount: Number(existingItem[config.fields.netAmountField]),
     }).catch((error) => {
-      console.error("Failed to create in-app notification:", error);
+      log.error("Failed to create in-app notification", error);
     });
 
     return apiResponse.success({ 

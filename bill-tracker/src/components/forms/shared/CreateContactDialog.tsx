@@ -23,24 +23,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Lightbulb } from "lucide-react";
-
-// WHT Types
-const WHT_TYPES = [
-  { value: "SERVICE", label: "ค่าบริการ (3%)" },
-  { value: "RENT", label: "ค่าเช่า (5%)" },
-  { value: "TRANSPORT", label: "ค่าขนส่ง (1%)" },
-  { value: "ADVERTISING", label: "ค่าโฆษณา (2%)" },
-  { value: "OTHER", label: "อื่นๆ" },
-];
-
-// WHT Rates by type
-const WHT_RATES: Record<string, number> = {
-  SERVICE: 3,
-  RENT: 5,
-  TRANSPORT: 1,
-  ADVERTISING: 2,
-  OTHER: 3,
-};
+import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
 
 export interface ContactFormData {
   peakCode: string;
@@ -679,7 +662,7 @@ export function CreateContactDialog({
                         setFormData({ 
                           ...formData, 
                           defaultWhtType: value,
-                          defaultWhtRate: WHT_RATES[value]?.toString() || formData.defaultWhtRate,
+                          defaultWhtRate: WHT_RATE_BY_TYPE[value]?.toString() || formData.defaultWhtRate,
                         });
                       }}
                     >
@@ -687,7 +670,7 @@ export function CreateContactDialog({
                         <SelectValue placeholder="เลือกประเภท" />
                       </SelectTrigger>
                       <SelectContent>
-                        {WHT_TYPES.map((type) => (
+                        {WHT_TYPE_OPTIONS.map((type) => (
                           <SelectItem key={type.value} value={type.value}>
                             {type.label}
                           </SelectItem>

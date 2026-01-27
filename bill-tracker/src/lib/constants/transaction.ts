@@ -36,6 +36,30 @@ export const WHT_OPTIONS = [
   { value: "OTHER", rate: 0, label: "อื่นๆ" },
 ] as const;
 
+/**
+ * Simple WHT rate lookup by type (for contact default settings)
+ * Uses shorter type names for easier usage in forms
+ */
+export const WHT_RATE_BY_TYPE: Record<string, number> = {
+  SERVICE: 3,
+  PROFESSIONAL: 5,
+  RENT: 5,
+  TRANSPORT: 1,
+  ADVERTISING: 2,
+  OTHER: 3,
+} as const;
+
+/**
+ * WHT type options for contact forms (simpler naming)
+ */
+export const WHT_TYPE_OPTIONS = [
+  { value: "SERVICE", label: "ค่าบริการ (3%)" },
+  { value: "RENT", label: "ค่าเช่า (5%)" },
+  { value: "TRANSPORT", label: "ค่าขนส่ง (1%)" },
+  { value: "ADVERTISING", label: "ค่าโฆษณา (2%)" },
+  { value: "OTHER", label: "อื่นๆ" },
+] as const;
+
 // =============================================================================
 // VAT Options
 // =============================================================================
@@ -44,6 +68,35 @@ export const VAT_OPTIONS = [
   { value: 0, label: "ไม่มี VAT (0%)" },
   { value: 7, label: "VAT 7%" },
 ] as const;
+
+// =============================================================================
+// WHT Status Constants (Centralized)
+// =============================================================================
+
+/**
+ * สถานะที่ห้ามเปลี่ยน WHT โดยเด็ดขาด (locked after accounting)
+ */
+export const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"] as const;
+
+/**
+ * สถานะที่ต้อง confirm ก่อนเปลี่ยน WHT
+ * แยกตาม transaction type เนื่องจาก workflow ต่างกัน
+ */
+export const WHT_CONFIRM_REQUIRED_STATUSES = {
+  expense: ["WHT_ISSUED", "READY_FOR_ACCOUNTING"] as const,
+  income: ["WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"] as const,
+} as const;
+
+/**
+ * Combined WHT confirm statuses (for components that check both types)
+ */
+export const WHT_CONFIRM_STATUSES_ALL = [
+  "WHT_ISSUED",
+  "WHT_CERT_RECEIVED", 
+  "READY_FOR_ACCOUNTING",
+] as const;
+
+export type TransactionType = "expense" | "income";
 
 // =============================================================================
 // Status Info Types

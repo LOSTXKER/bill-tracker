@@ -8,79 +8,14 @@ import { prisma } from "@/lib/db";
 import { notifyExpense } from "@/lib/notifications/line-messaging";
 import type { TransactionRouteConfig } from "../transaction-routes";
 import type { PaidByType, SettlementStatus } from "@prisma/client";
+import { validateExpenseWhtChange } from "@/lib/validations/wht-validator";
 
-// =============================================================================
-// WHT Change Rules
-// =============================================================================
+// Re-export WHT types and validator for backward compatibility
+export { validateExpenseWhtChange as validateWhtChange } from "@/lib/validations/wht-validator";
+export type { WhtChangeValidation } from "@/lib/validations/wht-validator";
 
-// สถานะที่ห้ามเปลี่ยน WHT โดยเด็ดขาด
-const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
-
-// สถานะที่ต้อง confirm ก่อนเปลี่ยน WHT (จะ rollback status อัตโนมัติ)
-const WHT_CONFIRM_REQUIRED_STATUSES = ["WHT_ISSUED", "READY_FOR_ACCOUNTING"];
-
-export interface WhtChangeValidation {
-  allowed: boolean;
-  requiresConfirmation: boolean;
-  message?: string;
-  rollbackStatus?: string;
-}
-
-/**
- * ตรวจสอบว่าสามารถเปลี่ยน WHT ได้หรือไม่
- */
-export function validateWhtChange(
-  currentStatus: string,
-  wasWht: boolean,
-  nowWht: boolean,
-  hasWhtCert: boolean
-): WhtChangeValidation {
-  // ไม่มีการเปลี่ยน WHT
-  if (wasWht === nowWht) {
-    return { allowed: true, requiresConfirmation: false };
-  }
-
-  // ห้ามเปลี่ยนหลังส่งบัญชี
-  if (WHT_LOCKED_STATUSES.includes(currentStatus)) {
-    return {
-      allowed: false,
-      requiresConfirmation: false,
-      message: "ไม่สามารถเปลี่ยนสถานะหัก ณ ที่จ่ายได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว",
-    };
-  }
-
-  // เปลี่ยนจาก หัก → ไม่หัก ตอนที่ออก 50 ทวิแล้ว
-  if (wasWht && !nowWht && currentStatus === "WHT_ISSUED") {
-    return {
-      allowed: true,
-      requiresConfirmation: true,
-      message: "คุณได้ออกหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) แล้ว การยกเลิกจะต้อง void เอกสาร 50 ทวิด้วย",
-      rollbackStatus: "TAX_INVOICE_RECEIVED",
-    };
-  }
-
-  // เปลี่ยนจาก หัก → ไม่หัก ตอนพร้อมส่งบัญชี (มี WHT cert)
-  if (wasWht && !nowWht && currentStatus === "READY_FOR_ACCOUNTING" && hasWhtCert) {
-    return {
-      allowed: true,
-      requiresConfirmation: true,
-      message: "คุณมีหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) แนบอยู่ การยกเลิกจะลบเอกสารออกด้วย",
-      rollbackStatus: "TAX_INVOICE_RECEIVED",
-    };
-  }
-
-  // เปลี่ยนจาก ไม่หัก → หัก ตอนพร้อมส่งบัญชี
-  if (!wasWht && nowWht && currentStatus === "READY_FOR_ACCOUNTING") {
-    return {
-      allowed: true,
-      requiresConfirmation: true,
-      message: "การเพิ่มหัก ณ ที่จ่ายจะต้องออกหนังสือรับรอง (50 ทวิ) ก่อนส่งบัญชี",
-      rollbackStatus: "WHT_PENDING_ISSUE",
-    };
-  }
-
-  return { allowed: true, requiresConfirmation: false };
-}
+// Internal alias for use within this file
+const validateWhtChange = validateExpenseWhtChange;
 
 export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "prismaModel"> & {
   prismaModel: typeof prisma.expense;
@@ -462,20 +397,23 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
   },
 
   notifyCreate: async (companyId, data, baseUrl) => {
+    // Type assertion for notification data
+    const notifyData = data as Record<string, unknown>;
+    
     await notifyExpense(companyId, {
-      id: data.id,
-      companyCode: data.companyCode,
-      companyName: data.companyName,
-      vendorName: data.vendorName || data.contactName || data.description,
-      description: data.description,
-      amount: Number(data.amount),
-      vatAmount: data.vatAmount ? Number(data.vatAmount) : undefined,
-      isWht: data.isWht || false,
-      whtRate: data.whtRate ? Number(data.whtRate) : undefined,
-      whtAmount: data.whtAmount ? Number(data.whtAmount) : undefined,
-      netPaid: Number(data.netPaid),
+      id: notifyData.id as string | undefined,
+      companyCode: notifyData.companyCode as string | undefined,
+      companyName: (notifyData.companyName as string) || "Unknown",
+      vendorName: (notifyData.vendorName || notifyData.contactName || notifyData.description) as string | undefined,
+      description: notifyData.description as string | undefined,
+      amount: Number(notifyData.amount) || 0,
+      vatAmount: notifyData.vatAmount ? Number(notifyData.vatAmount) : undefined,
+      isWht: (notifyData.isWht as boolean) || false,
+      whtRate: notifyData.whtRate ? Number(notifyData.whtRate) : undefined,
+      whtAmount: notifyData.whtAmount ? Number(notifyData.whtAmount) : undefined,
+      netPaid: Number(notifyData.netPaid) || 0,
       // Use workflowStatus (new field) or fall back to status/DRAFT
-      status: data.workflowStatus || data.status || "DRAFT",
+      status: (notifyData.workflowStatus || notifyData.status || "DRAFT") as string,
     }, baseUrl);
   },
   

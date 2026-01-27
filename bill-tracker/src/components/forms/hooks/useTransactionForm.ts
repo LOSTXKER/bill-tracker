@@ -13,6 +13,7 @@ import type { MultiDocAnalysisResult } from "@/lib/ai/types";
 import { MergeData, MergeDecision } from "../shared/MergeOptionsDialog";
 import { ConflictField, ConflictResolution, detectConflicts } from "../shared/ConflictDialog";
 import type { UnifiedTransactionConfig } from "../UnifiedTransactionForm";
+import { WHT_LOCKED_STATUSES, WHT_CONFIRM_STATUSES_ALL } from "@/lib/constants/transaction";
 
 // =============================================================================
 // Types
@@ -725,9 +726,6 @@ export function useTransactionForm({
   // WHT Change Rules
   // ==========================================================================
 
-  const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"];
-  const WHT_CONFIRM_STATUSES = ["WHT_ISSUED", "WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"];
-
   const whtChangeInfo = useMemo(() => {
     if (!transaction || mode !== "edit") return undefined;
 
@@ -735,7 +733,7 @@ export function useTransactionForm({
     const hasWhtCert = transaction.hasWhtCert || false;
     const currentWht = config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted;
 
-    if (WHT_LOCKED_STATUSES.includes(currentStatus)) {
+    if (WHT_LOCKED_STATUSES.includes(currentStatus as typeof WHT_LOCKED_STATUSES[number])) {
       return {
         isLocked: true,
         requiresConfirmation: false,
@@ -743,7 +741,7 @@ export function useTransactionForm({
       };
     }
 
-    if (WHT_CONFIRM_STATUSES.includes(currentStatus) || hasWhtCert) {
+    if (WHT_CONFIRM_STATUSES_ALL.includes(currentStatus as typeof WHT_CONFIRM_STATUSES_ALL[number]) || hasWhtCert) {
       return {
         isLocked: false,
         requiresConfirmation: true,

@@ -19,7 +19,20 @@ import {
   CheckCircle,
   Clock,
   Key,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { cn } from "@/lib/utils";
 import { EditPermissionsDialog } from "@/components/settings/edit-permissions-dialog";
@@ -172,6 +185,8 @@ export default function EmployeeDetailPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [editPermissionsOpen, setEditPermissionsOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch company ID
   useEffect(() => {
@@ -269,6 +284,35 @@ export default function EmployeeDetailPage() {
     return labels[action] || action;
   };
 
+  // Handle delete employee
+  const handleDeleteEmployee = async () => {
+    if (!companyId || !employee) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(
+        `/api/companies/${companyId}/members/${memberId}`,
+        { method: "DELETE" }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error(result.error?.message || "ไม่สามารถลบพนักงานได้");
+        return;
+      }
+
+      toast.success("ลบพนักงานเรียบร้อยแล้ว");
+      router.push(`/${companyCode.toLowerCase()}/employees`);
+    } catch (error) {
+      console.error("Error deleting employee:", error);
+      toast.error("เกิดข้อผิดพลาดในการลบพนักงาน");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -303,6 +347,14 @@ export default function EmployeeDetailPage() {
               >
                 <Shield className="mr-2 h-4 w-4" />
                 จัดการสิทธิ์
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                ลบพนักงาน
               </Button>
             </>
           )}
@@ -551,6 +603,45 @@ export default function EmployeeDetailPage() {
           onOpenChange={setResetPasswordOpen}
         />
       )}
+
+      {/* Delete Employee Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบพนักงาน</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ <strong>{employee.user.name}</strong> ({employee.user.email}) ออกจากบริษัทหรือไม่?
+              <br /><br />
+              การดำเนินการนี้จะ:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>ยกเลิกสิทธิ์การเข้าถึงบริษัทนี้</li>
+                <li>ไม่ส่งผลกระทบต่อรายการที่สร้างไว้</li>
+                <li>ไม่สามารถย้อนกลับได้</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEmployee}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  กำลังลบ...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  ลบพนักงาน
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
