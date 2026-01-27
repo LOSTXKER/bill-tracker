@@ -15,6 +15,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     select: {
       id: true,
       name: true,
+      legalName: true,
       code: true,
       taxId: true,
       address: true,

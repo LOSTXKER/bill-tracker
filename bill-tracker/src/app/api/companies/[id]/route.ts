@@ -33,12 +33,13 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { businessDescription, name, taxId, address, phone } = body;
+    const { businessDescription, name, legalName, taxId, address, phone } = body;
 
     // Build update data - only include fields that are provided
     const updateData: Record<string, unknown> = {};
     if (businessDescription !== undefined) updateData.businessDescription = businessDescription || null;
     if (name !== undefined) updateData.name = name;
+    if (legalName !== undefined) updateData.legalName = legalName || null;
     if (taxId !== undefined) updateData.taxId = taxId || null;
     if (address !== undefined) updateData.address = address || null;
     if (phone !== undefined) updateData.phone = phone || null;

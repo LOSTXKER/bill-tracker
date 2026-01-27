@@ -28,6 +28,7 @@ import { WhtSettingsSection } from "./sections/wht-settings-section";
 interface Company {
   id: string;
   name: string;
+  legalName: string | null;
   code: string;
   taxId: string | null;
   address: string | null;

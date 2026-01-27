@@ -57,7 +57,7 @@ export async function analyzeReceipt(
       fetchContacts(companyId),
       prisma.company.findUnique({
         where: { id: companyId },
-        select: { name: true, taxId: true },
+        select: { name: true, legalName: true, taxId: true },
       }),
     ]);
 
@@ -155,7 +155,7 @@ function buildSmartPrompt(
   accounts: { id: string; code: string; name: string; description: string | null }[],
   contacts: { id: string; name: string; taxId: string | null }[],
   transactionType: "EXPENSE" | "INCOME",
-  company: { name: string; taxId: string | null } | null
+  company: { name: string; legalName: string | null; taxId: string | null } | null
 ): string {
   // สร้างรายการบัญชี
   const accountList = accounts
@@ -167,10 +167,14 @@ function buildSmartPrompt(
     ? contacts.map(c => `- ${c.name}${c.taxId ? ` (${c.taxId})` : ""} | ID: ${c.id}`).join("\n")
     : "(ไม่มีผู้ติดต่อในระบบ)";
 
+  // รวมชื่อทั้งหมดที่อาจปรากฏในเอกสาร
+  const companyNames = [company?.legalName, company?.name].filter(Boolean).join(" / ");
+  
   return `คุณเป็นนักบัญชีผู้เชี่ยวชาญ วิเคราะห์เอกสารนี้แล้วตอบเป็น JSON
 
-## ข้อมูลบริษัทของเรา
-- ชื่อ: ${company?.name || "ไม่ระบุ"}
+## ข้อมูลบริษัทของเรา (⚠️ สำคัญ: ข้ามชื่อนี้ไปเมื่อหาผู้ติดต่อ)
+- ชื่อทางการ: ${company?.legalName || "ไม่ระบุ"}
+- ชื่อที่แสดง: ${company?.name || "ไม่ระบุ"}
 - เลขภาษี: ${company?.taxId || "ไม่ระบุ"}
 
 ## ประเภทรายการ: ${transactionType === "EXPENSE" ? "รายจ่าย (เราเป็นผู้ซื้อ)" : "รายรับ (เราเป็นผู้ขาย)"}
@@ -295,8 +299,9 @@ ${contactList}
 }
 
 ## หมายเหตุสำคัญ
-- ถ้าเอกสารมีชื่อบริษัทเรา (${company?.name || ""}) ให้ข้ามไป มองหาชื่ออีกฝั่ง
-- เลขภาษีของบริษัทเรา (${company?.taxId || ""}) ไม่ใช่ของผู้ขาย
+- ⚠️ ถ้าเอกสารมีชื่อบริษัทเรา (${companyNames || "ไม่ระบุ"}) ให้ข้ามไป มองหาชื่ออีกฝั่ง
+- ⚠️ เลขภาษีของบริษัทเรา (${company?.taxId || ""}) ไม่ใช่ของผู้ขาย
+- ในใบกำกับภาษี: "Bill to" / "ส่งถึง" คือผู้ซื้อ (อาจเป็นเรา) | ส่วนหัวเอกสาร/โลโก้คือผู้ขาย
 - VAT rate ในไทยคือ 0% หรือ 7%
 - ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)
 - **สกุลเงิน**: ดูสัญลักษณ์หรือตัวอักษรในเอกสาร เช่น $, USD, AED, €, EUR, £, GBP, ¥, JPY, ฿, THB, บาท ถ้าไม่แน่ใจให้ใส่ "THB"

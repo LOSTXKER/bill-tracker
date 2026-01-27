@@ -86,7 +86,8 @@ model Comment {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model Company {
   id                         String                 @id
-  name                       String
+  name                       String                 // ชื่อที่แสดงในระบบ (Display Name)
+  legalName                  String?                // ชื่อทางการที่ใช้ในเอกสาร/ใบกำกับภาษี
   code                       String                 @unique
   taxId                      String?
   address                    String?

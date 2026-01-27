@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 interface Company {
   id: string;
   name: string;
+  legalName: string | null;
   code: string;
   taxId: string | null;
   address: string | null;
@@ -33,6 +34,7 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
   // Form data state
   const [formData, setFormData] = useState({
     name: company.name,
+    legalName: company.legalName || "",
     taxId: company.taxId || "",
     phone: company.phone || "",
     address: company.address || "",
@@ -56,6 +58,7 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
     setIsEditing(true);
     setFormData({
       name: company.name,
+      legalName: company.legalName || "",
       taxId: company.taxId || "",
       phone: company.phone || "",
       address: company.address || "",
@@ -66,6 +69,7 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
     setIsEditing(false);
     setFormData({
       name: company.name,
+      legalName: company.legalName || "",
       taxId: company.taxId || "",
       phone: company.phone || "",
       address: company.address || "",
@@ -74,7 +78,7 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      toast.error("กรุณากรอกชื่อบริษัท");
+      toast.error("กรุณากรอกชื่อที่แสดง");
       return;
     }
 
@@ -85,6 +89,7 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name.trim(),
+          legalName: formData.legalName.trim() || null,
           taxId: formData.taxId.trim() || null,
           phone: formData.phone.trim() || null,
           address: formData.address.trim() || null,
@@ -156,12 +161,22 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
       >
         {isEditing ? (
           <>
-            <SettingsField label="ชื่อบริษัท" icon={Building2}>
+            <SettingsField label="ชื่อที่แสดง" icon={Building2}>
               <Input 
                 value={formData.name} 
                 onChange={(e) => handleInputChange("name", e.target.value)}
-                placeholder="ชื่อบริษัท"
+                placeholder="ชื่อที่แสดงในระบบ"
               />
+              <p className="text-xs text-muted-foreground mt-1">ชื่อที่แสดงใน UI ของระบบ</p>
+            </SettingsField>
+
+            <SettingsField label="ชื่อทางการ (Legal Name)" icon={FileText}>
+              <Input 
+                value={formData.legalName} 
+                onChange={(e) => handleInputChange("legalName", e.target.value)}
+                placeholder="ชื่อที่ใช้ในเอกสาร/ใบกำกับภาษี"
+              />
+              <p className="text-xs text-muted-foreground mt-1">AI ใช้ระบุตัวตนบริษัทจากเอกสาร</p>
             </SettingsField>
 
             <SettingsField label="เลขประจำตัวผู้เสียภาษี" icon={FileText}>
@@ -191,6 +206,10 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
           </>
         ) : (
           <>
+            <SettingsField label="ชื่อทางการ (Legal Name)" icon={FileText}>
+              <Input value={company.legalName || "-"} disabled className="bg-muted/50" />
+            </SettingsField>
+
             <SettingsField label="เลขประจำตัวผู้เสียภาษี" icon={FileText}>
               <Input value={company.taxId || "-"} disabled className="bg-muted/50" />
             </SettingsField>
