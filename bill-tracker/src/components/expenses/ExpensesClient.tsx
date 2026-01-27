@@ -14,11 +14,26 @@ import { EXPENSE_WORKFLOW_INFO } from "@/lib/constants/transaction";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+interface TabCounts {
+  all: number;
+  draft: number;
+  pending: number;
+  rejected: number;
+  waiting_doc: number;
+  doc_received: number;
+  ready: number;
+  sent: number;
+  recent: null;
+}
+
 interface ExpensesClientProps {
   companyCode: string;
   initialExpenses: any[];
   initialTotal: number;
   viewMode?: "official" | "internal";
+  currentUserId?: string;
+  canApprove?: boolean;
+  tabCounts?: TabCounts;
 }
 
 // Expense-specific configuration
@@ -49,7 +64,7 @@ const expenseListConfig: TransactionListConfig = {
   
   showCategory: true,
   
-  renderRow: (expense, companyCode, selected, onToggle) => (
+  renderRow: (expense, companyCode, selected, onToggle, options) => (
     <TransactionTableRow
       key={expense.id}
       transaction={expense}
@@ -57,6 +72,9 @@ const expenseListConfig: TransactionListConfig = {
       config={expenseRowConfig}
       selected={selected}
       onToggleSelect={onToggle}
+      currentUserId={options?.currentUserId}
+      canApprove={options?.canApprove}
+      onApprovalChange={options?.onRefresh}
     />
   ),
 };
@@ -66,6 +84,9 @@ export function ExpensesClient({
   initialExpenses,
   initialTotal,
   viewMode = "official",
+  currentUserId,
+  canApprove = false,
+  tabCounts,
 }: ExpensesClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -146,6 +167,9 @@ export function ExpensesClient({
         total={initialTotal}
         config={expenseListConfig}
         companies={companies}
+        currentUserId={currentUserId}
+        canApprove={canApprove}
+        tabCounts={tabCounts}
       />
     </div>
   );

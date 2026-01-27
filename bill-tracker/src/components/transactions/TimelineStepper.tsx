@@ -180,8 +180,9 @@ export function TimelineStepper({
       className
     )}>
       <div className="max-w-4xl mx-auto">
-        {/* Desktop/Tablet View */}
-        <div className="hidden sm:flex items-center">
+        {/* Desktop/Tablet View - with horizontal scroll for full visibility */}
+        <div className="hidden sm:block overflow-x-auto pb-2 -mx-2 px-2">
+          <div className="flex items-center min-w-max">
           {steps.map((step, index) => {
             const isCompleted = index < currentIndex;
             const isCurrent = index === currentIndex;
@@ -242,6 +243,7 @@ export function TimelineStepper({
               </React.Fragment>
             );
           })}
+          </div>
         </div>
 
         {/* Mobile View */}

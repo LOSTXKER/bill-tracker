@@ -7,6 +7,7 @@ import {
   Check,
   Edit,
   Loader2,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ApprovalStatus, ExpenseWorkflowStatus, IncomeWorkflowStatus } from "@prisma/client";
@@ -18,9 +19,32 @@ interface DraftActionsProps {
   workflowStatus: ExpenseWorkflowStatus | IncomeWorkflowStatus;
   approvalStatus: ApprovalStatus;
   rejectedReason?: string | null;
+  submittedAt?: string | null;
+  submittedByName?: string | null;
   canCreateDirect?: boolean;
   canMarkPaid?: boolean;
   onSuccess?: () => void;
+}
+
+// Format date for display
+function formatSubmittedDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "เมื่อสักครู่";
+  if (diffMins < 60) return `${diffMins} นาทีที่แล้ว`;
+  if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
+  if (diffDays < 7) return `${diffDays} วันที่แล้ว`;
+  
+  return date.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: diffDays > 365 ? "numeric" : undefined,
+  });
 }
 
 export function DraftActions({
@@ -30,12 +54,15 @@ export function DraftActions({
   workflowStatus,
   approvalStatus,
   rejectedReason,
+  submittedAt,
+  submittedByName,
   canCreateDirect = false,
   canMarkPaid = false,
   onSuccess,
 }: DraftActionsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -89,6 +116,30 @@ export function DraftActions({
     }
   };
 
+  const handleWithdraw = async () => {
+    setIsWithdrawing(true);
+    try {
+      const res = await fetch(`/api/${transactionType}s/${transactionId}/withdraw`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyCode }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "เกิดข้อผิดพลาดในการยกเลิกคำขอ");
+      }
+
+      toast.success(data.message || "ยกเลิกคำขออนุมัติแล้ว");
+      onSuccess?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   // Only show actions for DRAFT status
   if (workflowStatus !== "DRAFT") {
     return null;
@@ -134,10 +185,32 @@ export function DraftActions({
       );
 
     case "PENDING":
-      // Waiting for approval - no actions available
+      // Waiting for approval - show status and allow withdraw
       return (
-        <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md">
-          รอการอนุมัติ...
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md">
+            <div className="font-medium">รอการอนุมัติ</div>
+            {submittedAt && (
+              <div className="text-xs text-amber-500/80 mt-0.5">
+                ส่งเมื่อ {formatSubmittedDate(submittedAt)}
+                {submittedByName && ` โดย ${submittedByName}`}
+              </div>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleWithdraw}
+            disabled={isWithdrawing}
+            className="text-amber-600 border-amber-300 hover:bg-amber-50"
+          >
+            {isWithdrawing ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Undo2 className="h-4 w-4 mr-1" />
+            )}
+            ยกเลิกคำขอ
+          </Button>
         </div>
       );
 

@@ -56,7 +56,7 @@ import { PayerSection, PayerInfo } from "./shared/PayerSection";
 import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 
 // Transaction components
-import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge } from "@/components/transactions";
+import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge, ApprovalActions } from "@/components/transactions";
 import { CommentSection } from "@/components/comments/CommentSection";
 
 // Types & Constants
@@ -1245,6 +1245,12 @@ export function UnifiedTransactionForm({
     }
   };
 
+  // Navigate to list page with refresh
+  const navigateToList = () => {
+    router.push(`/${companyCode}/${config.listUrl}`);
+    router.refresh();
+  };
+
   // File upload wrappers for view/edit mode
   const handleFileUploadWrapper = async (file: File, type: "slip" | "invoice" | "wht" | "other") => {
     if (!transaction) return;
@@ -1368,12 +1374,10 @@ export function UnifiedTransactionForm({
           <AlertCircle className="h-8 w-8 text-destructive" />
         </div>
         <p className="text-destructive font-medium">{error || "ไม่พบรายการ"}</p>
-        <Link href={`/${companyCode}/${config.listUrl}`}>
-          <Button variant="outline">
+        <Button variant="outline" onClick={navigateToList}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             กลับหน้า{config.title}
           </Button>
-        </Link>
       </div>
     );
   }
@@ -1422,28 +1426,28 @@ export function UnifiedTransactionForm({
           {/* Compact Header */}
           <div className="flex items-center justify-between gap-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
-              <Link href={`/${companyCode}/${config.listUrl}`}>
-                <Button
+              <Button
                   variant="ghost"
                   size="icon"
                   className={cn("shrink-0 rounded-full h-9 w-9", config.iconColor)}
+                  onClick={navigateToList}
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-              </Link>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
-                  {statusInfo && (
+                  {/* Show single badge: ApprovalBadge for PENDING/REJECTED, otherwise StatusBadge */}
+                  {transaction.workflowStatus === "DRAFT" && transaction.approvalStatus === "PENDING" ? (
+                    <ApprovalBadge status="PENDING" size="sm" />
+                  ) : transaction.workflowStatus === "DRAFT" && transaction.approvalStatus === "REJECTED" ? (
+                    <ApprovalBadge status="REJECTED" size="sm" />
+                  ) : statusInfo && (
                     <Badge className={cn("text-xs", statusInfo.bgColor, statusInfo.color)}>
                       {config.type === "expense" && transaction.workflowStatus
                         ? getExpenseWorkflowLabel(transaction.workflowStatus, (transaction.documentType as string) || "TAX_INVOICE")
                         : statusInfo.label}
                     </Badge>
-                  )}
-                  {/* Show approval status badge for draft transactions */}
-                  {transaction.approvalStatus && transaction.workflowStatus === "DRAFT" && (
-                    <ApprovalBadge status={transaction.approvalStatus as ApprovalStatus} size="sm" />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -1475,21 +1479,72 @@ export function UnifiedTransactionForm({
                 </div>
               ) : (
                 <>
-                  {/* Show DraftActions for DRAFT status */}
+                  {/* Show actions based on role for DRAFT status */}
                   {transaction?.workflowStatus === "DRAFT" && transaction.approvalStatus && (
-                    <DraftActions
-                      companyCode={companyCode}
-                      transactionId={transaction.id}
-                      transactionType={config.type}
-                      workflowStatus={transaction.workflowStatus}
-                      approvalStatus={transaction.approvalStatus as ApprovalStatus}
-                      rejectedReason={transaction.rejectedReason as string | null}
-                      canCreateDirect={canCreateDirect}
-                      canMarkPaid={canMarkPaid}
-                      onSuccess={() => {
-                        refreshAll();
-                      }}
-                    />
+                    <>
+                      {/* PENDING: Show actions based on user role */}
+                      {transaction.approvalStatus === "PENDING" && (
+                        <>
+                          {/* Requester: Show only withdraw button */}
+                          {transaction.submittedBy === currentUserId && (
+                            <DraftActions
+                              companyCode={companyCode}
+                              transactionId={transaction.id}
+                              transactionType={config.type}
+                              workflowStatus={transaction.workflowStatus}
+                              approvalStatus={transaction.approvalStatus as ApprovalStatus}
+                              rejectedReason={transaction.rejectedReason as string | null}
+                              submittedAt={transaction.submittedAt as string | null}
+                              submittedByName={(transaction.submittedByUser as { name?: string } | null)?.name}
+                              canCreateDirect={canCreateDirect}
+                              canMarkPaid={canMarkPaid}
+                              onSuccess={() => {
+                                refreshAll();
+                              }}
+                            />
+                          )}
+                          
+                          {/* Approver (not requester): Show only approve/reject buttons */}
+                          {transaction.submittedBy !== currentUserId && currentUserId && hasPermission(`${config.type}s:approve`) && (
+                            <ApprovalActions
+                              transactionId={transaction.id}
+                              transactionType={config.type}
+                              approvalStatus={transaction.approvalStatus as ApprovalStatus}
+                              submittedBy={transaction.submittedBy as string | null}
+                              currentUserId={currentUserId}
+                              canApprove={true}
+                              onSuccess={refreshAll}
+                            />
+                          )}
+                          
+                          {/* Others (not requester, not approver): Show status only */}
+                          {transaction.submittedBy !== currentUserId && !hasPermission(`${config.type}s:approve`) && (
+                            <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md">
+                              รอการอนุมัติ
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* NOT_REQUIRED or REJECTED: Show DraftActions for owner */}
+                      {transaction.approvalStatus !== "PENDING" && (
+                        <DraftActions
+                          companyCode={companyCode}
+                          transactionId={transaction.id}
+                          transactionType={config.type}
+                          workflowStatus={transaction.workflowStatus}
+                          approvalStatus={transaction.approvalStatus as ApprovalStatus}
+                          rejectedReason={transaction.rejectedReason as string | null}
+                          submittedAt={transaction.submittedAt as string | null}
+                          submittedByName={(transaction.submittedByUser as { name?: string } | null)?.name}
+                          canCreateDirect={canCreateDirect}
+                          canMarkPaid={canMarkPaid}
+                          onSuccess={() => {
+                            refreshAll();
+                          }}
+                        />
+                      )}
+                    </>
                   )}
                   {/* Show WorkflowActions for non-DRAFT status */}
                   {transaction?.workflowStatus && transaction.workflowStatus !== "DRAFT" && (

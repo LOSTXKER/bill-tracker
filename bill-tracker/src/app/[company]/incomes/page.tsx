@@ -11,6 +11,8 @@ import { StatsSkeleton, TableSkeleton } from "@/components/shared/TableSkeleton"
 import { IncomesClient } from "@/components/incomes/IncomesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getIncomeStats } from "@/lib/cache/stats";
+import { getSession } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions/checker";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
@@ -121,6 +123,13 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
+  // Get session and check approval permission
+  const session = await getSession();
+  const currentUserId = session?.user?.id;
+  const canApprove = currentUserId 
+    ? await hasPermission(currentUserId, companyId, "incomes:approve")
+    : false;
+
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
   const sortOrder = (searchParams.sortOrder as string) || "desc";
@@ -128,6 +137,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const limit = parseInt((searchParams.limit as string) || "20");
   const search = searchParams.search as string | undefined;
   const status = searchParams.status as string | undefined;
+  const tab = searchParams.tab as string | undefined; // For approval/draft/rejected tabs
   const category = searchParams.category as string | undefined;
   const contact = searchParams.contact as string | undefined;
   const creator = searchParams.creator as string | undefined;
@@ -157,6 +167,21 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       whereClause.workflowStatus = { in: status.split(",") };
     } else {
       whereClause.workflowStatus = status;
+    }
+  }
+
+  // Handle special tab filters (approval status)
+  if (tab === "pending") {
+    // Show items pending approval
+    whereClause.approvalStatus = "PENDING";
+  } else if (tab === "rejected") {
+    // Show rejected items
+    whereClause.approvalStatus = "REJECTED";
+  } else if (tab === "draft") {
+    // Show draft items created by current user
+    whereClause.workflowStatus = "DRAFT";
+    if (currentUserId) {
+      whereClause.createdBy = currentUserId;
     }
   }
 
@@ -205,7 +230,13 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
     orderBy.push({ createdAt: "desc" });
   }
 
-  const [incomesRaw, total] = await Promise.all([
+  // Base where clause for counting (without tab-specific filters)
+  const baseWhereClause = {
+    companyId,
+    deletedAt: null,
+  };
+
+  const [incomesRaw, total, tabCounts] = await Promise.all([
     prisma.income.findMany({
       where: whereClause,
       orderBy,
@@ -225,6 +256,29 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       },
     }),
     prisma.income.count({ where: whereClause }),
+    // Count for each tab
+    Promise.all([
+      prisma.income.count({ where: baseWhereClause }), // all
+      currentUserId 
+        ? prisma.income.count({ where: { ...baseWhereClause, workflowStatus: "DRAFT", createdBy: currentUserId } })
+        : Promise.resolve(0), // draft (my drafts)
+      prisma.income.count({ where: { ...baseWhereClause, approvalStatus: "PENDING" } }), // pending
+      prisma.income.count({ where: { ...baseWhereClause, approvalStatus: "REJECTED" } }), // rejected
+      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: { in: ["RECEIVED", "NO_INVOICE_NEEDED", "WAITING_INVOICE_ISSUE", "WHT_PENDING_CERT"] } } }), // waiting_doc
+      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: { in: ["INVOICE_ISSUED", "INVOICE_SENT", "WHT_CERT_RECEIVED"] } } }), // doc_issued
+      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: "READY_FOR_ACCOUNTING" } }), // ready
+      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: { in: ["SENT_TO_ACCOUNTANT", "COMPLETED"] } } }), // sent
+    ]).then(([all, draft, pending, rejected, waiting_doc, doc_issued, ready, sent]) => ({
+      all,
+      draft,
+      pending,
+      rejected,
+      waiting_doc,
+      doc_issued,
+      ready,
+      sent,
+      recent: null, // Recent doesn't need a count
+    })),
   ]);
 
   // Map Prisma relation names to what the client expects
@@ -246,6 +300,9 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       companyCode={companyCode}
       initialIncomes={serializedIncomes}
       initialTotal={total}
+      currentUserId={currentUserId}
+      canApprove={canApprove}
+      tabCounts={tabCounts}
     />
   );
 }

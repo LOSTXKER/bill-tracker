@@ -49,7 +49,17 @@ export interface TransactionListConfig {
   showCategory?: boolean;
   
   // Custom row renderer
-  renderRow: (item: any, companyCode: string, selected: boolean, onToggle: () => void) => ReactNode;
+  renderRow: (
+    item: any, 
+    companyCode: string, 
+    selected: boolean, 
+    onToggle: () => void,
+    options?: { 
+      currentUserId?: string; 
+      canApprove?: boolean; 
+      onRefresh?: () => void;
+    }
+  ) => ReactNode;
 }
 
 export interface TableHeaderConfig {
@@ -59,12 +69,28 @@ export interface TableHeaderConfig {
   align?: "left" | "center" | "right";
 }
 
+interface TabCounts {
+  all: number;
+  draft: number;
+  pending: number;
+  rejected: number;
+  waiting_doc: number;
+  doc_received?: number; // For expenses
+  doc_issued?: number;   // For incomes
+  ready: number;
+  sent: number;
+  recent: null;
+}
+
 interface TransactionListClientProps {
   companyCode: string;
   data: any[];
   total: number;
   config: TransactionListConfig;
   companies?: CompanyOption[];
+  currentUserId?: string;
+  canApprove?: boolean;
+  tabCounts?: TabCounts;
 }
 
 // ============================================================================
@@ -114,9 +140,12 @@ export function TransactionListClient({
   total,
   config,
   companies = [],
+  currentUserId,
+  canApprove = false,
+  tabCounts,
 }: TransactionListClientProps) {
   const router = useRouter();
-  const { filters, setFilter, setFilterWithSort } = useTransactionFilters();
+  const { filters, setFilter, setFilterWithSort, updateFilters } = useTransactionFilters();
   const { page, limit, setPage, setLimit } = usePagination();
   const { sortBy, sortOrder, toggleSort } = useSorting("createdAt");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -147,17 +176,17 @@ export function TransactionListClient({
     const tab = statusTabs.find(t => t.key === tabKey);
     
     if (tabKey === "recent") {
-      setFilter("tab", "");
+      updateFilters({ tab: "", status: "" });
+      // Also update sort separately
       setFilterWithSort("status", "", "updatedAt", "desc");
     } else if (tabKey === "draft" || tabKey === "pending" || tabKey === "rejected") {
-      setFilter("status", "");
-      setFilter("tab", tabKey);
+      // Use updateFilters to update both status and tab in single navigation
+      updateFilters({ status: "", tab: tabKey });
     } else if (tab && tab.statuses.length > 0) {
-      setFilter("tab", "");
-      setFilterWithSort("status", tab.statuses.join(","), config.dateField, "desc");
+      updateFilters({ tab: "", status: tab.statuses.join(",") });
     } else {
-      setFilter("tab", "");
-      setFilterWithSort("status", "", config.dateField, "desc");
+      // "all" tab - clear all filters
+      updateFilters({ tab: "", status: "" });
     }
   };
 
@@ -258,6 +287,55 @@ export function TransactionListClient({
     });
   };
 
+  const handleBulkApprove = async () => {
+    startTransition(async () => {
+      try {
+        const res = await fetch(`${config.apiEndpoint}/batch/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: selectedIds }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
+        setSelectedIds([]);
+        router.refresh();
+      } catch (error) {
+        console.error("Bulk approve failed:", error);
+        throw error;
+      }
+    });
+  };
+
+  const handleBulkReject = async (reason: string) => {
+    startTransition(async () => {
+      try {
+        const res = await fetch(`${config.apiEndpoint}/batch/reject`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: selectedIds, reason }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "เกิดข้อผิดพลาด");
+        }
+        setSelectedIds([]);
+        router.refresh();
+      } catch (error) {
+        console.error("Bulk reject failed:", error);
+        throw error;
+      }
+    });
+  };
+
+  // Check if selected items include pending approval status
+  const hasPendingItems = useMemo(() => {
+    return data
+      .filter(item => selectedIds.includes(item.id))
+      .some(item => item.approvalStatus === "PENDING");
+  }, [data, selectedIds]);
+
   const SortableHeader = ({ field, children, align = "left" }: { field: string; children: React.ReactNode; align?: "left" | "center" | "right" }) => (
     <TableHead className={cn(
       "text-muted-foreground font-medium",
@@ -293,10 +371,36 @@ export function TransactionListClient({
 
   const EmptyIcon = config.emptyIcon;
 
-  // Count items per tab (for badges) - based on current data
+  // Count items per tab (for badges) - use server-provided counts if available
   const getTabCount = (tab: StatusTab) => {
-    if (tab.key === "all") return total;
     if (tab.key === "recent") return null;
+    
+    // Use server-provided counts if available
+    if (tabCounts) {
+      const key = tab.key as keyof TabCounts;
+      const count = tabCounts[key];
+      return count ?? null;
+    }
+    
+    // Fallback: count from current data (less accurate when filtered)
+    if (tab.key === "all") return total;
+    
+    // For draft tab, only count items created by current user
+    if (tab.key === "draft") {
+      return data.filter(item => 
+        (item.workflowStatus === "DRAFT" || item.status === "DRAFT") && 
+        item.creator?.id === currentUserId
+      ).length;
+    }
+    
+    // For pending/rejected tabs, count by approvalStatus
+    if (tab.isApprovalTab) {
+      return data.filter(item => item.approvalStatus === "PENDING").length;
+    }
+    if (tab.isRejectedTab) {
+      return data.filter(item => item.approvalStatus === "REJECTED").length;
+    }
+    
     return data.filter(item => tab.statuses.includes(item.workflowStatus || item.status)).length;
   };
 
@@ -424,7 +528,12 @@ export function TransactionListClient({
                         item, 
                         companyCode, 
                         selectedIds.includes(item.id), 
-                        () => toggleSelect(item.id)
+                        () => toggleSelect(item.id),
+                        {
+                          currentUserId,
+                          canApprove,
+                          onRefresh: () => router.refresh(),
+                        }
                       )
                     ))}
                   </TableBody>
@@ -456,6 +565,10 @@ export function TransactionListClient({
           currentStatusLabel={currentStatusLabel}
           onInternalCompanyChange={config.type === "expense" ? handleBulkInternalCompanyChange : undefined}
           companies={config.type === "expense" ? companies : undefined}
+          onBatchApprove={canApprove ? handleBulkApprove : undefined}
+          onBatchReject={canApprove ? handleBulkReject : undefined}
+          canApprove={canApprove}
+          hasPendingItems={hasPendingItems}
         />
       )}
     </div>

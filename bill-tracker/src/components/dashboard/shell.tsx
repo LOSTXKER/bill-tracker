@@ -35,6 +35,7 @@ import {
   UserCircle,
   Banknote,
   Coins,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -137,6 +138,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           href: `/${companyCode}/incomes`,
           icon: ArrowDownCircle,
           permission: "incomes:read",
+        },
+        {
+          name: "รออนุมัติ",
+          href: `/${companyCode}/approvals`,
+          icon: ClipboardCheck,
+          permission: "expenses:approve",
         },
       ],
     },

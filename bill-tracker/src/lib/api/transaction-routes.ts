@@ -675,16 +675,18 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
       }
     }
 
-    // Check access (use delete permission if defined, otherwise use update permission)
+    // Check access - Owner can delete their own items, or need delete/update permission
+    const isOwner = existingItem.createdBy === session.user.id;
     const permission = config.permissions.delete || config.permissions.update;
-    const hasAccess = await hasPermission(
+    const hasDeletePermission = await hasPermission(
       session.user.id,
       existingItem.companyId,
       permission
     );
 
-    if (!hasAccess) {
-      throw ApiErrors.forbidden();
+    // Allow deletion if: owner of the item OR has delete permission
+    if (!isOwner && !hasDeletePermission) {
+      throw ApiErrors.forbidden("คุณไม่มีสิทธิ์ลบรายการนี้");
     }
 
     // For expenses: Refund petty cash if applicable

@@ -10,7 +10,9 @@ import { toNumber } from "@/lib/utils/serializers";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { useTransactionRow } from "@/hooks/use-transaction-row";
-import { Send, Loader2, ShieldAlert, Receipt } from "lucide-react";
+import { Send, Loader2, ShieldAlert, Receipt, ArrowRightLeft } from "lucide-react";
+import { QuickApprovalCell } from "./QuickApprovalCell";
+import type { ApprovalStatus } from "@prisma/client";
 
 // =============================================================================
 // Types
@@ -32,6 +34,7 @@ export interface TransactionRowConfig {
   showLineButton?: boolean;
   showInternalCompany?: boolean;
   statusField?: "status" | "workflowStatus" | "reimbursementStatus";
+  showApprovalActions?: boolean;
 }
 
 export interface TransactionData {
@@ -74,6 +77,9 @@ export interface TransactionData {
   documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT" | null;
   // Fraud score for reimbursement
   fraudScore?: number | null;
+  // Approval fields
+  approvalStatus?: ApprovalStatus | null;
+  submittedBy?: string | null;
 }
 
 interface TransactionTableRowProps {
@@ -82,6 +88,9 @@ interface TransactionTableRowProps {
   config: TransactionRowConfig;
   selected?: boolean;
   onToggleSelect?: () => void;
+  currentUserId?: string;
+  canApprove?: boolean;
+  onApprovalChange?: () => void;
 }
 
 // =============================================================================
@@ -102,6 +111,7 @@ export const expenseRowConfig: TransactionRowConfig = {
   showLineButton: true,
   showInternalCompany: true,
   statusField: "workflowStatus",
+  showApprovalActions: false,
 };
 
 // =============================================================================
@@ -121,6 +131,7 @@ export const incomeRowConfig: TransactionRowConfig = {
   showCreator: true,
   showLineButton: true,
   statusField: "workflowStatus",
+  showApprovalActions: false,
 };
 
 // =============================================================================
@@ -163,6 +174,9 @@ export function TransactionTableRow({
   config,
   selected = false,
   onToggleSelect,
+  currentUserId,
+  canApprove = false,
+  onApprovalChange,
 }: TransactionTableRowProps) {
   const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
     companyCode,
@@ -236,8 +250,24 @@ export function TransactionTableRow({
           status={status || "PENDING"} 
           type={config.type}
           documentType={config.type === "expense" ? (transaction.documentType || undefined) : undefined}
+          approvalStatus={transaction.approvalStatus}
         />
       </TableCell>
+
+      {/* Approval Actions */}
+      {config.showApprovalActions && (
+        <TableCell className="text-center">
+          <QuickApprovalCell
+            transactionId={transaction.id}
+            transactionType={config.type}
+            approvalStatus={transaction.approvalStatus || "NOT_REQUIRED"}
+            submittedBy={transaction.submittedBy}
+            currentUserId={currentUserId}
+            canApprove={canApprove}
+            onSuccess={onApprovalChange}
+          />
+        </TableCell>
+      )}
 
       {/* Contact (for expense/income) or Requester (for reimbursement) */}
       {config.showRequester ? (
@@ -279,9 +309,15 @@ export function TransactionTableRow({
       {config.showInternalCompany && (
         <TableCell>
           {transaction.internalCompany ? (
-            <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-              {transaction.internalCompany.code}
-            </Badge>
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 gap-1">
+                <ArrowRightLeft className="h-3 w-3" />
+                จ่ายแทน
+              </Badge>
+              <span className="text-xs text-muted-foreground pl-0.5">
+                {transaction.internalCompany.code}
+              </span>
+            </div>
           ) : (
             <span className="text-muted-foreground/50">-</span>
           )}

@@ -17,6 +17,8 @@ import {
   SettlementAlert,
   SettlementAlertSkeleton,
   ViewModeToggle,
+  CrossCompanySummary,
+  CrossCompanySummarySkeleton,
 } from "@/components/dashboard";
 
 interface DashboardPageProps {
@@ -58,6 +60,11 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
       {/* Stats Cards */}
       <Suspense fallback={<StatsSkeleton />}>
         <StatsCards companyCode={companyCode} viewMode={viewMode as "official" | "internal"} />
+      </Suspense>
+
+      {/* Cross-Company Summary - shows inter-company transactions */}
+      <Suspense fallback={<CrossCompanySummarySkeleton />}>
+        <CrossCompanySummary companyCode={companyCode} />
       </Suspense>
 
       {/* Action Required Section */}

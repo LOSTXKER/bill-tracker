@@ -22,3 +22,4 @@ export {
 export { DraftActions } from "./DraftActions";
 export { ApprovalBadge } from "./ApprovalBadge";
 export { ApprovalActions } from "./ApprovalActions";
+export { QuickApprovalCell } from "./QuickApprovalCell";

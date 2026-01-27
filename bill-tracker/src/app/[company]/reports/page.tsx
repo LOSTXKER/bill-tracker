@@ -167,10 +167,18 @@ async function VATReport({
   const endDate = new Date(year, month, 0);
 
   // Build company filter based on viewMode
+  // Official: what we recorded in our books
+  // Internal: actual ownership (internalCompanyId or default to companyId if null)
   const expenseCompanyFilter = viewMode === "internal"
-    ? { internalCompanyId: company.id }
+    ? {
+        OR: [
+          { internalCompanyId: company.id },
+          { companyId: company.id, internalCompanyId: null },
+        ]
+      }
     : { companyId: company.id };
 
+  // Get expenses and incomes with VAT only
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
@@ -388,8 +396,15 @@ async function WHTReport({
   const endDate = new Date(year, month, 0);
 
   // Build company filter based on viewMode
+  // Official: what we recorded in our books
+  // Internal: actual ownership (internalCompanyId or default to companyId if null)
   const expenseCompanyFilter = viewMode === "internal"
-    ? { internalCompanyId: company.id }
+    ? {
+        OR: [
+          { internalCompanyId: company.id },
+          { companyId: company.id, internalCompanyId: null },
+        ]
+      }
     : { companyId: company.id };
 
   const [expenses, incomes] = await Promise.all([
@@ -620,11 +635,18 @@ async function MonthlySummary({
   const endDate = new Date(year, month, 0);
 
   // Build company filter based on viewMode
+  // Official: what we recorded in our books
+  // Internal: actual ownership (internalCompanyId or default to companyId if null)
   const expenseCompanyFilter = viewMode === "internal"
-    ? { internalCompanyId: company.id }
+    ? {
+        OR: [
+          { internalCompanyId: company.id },
+          { companyId: company.id, internalCompanyId: null },
+        ]
+      }
     : { companyId: company.id };
 
-  const [expenseSum, incomeSum, expenseByAccount, accounts] = await Promise.all([
+  const [expenseSum, incomeSum, expenseByAccount, accounts, allExpenses, allIncomes] = await Promise.all([
     prisma.expense.aggregate({
       where: {
         ...expenseCompanyFilter,
@@ -657,6 +679,28 @@ async function MonthlySummary({
     prisma.account.findMany({
       where: { companyId: company.id },
       select: { id: true, code: true, name: true },
+    }),
+    // Get all expenses for transaction list
+    prisma.expense.findMany({
+      where: {
+        ...expenseCompanyFilter,
+        billDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
+      },
+      include: { Contact: true, Account: true },
+      orderBy: { billDate: "desc" },
+      take: 50, // Limit to 50 most recent
+    }),
+    // Get all incomes for transaction list
+    prisma.income.findMany({
+      where: {
+        companyId: company.id,
+        receiveDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
+      },
+      include: { Contact: true },
+      orderBy: { receiveDate: "desc" },
+      take: 50, // Limit to 50 most recent
     }),
   ]);
   
@@ -783,6 +827,120 @@ async function MonthlySummary({
             </div>
           )}
         </CardContent>
+      </div>
+
+      {/* All Expenses Table */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5 text-red-500" />
+            <h3 className="text-sm font-semibold text-foreground">รายจ่ายทั้งหมด</h3>
+            <span className="text-xs text-muted-foreground">({allExpenses.length} รายการล่าสุด)</span>
+          </div>
+        </div>
+        {allExpenses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการในเดือนนี้</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">บัญชี</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ยอดเงิน</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">สุทธิ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allExpenses.map((expense) => (
+                  <TableRow key={expense.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {expense.billDate.toLocaleDateString("th-TH")}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {expense.description || "-"}
+                    </TableCell>
+                    <TableCell className="max-w-[150px] truncate">
+                      {expense.Contact?.name || "-"}
+                    </TableCell>
+                    <TableCell className="max-w-[150px] truncate">
+                      {expense.Account ? `${expense.Account.code} - ${expense.Account.name}` : "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(expense.amount))}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {Number(expense.vatAmount) > 0 ? formatCurrency(Number(expense.vatAmount)) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-red-600">
+                      {formatCurrency(Number(expense.netPaid))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* All Incomes Table */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-green-500" />
+            <h3 className="text-sm font-semibold text-foreground">รายรับทั้งหมด</h3>
+            <span className="text-xs text-muted-foreground">({allIncomes.length} รายการล่าสุด)</span>
+          </div>
+        </div>
+        {allIncomes.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">ไม่มีรายการในเดือนนี้</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">ยอดเงิน</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right">สุทธิ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allIncomes.map((income) => (
+                  <TableRow key={income.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {income.receiveDate.toLocaleDateString("th-TH")}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {income.source || "-"}
+                    </TableCell>
+                    <TableCell className="max-w-[150px] truncate">
+                      {income.Contact?.name || "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(Number(income.amount))}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {Number(income.vatAmount) > 0 ? formatCurrency(Number(income.vatAmount)) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-primary">
+                      {formatCurrency(Number(income.netReceived))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     </div>
   );

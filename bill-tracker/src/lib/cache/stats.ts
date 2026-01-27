@@ -19,9 +19,16 @@ export async function getExpenseStats(companyId: string, viewMode: ViewMode = "o
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
   // Build filter based on viewMode
+  // Official view: filter by companyId (what we recorded in our books)
+  // Internal view: filter by actual ownership (internalCompanyId or default to companyId if null)
   const companyFilter = viewMode === "internal"
-    ? { internalCompanyId: companyId }  // Internal view: filter by internalCompanyId
-    : { companyId };                     // Official view: filter by companyId
+    ? {
+        OR: [
+          { internalCompanyId: companyId },  // Explicitly belongs to us
+          { companyId: companyId, internalCompanyId: null },  // Recorded by us, no internal company = ours
+        ]
+      }
+    : { companyId };  // Official view: filter by companyId
 
   const expenseFilter = {
     ...companyFilter,

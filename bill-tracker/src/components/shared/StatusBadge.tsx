@@ -13,6 +13,7 @@ interface StatusBadgeProps {
   status: string;
   type: "expense" | "income" | "reimbursement";
   documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
+  approvalStatus?: "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED" | null;
 }
 
 // Legacy color map for backward compatibility
@@ -32,8 +33,33 @@ const colorMap: Record<string, string> = {
  * @param status - The status string (workflowStatus or legacy status)
  * @param type - The transaction type (expense, income, or reimbursement)
  * @param documentType - The document type for expenses (affects label display)
+ * @param approvalStatus - The approval status (shows "รออนุมัติ" when PENDING)
  */
-export function StatusBadge({ status, type, documentType }: StatusBadgeProps) {
+export function StatusBadge({ status, type, documentType, approvalStatus }: StatusBadgeProps) {
+  // If approval status is PENDING and status is DRAFT, show "รออนุมัติ" badge
+  if (approvalStatus === "PENDING" && status === "DRAFT") {
+    return (
+      <Badge
+        variant="outline"
+        className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800"
+      >
+        รออนุมัติ
+      </Badge>
+    );
+  }
+  
+  // If approval status is REJECTED and status is DRAFT, show "ถูกปฏิเสธ" badge
+  if (approvalStatus === "REJECTED" && status === "DRAFT") {
+    return (
+      <Badge
+        variant="outline"
+        className="bg-destructive/10 text-destructive border-destructive/20"
+      >
+        ถูกปฏิเสธ
+      </Badge>
+    );
+  }
+
   // First try new workflow statuses (uses full Tailwind classes)
   if (type === "expense") {
     const workflowInfo = EXPENSE_WORKFLOW_INFO[status];

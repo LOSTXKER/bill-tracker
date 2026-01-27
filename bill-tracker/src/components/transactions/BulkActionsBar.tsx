@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { X, Trash2, Send, FileDown, Loader2, ArrowRight, AlertCircle, CheckCircle2, Building2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { X, Trash2, Send, FileDown, Loader2, ArrowRight, AlertCircle, CheckCircle2, Building2, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -44,6 +45,11 @@ interface BulkActionsBarProps {
   // Internal company bulk edit
   onInternalCompanyChange?: (companyId: string | null) => Promise<void>;
   companies?: CompanyOption[];
+  // Batch approval props
+  onBatchApprove?: () => Promise<void>;
+  onBatchReject?: (reason: string) => Promise<void>;
+  canApprove?: boolean;
+  hasPendingItems?: boolean;  // true if selected items include PENDING approval status
 }
 
 export function BulkActionsBar({
@@ -58,12 +64,19 @@ export function BulkActionsBar({
   currentStatusLabel,
   onInternalCompanyChange,
   companies = [],
+  onBatchApprove,
+  onBatchReject,
+  canApprove = false,
+  hasPendingItems = false,
 }: BulkActionsBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStatusConfirm, setShowStatusConfirm] = useState(false);
   const [showInternalCompanyConfirm, setShowInternalCompanyConfirm] = useState(false);
   const [selectedInternalCompany, setSelectedInternalCompany] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const handleDelete = async () => {
     if (!onDelete) return;
@@ -131,6 +144,39 @@ export function BulkActionsBar({
     }
   };
 
+  const handleBatchApprove = async () => {
+    if (!onBatchApprove) return;
+    setIsLoading(true);
+    const toastId = toast.loading(`กำลังอนุมัติ ${selectedCount} รายการ...`);
+    try {
+      await onBatchApprove();
+      toast.success(`อนุมัติ ${selectedCount} รายการสำเร็จ`, { id: toastId });
+      setShowApproveConfirm(false);
+      onClearSelection();
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการอนุมัติ", { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBatchReject = async () => {
+    if (!onBatchReject || !rejectReason.trim()) return;
+    setIsLoading(true);
+    const toastId = toast.loading(`กำลังปฏิเสธ ${selectedCount} รายการ...`);
+    try {
+      await onBatchReject(rejectReason.trim());
+      toast.success(`ปฏิเสธ ${selectedCount} รายการสำเร็จ`, { id: toastId });
+      setShowRejectConfirm(false);
+      setRejectReason("");
+      onClearSelection();
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการปฏิเสธ", { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Determine status change UI state
   const hasMultipleStatuses = selectedStatuses.length > 1;
   const isAtFinalStatus = selectedStatuses.length === 1 && !nextStatus;
@@ -191,6 +237,36 @@ export function BulkActionsBar({
               <Send className="h-4 w-4 mr-2" />
               ส่งแจ้งเตือน
             </LoadingButton>
+          )}
+
+          {/* Batch Approval Actions */}
+          {canApprove && hasPendingItems && (
+            <>
+              {onBatchApprove && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowApproveConfirm(true)}
+                  disabled={isLoading}
+                  className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  อนุมัติ
+                </Button>
+              )}
+              {onBatchReject && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRejectConfirm(true)}
+                  disabled={isLoading}
+                  className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  ปฏิเสธ
+                </Button>
+              )}
+            </>
           )}
 
           {onInternalCompanyChange && companies.length > 0 && (
@@ -357,6 +433,78 @@ export function BulkActionsBar({
                 </>
               ) : (
                 "ยืนยัน"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Batch Approve Confirmation Dialog */}
+      <AlertDialog open={showApproveConfirm} onOpenChange={setShowApproveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการอนุมัติ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการอนุมัติ {selectedCount} รายการที่เลือกใช่หรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchApprove}
+              disabled={isLoading}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังอนุมัติ...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  อนุมัติ
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Batch Reject Confirmation Dialog */}
+      <AlertDialog open={showRejectConfirm} onOpenChange={setShowRejectConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการปฏิเสธ</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>คุณต้องการปฏิเสธ {selectedCount} รายการที่เลือก กรุณาระบุเหตุผล</p>
+                <Textarea
+                  placeholder="ระบุเหตุผลในการปฏิเสธ..."
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchReject}
+              disabled={isLoading || !rejectReason.trim()}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังปฏิเสธ...
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  ปฏิเสธ
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

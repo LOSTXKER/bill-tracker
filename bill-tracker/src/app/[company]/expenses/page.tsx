@@ -11,6 +11,8 @@ import { StatsSkeleton, TableSkeleton } from "@/components/shared/TableSkeleton"
 import { ExpensesClient } from "@/components/expenses/ExpensesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getExpenseStats } from "@/lib/cache/stats";
+import { getSession } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions/checker";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
@@ -121,6 +123,13 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
+  // Get session and check approval permission
+  const session = await getSession();
+  const currentUserId = session?.user?.id;
+  const canApprove = currentUserId 
+    ? await hasPermission(currentUserId, companyId, "expenses:approve")
+    : false;
+
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
   const sortOrder = (searchParams.sortOrder as string) || "desc";
@@ -128,6 +137,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const limit = parseInt((searchParams.limit as string) || "20");
   const search = searchParams.search as string | undefined;
   const status = searchParams.status as string | undefined;
+  const tab = searchParams.tab as string | undefined; // For approval/draft/rejected tabs
   const category = searchParams.category as string | undefined;
   const contact = searchParams.contact as string | undefined;
   const creator = searchParams.creator as string | undefined;
@@ -138,16 +148,27 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
 
   // Build where clause
   // Filter: Only show regular expenses OR reimbursements that have been PAID
-  // When viewMode is "internal", filter by internalCompanyId instead of companyId
+  // Official view: what we recorded in our books (by companyId)
+  // Internal view: actual ownership (internalCompanyId or default to companyId if null)
   const whereClause: any = viewMode === "internal"
     ? {
         // Internal view: Show expenses where this company is the "real" owner
-        internalCompanyId: companyId,
-        deletedAt: null,
-        OR: [
-          { isReimbursement: false },
-          { isReimbursement: true, reimbursementStatus: "PAID" as const },
+        // Either explicitly set as internalCompanyId, or recorded by us with no internal company
+        AND: [
+          {
+            OR: [
+              { internalCompanyId: companyId },
+              { companyId: companyId, internalCompanyId: null },
+            ],
+          },
+          {
+            OR: [
+              { isReimbursement: false },
+              { isReimbursement: true, reimbursementStatus: "PAID" as const },
+            ],
+          },
         ],
+        deletedAt: null,
       }
     : {
         // Official view (default): Show expenses recorded under this company
@@ -176,6 +197,21 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       whereClause.workflowStatus = { in: status.split(",") };
     } else {
       whereClause.workflowStatus = status;
+    }
+  }
+
+  // Handle special tab filters (approval status)
+  if (tab === "pending") {
+    // Show items pending approval
+    whereClause.approvalStatus = "PENDING";
+  } else if (tab === "rejected") {
+    // Show rejected items
+    whereClause.approvalStatus = "REJECTED";
+  } else if (tab === "draft") {
+    // Show draft items created by current user
+    whereClause.workflowStatus = "DRAFT";
+    if (currentUserId) {
+      whereClause.createdBy = currentUserId;
     }
   }
 
@@ -224,7 +260,35 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     orderBy.push({ createdAt: "desc" });
   }
 
-  const [expensesRaw, total] = await Promise.all([
+  // Base where clause for counting (without tab-specific filters)
+  const baseWhereClause = viewMode === "internal"
+    ? {
+        AND: [
+          {
+            OR: [
+              { internalCompanyId: companyId },
+              { companyId: companyId, internalCompanyId: null },
+            ],
+          },
+          {
+            OR: [
+              { isReimbursement: false },
+              { isReimbursement: true, reimbursementStatus: "PAID" as const },
+            ],
+          },
+        ],
+        deletedAt: null,
+      }
+    : {
+        companyId,
+        deletedAt: null,
+        OR: [
+          { isReimbursement: false },
+          { isReimbursement: true, reimbursementStatus: "PAID" as const },
+        ],
+      };
+
+  const [expensesRaw, total, tabCounts] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
       orderBy,
@@ -246,6 +310,29 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       },
     }),
     prisma.expense.count({ where: whereClause }),
+    // Count for each tab
+    Promise.all([
+      prisma.expense.count({ where: baseWhereClause }), // all
+      currentUserId 
+        ? prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "DRAFT", createdBy: currentUserId } })
+        : Promise.resolve(0), // draft (my drafts)
+      prisma.expense.count({ where: { ...baseWhereClause, approvalStatus: "PENDING" } }), // pending
+      prisma.expense.count({ where: { ...baseWhereClause, approvalStatus: "REJECTED" } }), // rejected
+      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["PAID", "WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE"] } } }), // waiting_doc
+      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["TAX_INVOICE_RECEIVED", "WHT_ISSUED", "WHT_SENT_TO_VENDOR"] } } }), // doc_received
+      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "READY_FOR_ACCOUNTING" } }), // ready
+      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["SENT_TO_ACCOUNTANT", "COMPLETED"] } } }), // sent
+    ]).then(([all, draft, pending, rejected, waiting_doc, doc_received, ready, sent]) => ({
+      all,
+      draft,
+      pending,
+      rejected,
+      waiting_doc,
+      doc_received,
+      ready,
+      sent,
+      recent: null, // Recent doesn't need a count
+    })),
   ]);
 
   // Map Prisma relation names to what the client expects
@@ -270,6 +357,9 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       initialExpenses={serializedExpenses}
       initialTotal={total}
       viewMode={viewMode as "official" | "internal"}
+      currentUserId={currentUserId}
+      canApprove={canApprove}
+      tabCounts={tabCounts}
     />
   );
 }
