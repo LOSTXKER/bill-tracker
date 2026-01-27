@@ -6,7 +6,7 @@ export { TimelineStepper } from "./TimelineStepper";
 export { AmountSummaryCard } from "./AmountSummaryCard";
 export { TransactionDetailSkeleton } from "./TransactionDetailSkeleton";
 export { TransactionDetailPage } from "./TransactionDetailPage";
-export { TransactionListClient, type TransactionListConfig, type TableHeaderConfig } from "./TransactionListClient";
+export { TransactionListClient, type TransactionListConfig, type TableHeaderConfig, type CompanyOption } from "./TransactionListClient";
 export { DocumentTimeline } from "./document-timeline";
 export { WorkflowActions } from "./workflow-actions";
 export { CombinedHistorySection } from "./CombinedHistorySection";

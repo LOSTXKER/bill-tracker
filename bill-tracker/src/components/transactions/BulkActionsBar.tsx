@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { X, Trash2, Send, FileDown, Loader2, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, Trash2, Send, FileDown, Loader2, ArrowRight, AlertCircle, CheckCircle2, Building2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { NextStatusInfo } from "@/lib/workflow/status-rules";
+
+export interface CompanyOption {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -28,6 +41,9 @@ interface BulkActionsBarProps {
   selectedStatuses?: string[];  // สถานะของรายการที่เลือก (unique values)
   nextStatus?: NextStatusInfo | null;  // สถานะถัดไปที่เป็นไปได้
   currentStatusLabel?: string;  // label ของสถานะปัจจุบัน (สำหรับแสดง)
+  // Internal company bulk edit
+  onInternalCompanyChange?: (companyId: string | null) => Promise<void>;
+  companies?: CompanyOption[];
 }
 
 export function BulkActionsBar({
@@ -40,9 +56,13 @@ export function BulkActionsBar({
   selectedStatuses = [],
   nextStatus,
   currentStatusLabel,
+  onInternalCompanyChange,
+  companies = [],
 }: BulkActionsBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStatusConfirm, setShowStatusConfirm] = useState(false);
+  const [showInternalCompanyConfirm, setShowInternalCompanyConfirm] = useState(false);
+  const [selectedInternalCompany, setSelectedInternalCompany] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -86,6 +106,26 @@ export function BulkActionsBar({
       toast.success("ส่งแจ้งเตือนสำเร็จ", { id: toastId });
     } catch (error) {
       toast.error("เกิดข้อผิดพลาดในการส่งแจ้งเตือน", { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInternalCompanyChange = async () => {
+    if (!onInternalCompanyChange) return;
+    setIsLoading(true);
+    const companyName = selectedInternalCompany 
+      ? companies.find(c => c.id === selectedInternalCompany)?.name || "บริษัทที่เลือก"
+      : "ไม่ระบุ";
+    const toastId = toast.loading(`กำลังตั้งบริษัทจริงเป็น "${companyName}"...`);
+    try {
+      await onInternalCompanyChange(selectedInternalCompany);
+      toast.success(`ตั้งบริษัทจริงเป็น "${companyName}" สำหรับ ${selectedCount} รายการสำเร็จ`, { id: toastId });
+      setShowInternalCompanyConfirm(false);
+      setSelectedInternalCompany(null);
+      onClearSelection();
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการตั้งบริษัทจริง", { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -151,6 +191,19 @@ export function BulkActionsBar({
               <Send className="h-4 w-4 mr-2" />
               ส่งแจ้งเตือน
             </LoadingButton>
+          )}
+
+          {onInternalCompanyChange && companies.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInternalCompanyConfirm(true)}
+              disabled={isLoading}
+              className="h-8"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              บริษัทจริง
+            </Button>
           )}
 
           {onExport && (
@@ -253,6 +306,54 @@ export function BulkActionsBar({
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   กำลังเปลี่ยน...
+                </>
+              ) : (
+                "ยืนยัน"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Internal Company Change Dialog */}
+      <AlertDialog open={showInternalCompanyConfirm} onOpenChange={setShowInternalCompanyConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ตั้งบริษัทจริง</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>เลือกบริษัทที่เป็นเจ้าของค่าใช้จ่ายจริงสำหรับ {selectedCount} รายการที่เลือก</p>
+                <Select
+                  value={selectedInternalCompany || "__none__"}
+                  onValueChange={(value) => setSelectedInternalCompany(value === "__none__" ? null : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกบริษัท" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">ไม่ระบุ (ใช้บริษัทที่บันทึก)</span>
+                    </SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} ({company.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleInternalCompanyChange}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังบันทึก...
                 </>
               ) : (
                 "ยืนยัน"

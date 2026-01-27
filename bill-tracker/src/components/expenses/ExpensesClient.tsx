@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { ArrowUpCircle, Building2, Eye } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   TransactionListClient, 
   type TransactionListConfig,
+  type CompanyOption,
   TransactionTableRow,
   expenseRowConfig,
 } from "@/components/transactions";
@@ -37,6 +39,7 @@ const expenseListConfig: TransactionListConfig = {
     { key: "contact", label: "ผู้ติดต่อ", sortable: true },
     { key: "category", label: "บัญชี" },
     { key: "description", label: "รายละเอียด" },
+    { key: "internalCompany", label: "บริษัทจริง" },
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },
     { key: "updatedAt", label: "แก้ไขล่าสุด", sortable: true },
@@ -66,6 +69,24 @@ export function ExpensesClient({
 }: ExpensesClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  
+  // Fetch companies for bulk internal company change
+  useEffect(() => {
+    fetch("/api/companies")
+      .then((res) => res.json())
+      .then((result) => {
+        const companiesList = result.data?.companies || [];
+        setCompanies(companiesList.map((c: { id: string; name: string; code: string }) => ({
+          id: c.id,
+          name: c.name,
+          code: c.code,
+        })));
+      })
+      .catch(() => {
+        // Ignore errors
+      });
+  }, []);
   
   const handleViewModeChange = (mode: "official" | "internal") => {
     const params = new URLSearchParams(searchParams.toString());
@@ -124,6 +145,7 @@ export function ExpensesClient({
         data={initialExpenses}
         total={initialTotal}
         config={expenseListConfig}
+        companies={companies}
       />
     </div>
   );

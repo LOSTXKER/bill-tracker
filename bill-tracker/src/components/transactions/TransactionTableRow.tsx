@@ -30,6 +30,7 @@ export interface TransactionRowConfig {
   showRequester?: boolean;
   showCreator?: boolean;
   showLineButton?: boolean;
+  showInternalCompany?: boolean;
   statusField?: "status" | "workflowStatus" | "reimbursementStatus";
 }
 
@@ -47,6 +48,9 @@ export interface TransactionData {
   contact?: { name: string } | null;
   contactName?: string | null; // One-time contact name (not saved as Contact)
   account?: { id: string; code: string; name: string } | null;
+  // Internal company tracking (for expenses that belong to a different company)
+  internalCompany?: { id: string; name: string; code: string } | null;
+  internalCompanyId?: string | null;
   creator?: {
     id: string;
     name: string;
@@ -96,6 +100,7 @@ export const expenseRowConfig: TransactionRowConfig = {
   whtRateField: "whtRate",
   showCreator: true,
   showLineButton: true,
+  showInternalCompany: true,
   statusField: "workflowStatus",
 };
 
@@ -269,6 +274,19 @@ export function TransactionTableRow({
           <span className="text-xs text-muted-foreground">-</span>
         )}
       </TableCell>
+
+      {/* Internal Company (for expenses recorded under a different company) */}
+      {config.showInternalCompany && (
+        <TableCell>
+          {transaction.internalCompany ? (
+            <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+              {transaction.internalCompany.code}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground/50">-</span>
+          )}
+        </TableCell>
+      )}
 
       {/* Creator (for expense/income) */}
       {config.showCreator && (

@@ -26,6 +26,12 @@ import { getNextStatus, getStatusLabel } from "@/lib/workflow/status-rules";
 // Types
 // ============================================================================
 
+export interface CompanyOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export interface TransactionListConfig {
   type: "expense" | "income";
   title: string;
@@ -58,6 +64,7 @@ interface TransactionListClientProps {
   data: any[];
   total: number;
   config: TransactionListConfig;
+  companies?: CompanyOption[];
 }
 
 // ============================================================================
@@ -106,6 +113,7 @@ export function TransactionListClient({
   data,
   total,
   config,
+  companies = [],
 }: TransactionListClientProps) {
   const router = useRouter();
   const { filters, setFilter, setFilterWithSort } = useTransactionFilters();
@@ -226,6 +234,26 @@ export function TransactionListClient({
         router.refresh();
       } catch (error) {
         console.error("Bulk status change failed:", error);
+      }
+    });
+  };
+
+  const handleBulkInternalCompanyChange = async (companyId: string | null) => {
+    startTransition(async () => {
+      try {
+        await Promise.all(
+          selectedIds.map(id =>
+            fetch(`${config.apiEndpoint}/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ internalCompanyId: companyId }),
+            })
+          )
+        );
+        setSelectedIds([]);
+        router.refresh();
+      } catch (error) {
+        console.error("Bulk internal company change failed:", error);
       }
     });
   };
@@ -426,6 +454,8 @@ export function TransactionListClient({
           selectedStatuses={selectedStatuses}
           nextStatus={nextStatus}
           currentStatusLabel={currentStatusLabel}
+          onInternalCompanyChange={config.type === "expense" ? handleBulkInternalCompanyChange : undefined}
+          companies={config.type === "expense" ? companies : undefined}
         />
       )}
     </div>
