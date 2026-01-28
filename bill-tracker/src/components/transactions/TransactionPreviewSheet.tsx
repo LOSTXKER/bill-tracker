@@ -12,8 +12,6 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ApprovalBadge } from "@/components/transactions/ApprovalBadge";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
@@ -370,21 +368,21 @@ export function TransactionPreviewSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="right" 
-        className="w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl p-0 flex flex-col"
+        className="w-full sm:max-w-md md:max-w-lg p-0 h-full overflow-hidden flex flex-col"
       >
-        {/* Header */}
-        <SheetHeader className="p-4 pb-2 border-b">
-          <div className="flex items-start justify-between gap-4">
+        {/* Header - Fixed */}
+        <SheetHeader className="flex-shrink-0 px-4 pt-4 pb-3 border-b bg-background">
+          <div className="flex items-start justify-between gap-3 pr-8">
             <div className="flex-1 min-w-0">
-              <SheetTitle className="text-lg">
+              <SheetTitle className="text-base font-semibold">
                 {transactionType === "expense" ? "รายจ่าย" : "รายรับ"}
               </SheetTitle>
-              <SheetDescription className="truncate">
-                {data?.Contact?.name || data?.contactName || "ไม่ระบุผู้ติดต่อ"}
+              <SheetDescription className="text-sm truncate mt-0.5">
+                {data?.Contact?.name || data?.contactName || "กำลังโหลด..."}
               </SheetDescription>
             </div>
             {data && (
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 <StatusBadge
                   status={data.workflowStatus || data.status || "DRAFT"}
                   type={transactionType}
@@ -399,17 +397,17 @@ export function TransactionPreviewSheet({
           </div>
         </SheetHeader>
 
-        {/* Content */}
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-4">
             {loading && (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             )}
 
             {error && (
-              <div className="text-center py-12 text-destructive">
+              <div className="text-center py-16 text-destructive">
                 <p>{error}</p>
                 <Button variant="outline" size="sm" onClick={fetchData} className="mt-4">
                   ลองใหม่
@@ -419,34 +417,34 @@ export function TransactionPreviewSheet({
 
             {data && !loading && (
               <>
-                {/* Amount Card */}
-                <div className="rounded-lg border bg-card p-4">
-                  <p className="text-sm text-muted-foreground mb-1">
+                {/* Amount Card - Compact */}
+                <div className="rounded-lg border bg-gradient-to-br from-card to-muted/30 p-4">
+                  <p className="text-xs text-muted-foreground mb-1">
                     {transactionType === "expense" ? "ยอดจ่ายสุทธิ" : "ยอดรับสุทธิ"}
                   </p>
-                  <p className={`text-3xl font-bold ${
+                  <p className={`text-2xl font-bold ${
                     transactionType === "expense" ? "text-destructive" : "text-primary"
                   }`}>
                     {formatCurrency(amount)}
                   </p>
 
-                  {/* Amount breakdown */}
+                  {/* Amount breakdown - Inline */}
                   {(data.amount || data.vatAmount || data.whtAmount) && (
-                    <div className="mt-3 pt-3 border-t space-y-1 text-sm">
+                    <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground space-y-0.5">
                       {data.amount && (
-                        <div className="flex justify-between text-muted-foreground">
+                        <div className="flex justify-between">
                           <span>ยอดก่อน VAT</span>
                           <span>{formatCurrency(toNumber(data.amount))}</span>
                         </div>
                       )}
-                      {data.vatAmount && (
-                        <div className="flex justify-between text-muted-foreground">
+                      {data.vatAmount && toNumber(data.vatAmount) > 0 && (
+                        <div className="flex justify-between">
                           <span>VAT 7%</span>
-                          <span>{formatCurrency(toNumber(data.vatAmount))}</span>
+                          <span>+{formatCurrency(toNumber(data.vatAmount))}</span>
                         </div>
                       )}
-                      {(data.isWht || data.isWhtDeducted) && data.whtAmount && (
-                        <div className="flex justify-between text-muted-foreground">
+                      {(data.isWht || data.isWhtDeducted) && data.whtAmount && toNumber(data.whtAmount) > 0 && (
+                        <div className="flex justify-between">
                           <span>หัก ณ ที่จ่าย {data.whtRate ? `(${data.whtRate}%)` : ""}</span>
                           <span>-{formatCurrency(toNumber(data.whtAmount))}</span>
                         </div>
@@ -455,72 +453,108 @@ export function TransactionPreviewSheet({
                   )}
                 </div>
 
-                {/* Details */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground">รายละเอียด</h4>
+                {/* Details - Grid Layout */}
+                <div className="rounded-lg border bg-card p-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                    รายละเอียด
+                  </h4>
                   
-                  <div className="grid gap-4">
-                    <InfoRow
-                      icon={User}
-                      label="ผู้ติดต่อ"
-                      value={data.Contact?.name || data.contactName}
-                    />
-                    <InfoRow
-                      icon={Calendar}
-                      label={transactionType === "expense" ? "วันที่บิล" : "วันที่รับเงิน"}
-                      value={
-                        (transactionType === "expense" ? data.billDate : data.receiveDate)
-                          ? formatThaiDate(new Date(transactionType === "expense" ? data.billDate! : data.receiveDate!))
-                          : null
-                      }
-                    />
-                    <InfoRow
-                      icon={Tag}
-                      label="หมวดหมู่บัญชี"
-                      value={data.Account ? `${data.Account.code} ${data.Account.name}` : null}
-                    />
-                    <InfoRow
-                      icon={FileText}
-                      label={transactionType === "expense" ? "รายละเอียด" : "แหล่งที่มา"}
-                      value={transactionType === "expense" ? data.description : data.source}
-                    />
-                    <InfoRow
-                      icon={Receipt}
-                      label="เลขที่เอกสาร"
-                      value={data.invoiceNumber}
-                    />
-                    <InfoRow
-                      icon={CreditCard}
-                      label="เลขอ้างอิง"
-                      value={data.referenceNo}
-                    />
-                    {data.notes && (
-                      <InfoRow
-                        icon={FileText}
-                        label="หมายเหตุ"
-                        value={data.notes}
-                      />
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {/* Contact */}
+                    {(data.Contact?.name || data.contactName) && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">ผู้ติดต่อ</p>
+                        <p className="font-medium">{data.Contact?.name || data.contactName}</p>
+                      </div>
                     )}
-                    <InfoRow
-                      icon={Clock}
-                      label="สร้างเมื่อ"
-                      value={data.createdAt ? formatThaiDate(new Date(data.createdAt)) : null}
-                    />
+                    
+                    {/* Date */}
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        {transactionType === "expense" ? "วันที่บิล" : "วันที่รับ"}
+                      </p>
+                      <p className="font-medium">
+                        {(transactionType === "expense" ? data.billDate : data.receiveDate)
+                          ? formatThaiDate(new Date(transactionType === "expense" ? data.billDate! : data.receiveDate!))
+                          : "-"}
+                      </p>
+                    </div>
+
+                    {/* Created */}
+                    <div>
+                      <p className="text-xs text-muted-foreground">สร้างเมื่อ</p>
+                      <p className="font-medium">
+                        {data.createdAt ? formatThaiDate(new Date(data.createdAt)) : "-"}
+                      </p>
+                    </div>
+
+                    {/* Account */}
+                    {data.Account && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">หมวดหมู่บัญชี</p>
+                        <p className="font-medium">{data.Account.code} {data.Account.name}</p>
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {(data.description || data.source) && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">
+                          {transactionType === "expense" ? "รายละเอียด" : "แหล่งที่มา"}
+                        </p>
+                        <p className="font-medium">{transactionType === "expense" ? data.description : data.source}</p>
+                      </div>
+                    )}
+
+                    {/* Invoice Number */}
+                    {data.invoiceNumber && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">เลขที่เอกสาร</p>
+                        <p className="font-medium">{data.invoiceNumber}</p>
+                      </div>
+                    )}
+
+                    {/* Reference */}
+                    {data.referenceNo && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">เลขอ้างอิง</p>
+                        <p className="font-medium">{data.referenceNo}</p>
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    {data.notes && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">หมายเหตุ</p>
+                        <p className="font-medium text-muted-foreground">{data.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Creator */}
                     {data.creator && (
-                      <InfoRow
-                        icon={User}
-                        label="สร้างโดย"
-                        value={data.creator.name}
-                      />
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">สร้างโดย</p>
+                        <p className="font-medium">{data.creator.name}</p>
+                      </div>
                     )}
                   </div>
+
+                  {/* WHT Badge */}
+                  {(data.isWht || data.isWhtDeducted) && (
+                    <div className="mt-3 pt-3 border-t">
+                      <Badge variant="outline" className="bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                        <Receipt className="h-3 w-3 mr-1" />
+                        หัก ณ ที่จ่าย {data.whtRate ? `${data.whtRate}%` : ""}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
 
                 {/* Documents */}
                 {documents.length > 0 && (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <ImageIcon className="h-3.5 w-3.5" />
                       เอกสารแนบ ({documents.reduce((acc, d) => acc + d.urls.length, 0)} ไฟล์)
                     </h4>
                     
@@ -534,25 +568,19 @@ export function TransactionPreviewSheet({
                   </div>
                 )}
 
-                {/* WHT Badge */}
-                {(data.isWht || data.isWhtDeducted) && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
-                      <Receipt className="h-3 w-3 mr-1" />
-                      หัก ณ ที่จ่าย {data.whtRate ? `${data.whtRate}%` : ""}
-                    </Badge>
-                  </div>
-                )}
+                {/* Bottom padding for scroll */}
+                <div className="h-4" />
               </>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        {/* Footer */}
-        <SheetFooter className="p-4 border-t bg-muted/30">
+        {/* Footer - Fixed */}
+        <SheetFooter className="flex-shrink-0 p-3 border-t bg-muted/30">
           <Button
             onClick={handleViewFull}
             className="w-full"
+            size="sm"
             disabled={loading || !!error}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
