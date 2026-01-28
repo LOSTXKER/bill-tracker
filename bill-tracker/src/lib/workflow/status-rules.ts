@@ -27,6 +27,12 @@ export const EXPENSE_WORKFLOW_ORDER: string[] = [
   "COMPLETED",
 ];
 
+// WHT-related statuses for expenses
+const EXPENSE_WHT_STATUSES = ["WHT_PENDING_ISSUE", "WHT_ISSUED"];
+
+// Tax invoice related statuses for expenses (skip if documentType is NO_DOCUMENT or CASH_RECEIPT)
+const EXPENSE_TAX_INVOICE_STATUSES = ["WAITING_TAX_INVOICE", "TAX_INVOICE_RECEIVED"];
+
 // =============================================================================
 // Income Workflow Order
 // =============================================================================
@@ -50,6 +56,9 @@ export const INCOME_WORKFLOW_ORDER: string[] = [
   "COMPLETED",
 ];
 
+// WHT-related statuses for incomes
+const INCOME_WHT_STATUSES = ["WHT_PENDING_CERT", "WHT_CERT_RECEIVED"];
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -59,17 +68,62 @@ export interface NextStatusInfo {
   label: string;
 }
 
+export interface TransactionWorkflowContext {
+  /** For expenses: true if WHT applies */
+  isWht?: boolean;
+  /** For incomes: true if WHT was deducted */
+  isWhtDeducted?: boolean;
+  /** For expenses: document type (TAX_INVOICE, CASH_RECEIPT, NO_DOCUMENT) */
+  documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT" | null;
+}
+
+/**
+ * Get the effective workflow order based on transaction context
+ * Skips statuses that don't apply (e.g., WHT statuses for non-WHT items)
+ */
+function getEffectiveWorkflowOrder(
+  type: "expense" | "income",
+  context?: TransactionWorkflowContext
+): string[] {
+  const baseOrder = type === "expense" ? EXPENSE_WORKFLOW_ORDER : INCOME_WORKFLOW_ORDER;
+  
+  if (!context) return baseOrder;
+  
+  return baseOrder.filter(status => {
+    if (type === "expense") {
+      // Skip WHT statuses if no WHT
+      if (EXPENSE_WHT_STATUSES.includes(status) && !context.isWht) {
+        return false;
+      }
+      // Skip tax invoice statuses if document type is NO_DOCUMENT or CASH_RECEIPT
+      if (EXPENSE_TAX_INVOICE_STATUSES.includes(status)) {
+        if (context.documentType === "NO_DOCUMENT" || context.documentType === "CASH_RECEIPT") {
+          return false;
+        }
+      }
+    } else {
+      // Skip WHT statuses if no WHT deducted
+      if (INCOME_WHT_STATUSES.includes(status) && !context.isWhtDeducted) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
 /**
  * หาสถานะถัดไปที่เป็นไปได้จากสถานะปัจจุบัน
  * @param currentStatus สถานะปัจจุบัน
  * @param type ประเภท expense หรือ income
+ * @param context ข้อมูลบริบทของรายการ (isWht, documentType, etc.)
  * @returns NextStatusInfo หรือ null ถ้าไม่มีสถานะถัดไป
  */
 export function getNextStatus(
   currentStatus: string,
-  type: "expense" | "income"
+  type: "expense" | "income",
+  context?: TransactionWorkflowContext
 ): NextStatusInfo | null {
-  const order = type === "expense" ? EXPENSE_WORKFLOW_ORDER : INCOME_WORKFLOW_ORDER;
+  const order = getEffectiveWorkflowOrder(type, context);
   const labels = type === "expense" ? EXPENSE_STATUS_LABELS : INCOME_STATUS_LABELS;
 
   const currentIndex = order.indexOf(currentStatus);
@@ -93,14 +147,16 @@ export function getNextStatus(
  * @param currentStatus สถานะปัจจุบัน
  * @param targetStatus สถานะที่ต้องการเปลี่ยนไป
  * @param type ประเภท expense หรือ income
+ * @param context ข้อมูลบริบทของรายการ (isWht, documentType, etc.)
  * @returns true ถ้าเปลี่ยนได้
  */
 export function canChangeStatus(
   currentStatus: string,
   targetStatus: string,
-  type: "expense" | "income"
+  type: "expense" | "income",
+  context?: TransactionWorkflowContext
 ): boolean {
-  const nextStatus = getNextStatus(currentStatus, type);
+  const nextStatus = getNextStatus(currentStatus, type, context);
   return nextStatus !== null && nextStatus.value === targetStatus;
 }
 

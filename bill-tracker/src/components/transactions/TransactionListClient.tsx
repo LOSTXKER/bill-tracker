@@ -21,7 +21,7 @@ import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-tr
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { StatusInfo } from "@/lib/constants/transaction";
-import { getNextStatus, getStatusLabel } from "@/lib/workflow/status-rules";
+import { getNextStatus, getStatusLabel, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
 
 // ============================================================================
 // Types
@@ -218,21 +218,61 @@ export function TransactionListClient({
 
   const clearSelection = () => setSelectedIds([]);
 
+  // Get selected items for bulk validation
+  const selectedItems = useMemo(() => {
+    return data.filter(item => selectedIds.includes(item.id));
+  }, [data, selectedIds]);
+
   // Calculate unique statuses of selected items for bulk validation
   const selectedStatuses = useMemo(() => {
     const statuses = new Set(
-      data
-        .filter(item => selectedIds.includes(item.id))
-        .map(item => item.workflowStatus || item.status)
+      selectedItems.map(item => item.workflowStatus || item.status)
     );
     return Array.from(statuses);
-  }, [data, selectedIds]);
+  }, [selectedItems]);
+
+  // Calculate workflow context for selected items (isWht, documentType, etc.)
+  const selectedWorkflowContext = useMemo((): TransactionWorkflowContext | null => {
+    if (selectedItems.length === 0) return null;
+    
+    // For bulk operations, we need consistent context across all items
+    // Check if all items have the same WHT setting
+    const whtValues = new Set(
+      selectedItems.map(item => 
+        config.type === "expense" ? item.isWht : item.isWhtDeducted
+      )
+    );
+    
+    // Check if all items have the same document type (for expenses)
+    const docTypeValues = config.type === "expense" 
+      ? new Set(selectedItems.map(item => item.documentType || null))
+      : new Set([null]);
+    
+    // If items have different WHT settings or document types, we can't determine a single next status
+    if (whtValues.size > 1 || docTypeValues.size > 1) {
+      // Return context based on most restrictive (no WHT, no tax invoice)
+      // This way the next status will be the common one for all items
+      return {
+        isWht: false,
+        isWhtDeducted: false,
+        documentType: null,
+      };
+    }
+    
+    // All items have the same settings
+    const firstItem = selectedItems[0];
+    return {
+      isWht: firstItem.isWht ?? false,
+      isWhtDeducted: firstItem.isWhtDeducted ?? false,
+      documentType: firstItem.documentType ?? null,
+    };
+  }, [selectedItems, config.type]);
 
   // Calculate next status (only if all selected items have the same status)
   const nextStatus = useMemo(() => {
     if (selectedStatuses.length !== 1) return null;
-    return getNextStatus(selectedStatuses[0], config.type);
-  }, [selectedStatuses, config.type]);
+    return getNextStatus(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
+  }, [selectedStatuses, config.type, selectedWorkflowContext]);
 
   // Get current status label for display
   const currentStatusLabel = useMemo(() => {
