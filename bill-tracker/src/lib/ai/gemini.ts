@@ -22,7 +22,7 @@ function getGeminiClient(): GoogleGenerativeAI {
 /**
  * Get text generation model (Gemini Pro)
  */
-export function getTextModel(modelName: string = "gemini-2.0-flash-exp"): GenerativeModel {
+export function getTextModel(modelName: string = "gemini-2.0-flash"): GenerativeModel {
   const client = getGeminiClient();
   return client.getGenerativeModel({ model: modelName });
 }
@@ -30,7 +30,7 @@ export function getTextModel(modelName: string = "gemini-2.0-flash-exp"): Genera
 /**
  * Get vision model (Gemini Pro Vision)
  */
-export function getVisionModel(modelName: string = "gemini-2.0-flash-exp"): GenerativeModel {
+export function getVisionModel(modelName: string = "gemini-2.0-flash"): GenerativeModel {
   const client = getGeminiClient();
   return client.getGenerativeModel({ model: modelName });
 }
