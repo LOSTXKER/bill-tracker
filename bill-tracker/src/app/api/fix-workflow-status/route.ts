@@ -40,6 +40,7 @@ export const POST = (request: Request) => {
       expenses: {
         whtFixed: 0,
         taxInvoiceFixed: 0,
+        paidCashReceiptFixed: 0,
         errors: [] as string[],
       },
       incomes: {
@@ -99,6 +100,29 @@ export const POST = (request: Request) => {
         }
       }
 
+      // Fix Expenses with PAID status but CASH_RECEIPT document type
+      // CASH_RECEIPT workflow should be: DRAFT → WAITING_TAX_INVOICE (รอบิลเงินสด)
+      const expensesWithPaidCashReceipt = await prisma.expense.findMany({
+        where: {
+          workflowStatus: ExpenseWorkflowStatus.PAID,
+          documentType: ExpenseDocumentType.CASH_RECEIPT,
+          deletedAt: null,
+        },
+        select: { id: true, workflowStatus: true, description: true },
+      });
+
+      for (const expense of expensesWithPaidCashReceipt) {
+        try {
+          await prisma.expense.update({
+            where: { id: expense.id },
+            data: { workflowStatus: ExpenseWorkflowStatus.WAITING_TAX_INVOICE },
+          });
+          results.expenses.paidCashReceiptFixed++;
+        } catch (err) {
+          results.expenses.errors.push(`Expense ${expense.id}: ${err}`);
+        }
+      }
+
       // Fix Incomes with WHT status but no WHT deducted
       const incomesWithWrongWhtStatus = await prisma.income.findMany({
         where: {
@@ -121,7 +145,7 @@ export const POST = (request: Request) => {
         }
       }
 
-      const totalFixed = results.expenses.whtFixed + results.expenses.taxInvoiceFixed + results.incomes.whtFixed;
+      const totalFixed = results.expenses.whtFixed + results.expenses.taxInvoiceFixed + results.expenses.paidCashReceiptFixed + results.incomes.whtFixed;
 
       return apiResponse.success(
         {
@@ -130,6 +154,7 @@ export const POST = (request: Request) => {
             totalFixed,
             expensesWhtFixed: results.expenses.whtFixed,
             expensesTaxInvoiceFixed: results.expenses.taxInvoiceFixed,
+            expensesPaidCashReceiptFixed: results.expenses.paidCashReceiptFixed,
             incomesWhtFixed: results.incomes.whtFixed,
           },
         },
@@ -180,6 +205,22 @@ export const GET = (request: Request) => {
         },
       });
 
+      // Find Expenses with PAID status but CASH_RECEIPT document type
+      const expensesWithPaidCashReceipt = await prisma.expense.findMany({
+        where: {
+          workflowStatus: ExpenseWorkflowStatus.PAID,
+          documentType: ExpenseDocumentType.CASH_RECEIPT,
+          deletedAt: null,
+        },
+        select: { 
+          id: true, 
+          workflowStatus: true, 
+          description: true, 
+          documentType: true,
+          Company: { select: { code: true, name: true } },
+        },
+      });
+
       // Find Incomes with WHT status but no WHT deducted
       const incomesWithWrongWhtStatus = await prisma.income.findMany({
         where: {
@@ -201,14 +242,16 @@ export const GET = (request: Request) => {
         expenses: {
           wrongWhtStatus: expensesWithWrongWhtStatus,
           wrongTaxInvoiceStatus: expensesWithWrongTaxStatus,
+          paidCashReceipt: expensesWithPaidCashReceipt,
         },
         incomes: {
           wrongWhtStatus: incomesWithWrongWhtStatus,
         },
         summary: {
-          totalToFix: expensesWithWrongWhtStatus.length + expensesWithWrongTaxStatus.length + incomesWithWrongWhtStatus.length,
+          totalToFix: expensesWithWrongWhtStatus.length + expensesWithWrongTaxStatus.length + expensesWithPaidCashReceipt.length + incomesWithWrongWhtStatus.length,
           expensesWhtToFix: expensesWithWrongWhtStatus.length,
           expensesTaxInvoiceToFix: expensesWithWrongTaxStatus.length,
+          expensesPaidCashReceiptToFix: expensesWithPaidCashReceipt.length,
           incomesWhtToFix: incomesWithWrongWhtStatus.length,
         },
       });
