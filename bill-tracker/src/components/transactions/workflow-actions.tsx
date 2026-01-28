@@ -28,7 +28,9 @@ import {
   Send,
   CheckCircle,
   Bell,
+  ArrowLeft,
 } from "lucide-react";
+import { getPreviousStatus, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
 
 interface WorkflowActionsProps {
   companyCode: string;
@@ -38,9 +40,11 @@ interface WorkflowActionsProps {
   currentStatus?: string; // alias for workflowStatus
   workflowStatus?: string;
   isWht?: boolean;
+  isWhtDeducted?: boolean; // for income type
   documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
   onActionComplete?: () => void;
   variant?: "default" | "compact";
+  isOwner?: boolean; // Owner can revert status
 }
 
 interface ActionConfig {
@@ -119,17 +123,32 @@ export function WorkflowActions({
   currentStatus,
   workflowStatus,
   isWht,
+  isWhtDeducted,
   documentType = "TAX_INVOICE",
   onActionComplete,
   variant = "default",
+  isOwner = false,
 }: WorkflowActionsProps) {
   const [loading, setLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ActionConfig | null>(null);
   const [notes, setNotes] = useState("");
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
 
   // Support both prop names
   const txType = type || transactionType || "expense";
   const status = currentStatus || workflowStatus || "";
+
+  // Build workflow context for getting previous status
+  const workflowContext: TransactionWorkflowContext = {
+    isWht: txType === "expense" ? isWht : undefined,
+    isWhtDeducted: txType === "income" ? isWhtDeducted : undefined,
+    documentType: txType === "expense" ? documentType : undefined,
+  };
+
+  // Get previous status for revert (owner only)
+  const previousStatus = isOwner 
+    ? getPreviousStatus(status, txType, workflowContext) 
+    : null;
 
   const actions = txType === "expense" 
     ? EXPENSE_ACTIONS[status] || []
@@ -205,18 +224,116 @@ export function WorkflowActions({
     }
   };
 
-  if (filteredActions.length === 0) {
+  // Handle revert action (owner only)
+  const handleRevert = async () => {
+    if (!previousStatus) return;
+    
+    setLoading(true);
+    const toastId = toast.loading("กำลังย้อนสถานะ...");
+    
+    try {
+      const res = await fetch(`/api/${companyCode}/document-workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionType: txType,
+          transactionId,
+          action: "revert",
+          targetStatus: previousStatus.value,
+          notes: notes || `ย้อนสถานะจาก ${status} ไปเป็น ${previousStatus.value}`,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "เกิดข้อผิดพลาด");
+      }
+
+      toast.success(`ย้อนสถานะเป็น "${previousStatus.label}" สำเร็จ`, { id: toastId });
+      setShowRevertConfirm(false);
+      setNotes("");
+      onActionComplete?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด", { id: toastId });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show nothing if no actions and no revert available
+  if (filteredActions.length === 0 && !previousStatus) {
     return null;
   }
 
   const primaryAction = filteredActions[0];
   const secondaryActions = filteredActions.slice(1);
 
+  // Revert button component (shown when owner and previous status exists)
+  const RevertButton = previousStatus ? (
+    <Button
+      variant="outline"
+      size={variant === "compact" ? "sm" : "default"}
+      onClick={() => setShowRevertConfirm(true)}
+      disabled={loading}
+      className="gap-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      {previousStatus.label}
+    </Button>
+  ) : null;
+
+  // Revert confirmation dialog
+  const RevertConfirmDialog = (
+    <Dialog open={showRevertConfirm} onOpenChange={setShowRevertConfirm}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ArrowLeft className="h-5 w-5 text-amber-600" />
+            ย้อนสถานะ
+          </DialogTitle>
+          <DialogDescription>
+            ต้องการย้อนสถานะจาก <strong>"{status}"</strong> กลับไปเป็น <strong>"{previousStatus?.label}"</strong> ใช่หรือไม่?
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="revert-notes">หมายเหตุ (ถ้ามี)</Label>
+            <Textarea
+              id="revert-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="เหตุผลในการย้อนสถานะ..."
+              className="mt-2"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowRevertConfirm(false)} disabled={loading}>
+            ยกเลิก
+          </Button>
+          <LoadingButton 
+            onClick={handleRevert} 
+            loading={loading}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            ย้อนสถานะ
+          </LoadingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   // Compact variant - single primary button with optional dropdown
   if (variant === "compact") {
     return (
       <>
         <div className="flex items-center gap-2">
+          {/* Revert button for owner */}
+          {RevertButton}
+          
           {primaryAction && (
             <LoadingButton
               onClick={() => handleAction(primaryAction)}
@@ -261,24 +378,32 @@ export function WorkflowActions({
             setNotes("");
           }}
         />
+        {RevertConfirmDialog}
       </>
     );
   }
 
   // Default variant
-  // If only one action, show as button
-  if (filteredActions.length === 1) {
+  // If only one action (or no actions but has revert), show as button
+  if (filteredActions.length <= 1) {
     const action = filteredActions[0];
     return (
       <>
-        <LoadingButton
-          onClick={() => handleAction(action)}
-          loading={loading}
-          className="gap-2"
-        >
-          {action.icon}
-          {action.label}
-        </LoadingButton>
+        <div className="flex items-center gap-2">
+          {/* Revert button for owner */}
+          {RevertButton}
+          
+          {action && (
+            <LoadingButton
+              onClick={() => handleAction(action)}
+              loading={loading}
+              className="gap-2"
+            >
+              {action.icon}
+              {action.label}
+            </LoadingButton>
+          )}
+        </div>
 
         <ConfirmDialog
           action={confirmDialog}
@@ -291,31 +416,37 @@ export function WorkflowActions({
             setNotes("");
           }}
         />
+        {RevertConfirmDialog}
       </>
     );
   }
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <LoadingButton loading={loading} className="gap-2">
-            ดำเนินการ
-            <ChevronDown className="h-4 w-4" />
-          </LoadingButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          {filteredActions.map((action, index) => (
-            <div key={action.action}>
-              {index > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuItem onClick={() => handleAction(action)} disabled={loading}>
-                {action.icon}
-                <span className="ml-2">{action.label}</span>
-              </DropdownMenuItem>
-            </div>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-2">
+        {/* Revert button for owner */}
+        {RevertButton}
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <LoadingButton loading={loading} className="gap-2">
+              ดำเนินการ
+              <ChevronDown className="h-4 w-4" />
+            </LoadingButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {filteredActions.map((action, index) => (
+              <div key={action.action}>
+                {index > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuItem onClick={() => handleAction(action)} disabled={loading}>
+                  {action.icon}
+                  <span className="ml-2">{action.label}</span>
+                </DropdownMenuItem>
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <ConfirmDialog
         action={confirmDialog}
@@ -328,6 +459,7 @@ export function WorkflowActions({
           setNotes("");
         }}
       />
+      {RevertConfirmDialog}
     </>
   );
 }

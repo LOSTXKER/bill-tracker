@@ -191,7 +191,7 @@ export function UnifiedTransactionForm({
   const router = useRouter();
   
   // Permissions for draft/approval workflow
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isOwner } = usePermissions();
   const canCreateDirect = config.type === "expense" 
     ? hasPermission("expenses:create-direct") 
     : hasPermission("incomes:create-direct");
@@ -420,6 +420,11 @@ export function UnifiedTransactionForm({
 
   // Track if we've already populated the form from SWR data
   const [formPopulated, setFormPopulated] = useState(false);
+  
+  // Reset formPopulated when transactionId changes (e.g., navigation or refresh)
+  useEffect(() => {
+    setFormPopulated(false);
+  }, [transactionId]);
   
   // Populate form when SWR data arrives (only once per transaction)
   useEffect(() => {
@@ -1576,12 +1581,14 @@ export function UnifiedTransactionForm({
                       type={config.type}
                       transactionId={transaction.id}
                       currentStatus={transaction.workflowStatus}
-                      isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
+                      isWht={config.type === "expense" ? transaction.isWht : undefined}
+                      isWhtDeducted={config.type === "income" ? transaction.isWhtDeducted : undefined}
                       documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") : undefined}
                       onActionComplete={() => {
                         refreshAll();
                       }}
                       variant="compact"
+                      isOwner={isOwner}
                     />
                   )}
                   <Button variant="outline" size="sm" onClick={handleEditClick}>

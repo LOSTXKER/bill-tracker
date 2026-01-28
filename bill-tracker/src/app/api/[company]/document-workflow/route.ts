@@ -148,13 +148,34 @@ export const POST = withCompanyAccessFromParams(
     const {
       transactionType, // "expense" | "income"
       transactionId,
-      action, // "receive_tax_invoice", "issue_wht", "send_wht", "receive_wht", "send_to_accounting", etc.
+      action, // "receive_tax_invoice", "issue_wht", "send_wht", "receive_wht", "send_to_accounting", "revert", etc.
       notes,
       metadata,
+      targetStatus, // For revert action: the status to revert to
     } = body;
 
     if (!transactionType || !transactionId || !action) {
       return apiResponse.badRequest("transactionType, transactionId, and action are required");
+    }
+
+    // For revert action, check if user is owner
+    if (action === "revert") {
+      const access = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: session.user.id,
+            companyId: company.id,
+          },
+        },
+      });
+      
+      if (!access?.isOwner) {
+        return apiResponse.forbidden("เฉพาะ Owner เท่านั้นที่สามารถย้อนสถานะได้");
+      }
+      
+      if (!targetStatus) {
+        return apiResponse.badRequest("targetStatus is required for revert action");
+      }
     }
 
     const now = new Date();
@@ -207,6 +228,12 @@ export const POST = withCompanyAccessFromParams(
           eventType = "STATUS_CHANGED";
           break;
 
+        case "revert":
+          // Owner can revert to previous status
+          newStatus = targetStatus as ExpenseWorkflowStatus;
+          eventType = "STATUS_CHANGED";
+          break;
+
         default:
           return apiResponse.badRequest(`Unknown action: ${action}`);
       }
@@ -231,7 +258,7 @@ export const POST = withCompanyAccessFromParams(
               eventDate: now,
               fromStatus: expense.workflowStatus,
               toStatus: newStatus,
-              notes,
+              notes: action === "revert" ? `ย้อนสถานะ: ${notes || ""}` : notes,
               metadata,
               createdBy: session.user.id,
             },
@@ -294,6 +321,12 @@ export const POST = withCompanyAccessFromParams(
           eventType = "STATUS_CHANGED";
           break;
 
+        case "revert":
+          // Owner can revert to previous status
+          newStatus = targetStatus as IncomeWorkflowStatus;
+          eventType = "STATUS_CHANGED";
+          break;
+
         default:
           return apiResponse.badRequest(`Unknown action: ${action}`);
       }
@@ -318,7 +351,7 @@ export const POST = withCompanyAccessFromParams(
               eventDate: now,
               fromStatus: income.workflowStatus,
               toStatus: newStatus,
-              notes,
+              notes: action === "revert" ? `ย้อนสถานะ: ${notes || ""}` : notes,
               metadata,
               createdBy: session.user.id,
             },
