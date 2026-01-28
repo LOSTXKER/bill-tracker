@@ -1218,17 +1218,24 @@ export function UnifiedTransactionForm({
       // This directly updates the cache without refetching
       await mutateTransaction({ data: { [config.type]: updatedData } }, { revalidate: false });
       
-      // Update selectedContact from the response to ensure UI consistency
+      // Update selectedContact and oneTimeContactName from the response to ensure UI consistency
       const contactData = updatedData.Contact || updatedData.contact;
       if (contactData) {
+        // Saved contact from database
         setSelectedContact({
           id: contactData.id,
           name: contactData.name,
           taxId: contactData.taxId,
         });
-      } else if (updatedData.contactId === null) {
-        // Contact was removed
+        setOneTimeContactName("");
+      } else if (updatedData.contactName) {
+        // One-time contact name (typed manually, not saved as Contact)
         setSelectedContact(null);
+        setOneTimeContactName(updatedData.contactName);
+      } else {
+        // No contact at all
+        setSelectedContact(null);
+        setOneTimeContactName("");
       }
       
       // Update selectedAccount from the response
