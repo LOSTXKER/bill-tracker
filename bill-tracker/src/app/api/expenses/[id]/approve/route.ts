@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
@@ -14,24 +14,53 @@ export const POST = (
   request: Request,
   routeParams: { params: Promise<{ id: string }> }
 ) => {
-  return withCompanyAccess(
-    async (req, { company, session }) => {
+  return withAuth(
+    async (req, { session }) => {
       const { id } = await routeParams.params;
 
-      // Find the expense
+      // Find the expense first (without company filter - we'll check access separately)
       const expense = await prisma.expense.findFirst({
         where: {
           id,
-          companyId: company.id,
           deletedAt: null,
         },
         include: {
           Contact: true,
+          Company: true,
         },
       });
 
       if (!expense) {
         return apiResponse.notFound("ไม่พบรายจ่าย");
+      }
+
+      const company = expense.Company;
+      if (!company) {
+        return apiResponse.badRequest("ไม่พบข้อมูลบริษัท");
+      }
+
+      // Check if user has access to this company
+      const access = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: session.user.id,
+            companyId: company.id,
+          },
+        },
+      });
+
+      if (!access) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้");
+      }
+
+      // Check if user has expenses:approve permission
+      const permissions = (access.permissions as string[]) || [];
+      const canApprove = access.isOwner || 
+        permissions.includes("expenses:approve") || 
+        permissions.includes("expenses:*");
+      
+      if (!canApprove) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์อนุมัติรายจ่าย");
       }
 
       // Only PENDING can be approved
@@ -123,7 +152,6 @@ export const POST = (
         { expense: updatedExpense },
         "อนุมัติรายจ่ายแล้ว"
       );
-    },
-    { permission: "expenses:approve" }
+    }
   )(request);
 };

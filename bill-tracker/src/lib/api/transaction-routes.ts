@@ -559,6 +559,12 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       key => workflowFileFields.includes(key)
     );
     
+    // Check if user is the owner of this item
+    const isOwner = existingItem.createdBy === session.user.id;
+    
+    // Check if item is in DRAFT status (owner can edit their drafts)
+    const isDraft = existingItem.workflowStatus === "DRAFT";
+    
     // Check access - allow change-status permission for file-only updates
     let hasAccess = await hasPermission(
       session.user.id,
@@ -566,7 +572,18 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       config.permissions.update
     );
     
-    // If no update permission but updating only files, check for change-status permission
+    // Owner can edit their own drafts or upload files to their own items
+    if (!hasAccess && isOwner) {
+      if (isDraft) {
+        // Owner can edit all fields of their own drafts
+        hasAccess = true;
+      } else if (isFileOnlyUpdate) {
+        // Owner can upload files to their own items (even after submission)
+        hasAccess = true;
+      }
+    }
+    
+    // If still no access and it's a file-only update, check for change-status permission
     if (!hasAccess && isFileOnlyUpdate) {
       const changeStatusPerm = config.modelName === "expense" 
         ? "expenses:change-status" 

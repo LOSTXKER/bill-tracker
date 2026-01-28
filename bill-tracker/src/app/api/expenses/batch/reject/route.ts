@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
@@ -16,8 +16,8 @@ interface RejectResult {
 }
 
 export const POST = (request: Request) => {
-  return withCompanyAccess(
-    async (req, { company, session }) => {
+  return withAuth(
+    async (req, { session }) => {
       const body = await req.json();
       const { ids, reason } = body as { ids: string[]; reason: string };
 
@@ -29,21 +29,65 @@ export const POST = (request: Request) => {
         return apiResponse.badRequest("กรุณาระบุเหตุผลในการปฏิเสธ");
       }
 
-      // Find all expenses
+      // Find all expenses (without company filter first, we'll check access per item)
       const expenses = await prisma.expense.findMany({
         where: {
           id: { in: ids },
-          companyId: company.id,
           deletedAt: null,
         },
         include: {
           Contact: true,
+          Company: true,
         },
       });
+
+      if (expenses.length === 0) {
+        return apiResponse.notFound("ไม่พบรายการที่เลือก");
+      }
+
+      // Get unique company IDs from selected expenses
+      const companyIds = [...new Set(expenses.map(e => e.companyId))];
+      
+      // Check user has access to all companies involved
+      const accessRecords = await prisma.companyAccess.findMany({
+        where: {
+          userId: session.user.id,
+          companyId: { in: companyIds },
+        },
+      });
+
+      // Create a map of company access for quick lookup
+      const accessMap = new Map(accessRecords.map(a => [a.companyId, a]));
 
       const results: RejectResult[] = [];
 
       for (const expense of expenses) {
+        // Check user has access to this expense's company
+        const access = accessMap.get(expense.companyId);
+        if (!access) {
+          results.push({
+            id: expense.id,
+            success: false,
+            error: "คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้",
+          });
+          continue;
+        }
+
+        // Check permission
+        const permissions = (access.permissions as string[]) || [];
+        const canApprove = access.isOwner || 
+          permissions.includes("expenses:approve") || 
+          permissions.includes("expenses:*");
+        
+        if (!canApprove) {
+          results.push({
+            id: expense.id,
+            success: false,
+            error: "คุณไม่มีสิทธิ์ปฏิเสธรายจ่าย",
+          });
+          continue;
+        }
+
         // Check if PENDING
         if (expense.approvalStatus !== "PENDING") {
           results.push({
@@ -77,7 +121,7 @@ export const POST = (request: Request) => {
 
         await createAuditLog({
           userId: session.user.id,
-          companyId: company.id,
+          companyId: expense.companyId,
           action: "UPDATE",
           entityType: "Expense",
           entityId: expense.id,
@@ -91,7 +135,7 @@ export const POST = (request: Request) => {
         // Notify the requester
         if (expense.createdBy) {
           await createNotification({
-            companyId: company.id,
+            companyId: expense.companyId,
             targetUserIds: [expense.createdBy],
             type: "TRANSACTION_REJECTED",
             entityType: "Expense",
@@ -128,7 +172,6 @@ export const POST = (request: Request) => {
         },
         `ปฏิเสธแล้ว ${rejectedCount} รายการ${failedCount > 0 ? `, ไม่สำเร็จ ${failedCount} รายการ` : ""}`
       );
-    },
-    { permission: "expenses:approve" }
+    }
   )(request);
 };

@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
@@ -14,8 +14,8 @@ export const POST = (
   request: Request,
   routeParams: { params: Promise<{ id: string }> }
 ) => {
-  return withCompanyAccess(
-    async (req, { company, session }) => {
+  return withAuth(
+    async (req, { session }) => {
       const { id } = await routeParams.params;
       const body = await req.json();
       const { reason } = body;
@@ -25,20 +25,49 @@ export const POST = (
         return apiResponse.badRequest("กรุณาระบุเหตุผลในการปฏิเสธ");
       }
 
-      // Find the income
+      // Find the income first (without company filter - we'll check access separately)
       const income = await prisma.income.findFirst({
         where: {
           id,
-          companyId: company.id,
           deletedAt: null,
         },
         include: {
           Contact: true,
+          Company: true,
         },
       });
 
       if (!income) {
         return apiResponse.notFound("ไม่พบรายรับ");
+      }
+
+      const company = income.Company;
+      if (!company) {
+        return apiResponse.badRequest("ไม่พบข้อมูลบริษัท");
+      }
+
+      // Check if user has access to this company
+      const access = await prisma.companyAccess.findUnique({
+        where: {
+          userId_companyId: {
+            userId: session.user.id,
+            companyId: company.id,
+          },
+        },
+      });
+
+      if (!access) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้");
+      }
+
+      // Check if user has incomes:approve permission
+      const permissions = (access.permissions as string[]) || [];
+      const canApprove = access.isOwner || 
+        permissions.includes("incomes:approve") || 
+        permissions.includes("incomes:*");
+      
+      if (!canApprove) {
+        return apiResponse.forbidden("คุณไม่มีสิทธิ์ปฏิเสธรายรับ");
       }
 
       // Only PENDING can be rejected
@@ -128,7 +157,6 @@ export const POST = (
         { income: updatedIncome },
         "ปฏิเสธรายรับแล้ว"
       );
-    },
-    { permission: "incomes:approve" }
+    }
   )(request);
 };
