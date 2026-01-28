@@ -105,7 +105,8 @@ function ImageViewer({
   if (!urls || urls.length === 0) return null;
 
   const currentUrl = urls[currentIndex];
-  const isPdf = currentUrl?.toLowerCase().endsWith(".pdf");
+  const urlString = typeof currentUrl === "string" ? currentUrl : String(currentUrl || "");
+  const isPdf = urlString.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="space-y-2">
@@ -118,7 +119,7 @@ function ImageViewer({
               <FileText className="h-12 w-12 mb-2" />
               <p className="text-sm">PDF Document</p>
               <a
-                href={currentUrl}
+                href={urlString}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline mt-1"
@@ -128,7 +129,7 @@ function ImageViewer({
             </div>
           ) : (
             <img
-              src={currentUrl}
+              src={urlString}
               alt={`${title} ${currentIndex + 1}`}
               className="max-h-full max-w-full object-contain"
               onClick={() => setShowFullscreen(true)}
@@ -168,7 +169,8 @@ function ImageViewer({
         {urls.length > 1 && (
           <div className="flex gap-1 p-2 overflow-x-auto">
             {urls.map((url, index) => {
-              const isThumbPdf = url?.toLowerCase().endsWith(".pdf");
+              const thumbUrlStr = typeof url === "string" ? url : String(url || "");
+              const isThumbPdf = thumbUrlStr.toLowerCase().endsWith(".pdf");
               return (
                 <button
                   key={index}
@@ -185,7 +187,7 @@ function ImageViewer({
                     </div>
                   ) : (
                     <img
-                      src={url}
+                      src={thumbUrlStr}
                       alt={`Thumbnail ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
@@ -215,7 +217,7 @@ function ImageViewer({
             <X className="h-6 w-6" />
           </button>
           <img
-            src={currentUrl}
+            src={urlString}
             alt="Fullscreen"
             className="max-h-[90vh] max-w-[90vw] object-contain"
             onClick={(e) => e.stopPropagation()}
@@ -332,7 +334,8 @@ export function TransactionPreviewSheet({
   // Navigate to full detail page
   const handleViewFull = () => {
     const path = transactionType === "expense" ? "expenses" : "incomes";
-    router.push(`/${companyCode.toLowerCase()}/${path}/${transactionId}`);
+    const code = typeof companyCode === "string" ? companyCode.toLowerCase() : String(companyCode || "").toLowerCase();
+    router.push(`/${code}/${path}/${transactionId}`);
     onOpenChange(false);
   };
 
