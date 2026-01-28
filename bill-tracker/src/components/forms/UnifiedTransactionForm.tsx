@@ -1205,7 +1205,32 @@ export function UnifiedTransactionForm({
 
       const result = await res.json();
       const updatedData = result.data?.[config.type] || result[config.type];
+      
+      // Update local state
       setTransaction(updatedData);
+      
+      // Update SWR cache to ensure data persists after refresh
+      // mutate() will revalidate and fetch fresh data from the server
+      await mutateTransaction();
+      
+      // Update selectedContact from the response to ensure UI consistency
+      const contactData = updatedData.Contact || updatedData.contact;
+      if (contactData) {
+        setSelectedContact({
+          id: contactData.id,
+          name: contactData.name,
+          taxId: contactData.taxId,
+        });
+      } else if (updatedData.contactId === null) {
+        // Contact was removed
+        setSelectedContact(null);
+      }
+      
+      // Update selectedAccount from the response
+      if (updatedData.accountId !== undefined) {
+        setSelectedAccount(updatedData.accountId);
+      }
+      
       onModeChange?.("view");
       setAuditRefreshKey((prev) => prev + 1);
       toast.success("บันทึกการแก้ไขสำเร็จ");
