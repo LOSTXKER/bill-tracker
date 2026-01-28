@@ -1209,9 +1209,9 @@ export function UnifiedTransactionForm({
       // Update local state
       setTransaction(updatedData);
       
-      // Update SWR cache to ensure data persists after refresh
-      // mutate() will revalidate and fetch fresh data from the server
-      await mutateTransaction();
+      // Update SWR cache with the response data to ensure it persists after refresh
+      // This directly updates the cache without refetching
+      await mutateTransaction({ data: { [config.type]: updatedData } }, { revalidate: false });
       
       // Update selectedContact from the response to ensure UI consistency
       const contactData = updatedData.Contact || updatedData.contact;

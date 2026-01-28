@@ -71,7 +71,7 @@ interface UseTransactionReturn {
   transaction: TransactionData | null;
   isLoading: boolean;
   error: Error | null;
-  mutate: () => Promise<any>;
+  mutate: (data?: any, opts?: { revalidate?: boolean }) => Promise<any>;
 }
 
 const fetcher = async (url: string) => {
@@ -91,16 +91,16 @@ export function useTransaction({
   const swrKey = enabled && transactionId ? `${apiEndpoint}/${transactionId}` : null;
 
   const { data, error, isLoading, mutate } = useSWR(swrKey, fetcher, {
-    // Keep data fresh but don't refetch on every focus
+    // Don't refetch on focus - we handle updates manually
     revalidateOnFocus: false,
-    // Don't refetch when window regains visibility
-    revalidateOnReconnect: false,
+    // Refetch on reconnect to ensure fresh data
+    revalidateOnReconnect: true,
     // Keep previous data while revalidating
     keepPreviousData: true,
-    // Cache for 5 minutes
-    dedupingInterval: 5 * 60 * 1000,
-    // Don't auto-revalidate
-    revalidateIfStale: false,
+    // Shorter deduping interval to allow faster updates
+    dedupingInterval: 2000,
+    // Revalidate stale data on mount (fresh data on page refresh)
+    revalidateOnMount: true,
   });
 
   // Extract transaction data from response
