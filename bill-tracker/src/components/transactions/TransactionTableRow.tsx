@@ -91,6 +91,7 @@ interface TransactionTableRowProps {
   currentUserId?: string;
   canApprove?: boolean;
   onApprovalChange?: () => void;
+  onPreview?: (id: string) => void;
 }
 
 // =============================================================================
@@ -177,12 +178,22 @@ export function TransactionTableRow({
   currentUserId,
   canApprove = false,
   onApprovalChange,
+  onPreview,
 }: TransactionTableRowProps) {
   const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
     companyCode,
     transactionType: config.type,
     transactionId: transaction.id,
   });
+
+  // Handle row click - open preview if available, otherwise navigate
+  const handleClick = () => {
+    if (onPreview) {
+      onPreview(transaction.id);
+    } else {
+      handleRowClick();
+    }
+  };
 
   // Get date based on config
   const rawDate = config.dateField === "billDate" 
@@ -219,7 +230,7 @@ export function TransactionTableRow({
   return (
     <TableRow
       className="cursor-pointer hover:bg-muted/50 transition-colors border-b border-border/50"
-      onClick={handleRowClick}
+      onClick={handleClick}
     >
       {/* Selection checkbox */}
       {onToggleSelect && (

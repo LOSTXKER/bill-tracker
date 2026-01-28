@@ -68,6 +68,7 @@ const incomeListConfig: TransactionListConfig = {
       currentUserId={options?.currentUserId}
       canApprove={options?.canApprove}
       onApprovalChange={options?.onRefresh}
+      onPreview={options?.onPreview}
     />
   ),
 };

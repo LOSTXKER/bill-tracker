@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, ReactNode } from "react";
+import { useState, useTransition, useMemo, ReactNode, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,6 +16,7 @@ import { TransactionFilters } from "@/components/transactions/TransactionFilters
 import { Pagination } from "@/components/shared/Pagination";
 import { BulkActionsBar } from "@/components/transactions/BulkActionsBar";
 import { ExportButton } from "@/components/transactions/ExportButton";
+import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
 import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-transaction-filters";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -58,6 +59,7 @@ export interface TransactionListConfig {
       currentUserId?: string; 
       canApprove?: boolean; 
       onRefresh?: () => void;
+      onPreview?: (id: string) => void;
     }
   ) => ReactNode;
 }
@@ -150,6 +152,15 @@ export function TransactionListClient({
   const { sortBy, sortOrder, toggleSort } = useSorting("createdAt");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
+  
+  // Preview Sheet state
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  
+  const handlePreview = useCallback((id: string) => {
+    setPreviewId(id);
+    setPreviewOpen(true);
+  }, []);
   
   const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
   
@@ -533,6 +544,7 @@ export function TransactionListClient({
                           currentUserId,
                           canApprove,
                           onRefresh: () => router.refresh(),
+                          onPreview: handlePreview,
                         }
                       )
                     ))}
@@ -571,6 +583,15 @@ export function TransactionListClient({
           hasPendingItems={hasPendingItems}
         />
       )}
+
+      {/* Transaction Preview Sheet */}
+      <TransactionPreviewSheet
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        transactionId={previewId}
+        transactionType={config.type}
+        companyCode={companyCode}
+      />
     </div>
   );
 }

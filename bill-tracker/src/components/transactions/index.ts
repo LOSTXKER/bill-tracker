@@ -26,3 +26,6 @@ export { QuickApprovalCell } from "./QuickApprovalCell";
 
 // Transaction view components
 export { TransactionViewHeader, type TransactionViewHeaderProps } from "./TransactionViewHeader";
+
+// Preview Sheet
+export { TransactionPreviewSheet, type PreviewTransactionType } from "./TransactionPreviewSheet";
