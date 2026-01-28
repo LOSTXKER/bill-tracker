@@ -1193,6 +1193,7 @@ export function UnifiedTransactionForm({
         body: JSON.stringify({
           ...formData,
           contactId: selectedContact?.id || null,
+          contactName: !selectedContact?.id && oneTimeContactName.trim() ? oneTimeContactName.trim() : null,
           accountId: selectedAccount || null,
           amount: Number(formData.amount),
           vatRate: Number(formData.vatRate),
