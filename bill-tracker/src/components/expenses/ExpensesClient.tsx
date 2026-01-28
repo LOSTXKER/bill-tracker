@@ -33,6 +33,7 @@ interface ExpensesClientProps {
   viewMode?: "official" | "internal";
   currentUserId?: string;
   canApprove?: boolean;
+  isOwner?: boolean;
   tabCounts?: TabCounts;
 }
 
@@ -87,6 +88,7 @@ export function ExpensesClient({
   viewMode = "official",
   currentUserId,
   canApprove = false,
+  isOwner = false,
   tabCounts,
 }: ExpensesClientProps) {
   const router = useRouter();
@@ -170,6 +172,7 @@ export function ExpensesClient({
         companies={companies}
         currentUserId={currentUserId}
         canApprove={canApprove}
+        isOwner={isOwner}
         tabCounts={tabCounts}
       />
     </div>

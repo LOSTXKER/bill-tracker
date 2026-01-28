@@ -27,6 +27,7 @@ interface IncomesClientProps {
   initialTotal: number;
   currentUserId?: string;
   canApprove?: boolean;
+  isOwner?: boolean;
   tabCounts?: TabCounts;
 }
 
@@ -79,6 +80,7 @@ export function IncomesClient({
   initialTotal,
   currentUserId,
   canApprove = false,
+  isOwner = false,
   tabCounts,
 }: IncomesClientProps) {
   return (
@@ -89,6 +91,7 @@ export function IncomesClient({
       config={incomeListConfig}
       currentUserId={currentUserId}
       canApprove={canApprove}
+      isOwner={isOwner}
       tabCounts={tabCounts}
     />
   );

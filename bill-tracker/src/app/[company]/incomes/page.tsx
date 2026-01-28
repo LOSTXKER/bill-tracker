@@ -12,7 +12,7 @@ import { IncomesClient } from "@/components/incomes/IncomesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getIncomeStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions/checker";
+import { hasPermission, getUserPermissions } from "@/lib/permissions/checker";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
@@ -123,12 +123,20 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  // Get session and check approval permission
+  // Get session and check permissions
   const session = await getSession();
   const currentUserId = session?.user?.id;
+  
+  // Get user permissions including isOwner
+  const userPermissions = currentUserId
+    ? await getUserPermissions(currentUserId, companyId)
+    : { isOwner: false, permissions: [] };
+  
   const canApprove = currentUserId 
     ? await hasPermission(currentUserId, companyId, "incomes:approve")
     : false;
+  
+  const isOwner = userPermissions.isOwner;
 
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
@@ -302,6 +310,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       initialTotal={total}
       currentUserId={currentUserId}
       canApprove={canApprove}
+      isOwner={isOwner}
       tabCounts={tabCounts}
     />
   );

@@ -170,3 +170,60 @@ export function getStatusLabel(status: string, type: "expense" | "income"): stri
   const labels = type === "expense" ? EXPENSE_STATUS_LABELS : INCOME_STATUS_LABELS;
   return labels[status]?.label || status;
 }
+
+/**
+ * หาสถานะก่อนหน้าที่เป็นไปได้จากสถานะปัจจุบัน (สำหรับ Owner ย้อนสถานะ)
+ * @param currentStatus สถานะปัจจุบัน
+ * @param type ประเภท expense หรือ income
+ * @param context ข้อมูลบริบทของรายการ (isWht, documentType, etc.)
+ * @returns NextStatusInfo หรือ null ถ้าไม่มีสถานะก่อนหน้า
+ */
+export function getPreviousStatus(
+  currentStatus: string,
+  type: "expense" | "income",
+  context?: TransactionWorkflowContext
+): NextStatusInfo | null {
+  const order = getEffectiveWorkflowOrder(type, context);
+  const labels = type === "expense" ? EXPENSE_STATUS_LABELS : INCOME_STATUS_LABELS;
+
+  const currentIndex = order.indexOf(currentStatus);
+
+  // ไม่พบสถานะในรายการ หรือ อยู่ต้นสุดแล้ว (ไม่สามารถย้อนได้)
+  // ไม่อนุญาตให้ย้อนกลับไปที่ DRAFT
+  if (currentIndex <= 1) {
+    return null;
+  }
+
+  const prevValue = order[currentIndex - 1];
+  const prevLabel = labels[prevValue]?.label || prevValue;
+
+  return {
+    value: prevValue,
+    label: prevLabel,
+  };
+}
+
+/**
+ * ดึงรายการสถานะทั้งหมดที่สามารถเลือกได้ (สำหรับ Owner)
+ * Owner สามารถเลือกสถานะใดก็ได้ใน workflow (ยกเว้น DRAFT)
+ * @param currentStatus สถานะปัจจุบัน
+ * @param type ประเภท expense หรือ income
+ * @param context ข้อมูลบริบทของรายการ
+ * @returns รายการสถานะที่เลือกได้
+ */
+export function getAllAvailableStatuses(
+  currentStatus: string,
+  type: "expense" | "income",
+  context?: TransactionWorkflowContext
+): NextStatusInfo[] {
+  const order = getEffectiveWorkflowOrder(type, context);
+  const labels = type === "expense" ? EXPENSE_STATUS_LABELS : INCOME_STATUS_LABELS;
+
+  // คืนค่าสถานะทั้งหมดยกเว้น DRAFT และสถานะปัจจุบัน
+  return order
+    .filter(status => status !== "DRAFT" && status !== currentStatus)
+    .map(status => ({
+      value: status,
+      label: labels[status]?.label || status,
+    }));
+}

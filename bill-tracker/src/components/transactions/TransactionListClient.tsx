@@ -21,7 +21,7 @@ import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-tr
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { StatusInfo } from "@/lib/constants/transaction";
-import { getNextStatus, getStatusLabel, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
+import { getNextStatus, getStatusLabel, getAllAvailableStatuses, getPreviousStatus, type TransactionWorkflowContext, type NextStatusInfo } from "@/lib/workflow/status-rules";
 
 // ============================================================================
 // Types
@@ -92,6 +92,7 @@ interface TransactionListClientProps {
   companies?: CompanyOption[];
   currentUserId?: string;
   canApprove?: boolean;
+  isOwner?: boolean;  // Owner can change status to any status (forward or backward)
   tabCounts?: TabCounts;
 }
 
@@ -144,6 +145,7 @@ export function TransactionListClient({
   companies = [],
   currentUserId,
   canApprove = false,
+  isOwner = false,
   tabCounts,
 }: TransactionListClientProps) {
   const router = useRouter();
@@ -273,6 +275,18 @@ export function TransactionListClient({
     if (selectedStatuses.length !== 1) return null;
     return getNextStatus(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
   }, [selectedStatuses, config.type, selectedWorkflowContext]);
+
+  // Calculate previous status for owners (only if all selected items have the same status)
+  const previousStatus = useMemo(() => {
+    if (selectedStatuses.length !== 1 || !isOwner) return null;
+    return getPreviousStatus(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
+  }, [selectedStatuses, config.type, selectedWorkflowContext, isOwner]);
+
+  // Calculate all available statuses for owners
+  const allAvailableStatuses = useMemo((): NextStatusInfo[] => {
+    if (selectedStatuses.length !== 1 || !isOwner) return [];
+    return getAllAvailableStatuses(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
+  }, [selectedStatuses, config.type, selectedWorkflowContext, isOwner]);
 
   // Get current status label for display
   const currentStatusLabel = useMemo(() => {
@@ -614,6 +628,9 @@ export function TransactionListClient({
           onStatusChange={handleBulkStatusChange}
           selectedStatuses={selectedStatuses}
           nextStatus={nextStatus}
+          previousStatus={previousStatus}
+          allAvailableStatuses={allAvailableStatuses}
+          isOwner={isOwner}
           currentStatusLabel={currentStatusLabel}
           onInternalCompanyChange={config.type === "expense" ? handleBulkInternalCompanyChange : undefined}
           companies={config.type === "expense" ? companies : undefined}

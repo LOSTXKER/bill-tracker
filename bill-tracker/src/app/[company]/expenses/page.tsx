@@ -12,7 +12,7 @@ import { ExpensesClient } from "@/components/expenses/ExpensesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getExpenseStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions/checker";
+import { hasPermission, getUserPermissions } from "@/lib/permissions/checker";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
@@ -123,12 +123,20 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  // Get session and check approval permission
+  // Get session and check permissions
   const session = await getSession();
   const currentUserId = session?.user?.id;
+  
+  // Get user permissions including isOwner
+  const userPermissions = currentUserId
+    ? await getUserPermissions(currentUserId, companyId)
+    : { isOwner: false, permissions: [] };
+  
   const canApprove = currentUserId 
     ? await hasPermission(currentUserId, companyId, "expenses:approve")
     : false;
+  
+  const isOwner = userPermissions.isOwner;
 
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
@@ -359,6 +367,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       viewMode={viewMode as "official" | "internal"}
       currentUserId={currentUserId}
       canApprove={canApprove}
+      isOwner={isOwner}
       tabCounts={tabCounts}
     />
   );
