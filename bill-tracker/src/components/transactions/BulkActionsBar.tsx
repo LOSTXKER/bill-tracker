@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Trash2, Send, FileDown, Loader2, ArrowRight, ArrowLeft, ChevronDown, AlertCircle, CheckCircle2, Building2, CheckCircle, XCircle } from "lucide-react";
+import { X, Trash2, Send, FileDown, Loader2, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Building2, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/select";
 import type { NextStatusInfo } from "@/lib/workflow/status-rules";
 
+// Note: Select is still used for Internal Company selection
+
 export interface CompanyOption {
   id: string;
   name: string;
@@ -42,8 +44,7 @@ interface BulkActionsBarProps {
   selectedStatuses?: string[];  // สถานะของรายการที่เลือก (unique values)
   nextStatus?: NextStatusInfo | null;  // สถานะถัดไปที่เป็นไปได้
   previousStatus?: NextStatusInfo | null;  // สถานะก่อนหน้า (สำหรับ Owner ย้อนสถานะ)
-  allAvailableStatuses?: NextStatusInfo[];  // สถานะทั้งหมดที่เลือกได้ (สำหรับ Owner)
-  isOwner?: boolean;  // true if user is owner (can change to any status)
+  isOwner?: boolean;  // true if user is owner (can revert status)
   currentStatusLabel?: string;  // label ของสถานะปัจจุบัน (สำหรับแสดง)
   // Internal company bulk edit
   onInternalCompanyChange?: (companyId: string | null) => Promise<void>;
@@ -65,7 +66,6 @@ export function BulkActionsBar({
   selectedStatuses = [],
   nextStatus,
   previousStatus,
-  allAvailableStatuses = [],
   isOwner = false,
   currentStatusLabel,
   onInternalCompanyChange,
@@ -77,8 +77,7 @@ export function BulkActionsBar({
 }: BulkActionsBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStatusConfirm, setShowStatusConfirm] = useState(false);
-  const [showStatusSelectDialog, setShowStatusSelectDialog] = useState(false);
-  const [selectedTargetStatus, setSelectedTargetStatus] = useState<NextStatusInfo | null>(null);
+  const [showRevertStatusConfirm, setShowRevertStatusConfirm] = useState(false);
   const [showInternalCompanyConfirm, setShowInternalCompanyConfirm] = useState(false);
   const [selectedInternalCompany, setSelectedInternalCompany] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -118,19 +117,18 @@ export function BulkActionsBar({
     }
   };
 
-  // Owner status change (can select any status)
-  const handleOwnerStatusChange = async () => {
-    if (!onStatusChange || !selectedTargetStatus) return;
+  // Owner revert status (go back one step)
+  const handleRevertStatus = async () => {
+    if (!onStatusChange || !previousStatus) return;
     setIsLoading(true);
-    const toastId = toast.loading(`กำลังเปลี่ยนสถานะ ${selectedCount} รายการ...`);
+    const toastId = toast.loading(`กำลังย้อนสถานะ ${selectedCount} รายการ...`);
     try {
-      await onStatusChange(selectedTargetStatus.value);
-      toast.success(`เปลี่ยนสถานะ ${selectedCount} รายการเป็น "${selectedTargetStatus.label}" สำเร็จ`, { id: toastId });
-      setShowStatusSelectDialog(false);
-      setSelectedTargetStatus(null);
+      await onStatusChange(previousStatus.value);
+      toast.success(`ย้อนสถานะ ${selectedCount} รายการเป็น "${previousStatus.label}" สำเร็จ`, { id: toastId });
+      setShowRevertStatusConfirm(false);
       onClearSelection();
     } catch (error) {
-      toast.error("เกิดข้อผิดพลาดในการเปลี่ยนสถานะ", { id: toastId });
+      toast.error("เกิดข้อผิดพลาดในการย้อนสถานะ", { id: toastId });
     } finally {
       setIsLoading(false);
     }
@@ -208,7 +206,6 @@ export function BulkActionsBar({
   const isAtFinalStatus = selectedStatuses.length === 1 && !nextStatus && !previousStatus;
   const canChangeStatus = selectedStatuses.length === 1 && nextStatus && onStatusChange;
   const canRevertStatus = selectedStatuses.length === 1 && previousStatus && onStatusChange && isOwner;
-  const canSelectAnyStatus = selectedStatuses.length === 1 && allAvailableStatuses.length > 0 && isOwner && onStatusChange;
 
   return (
     <>
@@ -240,15 +237,12 @@ export function BulkActionsBar({
                 </div>
               ) : (
                 <div className="flex items-center gap-1">
-                  {/* Revert button for owners */}
+                  {/* Revert button for owners - go back one step */}
                   {canRevertStatus && previousStatus && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setSelectedTargetStatus(previousStatus);
-                        setShowStatusSelectDialog(true);
-                      }}
+                      onClick={() => setShowRevertStatusConfirm(true)}
                       disabled={isLoading}
                       className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                       title="ย้อนสถานะ"
@@ -269,20 +263,6 @@ export function BulkActionsBar({
                     >
                       <ArrowRight className="h-4 w-4 mr-1" />
                       {nextStatus.label}
-                    </Button>
-                  )}
-
-                  {/* Status selector dropdown for owners */}
-                  {canSelectAnyStatus && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowStatusSelectDialog(true)}
-                      disabled={isLoading}
-                      className="h-8"
-                      title="เลือกสถานะ"
-                    >
-                      <ChevronDown className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
@@ -575,53 +555,43 @@ export function BulkActionsBar({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Owner Status Select Dialog */}
-      <AlertDialog open={showStatusSelectDialog} onOpenChange={setShowStatusSelectDialog}>
+      {/* Revert Status Confirmation Dialog (Owner only) */}
+      <AlertDialog open={showRevertStatusConfirm} onOpenChange={setShowRevertStatusConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>เลือกสถานะ</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4">
-                <p>
-                  เปลี่ยนสถานะ {selectedCount} รายการ
-                  {currentStatusLabel && (
-                    <> จาก <strong>"{currentStatusLabel}"</strong></>
-                  )}
-                </p>
-                <Select
-                  value={selectedTargetStatus?.value || ""}
-                  onValueChange={(value) => {
-                    const status = allAvailableStatuses.find(s => s.value === value);
-                    setSelectedTargetStatus(status || null);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกสถานะที่ต้องการ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allAvailableStatuses.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <AlertDialogTitle>ยืนยันการย้อนสถานะ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการย้อนสถานะ {selectedCount} รายการ
+              {currentStatusLabel && (
+                <>
+                  {" "}จาก <strong>"{currentStatusLabel}"</strong>
+                </>
+              )}
+              {previousStatus && (
+                <>
+                  {" "}กลับไปเป็น <strong>"{previousStatus.label}"</strong>
+                </>
+              )}
+              ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleOwnerStatusChange}
-              disabled={isLoading || !selectedTargetStatus}
+              onClick={handleRevertStatus}
+              disabled={isLoading}
+              className="bg-amber-600 hover:bg-amber-700"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  กำลังเปลี่ยน...
+                  กำลังย้อน...
                 </>
               ) : (
-                "ยืนยัน"
+                <>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  ย้อนสถานะ
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

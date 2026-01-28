@@ -21,7 +21,7 @@ import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-tr
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { StatusInfo } from "@/lib/constants/transaction";
-import { getNextStatus, getStatusLabel, getAllAvailableStatuses, getPreviousStatus, type TransactionWorkflowContext, type NextStatusInfo } from "@/lib/workflow/status-rules";
+import { getNextStatus, getStatusLabel, getPreviousStatus, type TransactionWorkflowContext, type NextStatusInfo } from "@/lib/workflow/status-rules";
 
 // ============================================================================
 // Types
@@ -280,12 +280,6 @@ export function TransactionListClient({
   const previousStatus = useMemo(() => {
     if (selectedStatuses.length !== 1 || !isOwner) return null;
     return getPreviousStatus(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
-  }, [selectedStatuses, config.type, selectedWorkflowContext, isOwner]);
-
-  // Calculate all available statuses for owners
-  const allAvailableStatuses = useMemo((): NextStatusInfo[] => {
-    if (selectedStatuses.length !== 1 || !isOwner) return [];
-    return getAllAvailableStatuses(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
   }, [selectedStatuses, config.type, selectedWorkflowContext, isOwner]);
 
   // Get current status label for display
@@ -629,7 +623,6 @@ export function TransactionListClient({
           selectedStatuses={selectedStatuses}
           nextStatus={nextStatus}
           previousStatus={previousStatus}
-          allAvailableStatuses={allAvailableStatuses}
           isOwner={isOwner}
           currentStatusLabel={currentStatusLabel}
           onInternalCompanyChange={config.type === "expense" ? handleBulkInternalCompanyChange : undefined}
