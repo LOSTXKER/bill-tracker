@@ -303,7 +303,14 @@ ${contactList}
 - ⚠️ เลขภาษีของบริษัทเรา (${company?.taxId || ""}) ไม่ใช่ของผู้ขาย
 - ในใบกำกับภาษี: "Bill to" / "ส่งถึง" คือผู้ซื้อ (อาจเป็นเรา) | ส่วนหัวเอกสาร/โลโก้คือผู้ขาย
 - VAT rate ในไทยคือ 0% หรือ 7%
-- ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)
+
+## ⚠️⚠️⚠️ การแปลงปี พ.ศ. → ค.ศ. (สำคัญมาก!) ⚠️⚠️⚠️
+- **ปีปัจจุบัน**: ค.ศ. ${new Date().getFullYear()} = พ.ศ. ${new Date().getFullYear() + 543}
+- เอกสารไทยมักใช้ปี พ.ศ. (เช่น 2569, 2568) ให้แปลงเป็น ค.ศ. โดย **ลบ 543**
+- ตัวอย่าง: 2569 - 543 = 2026, 2568 - 543 = 2025
+- ⚠️ **อ่านตัวเลขปีให้ละเอียด! โดยเฉพาะเลข 5 กับ 6** - อ่านผิดจะทำให้ปีคลาดเคลื่อน 10 ปี
+- ⚠️ **ห้าม return ปีที่เก่ากว่า ${new Date().getFullYear() - 2}** เพราะเอกสารใหม่ไม่ควรมีปีเก่ามาก
+- ถ้าไม่แน่ใจเรื่องปี → ดูจากรหัสอ้างอิง/เลขที่เอกสาร (มักมีปี ค.ศ. เช่น "202601..." = 2026)
 - **สกุลเงิน**: ดูสัญลักษณ์หรือตัวอักษรในเอกสาร เช่น $, USD, AED, €, EUR, £, GBP, ¥, JPY, ฿, THB, บาท ถ้าไม่แน่ใจให้ใส่ "THB"
 
 ## ⚠️⚠️⚠️ WHT (หัก ณ ที่จ่าย) - ต้องตรวจให้ละเอียด! ⚠️⚠️⚠️
@@ -481,14 +488,39 @@ function parseAIResponse(
       }
     }
 
-    // Normalize date (พ.ศ. → ค.ศ.)
+    // Normalize date (พ.ศ. → ค.ศ.) with validation
     let normalizedDate = parsed.date;
     if (normalizedDate) {
       const yearMatch = normalizedDate.match(/^(\d{4})/);
       if (yearMatch) {
-        const year = parseInt(yearMatch[1]);
+        let year = parseInt(yearMatch[1]);
+        
+        // If year is in Buddhist Era (พ.ศ.), convert to CE (ค.ศ.)
         if (year > 2500) {
-          normalizedDate = normalizedDate.replace(/^\d{4}/, String(year - 543));
+          year = year - 543;
+          normalizedDate = normalizedDate.replace(/^\d{4}/, String(year));
+        }
+        
+        // Validation: Fix unreasonable years (AI sometimes misreads digits)
+        const currentYear = new Date().getFullYear();
+        const minReasonableYear = currentYear - 2; // Allow 2 years back max
+        
+        if (year < minReasonableYear) {
+          // Common AI misread: 6 → 5 (e.g., 2569 read as 2559 → 2016 instead of 2026)
+          // Try to fix by adding 10 years
+          const correctedYear = year + 10;
+          if (correctedYear >= minReasonableYear && correctedYear <= currentYear + 1) {
+            console.log(`[AI Date Fix] Corrected year from ${year} to ${correctedYear} (likely AI misread 6 as 5)`);
+            normalizedDate = normalizedDate.replace(/^\d{4}/, String(correctedYear));
+          } else {
+            // If correction doesn't make sense, default to current year
+            console.log(`[AI Date Fix] Year ${year} too old, defaulting to ${currentYear}`);
+            normalizedDate = normalizedDate.replace(/^\d{4}/, String(currentYear));
+          }
+        } else if (year > currentYear + 1) {
+          // Year is in the future (too far), default to current year
+          console.log(`[AI Date Fix] Year ${year} in future, defaulting to ${currentYear}`);
+          normalizedDate = normalizedDate.replace(/^\d{4}/, String(currentYear));
         }
       }
     }
