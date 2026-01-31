@@ -96,13 +96,14 @@ const INCOME_STEPS_NO_WHT: Step[] = [
 ];
 
 // Map workflow statuses to their display step (matches schema ExpenseWorkflowStatus/IncomeWorkflowStatus)
-const STATUS_MAP: Record<string, string> = {
+// Note: Some statuses need context-aware mapping (handled in getStatusMapping function)
+const BASE_STATUS_MAP: Record<string, string> = {
   // Expense workflow statuses (from ExpenseWorkflowStatus enum in schema)
   DRAFT: "DRAFT",
   PAID: "PAID",
   WAITING_TAX_INVOICE: "PAID", // Waiting = still in PAID step
   TAX_INVOICE_RECEIVED: "TAX_INVOICE_RECEIVED",
-  WHT_PENDING_ISSUE: "TAX_INVOICE_RECEIVED", // Waiting = still in TAX_INVOICE_RECEIVED step
+  WHT_PENDING_ISSUE: "TAX_INVOICE_RECEIVED", // Default: Waiting = still in TAX_INVOICE_RECEIVED step
   WHT_ISSUED: "WHT_ISSUED",
   WHT_SENT_TO_VENDOR: "WHT_ISSUED", // After WHT issued
   READY_FOR_ACCOUNTING: "READY_FOR_ACCOUNTING",
@@ -117,6 +118,15 @@ const STATUS_MAP: Record<string, string> = {
   WHT_PENDING_CERT: "INVOICE_ISSUED", // Waiting for WHT cert
   WHT_CERT_RECEIVED: "WHT_CERT_RECEIVED",
 };
+
+// Get context-aware status mapping based on document type
+function getStatusMapping(status: string, documentType?: string): string {
+  // For NO_DOCUMENT or CASH_RECEIPT, WHT_PENDING_ISSUE should map to WHT_ISSUED step (showing as waiting)
+  if ((documentType === "NO_DOCUMENT" || documentType === "CASH_RECEIPT") && status === "WHT_PENDING_ISSUE") {
+    return "WHT_ISSUED";
+  }
+  return BASE_STATUS_MAP[status] || status;
+}
 
 // =============================================================================
 // Component
@@ -162,8 +172,8 @@ export function TimelineStepper({
   // Always include DRAFT step at the beginning to show complete timeline
   const steps = [draftStep, ...baseSteps];
 
-  // Map current status to step key
-  const mappedStatus = STATUS_MAP[currentStatus] || currentStatus;
+  // Map current status to step key (context-aware for document type)
+  const mappedStatus = getStatusMapping(currentStatus, documentType);
   
   // Find current step index
   const currentIndex = steps.findIndex(step => step.key === mappedStatus);

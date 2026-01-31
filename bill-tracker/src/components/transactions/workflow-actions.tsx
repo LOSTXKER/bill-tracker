@@ -63,11 +63,11 @@ const EXPENSE_ACTIONS: Record<string, ActionConfig[]> = {
     { action: "receive_tax_invoice", label: "ได้รับเอกสาร", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับเอกสารจากร้านค้าแล้ว" },
   ],
   TAX_INVOICE_RECEIVED: [
-    { action: "issue_wht", label: "ออกใบ 50 ทวิ", icon: <FileText className="h-4 w-4" />, description: "ออกหนังสือรับรองการหักภาษี ณ ที่จ่ายให้ vendor" },
+    { action: "issue_wht", label: "ออก 50 ทวิแล้ว", icon: <FileText className="h-4 w-4" />, description: "บันทึกว่าออกหนังสือรับรองหัก ณ ที่จ่ายแล้ว" },
     { action: "send_to_accounting", label: "ส่งบัญชี", icon: <Send className="h-4 w-4" />, description: "ส่งเอกสารให้ฝ่ายบัญชี" },
   ],
   WHT_PENDING_ISSUE: [
-    { action: "issue_wht", label: "ออกใบ 50 ทวิ", icon: <FileText className="h-4 w-4" />, description: "ออกหนังสือรับรองการหักภาษี ณ ที่จ่ายให้ vendor" },
+    { action: "issue_wht", label: "ออก 50 ทวิแล้ว", icon: <FileText className="h-4 w-4" />, description: "บันทึกว่าออกหนังสือรับรองหัก ณ ที่จ่ายแล้ว" },
   ],
   WHT_ISSUED: [
     { action: "send_wht", label: "ส่งใบ 50 ทวิให้ vendor", icon: <Send className="h-4 w-4" />, description: "ส่งหนังสือรับรองให้ vendor แล้ว" },
@@ -174,9 +174,9 @@ export function WorkflowActions({
           return {
             ...action,
             action: "skip_to_wht",
-            label: "ออก 50 ทวิ",
+            label: "ดำเนินการต่อ",
             icon: <FileText className="h-4 w-4" />,
-            description: "ดำเนินการออกหนังสือรับรองหัก ณ ที่จ่าย"
+            description: "ไปยังขั้นตอนออกหนังสือรับรองหัก ณ ที่จ่าย"
           };
         } else {
           // No WHT - go to accounting
