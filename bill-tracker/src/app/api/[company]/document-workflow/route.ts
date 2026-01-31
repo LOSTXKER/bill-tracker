@@ -202,6 +202,18 @@ export const POST = withCompanyAccessFromParams(
           eventType = "TAX_INVOICE_RECEIVED";
           break;
 
+        case "skip_to_wht":
+          // For NO_DOCUMENT type with WHT - skip document phase, go to WHT
+          newStatus = "WHT_PENDING_ISSUE";
+          eventType = "STATUS_CHANGED";
+          break;
+
+        case "skip_to_accounting":
+          // For NO_DOCUMENT type without WHT - skip document phase, go to accounting
+          newStatus = "READY_FOR_ACCOUNTING";
+          eventType = "STATUS_CHANGED";
+          break;
+
         case "issue_wht":
           updateData.hasWhtCert = true;
           updateData.whtCertIssuedAt = now;

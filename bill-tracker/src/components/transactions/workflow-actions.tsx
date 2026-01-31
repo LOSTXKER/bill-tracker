@@ -167,6 +167,28 @@ export function WorkflowActions({
           description: "บันทึกว่าได้รับบิลเงินสด/ใบเสร็จแล้ว"
         };
       }
+      // For NO_DOCUMENT type at PAID status, replace with appropriate action
+      if (documentType === "NO_DOCUMENT" && action.action === "receive_tax_invoice") {
+        if (isWht) {
+          // Has WHT - need to issue 50 ทวิ
+          return {
+            ...action,
+            action: "skip_to_wht",
+            label: "ออก 50 ทวิ",
+            icon: <FileText className="h-4 w-4" />,
+            description: "ดำเนินการออกหนังสือรับรองหัก ณ ที่จ่าย"
+          };
+        } else {
+          // No WHT - go to accounting
+          return {
+            ...action,
+            action: "skip_to_accounting",
+            label: "ส่งบัญชี",
+            icon: <Send className="h-4 w-4" />,
+            description: "ส่งเอกสารให้ฝ่ายบัญชี (ไม่มีใบกำกับภาษี)"
+          };
+        }
+      }
       return action;
     });
   };
@@ -175,10 +197,6 @@ export function WorkflowActions({
   const filteredActions = getModifiedActions(actions).filter((action) => {
     // Hide WHT actions if not using WHT
     if (action.action.includes("wht") && !isWht) {
-      return false;
-    }
-    // For NO_DOCUMENT type, hide document-related actions (they shouldn't appear anyway)
-    if (documentType === "NO_DOCUMENT" && action.action === "receive_tax_invoice") {
       return false;
     }
     return true;
