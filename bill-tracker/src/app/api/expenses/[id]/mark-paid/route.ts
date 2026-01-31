@@ -61,12 +61,11 @@ export const POST = (
       
       let targetWorkflowStatus: ExpenseWorkflowStatus;
       
-      // For NO_DOCUMENT type, skip directly to READY_FOR_ACCOUNTING
-      if (documentType === "NO_DOCUMENT") {
-        targetWorkflowStatus = "READY_FOR_ACCOUNTING";
-      } else if (hasTaxInvoice) {
-        // Has document already - check WHT (only for VAT 7% / TAX_INVOICE type)
-        targetWorkflowStatus = (isWht && documentType === "TAX_INVOICE") ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
+      // Determine next workflow status based on document type and WHT
+      if (documentType === "NO_DOCUMENT" || hasTaxInvoice) {
+        // No document needed or already have it - check WHT
+        // WHT is required regardless of document type (TAX_INVOICE or CASH_RECEIPT)
+        targetWorkflowStatus = isWht ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
       } else {
         // Waiting for document (tax invoice or cash receipt)
         targetWorkflowStatus = "WAITING_TAX_INVOICE";
