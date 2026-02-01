@@ -13,13 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ReportDateSelector } from "@/components/reports/ReportDateSelector";
 import {
   FileSpreadsheet,
   FileText,
@@ -63,32 +57,11 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <ViewModeToggle companyCode={companyCode} currentMode={viewMode} />
-          <div className="flex items-center gap-2">
-            <Select defaultValue={selectedMonth.toString()}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <SelectItem key={i + 1} value={(i + 1).toString()}>
-                    {new Date(2000, i).toLocaleDateString("th-TH", { month: "long" })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select defaultValue={selectedYear.toString()}>
-              <SelectTrigger className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <SelectItem key={i} value={(currentYear - i).toString()}>
-                    {currentYear - i}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <ReportDateSelector
+            companyCode={companyCode}
+            currentMonth={selectedMonth}
+            currentYear={selectedYear}
+          />
         </div>
       </div>
 
