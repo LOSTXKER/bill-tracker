@@ -73,11 +73,19 @@ export function TransactionFilters({
     updateFilter("search", "");
   };
 
+  // Format date as YYYY-MM-DD in local timezone (not UTC)
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const handleDateRangeSelect = (range: DateRange | undefined) => {
     setDateRange(range);
     updateFilters({
-      dateFrom: range?.from ? range.from.toISOString().split("T")[0] : "",
-      dateTo: range?.to ? range.to.toISOString().split("T")[0] : "",
+      dateFrom: range?.from ? formatDateLocal(range.from) : "",
+      dateTo: range?.to ? formatDateLocal(range.to) : "",
     });
   };
 
@@ -138,8 +146,8 @@ export function TransactionFilters({
     
     setDateRange({ from, to });
     updateFilters({
-      dateFrom: from.toISOString().split("T")[0],
-      dateTo: to.toISOString().split("T")[0],
+      dateFrom: formatDateLocal(from),
+      dateTo: formatDateLocal(to),
     });
   };
 
