@@ -790,21 +790,8 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
       throw ApiErrors.badRequest("รายการนี้ถูกลบไปแล้ว");
     }
 
-    // For expenses: Check if any payment is SETTLED (prevent deletion)
-    if (config.modelName === "expense") {
-      const settledPayments = await prisma.expensePayment.findFirst({
-        where: {
-          expenseId: id,
-          settlementStatus: "SETTLED",
-        },
-      });
-
-      if (settledPayments) {
-        throw ApiErrors.badRequest(
-          "ไม่สามารถลบรายจ่ายนี้ได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
-        );
-      }
-    }
+    // Note: We allow deletion of expenses even if they have SETTLED payments
+    // The settlement history will still show the deleted expense for audit purposes
 
     // Check access - Owner can delete their own items, or need delete/update permission
     const isOwner = existingItem.createdBy === session.user.id;
