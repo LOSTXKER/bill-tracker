@@ -15,7 +15,8 @@ import { DatePicker } from "./DatePicker";
 import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
 import { AccountSelector } from "./account-selector";
 import type { ContactSummary } from "@/types";
-import { Plus, X, ExternalLink, Link2 } from "lucide-react";
+import { Plus, X, ExternalLink, Link2, Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 // =============================================================================
 // Types
@@ -103,6 +104,18 @@ export interface TransactionFieldsSectionProps {
   internalCompanyId?: string | null;
   onInternalCompanyChange?: (id: string | null) => void;
   accessibleCompanies?: InternalCompanyOption[];
+  
+  // AI account suggestion callback
+  onAiSuggestAccount?: (suggestion: {
+    accountId: string | null;
+    alternatives: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      confidence: number;
+      reason: string;
+    }>;
+  }) => void;
 }
 
 // =============================================================================
@@ -135,6 +148,7 @@ export function TransactionFieldsSection({
   internalCompanyId,
   onInternalCompanyChange,
   accessibleCompanies = [],
+  onAiSuggestAccount,
 }: TransactionFieldsSectionProps) {
   const isEditable = mode === "create" || mode === "edit";
   const watchStatus = watch("status") as string | undefined;
@@ -144,6 +158,9 @@ export function TransactionFieldsSection({
   // Amount input mode state
   const [amountInputMode, setAmountInputMode] = useState<AmountInputMode>("beforeVat");
   const [displayAmount, setDisplayAmount] = useState<string>("");
+  
+  // AI suggest account state
+  const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
   
   // Sync display amount with form amount when form changes (e.g., from AI)
   const formAmount = watch("amount") as number | undefined;
@@ -225,6 +242,82 @@ export function TransactionFieldsSection({
   
   const removeReferenceUrl = (urlToRemove: string) => {
     onReferenceUrlsChange?.(referenceUrls.filter(url => url !== urlToRemove));
+  };
+  
+  // AI suggest account from description
+  const handleAiSuggestAccount = async () => {
+    const description = watch(config.descriptionField?.name || "description") as string;
+    
+    if (!description || description.trim().length < 3) {
+      toast.error("กรุณาพิมพ์รายละเอียดก่อน", {
+        description: "AI ต้องการข้อความอย่างน้อย 3 ตัวอักษรเพื่อวิเคราะห์"
+      });
+      return;
+    }
+    
+    if (!onAiSuggestAccount) return;
+    
+    setAiSuggestLoading(true);
+    try {
+      const res = await fetch("/api/ai/analyze-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: description,
+          companyCode,
+          type: config.type,
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error("AI ไม่สามารถวิเคราะห์ได้");
+      }
+      
+      const json = await res.json();
+      
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "ไม่สามารถวิเคราะห์ได้");
+      }
+      
+      const result = json.data;
+      
+      // Update account suggestion
+      if (result.account?.id) {
+        const alternatives = (result.accountAlternatives || []).map((alt: any) => ({
+          accountId: alt.id,
+          accountCode: alt.code,
+          accountName: alt.name,
+          confidence: alt.confidence || 50,
+          reason: alt.reason || "ทางเลือกอื่น",
+        }));
+        
+        onAiSuggestAccount({
+          accountId: result.account.id,
+          alternatives,
+        });
+        
+        // Auto-select if no account is selected
+        if (!selectedAccount) {
+          onAccountChange(result.account.id);
+        }
+        
+        toast.success("AI แนะนำบัญชีสำเร็จ", {
+          description: `${result.account.code} ${result.account.name}`
+        });
+      } else {
+        toast.info("AI ไม่สามารถระบุบัญชีได้", {
+          description: "ลองเพิ่มรายละเอียดเพิ่มเติม"
+        });
+      }
+      
+    } catch (error) {
+      console.error("AI suggest error:", error);
+      toast.error("ไม่สามารถวิเคราะห์ได้", {
+        description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง"
+      });
+    } finally {
+      setAiSuggestLoading(false);
+    }
   };
 
   // Load account details for view mode
@@ -434,7 +527,26 @@ export function TransactionFieldsSection({
 
         {/* Account Selector - AI แนะนำจากเอกสารอัตโนมัติ */}
         <div className="space-y-1.5">
-          <Label className="text-sm font-medium">บัญชี</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">บัญชี</Label>
+            {onAiSuggestAccount && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
+                onClick={handleAiSuggestAccount}
+                disabled={aiSuggestLoading}
+              >
+                {aiSuggestLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                AI จำแนก
+              </Button>
+            )}
+          </div>
           <AccountSelector
             value={selectedAccount}
             onValueChange={onAccountChange}

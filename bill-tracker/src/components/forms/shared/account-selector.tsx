@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Check, ChevronsUpDown, Sparkles, Search, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Sparkles, Search, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -138,34 +138,35 @@ export function AccountSelector({
         <label className="text-sm font-medium text-foreground">{label}</label>
       )}
       
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn("w-full justify-between", className)}
-            disabled={disabled || loading}
-          >
-            <div className="flex items-center gap-2 flex-1 truncate">
-              {selectedAccount ? (
-                <>
-                  <span className="font-mono text-xs">{selectedAccount.code}</span>
-                  <span className="truncate">{selectedAccount.name}</span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">{placeholder}</span>
+      <div className="flex gap-1">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className={cn("w-full justify-between", className)}
+              disabled={disabled || loading}
+            >
+              <div className="flex items-center gap-2 flex-1 truncate">
+                {selectedAccount ? (
+                  <>
+                    <span className="font-mono text-xs">{selectedAccount.code}</span>
+                    <span className="truncate">{selectedAccount.name}</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">{placeholder}</span>
+                )}
+              </div>
+              {suggestedAccountId && !value && (
+                <Badge variant="secondary" className="ml-2 gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI
+                </Badge>
               )}
-            </div>
-            {suggestedAccountId && !value && (
-              <Badge variant="secondary" className="ml-2 gap-1">
-                <Sparkles className="h-3 w-3" />
-                AI
-              </Badge>
-            )}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
         <PopoverContent className="w-[400px] p-0" align="start">
           <Command>
             <div className="flex items-center border-b px-3">
@@ -313,6 +314,21 @@ export function AccountSelector({
           </Command>
         </PopoverContent>
       </Popover>
+      
+      {/* Clear button - only show when value is selected */}
+      {value && !disabled && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          onClick={() => onValueChange(null)}
+          title="ล้างการเลือก"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+      </div>
     </div>
   );
 }

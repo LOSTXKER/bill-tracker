@@ -1689,6 +1689,16 @@ export function UnifiedTransactionForm({
                     internalCompanyId={internalCompanyId}
                     onInternalCompanyChange={config.type === "expense" ? setInternalCompanyId : undefined}
                     accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
+                    onAiSuggestAccount={(suggestion) => {
+                      setAccountSuggestion({
+                        accountId: suggestion.accountId,
+                        accountCode: null,
+                        accountName: null,
+                        confidence: 80,
+                        reason: "AI จำแนกจากรายละเอียด",
+                        alternatives: suggestion.alternatives,
+                      });
+                    }}
                   />
 
                   {/* Contact Defaults Suggestion */}
@@ -1870,6 +1880,16 @@ export function UnifiedTransactionForm({
                     internalCompanyId={internalCompanyId}
                     onInternalCompanyChange={config.type === "expense" && mode === "edit" ? setInternalCompanyId : undefined}
                     accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
+                    onAiSuggestAccount={mode === "edit" ? (suggestion) => {
+                      setAccountSuggestion({
+                        accountId: suggestion.accountId,
+                        accountCode: null,
+                        accountName: null,
+                        confidence: 80,
+                        reason: "AI จำแนกจากรายละเอียด",
+                        alternatives: suggestion.alternatives,
+                      });
+                    } : undefined}
                   />
 
                   <div className="border-t border-border" />
