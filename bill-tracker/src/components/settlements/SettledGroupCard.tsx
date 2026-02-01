@@ -27,8 +27,6 @@ import {
   ExternalLink,
   Undo2,
   Trash2,
-  FileText,
-  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -91,57 +89,11 @@ export function SettledGroupCard({
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [reverseReason, setReverseReason] = useState("");
   const [isReversing, setIsReversing] = useState(false);
-  
-  // Create expense dialog
-  const [showCreateExpenseDialog, setShowCreateExpenseDialog] = useState(false);
-  const [expenseNotes, setExpenseNotes] = useState("");
-  const [isCreatingExpense, setIsCreatingExpense] = useState(false);
 
   const handleReverseClick = (paymentId: string) => {
     setSelectedPaymentId(paymentId);
     setReverseReason("");
     setShowReverseDialog(true);
-  };
-
-  const handleCreateExpense = async () => {
-    setIsCreatingExpense(true);
-    
-    try {
-      // Get all non-deleted payment IDs from this group
-      const paymentIds = group.payments
-        .filter(p => !p.Expense.deletedAt)
-        .map(p => p.id);
-
-      const response = await fetch(
-        `/api/${companyCode}/settlements/create-expense`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            paymentIds,
-            notes: expenseNotes.trim() || undefined,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || "ไม่สามารถสร้างรายจ่ายได้");
-        return;
-      }
-
-      toast.success(data.data.message || "สร้างรายจ่ายสำเร็จ");
-      setShowCreateExpenseDialog(false);
-      setExpenseNotes("");
-      
-      // Optionally navigate to the new expense
-      // window.location.href = `/${companyCode}/expenses/${data.data.expense.id}`;
-    } catch (error) {
-      toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-    } finally {
-      setIsCreatingExpense(false);
-    }
   };
 
   const handleReverseConfirm = async () => {
@@ -214,15 +166,6 @@ export function SettledGroupCard({
                     {group.payments.length} รายการ
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-blue-600 border-blue-300 hover:bg-blue-50"
-                  onClick={() => setShowCreateExpenseDialog(true)}
-                >
-                  <FileText className="h-3 w-3 mr-1" />
-                  สร้างรายจ่าย
-                </Button>
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="icon">
                     {isExpanded ? (
@@ -383,79 +326,6 @@ export function SettledGroupCard({
         </DialogContent>
       </Dialog>
 
-      {/* Create Expense Dialog */}
-      <Dialog open={showCreateExpenseDialog} onOpenChange={setShowCreateExpenseDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-500" />
-              สร้างรายจ่ายจากการโอนคืน
-            </DialogTitle>
-            <DialogDescription>
-              สร้างรายการรายจ่ายเพื่อบันทึกการโอนเงินออกจากบัญชีบริษัท
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Summary */}
-            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">โอนคืนให้</span>
-                <span className="font-medium">{group.payerName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">จำนวนรายการ</span>
-                <span className="font-medium">{group.payments.filter(p => !p.Expense.deletedAt).length} รายการ</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">ยอดรวม</span>
-                <span className="font-semibold text-blue-600">
-                  ฿{group.totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="expenseNotes">หมายเหตุ (ถ้ามี)</Label>
-              <Textarea
-                id="expenseNotes"
-                placeholder="เช่น เลขที่บัญชีที่โอน, วันที่โอน..."
-                value={expenseNotes}
-                onChange={(e) => setExpenseNotes(e.target.value)}
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCreateExpenseDialog(false)}
-              disabled={isCreatingExpense}
-            >
-              ยกเลิก
-            </Button>
-            <Button
-              onClick={handleCreateExpense}
-              disabled={isCreatingExpense}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isCreatingExpense ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังสร้าง...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  สร้างรายจ่าย
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
