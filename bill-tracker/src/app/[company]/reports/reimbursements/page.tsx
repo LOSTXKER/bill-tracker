@@ -68,6 +68,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 // Get current year and past 3 years
 const currentYear = new Date().getFullYear();
+const currentMonth = new Date().getMonth() + 1; // 1-12
 const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
 
 // Thai month names
@@ -75,6 +76,18 @@ const thaiMonths = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
 ];
+
+// Full Thai month names for dropdown
+const thaiMonthsFull = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+];
+
+// Months array for dropdown
+const months = Array.from({ length: 12 }, (_, i) => ({
+  value: (i + 1).toString(),
+  label: thaiMonthsFull[i],
+}));
 
 function formatMonthLabel(monthKey: string) {
   const [year, month] = monthKey.split("-");
@@ -85,15 +98,25 @@ function formatMonthLabel(monthKey: string) {
 export default function ReimbursementReportPage({ params }: ReimbursementReportPageProps) {
   const { company: companyCode } = use(params);
   const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   // Build API URL with filters
   const buildApiUrl = () => {
     const params = new URLSearchParams();
     
-    // Year filter
+    // Year + Month filter
     if (selectedYear && selectedYear !== "all") {
-      params.set("dateFrom", `${selectedYear}-01-01`);
-      params.set("dateTo", `${selectedYear}-12-31`);
+      if (selectedMonth && selectedMonth !== "all") {
+        // Specific month selected
+        const month = selectedMonth.padStart(2, "0");
+        const lastDay = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate();
+        params.set("dateFrom", `${selectedYear}-${month}-01`);
+        params.set("dateTo", `${selectedYear}-${month}-${lastDay}`);
+      } else {
+        // Whole year
+        params.set("dateFrom", `${selectedYear}-01-01`);
+        params.set("dateTo", `${selectedYear}-12-31`);
+      }
     }
     
     return `/api/${companyCode}/settlements/report?${params.toString()}`;
@@ -138,12 +161,15 @@ export default function ReimbursementReportPage({ params }: ReimbursementReportP
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]">
+            <Select value={selectedYear} onValueChange={(val) => {
+              setSelectedYear(val);
+              if (val === "all") setSelectedMonth("all");
+            }}>
+              <SelectTrigger className="w-[100px]">
                 <SelectValue placeholder="เลือกปี" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
+                <SelectItem value="all">ทุกปี</SelectItem>
                 {years.map((year) => (
                   <SelectItem key={year} value={year.toString()}>
                     {year + 543}
@@ -154,10 +180,29 @@ export default function ReimbursementReportPage({ params }: ReimbursementReportP
           </div>
 
           {selectedYear !== "all" && (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="เลือกเดือน" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกเดือน</SelectItem>
+                {months.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {(selectedYear !== "all" || selectedMonth !== "all") && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedYear("all")}
+              onClick={() => {
+                setSelectedYear("all");
+                setSelectedMonth("all");
+              }}
             >
               ล้างตัวกรอง
             </Button>
@@ -174,7 +219,7 @@ export default function ReimbursementReportPage({ params }: ReimbursementReportP
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             รีเฟรช
           </Button>
-          <Link href={`/api/${companyCode}/settlements/report/export?year=${selectedYear}`}>
+          <Link href={`/api/${companyCode}/settlements/report/export?year=${selectedYear}&month=${selectedMonth}`}>
             <Button size="sm">
               <Download className="h-4 w-4 mr-2" />
               Export Excel

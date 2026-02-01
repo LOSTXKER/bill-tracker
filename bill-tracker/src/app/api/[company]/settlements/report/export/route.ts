@@ -15,12 +15,22 @@ export const GET = withCompanyAccessFromParams(
   async (request, { company }) => {
     const { searchParams } = new URL(request.url);
     const year = searchParams.get("year");
+    const month = searchParams.get("month");
 
     // Build date filter
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (year && year !== "all") {
-      dateFilter.gte = new Date(`${year}-01-01`);
-      dateFilter.lte = new Date(`${year}-12-31T23:59:59.999Z`);
+      if (month && month !== "all") {
+        // Specific month
+        const monthPadded = month.padStart(2, "0");
+        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+        dateFilter.gte = new Date(`${year}-${monthPadded}-01`);
+        dateFilter.lte = new Date(`${year}-${monthPadded}-${lastDay}T23:59:59.999Z`);
+      } else {
+        // Whole year
+        dateFilter.gte = new Date(`${year}-01-01`);
+        dateFilter.lte = new Date(`${year}-12-31T23:59:59.999Z`);
+      }
     }
 
     // Base where clause - only USER type needs settlement
@@ -270,9 +280,22 @@ export const GET = withCompanyAccessFromParams(
     // Generate buffer
     const buffer = await workbook.xlsx.writeBuffer();
 
+    // Thai month names for filename
+    const thaiMonthsFull = [
+      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+    ];
+
     // Generate filename
-    const yearLabel = year && year !== "all" ? `_${parseInt(year) + 543}` : "";
-    const filename = `รายงานการจ่ายคืน_${company.code}${yearLabel}.xlsx`;
+    let dateLabel = "";
+    if (year && year !== "all") {
+      if (month && month !== "all") {
+        dateLabel = `_${thaiMonthsFull[parseInt(month) - 1]}_${parseInt(year) + 543}`;
+      } else {
+        dateLabel = `_${parseInt(year) + 543}`;
+      }
+    }
+    const filename = `รายงานการจ่ายคืน_${company.code}${dateLabel}.xlsx`;
 
     return new NextResponse(new Uint8Array(buffer as ArrayBuffer), {
       headers: {
