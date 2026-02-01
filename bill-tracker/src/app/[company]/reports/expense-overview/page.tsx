@@ -82,10 +82,11 @@ export default function ExpenseOverviewPage({
   const router = useRouter();
   const [period, setPeriod] = useState<"month" | "quarter" | "year">("month");
 
-  const { data, isLoading } = useSWR<OverviewData>(
+  const { data: response, isLoading } = useSWR<{ success: boolean; data: OverviewData }>(
     `/api/${companyCode}/expense-overview?period=${period}`,
     fetcher
   );
+  const data = response?.data;
 
   const getPeriodLabel = () => {
     switch (period) {
