@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
 import {
   Dialog,
   DialogContent,
@@ -20,10 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Upload, X, CheckCircle2 } from "lucide-react";
+import { Loader2, Upload, X, CheckCircle2, Building2, User } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { useSession } from "next-auth/react";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface SettlePaymentDialogProps {
   isOpen: boolean;
@@ -61,6 +64,21 @@ export function SettlePaymentDialog({
   // Auto expense creation
   const [createExpense, setCreateExpense] = useState(true);
   const [expensePayerType, setExpensePayerType] = useState<"USER" | "COMPANY">("USER");
+  const [selectedPayerId, setSelectedPayerId] = useState<string>("");
+
+  // Fetch company members for payer dropdown
+  const { data: membersData } = useSWR(
+    isOpen ? `/api/${companyCode}/members` : null,
+    fetcher
+  );
+  const members = membersData?.data?.members || [];
+
+  // Set default payer to current user when dialog opens
+  useEffect(() => {
+    if (isOpen && session?.user?.id && !selectedPayerId) {
+      setSelectedPayerId(session.user.id);
+    }
+  }, [isOpen, session?.user?.id, selectedPayerId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -111,7 +129,7 @@ export function SettlePaymentDialog({
       // Auto expense creation fields
       createExpense,
       expensePayerType,
-      expensePayerId: expensePayerType === "USER" ? session?.user?.id : null,
+      expensePayerId: expensePayerType === "USER" ? selectedPayerId : null,
     };
 
     // OPTIMIZED: Optimistic update - close dialog immediately for better UX
@@ -129,6 +147,7 @@ export function SettlePaymentDialog({
     setSlipUrls([]);
     setCreateExpense(true);
     setExpensePayerType("USER");
+    setSelectedPayerId(session?.user?.id || "");
     setIsSubmitting(false);
 
     // Fire API request in background - if it fails, show error toast
@@ -158,6 +177,7 @@ export function SettlePaymentDialog({
       setSlipUrls([]);
       setCreateExpense(true);
       setExpensePayerType("USER");
+      setSelectedPayerId(session?.user?.id || "");
       onClose();
     }
   };
@@ -255,18 +275,41 @@ export function SettlePaymentDialog({
               <div className="space-y-2 pl-6">
                 <Label>ผู้จ่ายเงิน</Label>
                 <Select
-                  value={expensePayerType}
-                  onValueChange={(value) => setExpensePayerType(value as "USER" | "COMPANY")}
+                  value={expensePayerType === "COMPANY" ? "COMPANY" : selectedPayerId}
+                  onValueChange={(value) => {
+                    if (value === "COMPANY") {
+                      setExpensePayerType("COMPANY");
+                      setSelectedPayerId("");
+                    } else {
+                      setExpensePayerType("USER");
+                      setSelectedPayerId(value);
+                    }
+                  }}
                   disabled={isSubmitting}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="เลือกผู้จ่ายเงิน" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="USER">
-                      {session?.user?.name || "ตัวเอง"}
+                    {/* Company option */}
+                    <SelectItem value="COMPANY">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        <span>บัญชีบริษัท</span>
+                      </div>
                     </SelectItem>
-                    <SelectItem value="COMPANY">บัญชีบริษัท</SelectItem>
+                    {/* All users */}
+                    {members.map((member: { id: string; name: string }) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          <span>{member.name}</span>
+                          {member.id === session?.user?.id && (
+                            <span className="text-xs text-muted-foreground">(ตัวเอง)</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
