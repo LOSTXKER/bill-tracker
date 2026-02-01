@@ -160,9 +160,13 @@ export function TransactionFieldsSection({
   }, [formAmount, amountInputMode, vatRate]);
   
   // Handle amount input change
+  // Use precise decimal handling to avoid floating-point errors
   const handleAmountInput = (value: string) => {
     setDisplayAmount(value);
-    const numValue = parseFloat(value) || 0;
+    
+    // Parse and round to 2 decimal places to avoid floating-point precision issues
+    const parsed = parseFloat(value);
+    const numValue = isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
     
     if (amountInputMode === "includingVat" && vatRate > 0) {
       // Convert from including VAT to before VAT

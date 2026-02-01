@@ -262,8 +262,14 @@ export function TransactionAmountCard({
           <span className="text-muted-foreground">จำนวนเงินก่อนภาษี</span>
           <Input
             type="number"
+            step="0.01"
             value={amount || ""}
-            onChange={(e) => onAmountChange?.(Number(e.target.value) || 0)}
+            onChange={(e) => {
+              // Round to 2 decimal places to avoid floating-point precision issues
+              const parsed = parseFloat(e.target.value);
+              const rounded = isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
+              onAmountChange?.(rounded);
+            }}
             className="w-40 h-9 text-right bg-background"
             placeholder="0.00"
           />
