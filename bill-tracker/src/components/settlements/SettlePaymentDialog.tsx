@@ -12,9 +12,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Upload, X, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
+import { useSession } from "next-auth/react";
 
 interface SettlePaymentDialogProps {
   isOpen: boolean;
@@ -43,10 +52,15 @@ export function SettlePaymentDialog({
   onSuccess,
   isBatch = false,
 }: SettlePaymentDialogProps) {
+  const { data: session } = useSession();
   const [settlementRef, setSettlementRef] = useState("");
   const [slipUrls, setSlipUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Auto expense creation
+  const [createExpense, setCreateExpense] = useState(true);
+  const [expensePayerType, setExpensePayerType] = useState<"USER" | "COMPANY">("USER");
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -87,24 +101,34 @@ export function SettlePaymentDialog({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     
-    const endpoint = isBatch
-      ? `/api/${companyCode}/settlements/batch`
-      : `/api/${companyCode}/settlements/${paymentIds[0]}`;
+    // Always use batch endpoint (single item is just a batch of 1)
+    const endpoint = `/api/${companyCode}/settlements/batch`;
 
-    const body = isBatch
-      ? { paymentIds, settlementRef, settlementSlipUrls: slipUrls }
-      : { settlementRef, settlementSlipUrls: slipUrls };
+    const body = {
+      paymentIds,
+      settlementRef,
+      settlementSlipUrls: slipUrls,
+      // Auto expense creation fields
+      createExpense,
+      expensePayerType,
+      expensePayerId: expensePayerType === "USER" ? session?.user?.id : null,
+    };
 
     // OPTIMIZED: Optimistic update - close dialog immediately for better UX
     // Show success toast and trigger revalidation right away
     // This gives instant feedback while the API call happens in background
-    toast.success("บันทึกการโอนคืนสำเร็จ");
+    const successMessage = createExpense 
+      ? "บันทึกการโอนคืนและสร้างรายจ่ายสำเร็จ"
+      : "บันทึกการโอนคืนสำเร็จ";
+    toast.success(successMessage);
     onClose();
     onSuccess(); // Trigger batch revalidation
     
     // Reset form state
     setSettlementRef("");
     setSlipUrls([]);
+    setCreateExpense(true);
+    setExpensePayerType("USER");
     setIsSubmitting(false);
 
     // Fire API request in background - if it fails, show error toast
@@ -132,6 +156,8 @@ export function SettlePaymentDialog({
     if (!isSubmitting) {
       setSettlementRef("");
       setSlipUrls([]);
+      setCreateExpense(true);
+      setExpensePayerType("USER");
       onClose();
     }
   };
@@ -209,6 +235,45 @@ export function SettlePaymentDialog({
                 )}
               </label>
             </div>
+          </div>
+
+          {/* Auto Create Expense */}
+          <div className="space-y-3 pt-2 border-t">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="createExpense"
+                checked={createExpense}
+                onCheckedChange={(checked) => setCreateExpense(checked === true)}
+                disabled={isSubmitting}
+              />
+              <Label htmlFor="createExpense" className="font-normal cursor-pointer">
+                สร้างรายจ่ายอัตโนมัติ
+              </Label>
+            </div>
+
+            {createExpense && (
+              <div className="space-y-2 pl-6">
+                <Label>ผู้จ่ายเงิน</Label>
+                <Select
+                  value={expensePayerType}
+                  onValueChange={(value) => setExpensePayerType(value as "USER" | "COMPANY")}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USER">
+                      {session?.user?.name || "ตัวเอง"}
+                    </SelectItem>
+                    <SelectItem value="COMPANY">บัญชีบริษัท</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  ระบบจะสร้างรายจ่าย &quot;โอนคืนค่าใช้จ่ายให้{payerName}&quot; อัตโนมัติ
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

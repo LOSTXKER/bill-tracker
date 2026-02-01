@@ -8,12 +8,13 @@ interface RouteParams {
 
 /**
  * GET /api/[company]/settlements
- * Get pending settlements grouped by payer
+ * Get pending settlements grouped by payer or by settlement round
  */
 export const GET = withCompanyAccessFromParams(
   async (request, { company }) => {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "PENDING";
+    const groupBy = searchParams.get("groupBy") || "payer"; // "payer" or "round"
     const userId = searchParams.get("userId");
     const month = searchParams.get("month");
     const year = searchParams.get("year");
@@ -38,18 +39,19 @@ export const GET = withCompanyAccessFromParams(
       where.paidByUserId = userId;
     }
 
-    // Date filter
+    // Date filter - for SETTLED status, filter by settledAt; for PENDING, filter by createdAt
+    const dateField = status === "SETTLED" ? "settledAt" : "createdAt";
     if (month && year) {
       const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
       const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
-      where.createdAt = {
+      where[dateField] = {
         gte: startDate,
         lte: endDate,
       };
     } else if (year) {
       const startDate = new Date(parseInt(year), 0, 1);
       const endDate = new Date(parseInt(year), 11, 31, 23, 59, 59);
-      where.createdAt = {
+      where[dateField] = {
         gte: startDate,
         lte: endDate,
       };
@@ -83,12 +85,76 @@ export const GET = withCompanyAccessFromParams(
         },
       },
       orderBy: [
-        { paidByType: "asc" },
         { settledAt: "desc" },
+        { paidByType: "asc" },
       ],
     });
 
-    // Group by payer
+    // Group by round (settledAt timestamp) for SETTLED status
+    if (status === "SETTLED" && groupBy === "round") {
+      const groupedByRound: Record<string, {
+        roundKey: string;
+        settledAt: Date;
+        settlementRef: string | null;
+        settlementSlipUrls: string[];
+        settledBy: { id: string; name: string } | null;
+        payments: typeof payments;
+        totalAmount: number;
+        payerSummary: string;
+      }> = {};
+
+      payments.forEach((payment) => {
+        if (!payment.settledAt) return;
+        
+        // Use settledAt timestamp as round key (same second = same round)
+        const roundKey = payment.settledAt.toISOString();
+
+        if (!groupedByRound[roundKey]) {
+          groupedByRound[roundKey] = {
+            roundKey,
+            settledAt: payment.settledAt,
+            settlementRef: payment.settlementRef,
+            settlementSlipUrls: (payment.settlementSlipUrls as string[]) || [],
+            settledBy: payment.SettledByUser,
+            payments: [],
+            totalAmount: 0,
+            payerSummary: "",
+          };
+        }
+
+        groupedByRound[roundKey].payments.push(payment);
+        groupedByRound[roundKey].totalAmount += Number(payment.amount);
+      });
+
+      // Calculate payer summary for each round
+      Object.values(groupedByRound).forEach((round) => {
+        const payerCounts: Record<string, number> = {};
+        round.payments.forEach((p) => {
+          const name = p.PaidByUser?.name || "ไม่ระบุ";
+          payerCounts[name] = (payerCounts[name] || 0) + 1;
+        });
+        round.payerSummary = Object.entries(payerCounts)
+          .map(([name, count]) => `${name} (${count} รายการ)`)
+          .join(", ");
+      });
+
+      // Convert to array and sort by settledAt desc
+      const rounds = Object.values(groupedByRound).sort(
+        (a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime()
+      );
+
+      return apiResponse.successWithCache(
+        {
+          rounds,
+          totalSettled: payments.length,
+          totalAmount: payments.reduce((sum, p) => sum + Number(p.amount), 0),
+        },
+        undefined,
+        { maxAge: 5, staleWhileRevalidate: 30 }
+      );
+    }
+
+    // Group by payer (default)
     const groupedByPayer: Record<string, {
       payerType: string;
       payerId: string | null;

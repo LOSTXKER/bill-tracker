@@ -1,15 +1,23 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { SettlementSummaryCards } from "./SettlementSummaryCards";
 import { SettlementGroupCard } from "./SettlementGroupCard";
 import { SettledGroupCard } from "./SettledGroupCard";
+import { SettlementRoundsTable } from "./SettlementRoundsTable";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { RefreshCw, Inbox, User, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RefreshCw, Inbox, User, X, Filter } from "lucide-react";
 
 interface SettlementDashboardProps {
   companyCode: string;
@@ -18,9 +26,39 @@ interface SettlementDashboardProps {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+// Generate month/year options
+const currentDate = new Date();
+const currentYear = currentDate.getFullYear() + 543; // Buddhist year
+const currentMonth = currentDate.getMonth() + 1;
+
+const months = [
+  { value: "1", label: "มกราคม" },
+  { value: "2", label: "กุมภาพันธ์" },
+  { value: "3", label: "มีนาคม" },
+  { value: "4", label: "เมษายน" },
+  { value: "5", label: "พฤษภาคม" },
+  { value: "6", label: "มิถุนายน" },
+  { value: "7", label: "กรกฎาคม" },
+  { value: "8", label: "สิงหาคม" },
+  { value: "9", label: "กันยายน" },
+  { value: "10", label: "ตุลาคม" },
+  { value: "11", label: "พฤศจิกายน" },
+  { value: "12", label: "ธันวาคม" },
+];
+
+const years = Array.from({ length: 5 }, (_, i) => {
+  const year = currentYear - i;
+  return { value: String(year - 543), label: `${year}` }; // Store Gregorian, display Buddhist
+});
+
 export function SettlementDashboard({ companyCode, filterUserId }: SettlementDashboardProps) {
   const [tab, setTab] = useState<"pending" | "settled">("pending");
   const { mutate: globalMutate } = useSWRConfig();
+  
+  // Filter state
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(currentMonth));
+  const [selectedYear, setSelectedYear] = useState<string>(String(currentDate.getFullYear()));
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
 
   // Settlement API base path for batch revalidation
   const settlementBasePath = `/api/${companyCode}/settlements`;
@@ -32,10 +70,25 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
   } = useSWR(`${settlementBasePath}/summary`, fetcher);
 
   // Build URL with optional userId filter
-  const buildUrl = (status: string) => {
+  const buildUrl = (status: string, groupBy?: string) => {
     const params = new URLSearchParams({ status });
     if (filterUserId) {
       params.set("userId", filterUserId);
+    }
+    if (groupBy) {
+      params.set("groupBy", groupBy);
+    }
+    // Add date filters for settled tab
+    if (status === "SETTLED") {
+      if (selectedMonth && selectedMonth !== "all") {
+        params.set("month", selectedMonth);
+      }
+      if (selectedYear) {
+        params.set("year", selectedYear);
+      }
+      if (selectedEmployee && selectedEmployee !== "all") {
+        params.set("userId", selectedEmployee);
+      }
     }
     return `${settlementBasePath}?${params.toString()}`;
   };
@@ -49,14 +102,33 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     fetcher
   );
 
-  // Fetch settled settlements
+  // Fetch settled settlements with groupBy=round
   const {
     data: settledData,
     isLoading: settledLoading,
   } = useSWR(
-    tab === "settled" ? buildUrl("SETTLED") : null,
+    tab === "settled" ? buildUrl("SETTLED", "round") : null,
     fetcher
   );
+
+  // Get unique employees from pending data for filter dropdown
+  const employeeOptions = useMemo(() => {
+    const pendingGroups = pendingData?.data?.groups || [];
+    const employees: { value: string; label: string }[] = [
+      { value: "all", label: "พนักงานทั้งหมด" },
+    ];
+    
+    pendingGroups.forEach((group: any) => {
+      if (group.payerId && group.payerType === "USER") {
+        employees.push({
+          value: group.payerId,
+          label: group.payerName,
+        });
+      }
+    });
+    
+    return employees;
+  }, [pendingData]);
 
   // OPTIMIZED: Single batch revalidation using global mutate with key matcher
   // This triggers a single revalidation pass instead of 3 separate API calls
@@ -78,15 +150,26 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
   }, [revalidateAllSettlements]);
 
   const pendingGroups = pendingData?.data?.groups || [];
-  const settledGroups = settledData?.data?.groups || [];
+  const settledRounds = settledData?.data?.rounds || [];
   const isLoading = tab === "pending" ? pendingLoading : settledLoading;
-  const groups = tab === "pending" ? pendingGroups : settledGroups;
+  const groups = pendingGroups;
+
+  // Clear filters
+  const handleClearFilters = () => {
+    setSelectedMonth(String(currentMonth));
+    setSelectedYear(String(currentDate.getFullYear()));
+    setSelectedEmployee("all");
+  };
+
+  const hasActiveFilters = selectedEmployee !== "all" || 
+    selectedMonth !== String(currentMonth) || 
+    selectedYear !== String(currentDate.getFullYear());
 
   // Get filtered user name from groups (if filtering)
   const filteredUserName = filterUserId && pendingGroups.length > 0 
     ? pendingGroups[0]?.payerName 
-    : filterUserId && settledGroups.length > 0 
-      ? settledGroups[0]?.payerName 
+    : filterUserId && settledRounds.length > 0 
+      ? settledRounds[0]?.payerSummary?.split(" (")[0] 
       : null;
 
   return (
@@ -123,29 +206,86 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
       )}
 
       {/* Main Content */}
-      <div className="flex items-center justify-between">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "pending" | "settled")}>
-          <TabsList>
-            <TabsTrigger value="pending" className="gap-1">
-              รอโอนคืน
-              {summaryData?.data?.pending?.total?.count > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
-                  {summaryData.data.pending.total.count}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="settled">โอนคืนแล้ว</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          รีเฟรช
-        </Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "pending" | "settled")}>
+            <TabsList>
+              <TabsTrigger value="pending" className="gap-1">
+                รอโอนคืน
+                {summaryData?.data?.pending?.total?.count > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
+                    {summaryData.data.pending.total.count}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="settled">โอนคืนแล้ว</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            รีเฟรช
+          </Button>
+        </div>
+
+        {/* Filters for Settled Tab */}
+        {tab === "settled" && (
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="เดือน" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกเดือน</SelectItem>
+                {months.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[100px] h-9">
+                <SelectValue placeholder="ปี" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((year) => (
+                  <SelectItem key={year.value} value={year.value}>
+                    {year.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="พนักงาน" />
+              </SelectTrigger>
+              <SelectContent>
+                {employeeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="h-9 text-muted-foreground"
+              >
+                <X className="h-4 w-4 mr-1" />
+                ล้างตัวกรอง
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Groups List */}
@@ -155,38 +295,34 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
             <div key={i} className="h-32 bg-muted/50 rounded-lg animate-pulse" />
           ))}
         </div>
-      ) : groups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <Inbox className="h-12 w-12 mb-4" />
-          <p className="text-lg font-medium">
-            {tab === "pending" ? "ไม่มีรายการรอโอนคืน" : "ยังไม่มีรายการโอนคืน"}
-          </p>
-          <p className="text-sm mt-1">
-            {tab === "pending"
-              ? "รายการที่จ่ายโดยพนักงานหรือคนภายนอกจะแสดงที่นี่"
-              : "รายการที่โอนคืนแล้วจะแสดงที่นี่"}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {groups.map((group: any, index: number) =>
-            tab === "pending" ? (
+      ) : tab === "pending" ? (
+        groups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Inbox className="h-12 w-12 mb-4" />
+            <p className="text-lg font-medium">ไม่มีรายการรอโอนคืน</p>
+            <p className="text-sm mt-1">
+              รายการที่จ่ายโดยพนักงานหรือคนภายนอกจะแสดงที่นี่
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {groups.map((group: any, index: number) => (
               <SettlementGroupCard
                 key={`${group.payerType}_${group.payerId || group.payerName}_${index}`}
                 group={group}
                 companyCode={companyCode}
                 onSuccess={handleSettleSuccess}
               />
-            ) : (
-              <SettledGroupCard
-                key={`${group.payerType}_${group.payerId || group.payerName}_${index}`}
-                group={group}
-                companyCode={companyCode}
-                onSuccess={handleSettleSuccess}
-              />
-            )
-          )}
-        </div>
+            ))}
+          </div>
+        )
+      ) : (
+        /* Settled Tab - Use Table View */
+        <SettlementRoundsTable
+          rounds={settledRounds}
+          companyCode={companyCode}
+          onSuccess={handleSettleSuccess}
+        />
       )}
     </div>
   );
