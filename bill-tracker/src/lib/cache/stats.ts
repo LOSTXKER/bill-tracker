@@ -4,17 +4,45 @@ import { prisma } from "@/lib/db";
 
 export type ViewMode = "official" | "internal";
 
+export interface DateRangeFilter {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 /**
  * Get expense stats - real-time without caching
  * Stats should always be up-to-date
  * 
  * @param companyId - The company ID
  * @param viewMode - "official" (by companyId) or "internal" (by internalCompanyId)
+ * @param dateFilter - Optional date range filter
  */
-export async function getExpenseStats(companyId: string, viewMode: ViewMode = "official") {
+export async function getExpenseStats(
+  companyId: string, 
+  viewMode: ViewMode = "official",
+  dateFilter?: DateRangeFilter
+) {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  // If date filter provided, use it; otherwise use current month
+  const hasDateFilter = dateFilter?.dateFrom || dateFilter?.dateTo;
+  
+  let startDate: Date;
+  let endDate: Date;
+  
+  if (hasDateFilter) {
+    // Use custom date range
+    startDate = dateFilter?.dateFrom ? new Date(dateFilter.dateFrom) : new Date(0);
+    endDate = dateFilter?.dateTo ? new Date(dateFilter.dateTo) : new Date();
+    // Set end date to end of day
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    // Default to current month
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  }
+  
+  // For trend calculation (only when not using custom filter)
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
@@ -39,8 +67,13 @@ export async function getExpenseStats(companyId: string, viewMode: ViewMode = "o
     ],
   };
 
+  // For filtered stats, also apply date filter to workflow status counts
+  const filteredExpenseFilter = hasDateFilter 
+    ? { ...expenseFilter, billDate: { gte: startDate, lte: endDate } }
+    : expenseFilter;
+
   const [
-    monthlyTotal,
+    periodTotal,
     lastMonthTotal,
     waitingTaxInvoice,
     readyForAccounting,
@@ -50,51 +83,76 @@ export async function getExpenseStats(companyId: string, viewMode: ViewMode = "o
     prisma.expense.aggregate({
       where: {
         ...expenseFilter,
-        billDate: { gte: startOfMonth, lte: endOfMonth },
+        billDate: { gte: startDate, lte: endDate },
       },
       _sum: { netPaid: true },
       _count: true,
     }),
-    prisma.expense.aggregate({
-      where: {
-        ...expenseFilter,
-        billDate: { gte: startOfLastMonth, lte: endOfLastMonth },
-      },
-      _sum: { netPaid: true },
+    // Only calculate last month if not using custom filter
+    hasDateFilter 
+      ? Promise.resolve({ _sum: { netPaid: null } })
+      : prisma.expense.aggregate({
+          where: {
+            ...expenseFilter,
+            billDate: { gte: startOfLastMonth, lte: endOfLastMonth },
+          },
+          _sum: { netPaid: true },
+        }),
+    prisma.expense.count({
+      where: { ...filteredExpenseFilter, workflowStatus: "WAITING_TAX_INVOICE" },
     }),
     prisma.expense.count({
-      where: { ...expenseFilter, workflowStatus: "WAITING_TAX_INVOICE" },
+      where: { ...filteredExpenseFilter, workflowStatus: "READY_FOR_ACCOUNTING" },
     }),
     prisma.expense.count({
-      where: { ...expenseFilter, workflowStatus: "READY_FOR_ACCOUNTING" },
+      where: { ...filteredExpenseFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },
     }),
     prisma.expense.count({
-      where: { ...expenseFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },
-    }),
-    prisma.expense.count({
-      where: expenseFilter,
+      where: filteredExpenseFilter,
     }),
   ]);
 
   return {
-    monthlyTotal: Number(monthlyTotal._sum.netPaid) || 0,
-    monthlyCount: monthlyTotal._count,
+    monthlyTotal: Number(periodTotal._sum.netPaid) || 0,
+    monthlyCount: periodTotal._count,
     lastMonthTotal: Number(lastMonthTotal._sum.netPaid) || 0,
     waitingTaxInvoice,
     readyForAccounting,
     sentToAccountant,
     totalExpenses,
+    isFiltered: hasDateFilter,
   };
 }
 
 /**
  * Get income stats - real-time without caching
  * Stats should always be up-to-date
+ * 
+ * @param companyId - The company ID
+ * @param dateFilter - Optional date range filter
  */
-export async function getIncomeStats(companyId: string) {
+export async function getIncomeStats(companyId: string, dateFilter?: DateRangeFilter) {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  // If date filter provided, use it; otherwise use current month
+  const hasDateFilter = dateFilter?.dateFrom || dateFilter?.dateTo;
+  
+  let startDate: Date;
+  let endDate: Date;
+  
+  if (hasDateFilter) {
+    // Use custom date range
+    startDate = dateFilter?.dateFrom ? new Date(dateFilter.dateFrom) : new Date(0);
+    endDate = dateFilter?.dateTo ? new Date(dateFilter.dateTo) : new Date();
+    // Set end date to end of day
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    // Default to current month
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  }
+  
+  // For trend calculation (only when not using custom filter)
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
@@ -102,9 +160,14 @@ export async function getIncomeStats(companyId: string) {
     companyId,
     deletedAt: null,
   };
+  
+  // For filtered stats, also apply date filter to workflow status counts
+  const filteredIncomeFilter = hasDateFilter 
+    ? { ...incomeFilter, receiveDate: { gte: startDate, lte: endDate } }
+    : incomeFilter;
 
   const [
-    monthlyTotal,
+    periodTotal,
     lastMonthTotal,
     waitingInvoice,
     waitingWhtCert,
@@ -114,39 +177,43 @@ export async function getIncomeStats(companyId: string) {
     prisma.income.aggregate({
       where: {
         ...incomeFilter,
-        receiveDate: { gte: startOfMonth, lte: endOfMonth },
+        receiveDate: { gte: startDate, lte: endDate },
       },
       _sum: { netReceived: true },
       _count: true,
     }),
-    prisma.income.aggregate({
-      where: {
-        ...incomeFilter,
-        receiveDate: { gte: startOfLastMonth, lte: endOfLastMonth },
-      },
-      _sum: { netReceived: true },
+    // Only calculate last month if not using custom filter
+    hasDateFilter 
+      ? Promise.resolve({ _sum: { netReceived: null } })
+      : prisma.income.aggregate({
+          where: {
+            ...incomeFilter,
+            receiveDate: { gte: startOfLastMonth, lte: endOfLastMonth },
+          },
+          _sum: { netReceived: true },
+        }),
+    prisma.income.count({
+      where: { ...filteredIncomeFilter, workflowStatus: "WAITING_INVOICE_ISSUE" },
     }),
     prisma.income.count({
-      where: { ...incomeFilter, workflowStatus: "WAITING_INVOICE_ISSUE" },
+      where: { ...filteredIncomeFilter, workflowStatus: "WHT_PENDING_CERT" },
     }),
     prisma.income.count({
-      where: { ...incomeFilter, workflowStatus: "WHT_PENDING_CERT" },
+      where: { ...filteredIncomeFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },
     }),
     prisma.income.count({
-      where: { ...incomeFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },
-    }),
-    prisma.income.count({
-      where: incomeFilter,
+      where: filteredIncomeFilter,
     }),
   ]);
 
   return {
-    monthlyTotal: Number(monthlyTotal._sum.netReceived) || 0,
-    monthlyCount: monthlyTotal._count,
+    monthlyTotal: Number(periodTotal._sum.netReceived) || 0,
+    monthlyCount: periodTotal._count,
     lastMonthTotal: Number(lastMonthTotal._sum.netReceived) || 0,
     waitingInvoice,
     waitingWhtCert,
     sentToAccountant,
     totalIncomes,
+    isFiltered: hasDateFilter,
   };
 }

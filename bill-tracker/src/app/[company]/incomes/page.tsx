@@ -42,7 +42,11 @@ export default async function IncomesPage({ params, searchParams }: IncomesPageP
       />
 
       <Suspense fallback={<StatsSkeleton />}>
-        <IncomeStats companyCode={companyCode} />
+        <IncomeStats 
+          companyCode={companyCode}
+          dateFrom={urlParams.dateFrom as string | undefined}
+          dateTo={urlParams.dateTo as string | undefined}
+        />
       </Suspense>
 
       <Suspense fallback={<TableSkeleton />}>
@@ -52,15 +56,22 @@ export default async function IncomesPage({ params, searchParams }: IncomesPageP
   );
 }
 
-async function IncomeStats({ companyCode }: { companyCode: string }) {
+interface IncomeStatsProps {
+  companyCode: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+async function IncomeStats({ companyCode, dateFrom, dateTo }: IncomeStatsProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  // Use cached stats for better performance
-  const stats = await getIncomeStats(companyId);
+  // Use stats with date filter if provided
+  const dateFilter = (dateFrom || dateTo) ? { dateFrom, dateTo } : undefined;
+  const stats = await getIncomeStats(companyId, dateFilter);
 
-  // Calculate trend
-  const trendValue = stats.lastMonthTotal > 0 
+  // Calculate trend (only show when not filtered)
+  const trendValue = !stats.isFiltered && stats.lastMonthTotal > 0 
     ? ((stats.monthlyTotal - stats.lastMonthTotal) / stats.lastMonthTotal) * 100 
     : 0;
 
@@ -70,17 +81,20 @@ async function IncomeStats({ companyCode }: { companyCode: string }) {
   const waitingWhtProgress = totalPending > 0 ? (stats.waitingWhtCert / totalPending) * 100 : 0;
   const sentProgress = stats.totalIncomes > 0 ? (stats.sentToAccountant / stats.totalIncomes) * 100 : 0;
 
+  // Dynamic title based on filter
+  const periodTitle = stats.isFiltered ? "รายรับช่วงที่เลือก" : "รายรับเดือนนี้";
+
   return (
     <StatsGrid
       stats={[
         {
-          title: "รายรับเดือนนี้",
+          title: periodTitle,
           value: formatCurrency(stats.monthlyTotal),
           subtitle: `${stats.monthlyCount} รายการ`,
           icon: "arrow-down-circle",
           iconColor: "text-primary",
           featured: true,
-          trend: trendValue !== 0 ? {
+          trend: !stats.isFiltered && trendValue !== 0 ? {
             value: Math.abs(Math.round(trendValue)),
             isPositive: trendValue > 0,
           } : undefined,

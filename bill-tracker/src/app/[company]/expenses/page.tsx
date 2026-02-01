@@ -42,7 +42,12 @@ export default async function ExpensesPage({ params, searchParams }: ExpensesPag
       />
 
       <Suspense fallback={<StatsSkeleton />}>
-        <ExpenseStats companyCode={companyCode} />
+        <ExpenseStats 
+          companyCode={companyCode} 
+          dateFrom={urlParams.dateFrom as string | undefined}
+          dateTo={urlParams.dateTo as string | undefined}
+          viewMode={(urlParams.viewMode as string) || "official"}
+        />
       </Suspense>
 
       <Suspense fallback={<TableSkeleton />}>
@@ -52,15 +57,23 @@ export default async function ExpensesPage({ params, searchParams }: ExpensesPag
   );
 }
 
-async function ExpenseStats({ companyCode }: { companyCode: string }) {
+interface ExpenseStatsProps {
+  companyCode: string;
+  dateFrom?: string;
+  dateTo?: string;
+  viewMode?: string;
+}
+
+async function ExpenseStats({ companyCode, dateFrom, dateTo, viewMode = "official" }: ExpenseStatsProps) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  // Use cached stats for better performance
-  const stats = await getExpenseStats(companyId);
+  // Use stats with date filter if provided
+  const dateFilter = (dateFrom || dateTo) ? { dateFrom, dateTo } : undefined;
+  const stats = await getExpenseStats(companyId, viewMode as "official" | "internal", dateFilter);
 
-  // Calculate trend
-  const trendValue = stats.lastMonthTotal > 0 
+  // Calculate trend (only show when not filtered)
+  const trendValue = !stats.isFiltered && stats.lastMonthTotal > 0 
     ? ((stats.monthlyTotal - stats.lastMonthTotal) / stats.lastMonthTotal) * 100 
     : 0;
 
@@ -70,17 +83,20 @@ async function ExpenseStats({ companyCode }: { companyCode: string }) {
   const readyProgress = totalPending > 0 ? (stats.readyForAccounting / totalPending) * 100 : 0;
   const sentProgress = stats.totalExpenses > 0 ? (stats.sentToAccountant / stats.totalExpenses) * 100 : 0;
 
+  // Dynamic title based on filter
+  const periodTitle = stats.isFiltered ? "รายจ่ายช่วงที่เลือก" : "รายจ่ายเดือนนี้";
+
   return (
     <StatsGrid
       stats={[
         {
-          title: "รายจ่ายเดือนนี้",
+          title: periodTitle,
           value: formatCurrency(stats.monthlyTotal),
           subtitle: `${stats.monthlyCount} รายการ`,
           icon: "arrow-up-circle",
           iconColor: "text-destructive",
           featured: true,
-          trend: trendValue !== 0 ? {
+          trend: !stats.isFiltered && trendValue !== 0 ? {
             value: Math.abs(Math.round(trendValue)),
             isPositive: trendValue > 0,
           } : undefined,
