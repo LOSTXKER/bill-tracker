@@ -123,15 +123,20 @@ export const GET = withCompanyAccessFromParams(
         }
 
         groupedByRound[roundKey].payments.push(payment);
-        groupedByRound[roundKey].totalAmount += Number(payment.amount);
+        // Only count amount if expense is not deleted
+        if (!payment.Expense.deletedAt) {
+          groupedByRound[roundKey].totalAmount += Number(payment.amount);
+        }
       });
 
-      // Calculate payer summary for each round
+      // Calculate payer summary for each round (only count non-deleted)
       Object.values(groupedByRound).forEach((round) => {
         const payerCounts: Record<string, number> = {};
         round.payments.forEach((p) => {
-          const name = p.PaidByUser?.name || "ไม่ระบุ";
-          payerCounts[name] = (payerCounts[name] || 0) + 1;
+          if (!p.Expense.deletedAt) {
+            const name = p.PaidByUser?.name || "ไม่ระบุ";
+            payerCounts[name] = (payerCounts[name] || 0) + 1;
+          }
         });
         round.payerSummary = Object.entries(payerCounts)
           .map(([name, count]) => `${name} (${count} รายการ)`)
@@ -143,11 +148,14 @@ export const GET = withCompanyAccessFromParams(
         (a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime()
       );
 
+      // Filter out deleted expenses for totals
+      const activePayments = payments.filter((p) => !p.Expense.deletedAt);
+      
       return apiResponse.successWithCache(
         {
           rounds,
-          totalSettled: payments.length,
-          totalAmount: payments.reduce((sum, p) => sum + Number(p.amount), 0),
+          totalSettled: activePayments.length,
+          totalAmount: activePayments.reduce((sum, p) => sum + Number(p.amount), 0),
         },
         undefined,
         { maxAge: 5, staleWhileRevalidate: 30 }
