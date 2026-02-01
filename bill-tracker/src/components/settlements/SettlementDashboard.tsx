@@ -93,14 +93,11 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     return `${settlementBasePath}?${params.toString()}`;
   };
 
-  // Fetch pending settlements
+  // Fetch pending settlements (always fetch for employee list)
   const {
     data: pendingData,
     isLoading: pendingLoading,
-  } = useSWR(
-    tab === "pending" ? buildUrl("PENDING") : null,
-    fetcher
-  );
+  } = useSWR(buildUrl("PENDING"), fetcher);
 
   // Fetch settled settlements with groupBy=round
   const {
@@ -111,24 +108,44 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     fetcher
   );
 
-  // Get unique employees from pending data for filter dropdown
+  // Fetch all settled without filters to get all employees for dropdown
+  const { data: allSettledData } = useSWR(
+    `${settlementBasePath}?status=SETTLED&groupBy=round`,
+    fetcher
+  );
+
+  // Get unique employees from both pending and settled data for filter dropdown
   const employeeOptions = useMemo(() => {
+    const employeeMap = new Map<string, string>();
+    
+    // From pending groups
     const pendingGroups = pendingData?.data?.groups || [];
+    pendingGroups.forEach((group: any) => {
+      if (group.payerId && group.payerType === "USER") {
+        employeeMap.set(group.payerId, group.payerName);
+      }
+    });
+    
+    // From settled rounds (all data)
+    const settledRounds = allSettledData?.data?.rounds || [];
+    settledRounds.forEach((round: any) => {
+      round.payments?.forEach((payment: any) => {
+        if (payment.paidByUserId && payment.PaidByUser) {
+          employeeMap.set(payment.paidByUserId, payment.PaidByUser.name);
+        }
+      });
+    });
+    
     const employees: { value: string; label: string }[] = [
       { value: "all", label: "พนักงานทั้งหมด" },
     ];
     
-    pendingGroups.forEach((group: any) => {
-      if (group.payerId && group.payerType === "USER") {
-        employees.push({
-          value: group.payerId,
-          label: group.payerName,
-        });
-      }
+    employeeMap.forEach((name, id) => {
+      employees.push({ value: id, label: name });
     });
     
     return employees;
-  }, [pendingData]);
+  }, [pendingData, allSettledData]);
 
   // OPTIMIZED: Single batch revalidation using global mutate with key matcher
   // This triggers a single revalidation pass instead of 3 separate API calls
