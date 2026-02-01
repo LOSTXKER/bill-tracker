@@ -59,13 +59,13 @@ export function SettlePaymentDialog({
       for (const file of Array.from(files)) {
         const fileName = `${companyCode}/settlements/${Date.now()}-${file.name}`;
         const { data, error } = await supabase.storage
-          .from("receipts")
+          .from("bill-tracker")
           .upload(fileName, file);
 
         if (error) throw error;
 
         const { data: urlData } = supabase.storage
-          .from("receipts")
+          .from("bill-tracker")
           .getPublicUrl(data.path);
 
         uploadedUrls.push(urlData.publicUrl);

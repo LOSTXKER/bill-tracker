@@ -4,6 +4,7 @@ import { useState } from "react";
 import { NavLink, useIsActivePath } from "@/components/navigation";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
 import {
   Receipt,
   LayoutDashboard,
@@ -19,29 +20,52 @@ import {
   Wallet,
   User,
   Coins,
+  ClipboardCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useSidebarBadges, type SidebarBadges } from "@/hooks/use-sidebar-badges";
 
 interface NavigationItem {
   name: string;
   href: string;
   icon: LucideIcon;
   permission?: string;
+  badgeKey?: keyof SidebarBadges;
 }
 
-// Bottom nav item with optimistic active state
-function BottomNavItem({ href, icon: Icon, name }: { href: string; icon: LucideIcon; name: string }) {
+// Bottom nav item with optimistic active state and badge support
+function BottomNavItem({ 
+  href, 
+  icon: Icon, 
+  name,
+  badge 
+}: { 
+  href: string; 
+  icon: LucideIcon; 
+  name: string;
+  badge?: number;
+}) {
   const isActive = useIsActivePath(href);
   
   return (
     <NavLink
       href={href}
       className={cn(
-        "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 min-w-[60px]",
+        "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 min-w-[60px] relative",
         isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
-      <Icon className={cn("h-5 w-5 transition-colors", isActive && "text-primary")} />
+      <div className="relative">
+        <Icon className={cn("h-5 w-5 transition-colors", isActive && "text-primary")} />
+        {badge !== undefined && badge > 0 && (
+          <Badge 
+            variant="destructive" 
+            className="absolute -top-2 -right-2 h-4 min-w-[16px] px-1 text-[10px] font-medium"
+          >
+            {badge > 99 ? "99+" : badge}
+          </Badge>
+        )}
+      </div>
       <span className={cn("text-[10px] font-medium transition-colors", isActive && "text-primary")}>
         {name}
       </span>
@@ -49,16 +73,18 @@ function BottomNavItem({ href, icon: Icon, name }: { href: string; icon: LucideI
   );
 }
 
-// More menu item with optimistic active state
+// More menu item with optimistic active state and badge support
 function MoreMenuItem({ 
   href, 
   icon: Icon, 
-  name, 
+  name,
+  badge,
   onClick 
 }: { 
   href: string; 
   icon: LucideIcon; 
-  name: string; 
+  name: string;
+  badge?: number;
   onClick?: () => void;
 }) {
   const isActive = useIsActivePath(href);
@@ -75,7 +101,15 @@ function MoreMenuItem({
       )}
     >
       <Icon className={cn("h-5 w-5 transition-colors", isActive && "text-primary")} />
-      {name}
+      <span className="flex-1">{name}</span>
+      {badge !== undefined && badge > 0 && (
+        <Badge 
+          variant="destructive" 
+          className="h-5 min-w-[20px] px-1.5 text-xs font-medium"
+        >
+          {badge > 99 ? "99+" : badge}
+        </Badge>
+      )}
     </NavLink>
   );
 }
@@ -88,6 +122,9 @@ interface BottomNavProps {
 
 export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps) {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  
+  // Fetch sidebar badge counts
+  const { badges } = useSidebarBadges(companyCode);
 
   const hasPermission = (permission?: string) => {
     if (!permission) return true;
@@ -105,7 +142,8 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
   ];
 
   const moreNavItems: NavigationItem[] = [
-    { name: "โอนคืนพนักงาน", href: `/${companyCode}/reimbursements`, icon: Wallet, permission: "reimbursements:read" },
+    { name: "รออนุมัติ", href: `/${companyCode}/approvals`, icon: ClipboardCheck, permission: "expenses:approve", badgeKey: "pendingApprovals" },
+    { name: "โอนคืนพนักงาน", href: `/${companyCode}/reimbursements`, icon: Wallet, permission: "reimbursements:read", badgeKey: "pendingReimbursements" },
     { name: "เงินสดย่อย", href: `/${companyCode}/petty-cash`, icon: Coins, permission: "expenses:read" },
     { name: "โปรไฟล์", href: `/${companyCode}/profile`, icon: User },
     { name: "พนักงาน", href: `/${companyCode}/employees`, icon: Users, permission: "settings:manage-team" },
@@ -119,11 +157,25 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
   const filteredMainNav = mainNavItems.filter((item) => hasPermission(item.permission));
   const filteredMoreNav = moreNavItems.filter((item) => hasPermission(item.permission));
 
+  // Calculate total badge count for "More" button
+  const moreBadgeCount = filteredMoreNav.reduce((sum, item) => {
+    if (item.badgeKey && badges[item.badgeKey]) {
+      return sum + badges[item.badgeKey];
+    }
+    return sum;
+  }, 0);
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-border/50 bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-background/80">
       <div className="flex items-center justify-around h-16 px-2 safe-area-inset-bottom">
         {filteredMainNav.map((item) => (
-          <BottomNavItem key={item.name} href={item.href} icon={item.icon} name={item.name} />
+          <BottomNavItem 
+            key={item.name} 
+            href={item.href} 
+            icon={item.icon} 
+            name={item.name}
+            badge={item.badgeKey ? badges[item.badgeKey] : undefined}
+          />
         ))}
 
         {/* More Menu */}
@@ -131,9 +183,19 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
           <SheetTrigger asChild>
             <button
               suppressHydrationWarning
-              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 min-w-[60px] text-muted-foreground hover:text-foreground"
+              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 min-w-[60px] text-muted-foreground hover:text-foreground relative"
             >
-              <MoreHorizontal className="h-5 w-5" />
+              <div className="relative">
+                <MoreHorizontal className="h-5 w-5" />
+                {moreBadgeCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 h-4 min-w-[16px] px-1 text-[10px] font-medium"
+                  >
+                    {moreBadgeCount > 99 ? "99+" : moreBadgeCount}
+                  </Badge>
+                )}
+              </div>
               <span className="text-[10px] font-medium">อื่นๆ</span>
             </button>
           </SheetTrigger>
@@ -146,6 +208,7 @@ export function BottomNav({ companyCode, isOwner, permissions }: BottomNavProps)
                   href={item.href}
                   icon={item.icon}
                   name={item.name}
+                  badge={item.badgeKey ? badges[item.badgeKey] : undefined}
                   onClick={() => setMoreSheetOpen(false)}
                 />
               ))}

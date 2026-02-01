@@ -8,6 +8,7 @@ import { logout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,7 @@ import type { Company, UserRole } from "@prisma/client";
 import { PermissionProvider } from "@/components/providers/permission-provider";
 import { BottomNav } from "@/components/dashboard/bottom-nav";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { useSidebarBadges, type SidebarBadges } from "@/hooks/use-sidebar-badges";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -62,6 +64,7 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   permission?: string;
+  badgeKey?: keyof SidebarBadges;
 }
 
 interface NavGroup {
@@ -69,16 +72,18 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// NavItem component with optimistic active state
+// NavItem component with optimistic active state and badge support
 function NavItemLink({ 
   href, 
   icon: Icon, 
   name, 
+  badge,
   onClick 
 }: { 
   href: string; 
   icon: LucideIcon; 
   name: string; 
+  badge?: number;
   onClick?: () => void;
 }) {
   const isActive = useIsActivePath(href);
@@ -98,7 +103,15 @@ function NavItemLink({
         "h-5 w-5 transition-colors",
         isActive ? "text-primary" : ""
       )} />
-      {name}
+      <span className="flex-1">{name}</span>
+      {badge !== undefined && badge > 0 && (
+        <Badge 
+          variant="destructive" 
+          className="h-5 min-w-[20px] px-1.5 text-xs font-medium"
+        >
+          {badge > 99 ? "99+" : badge}
+        </Badge>
+      )}
     </NavLink>
   );
 }
@@ -106,6 +119,9 @@ function NavItemLink({
 export function DashboardShell({ children, company, user, isOwner, permissions }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const companyCode = company.code.toLowerCase();
+  
+  // Fetch sidebar badge counts
+  const { badges } = useSidebarBadges(companyCode);
 
   // Grouped navigation
   const navigationGroups: NavGroup[] = [
@@ -144,6 +160,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           href: `/${companyCode}/approvals`,
           icon: ClipboardCheck,
           permission: "expenses:approve",
+          badgeKey: "pendingApprovals",
         },
       ],
     },
@@ -155,6 +172,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           href: `/${companyCode}/reimbursements`,
           icon: Wallet,
           permission: "reimbursements:read",
+          badgeKey: "pendingReimbursements",
         },
         {
           name: "เงินสดย่อย",
@@ -273,6 +291,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
                 href={item.href}
                 icon={item.icon}
                 name={item.name}
+                badge={item.badgeKey ? badges[item.badgeKey] : undefined}
                 onClick={() => setSidebarOpen(false)}
               />
             ))}
