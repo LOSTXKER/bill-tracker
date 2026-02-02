@@ -10,6 +10,8 @@ export {
   BaseTransactionStrategy,
   transactionRegistry,
   getTransactionStrategy,
+  isValidTransactionType,
+  VALID_TRANSACTION_TYPES,
   type ITransactionStrategy,
   type TransactionType,
   type TransactionFieldMapping,
@@ -24,7 +26,7 @@ export { ExpenseStrategy, expenseStrategy } from "./expense-strategy";
 export { IncomeStrategy, incomeStrategy } from "./income-strategy";
 
 // Register all strategies
-import { transactionRegistry, getTransactionStrategy as getStrategy } from "./base";
+import { transactionRegistry, getTransactionStrategy as getStrategy, isValidTransactionType } from "./base";
 import { expenseStrategy } from "./expense-strategy";
 import { incomeStrategy } from "./income-strategy";
 
@@ -52,55 +54,76 @@ export function getAllStrategies() {
  * Check if a transaction type is supported
  */
 export function isTransactionTypeSupported(type: string): boolean {
-  return transactionRegistry.has(type as any);
+  return isValidTransactionType(type) && transactionRegistry.has(type);
 }
 
 /**
  * Get labels for a transaction type
+ * @throws Error if type is invalid
  */
 export function getTransactionLabels(type: string) {
-  const strategy = getStrategy(type as any);
+  if (!isValidTransactionType(type)) {
+    throw new Error(`Invalid transaction type: ${type}`);
+  }
+  const strategy = getStrategy(type);
   return strategy.labels;
 }
 
 /**
  * Get permissions for a transaction type
+ * @throws Error if type is invalid
  */
 export function getTransactionPermissions(type: string) {
-  const strategy = getStrategy(type as any);
+  if (!isValidTransactionType(type)) {
+    throw new Error(`Invalid transaction type: ${type}`);
+  }
+  const strategy = getStrategy(type);
   return strategy.permissions;
 }
 
 /**
  * Get field mappings for a transaction type
+ * @throws Error if type is invalid
  */
 export function getTransactionFields(type: string) {
-  const strategy = getStrategy(type as any);
+  if (!isValidTransactionType(type)) {
+    throw new Error(`Invalid transaction type: ${type}`);
+  }
+  const strategy = getStrategy(type);
   return strategy.fields;
 }
 
 /**
  * Validate create data using strategy
+ * @throws Error if type is invalid
  */
 export function validateTransactionCreate(type: string, data: Record<string, unknown>) {
-  const strategy = getStrategy(type as any);
+  if (!isValidTransactionType(type)) {
+    throw new Error(`Invalid transaction type: ${type}`);
+  }
+  const strategy = getStrategy(type);
   return strategy.validateCreate(data);
 }
 
 /**
  * Validate update data using strategy
+ * @throws Error if type is invalid
  */
 export function validateTransactionUpdate(
   type: string,
   existingData: Record<string, unknown>,
   updates: Record<string, unknown>
 ) {
-  const strategy = getStrategy(type as any);
+  if (!isValidTransactionType(type)) {
+    throw new Error(`Invalid transaction type: ${type}`);
+  }
+  const strategy = getStrategy(type);
   return strategy.validateUpdate(existingData, updates);
 }
 
 /**
  * Calculate transaction totals using strategy
+ * @throws Error if type is invalid
  */
 export function calculateTransactionTotals(
   type: string,
@@ -108,6 +131,9 @@ export function calculateTransactionTotals(
   vatRate: number,
   whtRate: number
 ) {
-  const strategy = getStrategy(type as any);
+  if (!isValidTransactionType(type)) {
+    throw new Error(`Invalid transaction type: ${type}`);
+  }
+  const strategy = getStrategy(type);
   return strategy.calculateTotals(amount, vatRate, whtRate);
 }

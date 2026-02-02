@@ -14,6 +14,23 @@ import type { Prisma } from "@prisma/client";
 
 export type TransactionType = "expense" | "income" | "transfer" | "adjustment";
 
+/**
+ * Valid transaction types array (for runtime validation)
+ */
+export const VALID_TRANSACTION_TYPES: readonly TransactionType[] = [
+  "expense",
+  "income", 
+  "transfer",
+  "adjustment"
+] as const;
+
+/**
+ * Type guard to check if a string is a valid TransactionType
+ */
+export function isValidTransactionType(type: string): type is TransactionType {
+  return VALID_TRANSACTION_TYPES.includes(type as TransactionType);
+}
+
 export interface TransactionFieldMapping {
   dateField: string;
   netAmountField: string;
