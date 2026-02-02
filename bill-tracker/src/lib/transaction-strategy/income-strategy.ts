@@ -195,6 +195,18 @@ export class IncomeStrategy extends BaseTransactionStrategy {
     return "income";
   }
 
+  getApiPath(): string {
+    return "/api/incomes";
+  }
+
+  getUiPath(companyCode: string): string {
+    return `/${companyCode.toLowerCase()}/incomes`;
+  }
+
+  getDetailPath(companyCode: string, transactionId: string): string {
+    return `/${companyCode.toLowerCase()}/incomes/${transactionId}`;
+  }
+
   getDisplayName(transaction: Record<string, unknown>): string {
     const contact = transaction.Contact as Record<string, unknown> | null;
     if (contact?.name) return String(contact.name);

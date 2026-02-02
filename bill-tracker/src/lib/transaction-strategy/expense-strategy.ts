@@ -209,6 +209,18 @@ export class ExpenseStrategy extends BaseTransactionStrategy {
     return "expense";
   }
 
+  getApiPath(): string {
+    return "/api/expenses";
+  }
+
+  getUiPath(companyCode: string): string {
+    return `/${companyCode.toLowerCase()}/expenses`;
+  }
+
+  getDetailPath(companyCode: string, transactionId: string): string {
+    return `/${companyCode.toLowerCase()}/expenses/${transactionId}`;
+  }
+
   getDisplayName(transaction: Record<string, unknown>): string {
     const contact = transaction.Contact as Record<string, unknown> | null;
     if (contact?.name) return String(contact.name);

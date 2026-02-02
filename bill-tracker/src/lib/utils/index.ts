@@ -83,3 +83,12 @@ export {
   type TransactionFieldMapping,
   type CommonTransaction,
 } from "./transaction-fields";
+
+// Transaction data extraction utilities (Phase 5 Refactoring)
+// TODO: Implement transaction-data-extraction.ts
+// export {
+//   extractFormData,
+//   extractAiData,
+//   normalizeAiWhtType,
+//   calculateMergedTotals,
+// } from "./transaction-data-extraction";

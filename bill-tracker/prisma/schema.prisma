@@ -86,8 +86,8 @@ model Comment {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model Company {
   id                         String                 @id
-  name                       String                 // ชื่อที่แสดงในระบบ (Display Name)
-  legalName                  String?                // ชื่อทางการที่ใช้ในเอกสาร/ใบกำกับภาษี
+  name                       String // ชื่อที่แสดงในระบบ (Display Name)
+  legalName                  String? // ชื่อทางการที่ใช้ในเอกสาร/ใบกำกับภาษี
   code                       String                 @unique
   taxId                      String?
   address                    String?
@@ -113,6 +113,7 @@ model Company {
   businessDescription        String?
   Account                    Account[]
   CompanyAccess              CompanyAccess[]
+  CompanyConfig              CompanyConfig[]
   Contact                    Contact[]
   Expense                    Expense[]
   ExpenseInternal            Expense[]              @relation("ExpenseInternalCompany")
@@ -142,47 +143,63 @@ model CompanyAccess {
   @@index([userId])
 }
 
+/// Company-specific configuration settings (Phase 7 Refactoring)
+/// Allows per-company customization of workflow, WHT rates, payment methods, etc.
+model CompanyConfig {
+  id        String   @id
+  companyId String
+  key       String // Configuration key: "wht_rates", "payment_methods", "workflow_statuses", etc.
+  value     Json // Configuration data (flexible JSON structure)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  createdBy String? // User who created this config
+  Company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([companyId])
+}
+
 model Contact {
-  id                   String                 @id
-  companyId            String
-  name                 String
-  taxId                String?
-  address              String?
-  phone                String?
-  email                String?
-  bankAccount          String?
-  bankName             String?
-  creditLimit          Decimal?               @db.Decimal(12, 2)
-  paymentTerms         Int?
-  notes                String?
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime
-  branchCode           String?                @default("00000")
-  type                 ContactType            @default(COMPANY)
-  peakCode             String?
-  contactCategory      ContactCategory        @default(VENDOR)
-  entityType           EntityType             @default(COMPANY)
-  businessType         String?
-  nationality          String?                @default("ไทย")
-  prefix               String?
-  firstName            String?
-  lastName             String?
-  subDistrict          String?
-  district             String?
-  province             String?
-  postalCode           String?
-  country              String?                @default("Thailand")
-  contactPerson        String?
-  source               DataSource             @default(MANUAL)
-  
+  id              String          @id
+  companyId       String
+  name            String
+  taxId           String?
+  address         String?
+  phone           String?
+  email           String?
+  bankAccount     String?
+  bankName        String?
+  creditLimit     Decimal?        @db.Decimal(12, 2)
+  paymentTerms    Int?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  branchCode      String?         @default("00000")
+  type            ContactType     @default(COMPANY)
+  peakCode        String?
+  contactCategory ContactCategory @default(VENDOR)
+  entityType      EntityType      @default(COMPANY)
+  businessType    String?
+  nationality     String?         @default("ไทย")
+  prefix          String?
+  firstName       String?
+  lastName        String?
+  subDistrict     String?
+  district        String?
+  province        String?
+  postalCode      String?
+  country         String?         @default("Thailand")
+  contactPerson   String?
+  source          DataSource      @default(MANUAL)
+
   // ค่าเริ่มต้นสำหรับธุรกรรม (Contact Defaults)
-  defaultVatRate         Int?                   // อัตรา VAT เริ่มต้น (0, 7, etc.)
-  defaultWhtEnabled      Boolean?               // เปิด/ปิด หัก ณ ที่จ่าย
-  defaultWhtRate         Decimal?               @db.Decimal(5, 2) // อัตราหัก ณ ที่จ่าย
-  defaultWhtType         String?                // ประเภท WHT (SERVICE, RENT, etc.)
-  descriptionTemplate    String?                // template คำอธิบาย
-  defaultsLastUpdatedAt  DateTime?              // วันที่อัปเดตค่าเริ่มต้นล่าสุด
-  
+  defaultVatRate        Int? // อัตรา VAT เริ่มต้น (0, 7, etc.)
+  defaultWhtEnabled     Boolean? // เปิด/ปิด หัก ณ ที่จ่าย
+  defaultWhtRate        Decimal?  @db.Decimal(5, 2) // อัตราหัก ณ ที่จ่าย
+  defaultWhtType        String? // ประเภท WHT (SERVICE, RENT, etc.)
+  descriptionTemplate   String? // template คำอธิบาย
+  defaultsLastUpdatedAt DateTime? // วันที่อัปเดตค่าเริ่มต้นล่าสุด
+
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Expense              Expense[]
   Income               Income[]
@@ -218,40 +235,40 @@ model DocumentEvent {
 }
 
 model Expense {
-  id                                         String                @id
+  id                                         String                 @id
   companyId                                  String
-  amount                                     Decimal               @db.Decimal(12, 2)
-  vatRate                                    Int                   @default(7)
-  vatAmount                                  Decimal?              @db.Decimal(12, 2)
-  isWht                                      Boolean               @default(false)
-  whtRate                                    Decimal?              @db.Decimal(5, 2)
-  whtAmount                                  Decimal?              @db.Decimal(12, 2)
+  amount                                     Decimal                @db.Decimal(12, 2)
+  vatRate                                    Int                    @default(7)
+  vatAmount                                  Decimal?               @db.Decimal(12, 2)
+  isWht                                      Boolean                @default(false)
+  whtRate                                    Decimal?               @db.Decimal(5, 2)
+  whtAmount                                  Decimal?               @db.Decimal(12, 2)
   whtType                                    WhtType?
-  netPaid                                    Decimal               @db.Decimal(12, 2)
+  netPaid                                    Decimal                @db.Decimal(12, 2)
   description                                String?
   invoiceNumber                              String?
   referenceNo                                String?
-  paymentMethod                              PaymentMethod         @default(BANK_TRANSFER)
-  billDate                                   DateTime              @default(now())
+  paymentMethod                              PaymentMethod          @default(BANK_TRANSFER)
+  billDate                                   DateTime               @default(now())
   dueDate                                    DateTime?
-  status                                     ExpenseDocStatus      @default(PENDING_PHYSICAL)
+  status                                     ExpenseDocStatus       @default(PENDING_PHYSICAL)
   notes                                      String?
   approvedBy                                 String?
   approvedAt                                 DateTime?
   createdBy                                  String
-  createdAt                                  DateTime              @default(now())
+  createdAt                                  DateTime               @default(now())
   updatedAt                                  DateTime
   contactId                                  String?
-  slipUrls                                   Json                  @default("[]")
-  taxInvoiceUrls                             Json                  @default("[]")
-  whtCertUrls                                Json                  @default("[]")
-  otherDocUrls                               Json                  @default("[]")
+  slipUrls                                   Json                   @default("[]")
+  taxInvoiceUrls                             Json                   @default("[]")
+  whtCertUrls                                Json                   @default("[]")
+  otherDocUrls                               Json                   @default("[]")
   deletedAt                                  DateTime?
   deletedBy                                  String?
   fraudAnalyzedAt                            DateTime?
   fraudFlags                                 Json?
   fraudScore                                 Int?
-  isReimbursement                            Boolean               @default(false)
+  isReimbursement                            Boolean                @default(false)
   reimbursementApprovedAt                    DateTime?
   reimbursementApprovedBy                    String?
   reimbursementPaidAt                        DateTime?
@@ -262,17 +279,17 @@ model Expense {
   requesterId                                String?
   contactName                                String?
   accountId                                  String?
-  hasTaxInvoice                              Boolean               @default(false)
-  hasWhtCert                                 Boolean               @default(false)
-  documentType                               ExpenseDocumentType   @default(TAX_INVOICE)
+  hasTaxInvoice                              Boolean                @default(false)
+  hasWhtCert                                 Boolean                @default(false)
+  documentType                               ExpenseDocumentType    @default(TAX_INVOICE)
   sentToAccountAt                            DateTime?
   taxInvoiceAt                               DateTime?
   whtCertIssuedAt                            DateTime?
   whtCertSentAt                              DateTime?
-  workflowStatus                             ExpenseWorkflowStatus @default(DRAFT)
-  referenceUrls                              Json                  @default("[]")
+  workflowStatus                             ExpenseWorkflowStatus  @default(DRAFT)
+  referenceUrls                              Json                   @default("[]")
   // Approval workflow fields
-  approvalStatus                             ApprovalStatus        @default(NOT_REQUIRED)
+  approvalStatus                             ApprovalStatus         @default(NOT_REQUIRED)
   rejectedReason                             String?
   submittedAt                                DateTime?
   submittedBy                                String?
@@ -280,15 +297,15 @@ model Expense {
   internalCompanyId                          String?
   Comment                                    Comment[]
   DocumentEvent                              DocumentEvent[]
-  Account                                    Account?              @relation(fields: [accountId], references: [id])
-  Company                                    Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  InternalCompany                            Company?              @relation("ExpenseInternalCompany", fields: [internalCompanyId], references: [id])
-  Contact                                    Contact?              @relation(fields: [contactId], references: [id])
-  User_Expense_createdByToUser               User                  @relation("Expense_createdByToUser", fields: [createdBy], references: [id])
-  User_Expense_reimbursementApprovedByToUser User?                 @relation("Expense_reimbursementApprovedByToUser", fields: [reimbursementApprovedBy], references: [id])
-  User_Expense_reimbursementPaidByToUser     User?                 @relation("Expense_reimbursementPaidByToUser", fields: [reimbursementPaidBy], references: [id])
-  User_Expense_requesterIdToUser             User?                 @relation("Expense_requesterIdToUser", fields: [requesterId], references: [id])
-  User_Expense_submittedByToUser             User?                 @relation("Expense_submittedByToUser", fields: [submittedBy], references: [id])
+  Account                                    Account?               @relation(fields: [accountId], references: [id])
+  Company                                    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  InternalCompany                            Company?               @relation("ExpenseInternalCompany", fields: [internalCompanyId], references: [id])
+  Contact                                    Contact?               @relation(fields: [contactId], references: [id])
+  User_Expense_createdByToUser               User                   @relation("Expense_createdByToUser", fields: [createdBy], references: [id])
+  User_Expense_reimbursementApprovedByToUser User?                  @relation("Expense_reimbursementApprovedByToUser", fields: [reimbursementApprovedBy], references: [id])
+  User_Expense_reimbursementPaidByToUser     User?                  @relation("Expense_reimbursementPaidByToUser", fields: [reimbursementPaidBy], references: [id])
+  User_Expense_requesterIdToUser             User?                  @relation("Expense_requesterIdToUser", fields: [requesterId], references: [id])
+  User_Expense_submittedByToUser             User?                  @relation("Expense_submittedByToUser", fields: [submittedBy], references: [id])
   ReimbursementRequest                       ReimbursementRequest?
   ExpensePayments                            ExpensePayment[]
   PettyCashTransactions                      PettyCashTransaction[]
@@ -307,61 +324,61 @@ model Expense {
 }
 
 model Income {
-  id                 String               @id
-  companyId          String
-  amount             Decimal              @db.Decimal(12, 2)
-  vatRate            Int                  @default(0)
-  vatAmount          Decimal?             @db.Decimal(12, 2)
-  isWhtDeducted      Boolean              @default(false)
-  whtRate            Decimal?             @db.Decimal(5, 2)
-  whtAmount          Decimal?             @db.Decimal(12, 2)
-  whtType            WhtType?
-  netReceived        Decimal              @db.Decimal(12, 2)
-  source             String?
-  invoiceNumber      String?
-  referenceNo        String?
-  paymentMethod      PaymentMethod        @default(BANK_TRANSFER)
-  receiveDate        DateTime             @default(now())
-  status             IncomeDocStatus      @default(PENDING_COPY_SEND)
-  notes              String?
-  jobOrderId         String?
-  createdBy          String
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime
-  contactId          String?
-  customerSlipUrls   Json                 @default("[]")
-  myBillCopyUrls     Json                 @default("[]")
-  whtCertUrls        Json                 @default("[]")
-  otherDocUrls       Json                 @default("[]")
-  deletedAt          DateTime?
-  deletedBy          String?
-  contactName        String?
-  accountId          String?
-  hasInvoice         Boolean              @default(false)
-  hasWhtCert         Boolean              @default(false)
-  invoiceIssuedAt    DateTime?
-  invoiceSentAt      DateTime?
-  sentToAccountAt    DateTime?
-  whtCertReceivedAt  DateTime?
-  whtCertRemindCount Int                  @default(0)
-  whtCertRemindedAt  DateTime?
-  workflowStatus     IncomeWorkflowStatus @default(DRAFT)
-  referenceUrls      Json                 @default("[]")
+  id                            String               @id
+  companyId                     String
+  amount                        Decimal              @db.Decimal(12, 2)
+  vatRate                       Int                  @default(0)
+  vatAmount                     Decimal?             @db.Decimal(12, 2)
+  isWhtDeducted                 Boolean              @default(false)
+  whtRate                       Decimal?             @db.Decimal(5, 2)
+  whtAmount                     Decimal?             @db.Decimal(12, 2)
+  whtType                       WhtType?
+  netReceived                   Decimal              @db.Decimal(12, 2)
+  source                        String?
+  invoiceNumber                 String?
+  referenceNo                   String?
+  paymentMethod                 PaymentMethod        @default(BANK_TRANSFER)
+  receiveDate                   DateTime             @default(now())
+  status                        IncomeDocStatus      @default(PENDING_COPY_SEND)
+  notes                         String?
+  jobOrderId                    String?
+  createdBy                     String
+  createdAt                     DateTime             @default(now())
+  updatedAt                     DateTime
+  contactId                     String?
+  customerSlipUrls              Json                 @default("[]")
+  myBillCopyUrls                Json                 @default("[]")
+  whtCertUrls                   Json                 @default("[]")
+  otherDocUrls                  Json                 @default("[]")
+  deletedAt                     DateTime?
+  deletedBy                     String?
+  contactName                   String?
+  accountId                     String?
+  hasInvoice                    Boolean              @default(false)
+  hasWhtCert                    Boolean              @default(false)
+  invoiceIssuedAt               DateTime?
+  invoiceSentAt                 DateTime?
+  sentToAccountAt               DateTime?
+  whtCertReceivedAt             DateTime?
+  whtCertRemindCount            Int                  @default(0)
+  whtCertRemindedAt             DateTime?
+  workflowStatus                IncomeWorkflowStatus @default(DRAFT)
+  referenceUrls                 Json                 @default("[]")
   // Approval workflow fields
-  approvalStatus     ApprovalStatus       @default(NOT_REQUIRED)
-  rejectedReason     String?
-  submittedAt        DateTime?
-  submittedBy        String?
-  approvedBy         String?
-  approvedAt         DateTime?
-  Comment            Comment[]
-  DocumentEvent      DocumentEvent[]
-  Account            Account?             @relation(fields: [accountId], references: [id])
-  Company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Contact            Contact?             @relation(fields: [contactId], references: [id])
-  User               User                 @relation("Income_createdByToUser", fields: [createdBy], references: [id])
-  User_Income_submittedByToUser  User?    @relation("Income_submittedByToUser", fields: [submittedBy], references: [id])
-  User_Income_approvedByToUser   User?    @relation("Income_approvedByToUser", fields: [approvedBy], references: [id])
+  approvalStatus                ApprovalStatus       @default(NOT_REQUIRED)
+  rejectedReason                String?
+  submittedAt                   DateTime?
+  submittedBy                   String?
+  approvedBy                    String?
+  approvedAt                    DateTime?
+  Comment                       Comment[]
+  DocumentEvent                 DocumentEvent[]
+  Account                       Account?             @relation(fields: [accountId], references: [id])
+  Company                       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Contact                       Contact?             @relation(fields: [contactId], references: [id])
+  User                          User                 @relation("Income_createdByToUser", fields: [createdBy], references: [id])
+  User_Income_submittedByToUser User?                @relation("Income_submittedByToUser", fields: [submittedBy], references: [id])
+  User_Income_approvedByToUser  User?                @relation("Income_approvedByToUser", fields: [approvedBy], references: [id])
 
   @@index([accountId])
   @@index([companyId, receiveDate])
@@ -481,8 +498,8 @@ model ExpensePayment {
   id                    String           @id @default(cuid())
   expenseId             String
   paidByType            PaidByType
-  paidByUserId          String?          // Required when paidByType = USER
-  paidByPettyCashFundId String?          // Required when paidByType = PETTY_CASH
+  paidByUserId          String? // Required when paidByType = USER
+  paidByPettyCashFundId String? // Required when paidByType = PETTY_CASH
   // DEPRECATED: These fields were for EXTERNAL payers (kept for migration compatibility)
   paidByName            String?
   paidByBankName        String?
@@ -651,9 +668,9 @@ enum ExpenseDocStatus {
 }
 
 enum ExpenseDocumentType {
-  TAX_INVOICE   // ใบกำกับภาษี (VAT 7%)
-  CASH_RECEIPT  // บิลเงินสด (VAT 0%)
-  NO_DOCUMENT   // ไม่มีเอกสาร (VAT 0%)
+  TAX_INVOICE // ใบกำกับภาษี (VAT 7%)
+  CASH_RECEIPT // บิลเงินสด (VAT 0%)
+  NO_DOCUMENT // ไม่มีเอกสาร (VAT 0%)
 }
 
 enum ExpenseWorkflowStatus {
@@ -704,9 +721,9 @@ enum NotificationType {
   TRANSACTION_UPDATED
   TRANSACTION_DELETED
   TRANSACTION_STATUS_CHANGED
-  TRANSACTION_SUBMITTED       // ส่งคำขออนุมัติ
-  TRANSACTION_APPROVED        // อนุมัติรายการ
-  TRANSACTION_REJECTED        // ปฏิเสธรายการ
+  TRANSACTION_SUBMITTED // ส่งคำขออนุมัติ
+  TRANSACTION_APPROVED // อนุมัติรายการ
+  TRANSACTION_REJECTED // ปฏิเสธรายการ
   FILE_UPLOADED
   REIMBURSEMENT_SUBMITTED
   REIMBURSEMENT_APPROVED
@@ -741,10 +758,10 @@ enum ReimbursementStatus {
 }
 
 enum ApprovalStatus {
-  NOT_REQUIRED  // ไม่ต้องอนุมัติ (สร้างโดยคนมีสิทธิ์ create-direct)
-  PENDING       // รออนุมัติ
-  APPROVED      // อนุมัติแล้ว
-  REJECTED      // ถูกปฏิเสธ
+  NOT_REQUIRED // ไม่ต้องอนุมัติ (สร้างโดยคนมีสิทธิ์ create-direct)
+  PENDING // รออนุมัติ
+  APPROVED // อนุมัติแล้ว
+  REJECTED // ถูกปฏิเสธ
 }
 
 enum UserRole {
@@ -782,16 +799,16 @@ enum SettlementStatus {
 // =============================================================================
 
 model PettyCashFund {
-  id            String                 @id @default(cuid())
+  id            String   @id @default(cuid())
   companyId     String
-  name          String                 // ชื่อกองทุน เช่น "เงินสดย่อยสำนักงาน"
-  initialAmount Decimal                @db.Decimal(12, 2) // ยอดตั้งต้น
-  currentAmount Decimal                @db.Decimal(12, 2) // ยอดคงเหลือปัจจุบัน
-  lowThreshold  Decimal?               @db.Decimal(12, 2) // ยอดขั้นต่ำที่ต้องเตือน
-  custodianId   String?                // ผู้ดูแลกองทุน
-  isActive      Boolean                @default(true)
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  name          String // ชื่อกองทุน เช่น "เงินสดย่อยสำนักงาน"
+  initialAmount Decimal  @db.Decimal(12, 2) // ยอดตั้งต้น
+  currentAmount Decimal  @db.Decimal(12, 2) // ยอดคงเหลือปัจจุบัน
+  lowThreshold  Decimal? @db.Decimal(12, 2) // ยอดขั้นต่ำที่ต้องเตือน
+  custodianId   String? // ผู้ดูแลกองทุน
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   Company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Custodian       User?                  @relation("PettyCashFund_custodian", fields: [custodianId], references: [id])
@@ -807,14 +824,14 @@ model PettyCashTransaction {
   fundId      String
   type        PettyCashTransactionType
   amount      Decimal                  @db.Decimal(12, 2)
-  expenseId   String?                  // ถ้าเป็นการจ่ายจากรายจ่าย
+  expenseId   String? // ถ้าเป็นการจ่ายจากรายจ่าย
   description String?
   createdBy   String
   createdAt   DateTime                 @default(now())
 
-  Fund        PettyCashFund            @relation(fields: [fundId], references: [id], onDelete: Cascade)
-  Expense     Expense?                 @relation(fields: [expenseId], references: [id])
-  User        User                     @relation("PettyCashTransaction_createdBy", fields: [createdBy], references: [id])
+  Fund    PettyCashFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  Expense Expense?      @relation(fields: [expenseId], references: [id])
+  User    User          @relation("PettyCashTransaction_createdBy", fields: [createdBy], references: [id])
 
   @@index([fundId])
   @@index([expenseId])
@@ -822,7 +839,7 @@ model PettyCashTransaction {
 }
 
 enum PettyCashTransactionType {
-  EXPENSE     // จ่ายออก (ตัดจากรายจ่าย)
-  REPLENISH   // เติมเงิน
-  ADJUSTMENT  // ปรับยอด (เช่น นับเงินสดได้ไม่ตรง)
+  EXPENSE // จ่ายออก (ตัดจากรายจ่าย)
+  REPLENISH // เติมเงิน
+  ADJUSTMENT // ปรับยอด (เช่น นับเงินสดได้ไม่ตรง)
 }
