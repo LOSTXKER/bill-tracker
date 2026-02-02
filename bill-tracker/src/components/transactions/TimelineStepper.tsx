@@ -37,7 +37,8 @@ const EXPENSE_STEPS: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
   { key: "TAX_INVOICE_RECEIVED", label: "ได้ใบกำกับ", icon: <FileText className="h-4 w-4" /> },
   { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
-  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "WHT_SENT_TO_VENDOR", label: "ส่ง 50 ทวิแล้ว", icon: <Send className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <FileCheck className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
@@ -61,7 +62,8 @@ const EXPENSE_STEPS_CASH_RECEIPT_WHT: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
   { key: "TAX_INVOICE_RECEIVED", label: "ได้บิลเงินสด", icon: <Receipt className="h-4 w-4" /> },
   { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
-  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "WHT_SENT_TO_VENDOR", label: "ส่ง 50 ทวิแล้ว", icon: <Send className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <FileCheck className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
@@ -76,7 +78,8 @@ const EXPENSE_STEPS_NO_DOCUMENT: Step[] = [
 const EXPENSE_STEPS_NO_DOCUMENT_WHT: Step[] = [
   { key: "PAID", label: "จ่ายเงินแล้ว", icon: <CreditCard className="h-4 w-4" /> },
   { key: "WHT_ISSUED", label: "ออก 50 ทวิ", icon: <FileBadge className="h-4 w-4" /> },
-  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <Send className="h-4 w-4" /> },
+  { key: "WHT_SENT_TO_VENDOR", label: "ส่ง 50 ทวิแล้ว", icon: <Send className="h-4 w-4" /> },
+  { key: "READY_FOR_ACCOUNTING", label: "รอส่งบัญชี", icon: <FileCheck className="h-4 w-4" /> },
   { key: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
@@ -105,7 +108,7 @@ const BASE_STATUS_MAP: Record<string, string> = {
   TAX_INVOICE_RECEIVED: "TAX_INVOICE_RECEIVED",
   WHT_PENDING_ISSUE: "TAX_INVOICE_RECEIVED", // Default: Waiting = still in TAX_INVOICE_RECEIVED step
   WHT_ISSUED: "WHT_ISSUED",
-  WHT_SENT_TO_VENDOR: "WHT_ISSUED", // After WHT issued
+  WHT_SENT_TO_VENDOR: "WHT_SENT_TO_VENDOR", // Now visible as separate step
   READY_FOR_ACCOUNTING: "READY_FOR_ACCOUNTING",
   SENT_TO_ACCOUNTANT: "SENT_TO_ACCOUNTANT",
   COMPLETED: "SENT_TO_ACCOUNTANT",

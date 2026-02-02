@@ -70,7 +70,7 @@ const EXPENSE_ACTIONS: Record<string, ActionConfig[]> = {
     { action: "issue_wht", label: "ออก 50 ทวิแล้ว", icon: <FileText className="h-4 w-4" />, description: "บันทึกว่าออกหนังสือรับรองหัก ณ ที่จ่ายแล้ว" },
   ],
   WHT_ISSUED: [
-    { action: "send_wht", label: "ส่งใบ 50 ทวิให้ vendor", icon: <Send className="h-4 w-4" />, description: "ส่งหนังสือรับรองให้ vendor แล้ว" },
+    { action: "send_wht", label: "ส่งใบ 50 ทวิให้ vendor", icon: <Send className="h-4 w-4" />, description: "ส่งหนังสือรับรองให้ vendor แล้ว", requiresConfirm: true },
   ],
   WHT_SENT_TO_VENDOR: [
     { action: "send_to_accounting", label: "ส่งบัญชี", icon: <Send className="h-4 w-4" />, description: "ส่งเอกสารให้ฝ่ายบัญชี" },
@@ -133,6 +133,7 @@ export function WorkflowActions({
   const [confirmDialog, setConfirmDialog] = useState<ActionConfig | null>(null);
   const [notes, setNotes] = useState("");
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [deliveryMethod, setDeliveryMethod] = useState("");
 
   // Support both prop names
   const txType = type || transactionType || "expense";
@@ -215,6 +216,11 @@ export function WorkflowActions({
     const toastId = toast.loading("กำลังดำเนินการ...");
     
     try {
+      // Include delivery method in metadata for send_wht action
+      const metadata = action === "send_wht" && deliveryMethod 
+        ? { deliveryMethod } 
+        : undefined;
+      
       const res = await fetch(`/api/${companyCode}/document-workflow`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -223,6 +229,7 @@ export function WorkflowActions({
           transactionId,
           action,
           notes: actionNotes || notes,
+          metadata,
         }),
       });
 
@@ -394,7 +401,10 @@ export function WorkflowActions({
           onCancel={() => {
             setConfirmDialog(null);
             setNotes("");
+            setDeliveryMethod("");
           }}
+          deliveryMethod={deliveryMethod}
+          setDeliveryMethod={setDeliveryMethod}
         />
         {RevertConfirmDialog}
       </>
@@ -432,7 +442,10 @@ export function WorkflowActions({
           onCancel={() => {
             setConfirmDialog(null);
             setNotes("");
+            setDeliveryMethod("");
           }}
+          deliveryMethod={deliveryMethod}
+          setDeliveryMethod={setDeliveryMethod}
         />
         {RevertConfirmDialog}
       </>
@@ -475,12 +488,23 @@ export function WorkflowActions({
         onCancel={() => {
           setConfirmDialog(null);
           setNotes("");
+          setDeliveryMethod("");
         }}
+        deliveryMethod={deliveryMethod}
+        setDeliveryMethod={setDeliveryMethod}
       />
       {RevertConfirmDialog}
     </>
   );
 }
+
+// Delivery method options for WHT certificates
+const DELIVERY_METHODS = [
+  { value: "email", label: "อีเมล", icon: "📧" },
+  { value: "physical", label: "ส่งตัวจริง (ไปรษณีย์/messenger)", icon: "📬" },
+  { value: "line", label: "LINE", icon: "💬" },
+  { value: "pickup", label: "มารับเอง", icon: "🏢" },
+];
 
 function ConfirmDialog({
   action,
@@ -489,6 +513,8 @@ function ConfirmDialog({
   loading,
   onConfirm,
   onCancel,
+  deliveryMethod,
+  setDeliveryMethod,
 }: {
   action: ActionConfig | null;
   notes: string;
@@ -496,8 +522,12 @@ function ConfirmDialog({
   loading: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  deliveryMethod?: string;
+  setDeliveryMethod?: (method: string) => void;
 }) {
   if (!action) return null;
+
+  const isSendWht = action.action === "send_wht";
 
   return (
     <Dialog open={!!action} onOpenChange={(open) => !open && onCancel()}>
@@ -511,6 +541,27 @@ function ConfirmDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Delivery method selection for WHT sending */}
+          {isSendWht && setDeliveryMethod && (
+            <div>
+              <Label>วิธีส่ง</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {DELIVERY_METHODS.map((method) => (
+                  <Button
+                    key={method.value}
+                    type="button"
+                    variant={deliveryMethod === method.value ? "default" : "outline"}
+                    className="justify-start gap-2 h-auto py-3"
+                    onClick={() => setDeliveryMethod(method.value)}
+                  >
+                    <span>{method.icon}</span>
+                    <span>{method.label}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div>
             <Label htmlFor="notes">หมายเหตุ (ถ้ามี)</Label>
             <Textarea
@@ -527,7 +578,11 @@ function ConfirmDialog({
           <Button variant="outline" onClick={onCancel} disabled={loading}>
             ยกเลิก
           </Button>
-          <LoadingButton onClick={onConfirm} loading={loading}>
+          <LoadingButton 
+            onClick={onConfirm} 
+            loading={loading}
+            disabled={isSendWht && !deliveryMethod}
+          >
             ยืนยัน
           </LoadingButton>
         </DialogFooter>

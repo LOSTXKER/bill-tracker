@@ -119,6 +119,7 @@ export const EXPENSE_WORKFLOW_FLOW = [
   "PAID",
   "TAX_INVOICE_RECEIVED",
   "WHT_ISSUED",  // ถ้ามี WHT
+  "WHT_SENT_TO_VENDOR",  // ส่งใบหัก ณ ที่จ่ายให้ vendor แล้ว
   "READY_FOR_ACCOUNTING",
   "SENT_TO_ACCOUNTANT",
 ] as const;

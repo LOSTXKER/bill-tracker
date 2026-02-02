@@ -37,6 +37,7 @@ import {
   Banknote,
   Coins,
   ClipboardCheck,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -173,6 +174,13 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: Wallet,
           permission: "reimbursements:read",
           badgeKey: "pendingReimbursements",
+        },
+        {
+          name: "รอส่ง 50 ทวิ",
+          href: `/${companyCode}/wht-deliveries`,
+          icon: Send,
+          permission: "expenses:read",
+          badgeKey: "pendingWhtDeliveries",
         },
         {
           name: "เงินสดย่อย",

@@ -10,6 +10,7 @@ export interface SidebarBadges {
   pendingApprovals: number;
   pendingReimbursements: number;
   pendingSettlements: number;
+  pendingWhtDeliveries: number;
   unreadNotifications: number;
 }
 
@@ -34,6 +35,7 @@ export function useSidebarBadges(
     pendingApprovals: 0,
     pendingReimbursements: 0,
     pendingSettlements: 0,
+    pendingWhtDeliveries: 0,
     unreadNotifications: 0,
   });
   const [loading, setLoading] = useState(true);

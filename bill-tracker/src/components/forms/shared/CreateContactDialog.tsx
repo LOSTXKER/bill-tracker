@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Lightbulb } from "lucide-react";
+import { Loader2, Lightbulb, Send } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
 
@@ -58,6 +58,10 @@ export interface ContactFormData {
   defaultWhtRate: string;
   defaultWhtType: string;
   descriptionTemplate: string;
+  // Delivery Preferences
+  preferredDeliveryMethod: string;
+  deliveryEmail: string;
+  deliveryNotes: string;
 }
 
 /**
@@ -102,6 +106,10 @@ export interface Contact {
   defaultWhtRate?: number | null;
   defaultWhtType?: string | null;
   descriptionTemplate?: string | null;
+  // Delivery Preferences
+  preferredDeliveryMethod?: string | null;
+  deliveryEmail?: string | null;
+  deliveryNotes?: string | null;
 }
 
 /**
@@ -141,6 +149,10 @@ function contactToFormData(contact: Contact): ContactFormData {
     defaultWhtRate: contact.defaultWhtRate?.toString() || "",
     defaultWhtType: contact.defaultWhtType || "",
     descriptionTemplate: contact.descriptionTemplate || "",
+    // Delivery Preferences
+    preferredDeliveryMethod: contact.preferredDeliveryMethod || "",
+    deliveryEmail: contact.deliveryEmail || "",
+    deliveryNotes: contact.deliveryNotes || "",
   };
 }
 
@@ -184,6 +196,10 @@ const defaultFormData: ContactFormData = {
   defaultWhtRate: "",
   defaultWhtType: "",
   descriptionTemplate: "",
+  // Delivery Preferences
+  preferredDeliveryMethod: "",
+  deliveryEmail: "",
+  deliveryNotes: "",
 };
 
 export function CreateContactDialog({
@@ -232,6 +248,10 @@ export function CreateContactDialog({
         defaultWhtRate: formData.defaultWhtRate ? parseFloat(formData.defaultWhtRate) : null,
         defaultWhtType: formData.defaultWhtType || null,
         descriptionTemplate: formData.descriptionTemplate || null,
+        // Delivery Preferences
+        preferredDeliveryMethod: formData.preferredDeliveryMethod || null,
+        deliveryEmail: formData.deliveryEmail || null,
+        deliveryNotes: formData.deliveryNotes || null,
         ...(editingContact && { id: editingContact.id }),
       };
 
@@ -660,6 +680,68 @@ export function CreateContactDialog({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Delivery Preferences */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Send className="h-4 w-4 text-blue-500" />
+              <h3 className="font-medium text-sm">วิธีส่งเอกสาร</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              กำหนดวิธีการส่งเอกสาร (ใบหัก ณ ที่จ่าย ฯลฯ) ให้ผู้ติดต่อนี้
+            </p>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-deliveryMethod">วิธีส่งที่ต้องการ</Label>
+                <Select
+                  value={formData.preferredDeliveryMethod || "__NONE__"}
+                  onValueChange={(value) => setFormData({ ...formData, preferredDeliveryMethod: value === "__NONE__" ? "" : value })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="ไม่ระบุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
+                    <SelectItem value="email">📧 อีเมล</SelectItem>
+                    <SelectItem value="physical">📬 ส่งตัวจริง (ไปรษณีย์/messenger)</SelectItem>
+                    <SelectItem value="line">💬 LINE</SelectItem>
+                    <SelectItem value="pickup">🏢 มารับเอง</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.preferredDeliveryMethod === "email" && (
+                <div className="space-y-2">
+                  <Label htmlFor="contact-deliveryEmail">อีเมลสำหรับส่งเอกสาร</Label>
+                  <Input
+                    id="contact-deliveryEmail"
+                    type="email"
+                    value={formData.deliveryEmail}
+                    onChange={(e) => setFormData({ ...formData, deliveryEmail: e.target.value })}
+                    placeholder={formData.email || "email@example.com"}
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    หากไม่ระบุจะใช้อีเมลหลักของผู้ติดต่อ
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="contact-deliveryNotes">หมายเหตุการส่ง</Label>
+                <Input
+                  id="contact-deliveryNotes"
+                  value={formData.deliveryNotes}
+                  onChange={(e) => setFormData({ ...formData, deliveryNotes: e.target.value })}
+                  placeholder="เช่น ส่งถึงคุณสมชาย ฝ่ายบัญชี"
+                  className="h-10"
+                />
+              </div>
             </div>
           </div>
 

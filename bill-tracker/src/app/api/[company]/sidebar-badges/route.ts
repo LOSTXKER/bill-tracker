@@ -64,6 +64,7 @@ async function handleGet(
     pendingApprovals: 0,
     pendingReimbursements: 0,
     pendingSettlements: 0,
+    pendingWhtDeliveries: 0,
     unreadNotifications: 0,
   };
 
@@ -168,7 +169,26 @@ async function handleGet(
     );
   }
 
-  // 4. Unread Notifications - always fetch for current user
+  // 4. Pending WHT Deliveries - WHT certs that need to be sent to vendors
+  const canReadExpenses = checkPermission("expenses:read", permissions, isOwner);
+  
+  if (canReadExpenses) {
+    queries.push(
+      (async () => {
+        badges.pendingWhtDeliveries = await prisma.expense.count({
+          where: {
+            companyId: company.id,
+            deletedAt: null,
+            isWht: true,
+            hasWhtCert: true,
+            workflowStatus: "WHT_ISSUED", // Issued but not sent
+          },
+        });
+      })()
+    );
+  }
+
+  // 5. Unread Notifications - always fetch for current user
   queries.push(
     (async () => {
       badges.unreadNotifications = await getUnreadCount(company.id, userId);

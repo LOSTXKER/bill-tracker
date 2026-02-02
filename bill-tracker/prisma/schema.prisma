@@ -200,6 +200,11 @@ model Contact {
   descriptionTemplate   String? // template คำอธิบาย
   defaultsLastUpdatedAt DateTime? // วันที่อัปเดตค่าเริ่มต้นล่าสุด
 
+  // วิธีส่งเอกสาร (Document Delivery Preferences)
+  preferredDeliveryMethod String? // 'email' | 'physical' | 'line' | 'pickup'
+  deliveryEmail           String? // อีเมลสำหรับส่งเอกสาร (อาจแตกต่างจาก email หลัก)
+  deliveryNotes           String? // หมายเหตุการส่งเอกสาร
+
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Expense              Expense[]
   Income               Income[]

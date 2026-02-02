@@ -223,7 +223,7 @@ export const POST = withCompanyAccessFromParams(
 
         case "send_wht":
           updateData.whtCertSentAt = now;
-          newStatus = "READY_FOR_ACCOUNTING";
+          newStatus = "WHT_SENT_TO_VENDOR";  // Now properly goes to WHT_SENT_TO_VENDOR status
           eventType = "WHT_CERT_SENT";
           break;
 

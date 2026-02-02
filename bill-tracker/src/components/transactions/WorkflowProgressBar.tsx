@@ -48,7 +48,7 @@ export function WorkflowProgressBar({
     // Map intermediate statuses
     if (type === "expense") {
       if (status === "WAITING_TAX_INVOICE") return 0; // Still at PAID step
-      if (status === "WHT_PENDING_ISSUE" || status === "WHT_SENT_TO_VENDOR") return flow.indexOf("WHT_ISSUED" as any);
+      if (status === "WHT_PENDING_ISSUE") return flow.indexOf("WHT_ISSUED" as any);
       if (status === "COMPLETED") return flow.length - 1;
     } else {
       if (status === "WAITING_INVOICE_ISSUE" || status === "INVOICE_SENT") return flow.indexOf("INVOICE_ISSUED" as any);

@@ -98,6 +98,10 @@ export const POST = withCompanyAccess(
                                body.descriptionTemplate !== undefined
           ? new Date()
           : null,
+        // Delivery preferences
+        preferredDeliveryMethod: body.preferredDeliveryMethod || null,
+        deliveryEmail: body.deliveryEmail || null,
+        deliveryNotes: body.deliveryNotes || null,
         updatedAt: new Date(),
       },
     });
@@ -178,6 +182,10 @@ export const PATCH = withCompanyAccess(
         defaultWhtType: data.defaultWhtType !== undefined ? data.defaultWhtType : existing.defaultWhtType,
         descriptionTemplate: data.descriptionTemplate !== undefined ? data.descriptionTemplate : existing.descriptionTemplate,
         defaultsLastUpdatedAt: isUpdatingDefaults ? new Date() : existing.defaultsLastUpdatedAt,
+        // Delivery preferences
+        preferredDeliveryMethod: data.preferredDeliveryMethod !== undefined ? data.preferredDeliveryMethod : existing.preferredDeliveryMethod,
+        deliveryEmail: data.deliveryEmail !== undefined ? data.deliveryEmail : existing.deliveryEmail,
+        deliveryNotes: data.deliveryNotes !== undefined ? data.deliveryNotes : existing.deliveryNotes,
       },
     });
 
