@@ -9,6 +9,7 @@ import { apiResponse } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
 import { notifyRejection } from "@/lib/notifications/line-messaging";
+import { getBaseUrl } from "@/lib/utils/get-base-url";
 
 export const POST = (
   request: Request,
@@ -136,10 +137,6 @@ export const POST = (
         ? await prisma.user.findUnique({ where: { id: expense.submittedBy }, select: { name: true } })
         : null;
       
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : "http://localhost:3000";
-      
       await notifyRejection(company.id, {
         id,
         companyCode: company.code.toLowerCase(),
@@ -151,7 +148,7 @@ export const POST = (
         submitterName: submitter?.name || "ไม่ระบุ",
         approverName: session.user.name || undefined,
         rejectedReason: reason.trim(),
-      }, baseUrl);
+      }, getBaseUrl());
 
       return apiResponse.success(
         { expense: updatedExpense },

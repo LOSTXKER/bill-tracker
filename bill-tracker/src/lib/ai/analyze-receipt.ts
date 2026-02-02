@@ -713,7 +713,7 @@ function combineResults(results: ReceiptAnalysisResult[]): ReceiptAnalysisResult
 
   // ⚠️ เตือนเฉพาะกรณีเดียว: หลายใบกำกับจากคนละร้าน (ควรแยกรายการ)
   if (invoices.length > 1) {
-    const vendorNames = [...new Set(invoices.map(i => i.vendor.name).filter(Boolean))];
+    const vendorNames = [...new Set(invoices.map(i => i.vendor?.name).filter(Boolean))];
     if (vendorNames.length > 1) {
       warnings.push({
         type: "multiple_invoices",

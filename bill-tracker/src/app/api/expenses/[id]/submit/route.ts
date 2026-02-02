@@ -6,10 +6,10 @@
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
-import { hasPermission } from "@/lib/permissions/checker";
 import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
 import { notifyApprovalRequest } from "@/lib/notifications/line-messaging";
+import { getBaseUrl } from "@/lib/utils/get-base-url";
 import type { ExpenseWorkflowStatus } from "@prisma/client";
 
 export const POST = (
@@ -69,8 +69,10 @@ export const POST = (
       const currentWorkflowStatus = expense.workflowStatus;
       const currentApprovalStatus = expense.approvalStatus;
       
-      // Log for debugging
-      console.log(`[Submit Expense] id=${id}, workflowStatus=${currentWorkflowStatus}, approvalStatus=${currentApprovalStatus}`);
+      // Debug logging (only in development)
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Submit Expense] id=${id}, workflowStatus=${currentWorkflowStatus}, approvalStatus=${currentApprovalStatus}`);
+      }
 
       // Only DRAFT can be submitted (or null for old records before migration)
       if (currentWorkflowStatus !== "DRAFT" && currentWorkflowStatus !== null) {
@@ -238,10 +240,6 @@ export const POST = (
         }
 
         // Send LINE notification
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
-          ? `https://${process.env.VERCEL_URL}` 
-          : "http://localhost:3000";
-        
         await notifyApprovalRequest(company.id, {
           id,
           companyCode: company.code.toLowerCase(),
@@ -251,7 +249,7 @@ export const POST = (
           vendorOrCustomer: expense.Contact?.name || undefined,
           amount: Number(expense.netPaid),
           submitterName: session.user.name || "ไม่ระบุ",
-        }, baseUrl);
+        }, getBaseUrl());
 
         return apiResponse.success(
           { expense: updatedExpense },

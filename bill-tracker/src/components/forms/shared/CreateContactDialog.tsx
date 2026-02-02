@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Lightbulb } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 export interface ContactFormData {
   peakCode: string;
@@ -59,6 +60,10 @@ export interface ContactFormData {
   descriptionTemplate: string;
 }
 
+/**
+ * Full Contact interface with all editable fields
+ * Used for editing contacts in the dialog
+ */
 export interface Contact {
   id: string;
   name: string;
@@ -72,12 +77,71 @@ export interface Contact {
   paymentTerms?: number | null;
   notes?: string | null;
   source?: "PEAK" | "MANUAL" | null;
+  // Peak Integration
+  peakCode?: string | null;
+  // Entity Information
+  contactCategory?: string | null;
+  entityType?: string | null;
+  businessType?: string | null;
+  nationality?: string | null;
+  prefix?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  branchCode?: string | null;
+  // Address Details
+  subDistrict?: string | null;
+  district?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  // Contact
+  contactPerson?: string | null;
   // Transaction Defaults
   defaultVatRate?: number | null;
   defaultWhtEnabled?: boolean | null;
   defaultWhtRate?: number | null;
   defaultWhtType?: string | null;
   descriptionTemplate?: string | null;
+}
+
+/**
+ * Convert Contact to ContactFormData
+ * Centralizes the mapping logic and removes the need for `as any` casts
+ */
+function contactToFormData(contact: Contact): ContactFormData {
+  return {
+    peakCode: contact.peakCode || "",
+    contactCategory: contact.contactCategory || "VENDOR",
+    entityType: contact.entityType || "COMPANY",
+    businessType: contact.businessType || "",
+    nationality: contact.nationality || "ไทย",
+    prefix: contact.prefix || "",
+    firstName: contact.firstName || "",
+    lastName: contact.lastName || "",
+    name: contact.name || "",
+    taxId: contact.taxId || "",
+    branchCode: contact.branchCode || "00000",
+    address: contact.address || "",
+    subDistrict: contact.subDistrict || "",
+    district: contact.district || "",
+    province: contact.province || "",
+    postalCode: contact.postalCode || "",
+    country: contact.country || "Thailand",
+    contactPerson: contact.contactPerson || "",
+    phone: contact.phone || "",
+    email: contact.email || "",
+    bankAccount: contact.bankAccount || "",
+    bankName: contact.bankName || "",
+    creditLimit: contact.creditLimit?.toString() || "",
+    paymentTerms: contact.paymentTerms?.toString() || "",
+    notes: contact.notes || "",
+    // Transaction Defaults
+    defaultVatRate: contact.defaultVatRate?.toString() || "",
+    defaultWhtEnabled: contact.defaultWhtEnabled || false,
+    defaultWhtRate: contact.defaultWhtRate?.toString() || "",
+    defaultWhtType: contact.defaultWhtType || "",
+    descriptionTemplate: contact.descriptionTemplate || "",
+  };
 }
 
 interface CreateContactDialogProps {
@@ -131,41 +195,7 @@ export function CreateContactDialog({
 }: CreateContactDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<ContactFormData>(
-    editingContact
-      ? {
-          peakCode: (editingContact as any).peakCode || "",
-          contactCategory: (editingContact as any).contactCategory || "VENDOR",
-          entityType: (editingContact as any).entityType || "COMPANY",
-          businessType: (editingContact as any).businessType || "",
-          nationality: (editingContact as any).nationality || "ไทย",
-          prefix: (editingContact as any).prefix || "",
-          firstName: (editingContact as any).firstName || "",
-          lastName: (editingContact as any).lastName || "",
-          name: editingContact.name || "",
-          taxId: editingContact.taxId || "",
-          branchCode: (editingContact as any).branchCode || "00000",
-          address: editingContact.address || "",
-          subDistrict: (editingContact as any).subDistrict || "",
-          district: (editingContact as any).district || "",
-          province: (editingContact as any).province || "",
-          postalCode: (editingContact as any).postalCode || "",
-          country: (editingContact as any).country || "Thailand",
-          contactPerson: (editingContact as any).contactPerson || "",
-          phone: editingContact.phone || "",
-          email: editingContact.email || "",
-          bankAccount: editingContact.bankAccount || "",
-          bankName: editingContact.bankName || "",
-          creditLimit: editingContact.creditLimit?.toString() || "",
-          paymentTerms: editingContact.paymentTerms?.toString() || "",
-          notes: editingContact.notes || "",
-          // Transaction Defaults
-          defaultVatRate: editingContact.defaultVatRate?.toString() || "",
-          defaultWhtEnabled: editingContact.defaultWhtEnabled || false,
-          defaultWhtRate: editingContact.defaultWhtRate?.toString() || "",
-          defaultWhtType: editingContact.defaultWhtType || "",
-          descriptionTemplate: editingContact.descriptionTemplate || "",
-        }
-      : defaultFormData
+    editingContact ? contactToFormData(editingContact) : defaultFormData
   );
 
   const resetForm = () => {
@@ -175,39 +205,7 @@ export function CreateContactDialog({
   // Watch for editingContact changes when dialog opens
   useEffect(() => {
     if (open && editingContact) {
-      setFormData({
-        peakCode: (editingContact as any).peakCode || "",
-        contactCategory: (editingContact as any).contactCategory || "VENDOR",
-        entityType: (editingContact as any).entityType || "COMPANY",
-        businessType: (editingContact as any).businessType || "",
-        nationality: (editingContact as any).nationality || "ไทย",
-        prefix: (editingContact as any).prefix || "",
-        firstName: (editingContact as any).firstName || "",
-        lastName: (editingContact as any).lastName || "",
-        name: editingContact.name || "",
-        taxId: editingContact.taxId || "",
-        branchCode: (editingContact as any).branchCode || "00000",
-        address: editingContact.address || "",
-        subDistrict: (editingContact as any).subDistrict || "",
-        district: (editingContact as any).district || "",
-        province: (editingContact as any).province || "",
-        postalCode: (editingContact as any).postalCode || "",
-        country: (editingContact as any).country || "Thailand",
-        contactPerson: (editingContact as any).contactPerson || "",
-        phone: editingContact.phone || "",
-        email: editingContact.email || "",
-        bankAccount: editingContact.bankAccount || "",
-        bankName: editingContact.bankName || "",
-        creditLimit: editingContact.creditLimit?.toString() || "",
-        paymentTerms: editingContact.paymentTerms?.toString() || "",
-        notes: editingContact.notes || "",
-        // Transaction Defaults
-        defaultVatRate: editingContact.defaultVatRate?.toString() || "",
-        defaultWhtEnabled: editingContact.defaultWhtEnabled || false,
-        defaultWhtRate: editingContact.defaultWhtRate?.toString() || "",
-        defaultWhtType: editingContact.defaultWhtType || "",
-        descriptionTemplate: editingContact.descriptionTemplate || "",
-      });
+      setFormData(contactToFormData(editingContact));
     } else if (open && !editingContact) {
       resetForm();
     }
@@ -254,7 +252,7 @@ export function CreateContactDialog({
         throw new Error(data.error || "เกิดข้อผิดพลาด");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -263,39 +261,7 @@ export function CreateContactDialog({
   // Reset form when dialog opens with editing contact
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && editingContact) {
-      setFormData({
-        peakCode: (editingContact as any).peakCode || "",
-        contactCategory: (editingContact as any).contactCategory || "VENDOR",
-        entityType: (editingContact as any).entityType || "COMPANY",
-        businessType: (editingContact as any).businessType || "",
-        nationality: (editingContact as any).nationality || "ไทย",
-        prefix: (editingContact as any).prefix || "",
-        firstName: (editingContact as any).firstName || "",
-        lastName: (editingContact as any).lastName || "",
-        name: editingContact.name || "",
-        taxId: editingContact.taxId || "",
-        branchCode: (editingContact as any).branchCode || "00000",
-        address: editingContact.address || "",
-        subDistrict: (editingContact as any).subDistrict || "",
-        district: (editingContact as any).district || "",
-        province: (editingContact as any).province || "",
-        postalCode: (editingContact as any).postalCode || "",
-        country: (editingContact as any).country || "Thailand",
-        contactPerson: (editingContact as any).contactPerson || "",
-        phone: editingContact.phone || "",
-        email: editingContact.email || "",
-        bankAccount: editingContact.bankAccount || "",
-        bankName: editingContact.bankName || "",
-        creditLimit: editingContact.creditLimit?.toString() || "",
-        paymentTerms: editingContact.paymentTerms?.toString() || "",
-        notes: editingContact.notes || "",
-        // Transaction Defaults
-        defaultVatRate: editingContact.defaultVatRate?.toString() || "",
-        defaultWhtEnabled: editingContact.defaultWhtEnabled || false,
-        defaultWhtRate: editingContact.defaultWhtRate?.toString() || "",
-        defaultWhtType: editingContact.defaultWhtType || "",
-        descriptionTemplate: editingContact.descriptionTemplate || "",
-      });
+      setFormData(contactToFormData(editingContact));
     } else if (newOpen && !editingContact) {
       resetForm();
     }
@@ -607,14 +573,14 @@ export function CreateContactDialog({
               <div className="space-y-2">
                 <Label htmlFor="contact-defaultVatRate">อัตรา VAT เริ่มต้น</Label>
                 <Select
-                  value={formData.defaultVatRate}
-                  onValueChange={(value) => setFormData({ ...formData, defaultVatRate: value })}
+                  value={formData.defaultVatRate || "__NONE__"}
+                  onValueChange={(value) => setFormData({ ...formData, defaultVatRate: value === "__NONE__" ? "" : value })}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="ไม่ระบุ" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">ไม่ระบุ</SelectItem>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
                     <SelectItem value="0">0% (ไม่มี VAT)</SelectItem>
                     <SelectItem value="7">7%</SelectItem>
                   </SelectContent>

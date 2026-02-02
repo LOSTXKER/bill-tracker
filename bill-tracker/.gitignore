@@ -44,3 +44,16 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# Excel files - data exports should not be in git
+*.xlsx
+*.xls
+
+# Temporary database/utility scripts
+backup-and-rollback.ts
+check-data.ts
+verify-db.ts
+check-new-columns.sql
+
+# Archived/completed migration documentation
+CATEGORY_TO_ACCOUNT_*.md

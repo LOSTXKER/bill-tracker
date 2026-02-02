@@ -7,7 +7,7 @@ type Decimal = Prisma.Decimal;
  * @param value - The Decimal value to convert
  * @returns The number value or null
  */
-export function serializeDecimal(value: any): number | null {
+export function serializeDecimal(value: Decimal | number | string | null | undefined): number | null {
   if (value === null || value === undefined) return null;
   return Number(value);
 }
@@ -55,31 +55,71 @@ export function serializeTransaction<T extends Record<string, any>>(
 }
 
 /**
+ * Serialize contact data for client components
+ * Converts Decimal fields to numbers
+ */
+export function serializeContact<T extends Record<string, any>>(contact: T | null | undefined): T | null {
+  if (!contact) return null;
+  
+  const serialized = { ...contact };
+  
+  // Serialize contact decimal fields
+  const contactDecimalFields = ['defaultWhtRate', 'defaultVatRate', 'creditLimit'];
+  contactDecimalFields.forEach((field) => {
+    if (field in serialized) {
+      (serialized as any)[field] = serializeDecimal(serialized[field]);
+    }
+  });
+  
+  return serialized;
+}
+
+/**
  * Serialize expense data for client components
- * Converts all Decimal fields to numbers
+ * Converts all Decimal fields to numbers, including nested relations
  */
 export function serializeExpense<T extends Expense>(expense: T): SerializedExpense<T> {
-  return serializeTransaction(expense, [
+  const serialized = serializeTransaction(expense, [
     'amount',
     'vatAmount',
     'whtRate',
     'whtAmount',
     'netPaid',
   ] as (keyof T)[]) as SerializedExpense<T>;
+  
+  // Also serialize nested contact if present
+  if ('contact' in serialized && serialized.contact) {
+    (serialized as any).contact = serializeContact(serialized.contact);
+  }
+  if ('Contact' in serialized && serialized.Contact) {
+    (serialized as any).Contact = serializeContact(serialized.Contact);
+  }
+  
+  return serialized;
 }
 
 /**
  * Serialize income data for client components
- * Converts all Decimal fields to numbers
+ * Converts all Decimal fields to numbers, including nested relations
  */
 export function serializeIncome<T extends Income>(income: T): SerializedIncome<T> {
-  return serializeTransaction(income, [
+  const serialized = serializeTransaction(income, [
     'amount',
     'vatAmount',
     'whtRate',
     'whtAmount',
     'netReceived',
   ] as (keyof T)[]) as SerializedIncome<T>;
+  
+  // Also serialize nested contact if present
+  if ('contact' in serialized && serialized.contact) {
+    (serialized as any).contact = serializeContact(serialized.contact);
+  }
+  if ('Contact' in serialized && serialized.Contact) {
+    (serialized as any).Contact = serializeContact(serialized.Contact);
+  }
+  
+  return serialized;
 }
 
 /**
