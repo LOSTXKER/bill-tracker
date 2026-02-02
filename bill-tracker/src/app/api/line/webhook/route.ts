@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { createApiLogger } from "@/lib/utils/logger";
 import {
   verifySignature,
   handleTextMessage,
@@ -13,6 +14,8 @@ import {
   type LineWebhookBody,
   type LineCompanyConfig,
 } from "@/lib/line";
+
+const log = createApiLogger("line/webhook");
 
 /**
  * POST /api/line/webhook
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Process each event
     for (const event of body.events) {
-      console.log("LINE Event:", event.type, event);
+      log.debug("LINE Event received", { type: event.type, sourceType: event.source?.type });
 
       // Find company with matching LINE configuration
       const companies = await prisma.company.findMany({
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
         // Auto-save Group ID from any event (in case join event wasn't received)
         const eventGroupId = event.source?.groupId;
         if (eventGroupId && !company.lineGroupId) {
-          console.log(`[LINE] Auto-saving Group ID: ${eventGroupId} for company: ${company.name}`);
+          log.info("Auto-saving Group ID", { groupId: eventGroupId, company: company.name });
           await prisma.company.update({
             where: { id: company.id },
             data: { lineGroupId: eventGroupId },
@@ -126,7 +129,7 @@ export async function POST(request: NextRequest) {
             break;
 
           default:
-            console.log("Unhandled event type:", event.type);
+            log.debug("Unhandled event type", { type: event.type });
         }
 
         // Event processed, no need to check other companies
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("LINE webhook error:", error);
+    log.error("LINE webhook error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -6,6 +6,9 @@
 import type { LineWebhookEvent, LineCompanyConfig } from "../types";
 import { replyToLine, pushMessageToLine, downloadLineImage } from "../api";
 import { analyzeImage } from "@/lib/ai/gemini";
+import { createLogger } from "@/lib/utils/logger";
+
+const log = createLogger("line-image-handler");
 
 /**
  * Handle image message (receipt OCR)
@@ -106,10 +109,9 @@ export async function handleImageMessage(
       channelAccessToken
     );
 
-    // Log OCR analysis
-    console.log(`[LINE OCR] Company ${company.id}: analyzed receipt via LINE`);
+    log.info("Receipt analyzed via LINE", { companyId: company.id });
   } catch (error) {
-    console.error("LINE OCR error:", error);
+    log.error("LINE OCR error", error);
     await pushMessageToLine(
       recipient,
       [

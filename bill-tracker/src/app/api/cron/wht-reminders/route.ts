@@ -13,7 +13,11 @@
 
 import { NextRequest } from "next/server";
 import { apiResponse } from "@/lib/api/response";
+import { createApiLogger } from "@/lib/utils/logger";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 import { sendWhtDeadlineReminders, sendPendingDocsReminders } from "@/lib/notifications/wht-reminder";
+
+const log = createApiLogger("cron/wht-reminders");
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -28,15 +32,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log("[Cron] Starting WHT & Document reminders...");
+    log.info("Starting WHT & Document reminders");
 
     // Send WHT deadline reminders
     const whtResult = await sendWhtDeadlineReminders();
-    console.log("[Cron] WHT reminders:", whtResult);
+    log.info("WHT reminders sent", whtResult);
 
     // Send pending documents reminders
     const docsResult = await sendPendingDocsReminders();
-    console.log("[Cron] Document reminders:", docsResult);
+    log.info("Document reminders sent", docsResult);
 
     return apiResponse.success({
       whtReminders: whtResult,
@@ -44,10 +48,8 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[Cron] Error:", error);
-    return apiResponse.error(
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    log.error("Cron job error", error);
+    return apiResponse.error(getErrorMessage(error, "Unknown error"));
   }
 }
 

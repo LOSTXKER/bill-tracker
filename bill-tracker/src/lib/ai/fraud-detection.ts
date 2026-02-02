@@ -5,7 +5,10 @@
 
 import { prisma } from "@/lib/db";
 import { analyzeImage } from "./gemini";
+import { createLogger } from "@/lib/utils/logger";
 import { Prisma } from "@prisma/client";
+
+const log = createLogger("fraud-detection");
 
 // =============================================================================
 // Types
@@ -199,7 +202,7 @@ async function checkFakeReceipt(receiptUrls: string[]): Promise<FraudFlag[]> {
     });
 
     if (response.error) {
-      console.error("AI receipt analysis error:", response.error);
+      log.error("AI receipt analysis error", response.error);
       return flags;
     }
 
@@ -249,10 +252,10 @@ async function checkFakeReceipt(receiptUrls: string[]): Promise<FraudFlag[]> {
         }
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
+      log.error("Failed to parse AI response", parseError);
     }
   } catch (error) {
-    console.error("Fake receipt check error:", error);
+    log.error("Fake receipt check error", error);
   }
 
   return flags;
@@ -349,11 +352,11 @@ async function checkPersonalExpense(
             });
           }
         } catch (parseError) {
-          console.error("Failed to parse personal expense AI response:", parseError);
+          log.error("Failed to parse personal expense AI response", parseError);
         }
       }
     } catch (error) {
-      console.error("Personal expense check error:", error);
+      log.error("Personal expense check error", error);
     }
   }
 
@@ -456,11 +459,11 @@ export async function analyzeReimbursementRequest(
       },
     });
 
-    console.log(`[Fraud Detection] Analyzed request ${requestId}: score=${result.overallScore}, recommendation=${result.recommendation}`);
+    log.info("Fraud analysis completed", { requestId, score: result.overallScore, recommendation: result.recommendation });
 
     return result;
   } catch (error) {
-    console.error("Error analyzing reimbursement request:", error);
+    log.error("Error analyzing reimbursement request", error, { requestId });
     return null;
   }
 }
@@ -522,7 +525,7 @@ export async function analyzeAndUpdateExpense(
 
     return result;
   } catch (error) {
-    console.error("Error analyzing expense:", error);
+    log.error("Error analyzing expense", error);
     return null;
   }
 }

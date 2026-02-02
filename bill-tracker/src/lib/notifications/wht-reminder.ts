@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/db";
 import { sendTextMessage } from "./line-messaging";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 interface WhtReminderResult {
   success: boolean;
@@ -104,12 +105,12 @@ export async function sendWhtDeadlineReminders(): Promise<WhtReminderResult> {
           }
         }
       } catch (error) {
-        result.errors.push(`Company ${company.code}: ${error instanceof Error ? error.message : String(error)}`);
+        result.errors.push(`Company ${company.code}: ${getErrorMessage(error)}`);
       }
     }
   } catch (error) {
     result.success = false;
-    result.errors.push(`Global error: ${error instanceof Error ? error.message : String(error)}`);
+    result.errors.push(`Global error: ${getErrorMessage(error)}`);
   }
 
   return result;
@@ -169,12 +170,12 @@ export async function sendPendingDocsReminders(): Promise<WhtReminderResult> {
           result.companiesNotified++;
         }
       } catch (error) {
-        result.errors.push(`Company ${company.code}: ${error instanceof Error ? error.message : String(error)}`);
+        result.errors.push(`Company ${company.code}: ${getErrorMessage(error)}`);
       }
     }
   } catch (error) {
     result.success = false;
-    result.errors.push(`Global error: ${error instanceof Error ? error.message : String(error)}`);
+    result.errors.push(`Global error: ${getErrorMessage(error)}`);
   }
 
   return result;

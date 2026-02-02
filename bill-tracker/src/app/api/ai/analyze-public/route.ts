@@ -1,7 +1,11 @@
 import { apiResponse } from "@/lib/api/response";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { prisma } from "@/lib/db";
+import { createApiLogger } from "@/lib/utils/logger";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 import { analyzeReceipt } from "@/lib/ai/analyze-receipt";
+
+const log = createApiLogger("ai/analyze-public");
 
 /**
  * POST /api/ai/analyze-public
@@ -75,9 +79,7 @@ export async function POST(request: Request) {
 
     return apiResponse.success(response);
   } catch (error) {
-    console.error("[analyze-public] Error:", error);
-    return apiResponse.error(
-      error instanceof Error ? error.message : "Failed to analyze receipt"
-    );
+    log.error("Public analyze error", error);
+    return apiResponse.error(getErrorMessage(error, "Failed to analyze receipt"));
   }
 }

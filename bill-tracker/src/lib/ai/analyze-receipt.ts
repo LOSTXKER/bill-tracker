@@ -12,6 +12,9 @@
 import { prisma } from "@/lib/db";
 import { analyzeImage } from "./gemini";
 import { findBestMatchingContact } from "@/lib/utils/string-similarity";
+import { createLogger } from "@/lib/utils/logger";
+
+const log = createLogger("ai-receipt");
 
 // Import types from centralized location
 import type {
@@ -66,12 +69,11 @@ export async function analyzeReceipt(
     }
 
     // 2. สร้าง Prompt ที่ส่ง context ทั้งหมดให้ AI
-    console.log("[AI] Context:", {
+    log.debug("AI Context", {
       accountsCount: accounts.length,
       contactsCount: contacts.length,
       transactionType,
       company: company?.name,
-      sampleAccounts: accounts.slice(0, 3).map(a => `${a.code} - ${a.name}`),
     });
     const prompt = buildSmartPrompt(accounts, contacts, transactionType, company);
 
@@ -82,11 +84,10 @@ export async function analyzeReceipt(
         maxTokens: 4096,
       });
       if (response.error) {
-        console.error("[analyzeReceipt] AI error for", url, response.error);
+        log.error("AI analysis error", response.error, { url });
         return null;
       }
-      // Debug: Log raw AI response to check WHT detection
-      console.log("[AI Raw Response]", response.data.substring(0, 500));
+      log.debug("AI raw response", { preview: response.data.substring(0, 300) });
       return parseAIResponse(response.data, accounts, contacts, company?.taxId);
     });
 
@@ -105,7 +106,7 @@ export async function analyzeReceipt(
     return combineResults(validResults);
 
   } catch (error) {
-    console.error("[analyzeReceipt] Error:", error);
+    log.error("analyzeReceipt error", error);
     return { error: "เกิดข้อผิดพลาดในการวิเคราะห์" };
   }
 }
@@ -414,13 +415,9 @@ function parseAIResponse(
         reason: parsed.account?.reason || "AI วิเคราะห์จากเอกสาร",
       };
     } else if (parsed.account) {
-      // Log what AI sent that didn't match
-      console.log("[AI] Account NOT MATCHED - AI sent:", {
-        id: parsed.account.id,
-        code: parsed.account.code,
-        name: parsed.account.name,
+      log.debug("Account not matched", {
+        aiSent: { id: parsed.account.id, code: parsed.account.code, name: parsed.account.name },
       });
-      console.log("[AI] Available accounts:", accounts.slice(0, 5).map(a => ({ id: a.id, code: a.code, name: a.name })));
     }
 
     // Parse account alternatives
@@ -439,7 +436,7 @@ function parseAIResponse(
         }
       }
     }
-    console.log("[AI] Account:", account.code || "NONE", "| Alternatives:", accountAlternatives.map(a => a.code).join(", ") || "none");
+    log.debug("Account result", { account: account.code || "NONE", alternatives: accountAlternatives.map(a => a.code) });
 
     // Validate contact (AI อาจ match ผิด ต้องเช็คอีกที)
     let matchedContactId: string | null = null;
@@ -462,7 +459,7 @@ function parseAIResponse(
       if (foundByTaxId) {
         matchedContactId = foundByTaxId.id;
         matchedContactName = foundByTaxId.name;
-        console.log("[AI] Contact matched by taxId verification:", foundByTaxId.name);
+        log.debug("Contact matched by taxId", { name: foundByTaxId.name });
       }
     }
 
@@ -473,7 +470,7 @@ function parseAIResponse(
       if (foundByName) {
         matchedContactId = foundByName.id;
         matchedContactName = foundByName.name;
-        console.log("[AI] Contact matched by fuzzy name:", parsed.vendor.name, "→", foundByName.name);
+        log.debug("Contact matched by fuzzy name", { original: parsed.vendor.name, matched: foundByName.name });
       }
     }
 
@@ -483,7 +480,7 @@ function parseAIResponse(
       const normalizedVendorTaxId = vendorTaxId.replace(/[^0-9]/g, "");
       const normalizedCompanyTaxId = companyTaxId.replace(/[^0-9]/g, "");
       if (normalizedVendorTaxId === normalizedCompanyTaxId) {
-        console.log("[AI] Rejected vendor tax ID - matches company tax ID");
+        log.debug("Rejected vendor tax ID - matches company tax ID");
         vendorTaxId = null;
       }
     }
@@ -510,16 +507,16 @@ function parseAIResponse(
           // Try to fix by adding 10 years
           const correctedYear = year + 10;
           if (correctedYear >= minReasonableYear && correctedYear <= currentYear + 1) {
-            console.log(`[AI Date Fix] Corrected year from ${year} to ${correctedYear} (likely AI misread 6 as 5)`);
+            log.debug("Date fix: corrected year", { from: year, to: correctedYear });
             normalizedDate = normalizedDate.replace(/^\d{4}/, String(correctedYear));
           } else {
             // If correction doesn't make sense, default to current year
-            console.log(`[AI Date Fix] Year ${year} too old, defaulting to ${currentYear}`);
+            log.debug("Date fix: year too old", { year, defaultTo: currentYear });
             normalizedDate = normalizedDate.replace(/^\d{4}/, String(currentYear));
           }
         } else if (year > currentYear + 1) {
           // Year is in the future (too far), default to current year
-          console.log(`[AI Date Fix] Year ${year} in future, defaulting to ${currentYear}`);
+          log.debug("Date fix: year in future", { year, defaultTo: currentYear });
           normalizedDate = normalizedDate.replace(/^\d{4}/, String(currentYear));
         }
       }
@@ -532,8 +529,7 @@ function parseAIResponse(
     }
 
     // Normalize WHT rate
-    console.log("[AI WHT Raw]", {
-      wht: parsed.wht,
+    log.debug("WHT raw data", {
       rawRate: parsed.wht?.rate,
       rawAmount: parsed.wht?.amount,
       rawType: parsed.wht?.type,
@@ -554,7 +550,7 @@ function parseAIResponse(
         const extractedAmount = parseFloat(whtAmountMatch[1].replace(/,/g, ''));
         if (extractedAmount > 0) {
           whtAmount = extractedAmount;
-          console.log("[AI WHT Fallback] Extracted WHT amount from text:", extractedAmount);
+          log.debug("WHT fallback: extracted amount", { amount: extractedAmount });
           
           // Try to calculate rate if we have amount
           if (parsed.amount && parsed.amount > 0) {
@@ -566,14 +562,14 @@ function parseAIResponse(
             else if (calculatedRate <= 7.5) whtRate = 5;
             else if (calculatedRate <= 12.5) whtRate = 10;
             else whtRate = 15;
-            console.log("[AI WHT Fallback] Calculated rate:", calculatedRate, "→", whtRate, "%");
+            log.debug("WHT fallback: calculated rate", { calculatedRate, whtRate });
           }
         }
       }
       
       if (whtRateMatch && !whtRate) {
         whtRate = parseFloat(whtRateMatch[1]);
-        console.log("[AI WHT Fallback] Extracted WHT rate from text:", whtRate, "%");
+        log.debug("WHT fallback: extracted rate", { whtRate });
       }
       
       // Default type based on rate
@@ -594,7 +590,7 @@ function parseAIResponse(
       else whtRate = null;
     }
     
-    console.log("[AI WHT Final]", { whtRate, whtAmount, whtType });
+    log.debug("WHT final", { whtRate, whtAmount, whtType });
 
     // Normalize currency
     const validCurrencies = ["THB", "USD", "AED", "EUR", "GBP", "JPY", "CNY", "SGD", "HKD", "MYR"];
@@ -642,9 +638,7 @@ function parseAIResponse(
     };
 
   } catch (error) {
-    console.error("[parseAIResponse] Parse error:", error);
-    console.error("[parseAIResponse] Raw:", rawResponse);
-
+    log.error("parseAIResponse error", error, { rawPreview: rawResponse?.substring(0, 200) });
     return createEmptyResult(rawResponse);
   }
 }

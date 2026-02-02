@@ -2,7 +2,10 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { createLogger } from "@/lib/utils/logger";
 import type { UserRole } from "@prisma/client";
+
+const log = createLogger("auth");
 
 declare module "next-auth" {
   interface Session {
@@ -84,30 +87,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = (credentials.email as string).toLowerCase().trim();
         const password = credentials.password as string;
 
-        console.log("[AUTH] Login attempt for email:", email);
+        log.info("Login attempt", { email });
 
         try {
           const user = await prisma.user.findUnique({
             where: { email },
           });
 
-          console.log("[AUTH] User found:", user ? `${user.email} (active: ${user.isActive})` : "NOT FOUND");
+          log.debug("User lookup result", { 
+            found: !!user, 
+            isActive: user?.isActive 
+          });
 
           if (!user) {
-            console.log("[AUTH] FAILED: User not found");
+            log.warn("Login failed: User not found", { email });
             return null;
           }
           
           if (!user.isActive) {
-            console.log("[AUTH] FAILED: User is inactive");
+            log.warn("Login failed: User inactive", { email });
             return null;
           }
 
           const isPasswordValid = await compare(password, user.password);
-          console.log("[AUTH] Password valid:", isPasswordValid);
-
+          
           if (!isPasswordValid) {
-            console.log("[AUTH] FAILED: Invalid password");
+            log.warn("Login failed: Invalid password", { email });
             return null;
           }
 
@@ -125,7 +130,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             avatarUrl: user.avatarUrl,
           };
         } catch (error) {
-          console.error("Auth error:", error);
+          log.error("Auth error", error, { email });
           return null;
         }
       },

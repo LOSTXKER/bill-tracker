@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 /**
  * Contact defaults for transactions
@@ -87,6 +88,6 @@ export function useContactDefaults(
     defaults,
     hasDefaults,
     isLoading,
-    error: error ? (error instanceof Error ? error.message : "Failed to fetch contact defaults") : null,
+    error: error ? getErrorMessage(error, "Failed to fetch contact defaults") : null,
   };
 }

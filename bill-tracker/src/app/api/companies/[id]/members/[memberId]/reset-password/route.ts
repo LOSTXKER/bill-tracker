@@ -8,8 +8,11 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { createApiLogger } from "@/lib/utils/logger";
 import { hash } from "bcryptjs";
 import { z } from "zod";
+
+const log = createApiLogger("companies/members/reset-password");
 
 const resetPasswordSchema = z.object({
   newPassword: z
@@ -67,10 +70,11 @@ export const POST = withCompanyAccessFromParams(
       data: { password: hashedPassword },
     });
 
-    // Log the action (optional - you can add audit logging here)
-    console.log(
-      `Password reset: ${memberAccess.User.email} by ${session.user.email} at ${new Date().toISOString()}`
-    );
+    // Audit log
+    log.info("Password reset", { 
+      targetUser: memberAccess.User.email, 
+      byUser: session.user.email 
+    });
 
     return apiResponse.success(
       {

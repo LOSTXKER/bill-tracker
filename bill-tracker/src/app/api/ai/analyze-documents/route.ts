@@ -4,6 +4,9 @@ import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { prisma } from "@/lib/db";
 import { analyzeReceipt, ReceiptAnalysisResult } from "@/lib/ai/analyze-receipt";
 import { convertCurrency, CurrencyDetectionResult } from "@/lib/ai/currency-converter";
+import { createApiLogger } from "@/lib/utils/logger";
+
+const log = createApiLogger("ai/analyze-documents");
 
 /**
  * POST /api/ai/analyze-documents
@@ -69,7 +72,7 @@ export async function POST(request: Request) {
         aiResult.currency as "USD" | "AED" | "THB",
         exchangeRates
       );
-      console.log("💱 Currency conversion:", {
+      log.info("Currency conversion applied", {
         originalCurrency: aiResult.currency,
         originalAmount: aiResult.amount,
         convertedAmount: currencyConversion.convertedAmount,
@@ -77,8 +80,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Log
-    console.log("🧠 AI Analysis:", {
+    log.info("AI analysis completed", {
       userId: session.user.id,
       companyId: company.id,
       processingTime,
@@ -87,8 +89,6 @@ export async function POST(request: Request) {
       account: aiResult.account.name,
       confidence: aiResult.confidence.overall,
       isNewVendor: !aiResult.vendor.matchedContactId,
-      currency: aiResult.currency,
-      hasCurrencyConversion: !!currencyConversion?.convertedAmount,
     });
 
     // Convert to legacy format for frontend

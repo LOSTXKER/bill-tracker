@@ -2,6 +2,10 @@ import { hash } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
 import { apiResponse } from "@/lib/api/response";
+import { createApiLogger } from "@/lib/utils/logger";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
+
+const log = createApiLogger("auth/register");
 
 export async function POST(request: Request) {
   try {
@@ -52,16 +56,14 @@ export async function POST(request: Request) {
       "สร้างบัญชีสำเร็จ"
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    log.error("Registration error", error);
     
     // Handle Prisma unique constraint error
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return apiResponse.badRequest("อีเมลนี้ถูกใช้งานแล้ว");
     }
     
-    // Log detailed error for debugging
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Registration detailed error:", errorMessage);
+    const errorMessage = getErrorMessage(error);
     
     // Check for database connection errors
     if (errorMessage.includes("connect") || errorMessage.includes("ECONNREFUSED") || errorMessage.includes("timeout")) {

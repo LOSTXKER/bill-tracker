@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import type { ContactSummary } from "@/types";
 import { swrKeys } from "@/lib/swr-config";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 interface ApiResponse {
   success: boolean;
@@ -44,7 +45,7 @@ export function useContacts(companyCode: string): UseContactsReturn {
   return {
     contacts,
     isLoading,
-    error: error ? (error instanceof Error ? error.message : "Failed to fetch contacts") : null,
+    error: error ? getErrorMessage(error, "Failed to fetch contacts") : null,
     refetch,
   };
 }

@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentResult } from "@google/generative-ai";
+import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 // Initialize Gemini AI client
 let genAI: GoogleGenerativeAI | null = null;
@@ -229,10 +230,9 @@ export async function analyzeImage(
       throw new Error("Invalid image data type");
     }
   } catch (error) {
-    console.error("Failed to prepare image data:", error);
     return {
       data: "",
-      error: error instanceof Error ? error.message : "Failed to prepare image data",
+      error: getErrorMessage(error, "Failed to prepare image data"),
     };
   }
 
@@ -404,10 +404,9 @@ export async function chat(
       usage,
     };
   } catch (error) {
-    console.error("Gemini chat error:", error);
     return {
       data: "",
-      error: error instanceof Error ? error.message : "Failed to chat with AI",
+      error: getErrorMessage(error, "Failed to chat with AI"),
     };
   }
 }
@@ -450,7 +449,7 @@ export async function testConnection(): Promise<{ success: boolean; message: str
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: getErrorMessage(error, "Unknown error"),
     };
   }
 }

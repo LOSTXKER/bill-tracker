@@ -10,7 +10,10 @@
 import { prisma } from "@/lib/db";
 import { generateText } from "./gemini";
 import { findBestMatchingContact } from "@/lib/utils/string-similarity";
+import { createLogger } from "@/lib/utils/logger";
 import type { ReceiptAnalysisResult } from "./types";
+
+const log = createLogger("ai-text");
 
 export interface TextAnalysisInput {
   text: string;
@@ -56,14 +59,14 @@ export async function analyzeText(
     });
 
     if (response.error) {
-      console.error("[analyzeText] AI error:", response.error);
+      log.error("AI analysis error", response.error);
       return { error: "AI ไม่สามารถวิเคราะห์ได้: " + response.error };
     }
 
     return parseAIResponse(response.data, accounts, contacts, company?.taxId);
 
   } catch (error) {
-    console.error("[analyzeText] Error:", error);
+    log.error("analyzeText error", error);
     return { error: "เกิดข้อผิดพลาดในการวิเคราะห์" };
   }
 }
@@ -314,7 +317,7 @@ function parseAIResponse(
       if (foundByTaxId) {
         matchedContactId = foundByTaxId.id;
         matchedContactName = foundByTaxId.name;
-        console.log("[AI Text] Contact matched by taxId:", foundByTaxId.name);
+        log.debug("Contact matched by taxId", { name: foundByTaxId.name });
       }
     }
 
@@ -325,7 +328,7 @@ function parseAIResponse(
       if (foundByName) {
         matchedContactId = foundByName.id;
         matchedContactName = foundByName.name;
-        console.log("[AI Text] Contact matched by fuzzy name:", parsed.vendor.name, "→", foundByName.name);
+        log.debug("Contact matched by fuzzy name", { original: parsed.vendor.name, matched: foundByName.name });
       }
     }
 
@@ -393,8 +396,7 @@ function parseAIResponse(
     };
 
   } catch (error) {
-    console.error("[parseAIResponse] Parse error:", error);
-    console.error("[parseAIResponse] Raw:", rawResponse);
+    log.error("parseAIResponse error", error, { rawPreview: rawResponse?.substring(0, 200) });
 
     return {
       vendor: {
