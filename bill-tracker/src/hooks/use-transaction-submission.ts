@@ -267,7 +267,12 @@ export function useTransactionSubmission({
         referenceNo: transaction.referenceNo,
         notes: transaction.notes,
         documentType: transaction.documentType || "TAX_INVOICE",
-        [config.fields.dateField.name]: transaction[config.fields.dateField.name],
+        [config.fields.dateField.name]: transaction[config.fields.dateField.name]
+          ? new Date(transaction[config.fields.dateField.name] as string)
+          : undefined,
+        ...(config.fields.descriptionField
+          ? { [config.fields.descriptionField.name]: transaction[config.fields.descriptionField.name] }
+          : {}),
       });
     }
   };

@@ -35,7 +35,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency, normalizeWhtType } from "@/lib/utils/tax-calculator";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 // Hooks
 import { useContacts } from "@/hooks/use-contacts";
@@ -44,6 +44,9 @@ import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 import { useTransaction } from "@/hooks/use-transaction";
 import { useSafeCompany } from "@/hooks/use-company";
+import { useAiResultProcessor } from "@/hooks/use-ai-result-processor";
+import { useTransactionSubmission } from "@/hooks/use-transaction-submission";
+import { useMergeHandler } from "@/hooks/use-merge-handler";
 
 // Shared form components
 import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
@@ -200,7 +203,7 @@ export function UnifiedTransactionForm({
     : hasPermission("incomes:mark-received");
   
   // Use mode from props directly (controlled by parent)
-  const [isLoading, setIsLoading] = useState(false);
+  // Note: isLoading and saving are now managed by useTransactionSubmission hook
   
   // Use SWR for transaction fetching (provides caching across navigations)
   const {
@@ -218,7 +221,7 @@ export function UnifiedTransactionForm({
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
   const loading = mode !== "create" && swrLoading && !transaction;
   const error = swrError?.message || null;
-  const [saving, setSaving] = useState(false);
+  // Note: saving is now managed by useTransactionSubmission hook
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
@@ -245,14 +248,8 @@ export function UnifiedTransactionForm({
 
   // Merge Dialog State
   const [showMergeDialog, setShowMergeDialog] = useState(false);
-  const [pendingAiResult, setPendingAiResult] = useState<MultiDocAnalysisResult | null>(null);
-  const [existingFormData, setExistingFormData] = useState<MergeData | null>(null);
-  const [newAiData, setNewAiData] = useState<MergeData | null>(null);
-
-  // Conflict Dialog State
-  const [showConflictDialog, setShowConflictDialog] = useState(false);
-  const [pendingConflicts, setPendingConflicts] = useState<ConflictField[]>([]);
-  const [pendingMergedData, setPendingMergedData] = useState<MergeData | null>(null);
+  // Note: pendingAiResult, existingFormData, newAiData, pendingConflicts, pendingMergedData, 
+  // showConflictDialog are now managed by useMergeHandler hook
 
   // Contacts
   const { contacts, isLoading: contactsLoading, refetch: refetchContacts } = useContacts(companyCode);
@@ -390,6 +387,80 @@ export function UnifiedTransactionForm({
   const watchWhtType = watch("whtType") as string;
   const watchDate = watch(config.fields.dateField.name);
   const watchDocumentType = watch("documentType") as string | undefined;
+
+  // AI Result Processor Hook (Phase 5 Integration)
+  const { applyAiResult } = useAiResultProcessor({
+    config,
+    setValue,
+    contacts,
+    setSelectedContact,
+    setAiVendorSuggestion,
+    setAccountSuggestion,
+    setPendingContactId,
+    setAiApplied,
+  });
+
+  // Merge Handler Hook (Phase 5 Integration)
+  const {
+    pendingAiResult,
+    setPendingAiResult,
+    existingFormData,
+    setExistingFormData,
+    newAiData,
+    setNewAiData,
+    pendingConflicts,
+    pendingMergedData,
+    showConflictDialog,
+    setShowConflictDialog,
+    handleMergeDecision: handleMergeDecisionRaw,
+    handleConflictResolution,
+    applyMergedData,
+  } = useMergeHandler({
+    config,
+    setValue,
+    contacts,
+    setSelectedContact,
+    setSelectedAccount,
+    setAiResult,
+    setAiApplied,
+  });
+
+  // Wrap handleMergeDecision to pass detectConflicts
+  const handleMergeDecision = (decision: MergeDecision) => {
+    handleMergeDecisionRaw(decision, detectConflicts);
+  };
+
+  // Transaction Submission Hook (Phase 5 Integration)
+  const {
+    onSubmit,
+    handleSave,
+    handleEditClick,
+    handleCancelEdit,
+    isLoading,
+    saving,
+  } = useTransactionSubmission({
+    config,
+    companyCode,
+    transactionId,
+    selectedContact,
+    oneTimeContactName,
+    setOneTimeContactName,
+    selectedAccount,
+    setSelectedAccount,
+    calculation,
+    categorizedFiles,
+    referenceUrls,
+    payers,
+    internalCompanyId,
+    watch,
+    reset,
+    transaction,
+    setTransaction,
+    mutateTransaction,
+    setAuditRefreshKey,
+    onModeChange,
+    setSelectedContact,
+  });
 
   // Initialize files from prefill data (e.g., from reimbursement)
   const [filesInitialized, setFilesInitialized] = useState(false);
@@ -730,558 +801,11 @@ export function UnifiedTransactionForm({
         applyAiResult(result);
       }
     },
-    [hasExistingData, extractFormData, extractAiData]
+    [hasExistingData, extractFormData, extractAiData, applyAiResult]
   );
 
-  // Apply AI data to form
-  const applyAiResult = useCallback(
-    (result: MultiDocAnalysisResult) => {
-      if (!result) return;
-
-      const combined = result.combined || {
-        totalAmount: 0,
-        vatAmount: 0,
-        date: null,
-        invoiceNumbers: [],
-        vendorName: null,
-        vendorTaxId: null,
-      };
-      const smart = result.smart;
-      const suggested = (smart?.suggested || {}) as Record<string, unknown>;
-
-      const extendedCombined = combined as typeof combined & {
-        vatRate?: number | null;
-        amount?: number | null;
-        whtRate?: number | null;
-        whtAmount?: number | null;
-        whtType?: string | null;
-        documentType?: string | null;
-        vendorBranchNumber?: string | null;
-        vendorEmail?: string | null;
-        description?: string | null;
-        invoiceNumber?: string | null;
-        items?: string[];
-      };
-
-      // Apply amount
-      const hasCurrencyConversion =
-        result.currencyConversion?.convertedAmount !== null &&
-        result.currencyConversion?.convertedAmount !== undefined &&
-        result.currencyConversion?.currency !== "THB";
-
-      if (hasCurrencyConversion && result.currencyConversion?.convertedAmount) {
-        setValue("amount", result.currencyConversion.convertedAmount);
-      } else if (extendedCombined.amount) {
-        setValue("amount", extendedCombined.amount);
-      } else if (combined.totalAmount && extendedCombined.vatRate) {
-        const amountBeforeVat = combined.totalAmount / (1 + extendedCombined.vatRate / 100);
-        setValue("amount", Math.round(amountBeforeVat * 100) / 100);
-      } else if (combined.totalAmount) {
-        setValue("amount", combined.totalAmount);
-      } else if (suggested.amount !== null && suggested.amount !== undefined) {
-        setValue("amount", suggested.amount);
-      }
-
-      // Apply VAT rate
-      const vatRate = suggested.vatRate ?? extendedCombined.vatRate;
-      if (vatRate !== null && vatRate !== undefined) {
-        setValue("vatRate", vatRate);
-      }
-
-      // Apply date
-      if (combined.date || suggested.date) {
-        const dateStr = combined.date || (suggested.date as string);
-        if (dateStr) {
-          setValue(config.fields.dateField.name, new Date(dateStr));
-        }
-      }
-
-      // Apply invoice number (รองรับ invoiceNumbers จาก AI)
-      const invoiceNum = combined.invoiceNumbers && combined.invoiceNumbers.length > 0 
-        ? combined.invoiceNumbers.join(", ") 
-        : null;
-      if (invoiceNum) {
-        setValue("invoiceNumber", invoiceNum);
-      }
-
-      // Apply description - ใช้ AI สรุปมาก่อน
-      if (config.fields.descriptionField) {
-        let description: string | null = null;
-        
-        // 1. ใช้ description จาก AI (สรุปค่าใช้จ่าย)
-        if (extendedCombined.description && typeof extendedCombined.description === "string") {
-          description = extendedCombined.description;
-        }
-        
-        // 2. ถ้าไม่มี ลองรวม items จาก OCR
-        if (!description) {
-          const allItems: string[] = [];
-          for (const file of result.files || []) {
-            const extracted = file.extracted as {
-              items?: Array<{ description: string } | string>;
-            };
-            if (extracted?.items && Array.isArray(extracted.items)) {
-              for (const item of extracted.items) {
-                if (typeof item === "string" && item.trim()) {
-                  allItems.push(item.trim());
-                } else if (typeof item === "object" && item?.description && item.description.trim()) {
-                  allItems.push(item.description.trim());
-                }
-              }
-            }
-          }
-          if (allItems.length > 0) {
-            const itemsText = allItems.slice(0, 5).join(", ");
-            description =
-              allItems.length > 5 ? `${itemsText} และอื่นๆ (${allItems.length} รายการ)` : itemsText;
-          }
-        }
-
-        // 3. ถ้ายังไม่มี ลอง suggested
-        if (!description && suggested.description) {
-          description = suggested.description as string;
-        }
-
-        // 4. Fallback เป็นชื่อร้าน
-        if (!description && combined.vendorName) {
-          const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
-          description = `${prefix} ${combined.vendorName}`;
-        }
-
-        if (description) {
-          setValue(config.fields.descriptionField.name, description);
-        }
-      }
-
-      // Apply contact
-      const contactIdToUse = (suggested.contactId as string) || result.smart?.foundContact?.id;
-      if (contactIdToUse) {
-        const contact = contacts.find((c) => c.id === contactIdToUse);
-        if (contact) {
-          setSelectedContact(contact);
-          setAiVendorSuggestion(null); // Clear suggestion when contact is found
-        } else {
-          setPendingContactId(contactIdToUse);
-        }
-      } else if (result.smart?.isNewVendor && (combined.vendorName || combined.vendorTaxId)) {
-        // ไม่พบผู้ติดต่อ → แนะนำสร้างใหม่
-        setAiVendorSuggestion({
-          name: combined.vendorName || "",
-          taxId: combined.vendorTaxId,
-          branchNumber: extendedCombined.vendorBranchNumber ?? null,
-          address: null,
-          phone: null,
-          email: extendedCombined.vendorEmail ?? null,
-        });
-      }
-
-      // ไม่ auto-fill บัญชี - ให้ผู้ใช้เลือกเอง
-      // แต่เก็บ suggestion พร้อม alternatives ไว้แสดงใน UI
-      if (result.aiAccountSuggestion?.accountId) {
-        setAccountSuggestion({
-          accountId: result.aiAccountSuggestion.accountId,
-          accountCode: result.aiAccountSuggestion.accountCode,
-          accountName: result.aiAccountSuggestion.accountName,
-          confidence: result.aiAccountSuggestion.confidence,
-          reason: result.aiAccountSuggestion.reason || "AI วิเคราะห์จากเอกสาร",
-          alternatives: result.aiAccountSuggestion.alternatives || [],
-        });
-      }
-
-      // แสดงคำเตือนจาก AI (ถ้ามี)
-      if (result.warnings && Array.isArray(result.warnings)) {
-        for (const warning of result.warnings) {
-          if (warning.severity === "warning") {
-            toast.warning(warning.message, {
-              duration: 8000, // แสดงนานขึ้นให้อ่าน
-            });
-          } else {
-            toast.info(warning.message, {
-              duration: 5000,
-            });
-          }
-        }
-      }
-
-      // Apply WHT (Withholding Tax) from AI
-      const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
-      const whtAmount = (suggested.whtAmount as number | null | undefined) ?? extendedCombined.whtAmount;
-      const rawWhtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
-      // Normalize AI's whtType to valid enum key (e.g., "ค่าธรรมเนียม" -> "SERVICE_3")
-      const whtType = normalizeWhtType(rawWhtType);
-      
-      // Debug: Log WHT data from AI
-      console.log("[AI WHT Debug]", {
-        "suggested.whtRate": suggested.whtRate,
-        "extendedCombined.whtRate": extendedCombined.whtRate,
-        "extendedCombined.whtAmount": whtAmount,
-        "whtRate (final)": whtRate,
-        "rawWhtType": rawWhtType,
-        "whtType (normalized)": whtType,
-      });
-      
-      // Enable WHT if we have rate OR amount
-      const hasWht = (whtRate !== null && whtRate !== undefined && whtRate > 0) || 
-                     (whtAmount !== null && whtAmount !== undefined && whtAmount > 0);
-      
-      if (hasWht) {
-        // Enable WHT toggle
-        console.log("[AI WHT] Enabling WHT - rate:", whtRate, "amount:", whtAmount, "type:", whtType);
-        setValue(config.fields.whtField.name, true);
-        
-        // Set rate (calculate from amount if not provided)
-        if (whtRate && whtRate > 0) {
-          setValue("whtRate", whtRate);
-        } else if (whtAmount) {
-          // Calculate rate from amount: rate = (whtAmount / baseAmount) * 100
-          const aiAmount = extendedCombined.amount || (suggested.amount as number | null);
-          if (aiAmount && aiAmount > 0) {
-            const calculatedRate = Math.round((whtAmount / aiAmount) * 100);
-            if ([1, 2, 3, 5].includes(calculatedRate)) {
-              setValue("whtRate", calculatedRate);
-              console.log("[AI WHT] Calculated rate from amount:", calculatedRate, "%");
-            }
-          }
-        }
-        
-        if (whtType) {
-          setValue("whtType", whtType);
-        }
-      }
-
-      setAiApplied(true);
-      
-      // Build success message with document type info
-      const documentType = (suggested.documentType as string | null | undefined) || extendedCombined.documentType;
-      const docTypeNames: Record<string, string> = {
-        TAX_INVOICE: "ใบกำกับภาษี",
-        RECEIPT: "ใบเสร็จรับเงิน",
-        INVOICE: "ใบแจ้งหนี้",
-        BANK_SLIP: "สลิปโอนเงิน",
-        WHT_CERT: "ใบหัก ณ ที่จ่าย",
-      };
-      const docTypeName = documentType ? docTypeNames[documentType] : null;
-      
-      toast.success("กรอกข้อมูลจาก AI แล้ว", {
-        description: docTypeName 
-          ? `ตรวจพบ${docTypeName} - โปรดตรวจสอบความถูกต้องก่อนบันทึก`
-          : "โปรดตรวจสอบความถูกต้องก่อนบันทึก",
-      });
-    },
-    [setValue, config, contacts]
-  );
-
-  // AI Account Suggestion
-  // Handle merge decision
-  const handleMergeDecision = useCallback(
-    (decision: MergeDecision) => {
-      if (decision.action === "cancel") {
-        setPendingAiResult(null);
-        toast.info("เก็บไฟล์ไว้ แต่ไม่เปลี่ยนข้อมูลในฟอร์ม");
-        return;
-      }
-
-      if (decision.action === "replace" && decision.mergedData) {
-        applyMergedData(decision.mergedData);
-        if (pendingAiResult) {
-          setAiResult(pendingAiResult);
-          setAiApplied(true);
-        }
-        setPendingAiResult(null);
-        toast.success("แทนที่ข้อมูลด้วยข้อมูลจาก AI แล้ว");
-        return;
-      }
-
-      if (decision.action === "merge" && decision.mergedData) {
-        const conflicts = detectConflicts(
-          existingFormData as unknown as Record<string, unknown>,
-          newAiData as unknown as Record<string, unknown>
-        );
-
-        if (conflicts.length > 0) {
-          setPendingConflicts(conflicts);
-          setPendingMergedData(decision.mergedData);
-          setShowConflictDialog(true);
-        } else {
-          applyMergedData(decision.mergedData);
-          if (pendingAiResult) {
-            setAiResult(pendingAiResult);
-            setAiApplied(true);
-          }
-          setPendingAiResult(null);
-          toast.success("รวมยอดเงินแล้ว");
-        }
-      }
-    },
-    [existingFormData, newAiData, pendingAiResult]
-  );
-
-  // Handle conflict resolution
-  const handleConflictResolution = useCallback(
-    (resolution: ConflictResolution) => {
-      if (!pendingMergedData || !existingFormData || !newAiData) return;
-
-      const finalData: MergeData = { ...pendingMergedData };
-
-      for (const [field, choice] of Object.entries(resolution)) {
-        const sourceData = choice === "existing" ? existingFormData : newAiData;
-        (finalData as unknown as Record<string, unknown>)[field] = (
-          sourceData as unknown as Record<string, unknown>
-        )[field];
-      }
-
-      applyMergedData(finalData);
-      if (pendingAiResult) {
-        setAiResult(pendingAiResult);
-        setAiApplied(true);
-      }
-      setPendingAiResult(null);
-      setPendingConflicts([]);
-      setPendingMergedData(null);
-      toast.success("รวมข้อมูลสำเร็จ");
-    },
-    [pendingMergedData, existingFormData, newAiData, pendingAiResult]
-  );
-
-  // Apply merged data to form
-  const applyMergedData = useCallback(
-    (data: MergeData) => {
-      if (data.amount !== null) {
-        setValue("amount", data.amount);
-      }
-      if (data.vatRate !== null) {
-        setValue("vatRate", data.vatRate);
-      }
-      if (data.date) {
-        setValue(config.fields.dateField.name, new Date(data.date));
-      }
-      if (data.invoiceNumber) {
-        setValue("invoiceNumber", data.invoiceNumber);
-      }
-      if (data.description && config.fields.descriptionField) {
-        setValue(config.fields.descriptionField.name, data.description);
-      }
-      if (data.contactId) {
-        const contact = contacts.find((c) => c.id === data.contactId);
-        if (contact) {
-          setSelectedContact(contact);
-        }
-      }
-      if (data.accountId) {
-        setSelectedAccount(data.accountId);
-      }
-    },
-    [setValue, config, contacts]
-  );
-
-  // Handle form submit (create mode)
-  const onSubmit = async (data: Record<string, unknown>) => {
-    // Validation
-    const validationErrors: string[] = [];
-    const hasValidContact = selectedContact?.id || oneTimeContactName.trim();
-    if (!hasValidContact) validationErrors.push("กรุณาระบุผู้ติดต่อ");
-    // Note: account is optional, status is auto-determined based on documents if not selected
-
-    const descriptionValue = config.fields.descriptionField
-      ? data[config.fields.descriptionField.name]
-      : null;
-    if (config.fields.descriptionField && (!descriptionValue || (descriptionValue as string).trim() === "")) {
-      validationErrors.push("กรุณาระบุรายละเอียด");
-    }
-    if (!data.amount || (data.amount as number) <= 0) {
-      validationErrors.push("กรุณาระบุจำนวนเงิน");
-    }
-
-    // Validate payers for expense (บังคับระบุผู้จ่าย)
-    if (config.type === "expense") {
-      if (payers.length === 0) {
-        validationErrors.push("กรุณาระบุผู้จ่ายเงิน");
-      } else {
-        // Check if USER type has user selected
-        const invalidUserPayers = payers.filter(
-          (p) => p.paidByType === "USER" && !p.paidByUserId
-        );
-        if (invalidUserPayers.length > 0) {
-          validationErrors.push("กรุณาเลือกพนักงานสำหรับผู้จ่ายแต่ละราย");
-        }
-        // Check if PETTY_CASH type has fund selected
-        const invalidPettyCashPayers = payers.filter(
-          (p) => p.paidByType === "PETTY_CASH" && !p.paidByPettyCashFundId
-        );
-        if (invalidPettyCashPayers.length > 0) {
-          validationErrors.push("กรุณาเลือกกองทุนเงินสดย่อย");
-        }
-      }
-    }
-
-    if (validationErrors.length > 0) {
-      toast.error(validationErrors.join(", "));
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const fileData = {
-        [config.documentConfig.fields.slip]: categorizedFiles.slip,
-        [config.documentConfig.fields.invoice]: categorizedFiles.invoice,
-        [config.documentConfig.fields.whtCert]: categorizedFiles.whtCert,
-        otherDocUrls: categorizedFiles.other,
-      };
-
-      const response = await fetch(config.apiEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          companyCode: companyCode.toUpperCase(),
-          contactId: selectedContact?.id || null,
-          contactName: !selectedContact?.id && oneTimeContactName.trim() ? oneTimeContactName.trim() : null,
-          accountId: selectedAccount,
-          category: undefined,
-          vatAmount: calculation.vatAmount,
-          whtAmount: calculation.whtAmount,
-          [config.fields.netAmountField]: calculation.netAmount,
-          referenceUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
-          // Include payers and internal company for expense type
-          ...(config.type === "expense" && payers.length > 0 ? { payers } : {}),
-          ...(config.type === "expense" && internalCompanyId ? { internalCompanyId } : {}),
-          ...fileData,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "เกิดข้อผิดพลาด");
-      }
-
-      toast.success(`บันทึก${config.title}สำเร็จ`);
-      
-      // Redirect to the created item's detail page
-      const createdItem = result.data?.expense || result.data?.income;
-      if (createdItem?.id) {
-        router.push(`/${companyCode.toLowerCase()}/${config.listUrl}/${createdItem.id}`);
-      } else {
-        // Fallback to list page if ID not available
-        router.push(`/${companyCode.toLowerCase()}/${config.listUrl}`);
-      }
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle save (edit mode)
-  const handleSave = async () => {
-    if (!transaction) return;
-
-    try {
-      setSaving(true);
-      const formData = watch();
-      const whtEnabled = formData[config.fields.whtField.name] as boolean;
-      const calc = config.calculateTotals(
-        Number(formData.amount) || 0,
-        Number(formData.vatRate) || 0,
-        whtEnabled ? Number(formData.whtRate) || 0 : 0
-      );
-
-      const res = await fetch(`${config.apiEndpoint}/${transactionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          contactId: selectedContact?.id || null,
-          contactName: !selectedContact?.id && oneTimeContactName.trim() ? oneTimeContactName.trim() : null,
-          accountId: selectedAccount || null,
-          amount: Number(formData.amount),
-          vatRate: Number(formData.vatRate),
-          vatAmount: calc.vatAmount,
-          whtRate: whtEnabled ? Number(formData.whtRate) : null,
-          whtAmount: whtEnabled ? calc.whtAmount : null,
-          [config.fields.netAmountField]: calc.netAmount,
-          referenceUrls: referenceUrls.length > 0 ? referenceUrls : [],
-          // Include payers and internal company for expense type
-          ...(config.type === "expense" ? { payers, internalCompanyId: internalCompanyId || null } : {}),
-        }),
-      });
-
-      if (!res.ok) throw new Error(`Failed to update ${config.type}`);
-
-      const result = await res.json();
-      const updatedData = result.data?.[config.type] || result[config.type];
-      
-      // Update local state
-      setTransaction(updatedData);
-      
-      // Update SWR cache with the response data to ensure it persists after refresh
-      // This directly updates the cache without refetching
-      await mutateTransaction({ data: { [config.type]: updatedData } }, { revalidate: false });
-      
-      // Update selectedContact and oneTimeContactName from the response to ensure UI consistency
-      const contactData = updatedData.Contact || updatedData.contact;
-      if (contactData) {
-        // Saved contact from database
-        setSelectedContact({
-          id: contactData.id,
-          name: contactData.name,
-          taxId: contactData.taxId,
-        });
-        setOneTimeContactName("");
-      } else if (updatedData.contactName) {
-        // One-time contact name (typed manually, not saved as Contact)
-        setSelectedContact(null);
-        setOneTimeContactName(updatedData.contactName);
-      } else {
-        // No contact at all
-        setSelectedContact(null);
-        setOneTimeContactName("");
-      }
-      
-      // Update selectedAccount from the response
-      if (updatedData.accountId !== undefined) {
-        setSelectedAccount(updatedData.accountId);
-      }
-      
-      onModeChange?.("view");
-      setAuditRefreshKey((prev) => prev + 1);
-      toast.success("บันทึกการแก้ไขสำเร็จ");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Mode change handlers
-  const handleEditClick = () => {
-    onModeChange?.("edit");
-  };
-
-  const handleCancelEdit = () => {
-    onModeChange?.("view");
-    if (transaction) {
-      reset({
-        amount: transaction.amount,
-        vatRate: transaction.vatRate,
-        [config.fields.whtField.name]: transaction[config.fields.whtField.name],
-        whtRate: transaction.whtRate,
-        whtType: transaction.whtType,
-        status: transaction.status,
-        invoiceNumber: transaction.invoiceNumber,
-        referenceNo: transaction.referenceNo,
-        notes: transaction.notes,
-        documentType: transaction.documentType || "TAX_INVOICE",
-        [config.fields.dateField.name]: transaction[config.fields.dateField.name]
-          ? new Date(transaction[config.fields.dateField.name] as string)
-          : undefined,
-        ...(config.fields.descriptionField
-          ? { [config.fields.descriptionField.name]: transaction[config.fields.descriptionField.name] }
-          : {}),
-      });
-    }
-  };
+  // Note: handleMergeDecision, handleConflictResolution, applyMergedData are now from useMergeHandler hook
+  // Note: onSubmit, handleSave, handleEditClick, handleCancelEdit are now from useTransactionSubmission hook
 
   // Navigate to list page with refresh
   const navigateToList = () => {

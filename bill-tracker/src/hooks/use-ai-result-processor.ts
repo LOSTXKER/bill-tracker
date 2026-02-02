@@ -21,16 +21,16 @@ export interface AiVendorSuggestion {
 }
 
 export interface AccountSuggestion {
-  accountId: string;
+  accountId: string | null;
   accountCode: string | null;
   accountName: string | null;
-  confidence: number | string;
+  confidence: number;
   reason: string;
-  alternatives: Array<{
+  alternatives?: Array<{
     accountId: string;
-    accountCode: string | null;
-    accountName: string | null;
-    confidence: number | string;
+    accountCode: string;
+    accountName: string;
+    confidence: number;
     reason: string;
   }>;
 }

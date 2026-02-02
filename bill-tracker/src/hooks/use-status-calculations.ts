@@ -28,9 +28,11 @@ export function useStatusCalculations({
   isOwner,
 }: UseStatusCalculationsProps) {
   // Calculate unique statuses of selected items
-  const selectedStatuses = useMemo(() => {
+  const selectedStatuses = useMemo((): string[] => {
     const statuses = new Set(
-      selectedItems.map(item => item.workflowStatus || item.status)
+      selectedItems
+        .map(item => item.workflowStatus || item.status)
+        .filter((s): s is string => typeof s === "string")
     );
     return Array.from(statuses);
   }, [selectedItems]);

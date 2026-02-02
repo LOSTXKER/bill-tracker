@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, ReactNode, useCallback } from "react";
+import { useState, ReactNode, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -18,6 +18,9 @@ import { BulkActionsBar } from "@/components/transactions/BulkActionsBar";
 import { ExportButton } from "@/components/transactions/ExportButton";
 import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
 import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-transaction-filters";
+import { useSelection } from "@/hooks/use-selection";
+import { useBulkActions } from "@/hooks/use-bulk-actions";
+import { useStatusCalculations } from "@/hooks/use-status-calculations";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { StatusInfo } from "@/lib/constants/transaction";
@@ -152,8 +155,44 @@ export function TransactionListClient({
   const { filters, setFilter, setFilterWithSort, updateFilters } = useTransactionFilters();
   const { page, limit, setPage, setLimit } = usePagination();
   const { sortBy, sortOrder, toggleSort } = useSorting("createdAt");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isPending, startTransition] = useTransition();
+  
+  // Selection Hook (Phase 5 Integration)
+  const {
+    selectedIds,
+    setSelectedIds,
+    selectedItems,
+    toggleSelectAll,
+    toggleSelect,
+    clearSelection,
+  } = useSelection({ data });
+
+  // Bulk Actions Hook (Phase 5 Integration)
+  const {
+    handleBulkDelete,
+    handleBulkStatusChange,
+    handleBulkInternalCompanyChange,
+    handleBulkApprove,
+    handleBulkReject,
+    isPending,
+  } = useBulkActions({
+    apiEndpoint: config.apiEndpoint,
+    selectedIds,
+    setSelectedIds,
+  });
+
+  // Status Calculations Hook (Phase 5 Integration)
+  const {
+    selectedStatuses,
+    selectedWorkflowContext,
+    nextStatus,
+    previousStatus,
+    currentStatusLabel,
+    hasPendingItems,
+  } = useStatusCalculations({
+    selectedItems,
+    transactionType: config.type,
+    isOwner,
+  });
   
   // Preview Sheet state
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -203,197 +242,11 @@ export function TransactionListClient({
     }
   };
 
-  // Selection handlers
-  const toggleSelectAll = () => {
-    if (selectedIds.length === data.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(data.map(item => item.id));
-    }
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const clearSelection = () => setSelectedIds([]);
-
-  // Get selected items for bulk validation
-  const selectedItems = useMemo(() => {
-    return data.filter(item => selectedIds.includes(item.id));
-  }, [data, selectedIds]);
-
-  // Calculate unique statuses of selected items for bulk validation
-  const selectedStatuses = useMemo(() => {
-    const statuses = new Set(
-      selectedItems.map(item => item.workflowStatus || item.status)
-    );
-    return Array.from(statuses);
-  }, [selectedItems]);
-
-  // Calculate workflow context for selected items (isWht, documentType, etc.)
-  const selectedWorkflowContext = useMemo((): TransactionWorkflowContext | null => {
-    if (selectedItems.length === 0) return null;
-    
-    // For bulk operations, we need consistent context across all items
-    // Check if all items have the same WHT setting
-    const whtValues = new Set(
-      selectedItems.map(item => 
-        config.type === "expense" ? item.isWht : item.isWhtDeducted
-      )
-    );
-    
-    // Check if all items have the same document type (for expenses)
-    const docTypeValues = config.type === "expense" 
-      ? new Set(selectedItems.map(item => item.documentType || null))
-      : new Set([null]);
-    
-    // If items have different WHT settings or document types, we can't determine a single next status
-    if (whtValues.size > 1 || docTypeValues.size > 1) {
-      // Return context based on most restrictive (no WHT, no tax invoice)
-      // This way the next status will be the common one for all items
-      return {
-        isWht: false,
-        isWhtDeducted: false,
-        documentType: null,
-      };
-    }
-    
-    // All items have the same settings
-    const firstItem = selectedItems[0];
-    return {
-      isWht: firstItem.isWht ?? false,
-      isWhtDeducted: firstItem.isWhtDeducted ?? false,
-      documentType: firstItem.documentType ?? null,
-    };
-  }, [selectedItems, config.type]);
-
-  // Calculate next status (only if all selected items have the same status)
-  const nextStatus = useMemo(() => {
-    if (selectedStatuses.length !== 1) return null;
-    return getNextStatus(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
-  }, [selectedStatuses, config.type, selectedWorkflowContext]);
-
-  // Calculate previous status for owners (only if all selected items have the same status)
-  const previousStatus = useMemo(() => {
-    if (selectedStatuses.length !== 1 || !isOwner) return null;
-    return getPreviousStatus(selectedStatuses[0], config.type, selectedWorkflowContext || undefined);
-  }, [selectedStatuses, config.type, selectedWorkflowContext, isOwner]);
-
-  // Get current status label for display
-  const currentStatusLabel = useMemo(() => {
-    if (selectedStatuses.length !== 1) return undefined;
-    return getStatusLabel(selectedStatuses[0], config.type);
-  }, [selectedStatuses, config.type]);
-
-  // Bulk actions - use router.refresh() to get fresh data from server
-  const handleBulkDelete = async () => {
-    startTransition(async () => {
-      try {
-        await Promise.all(
-          selectedIds.map(id =>
-            fetch(`${config.apiEndpoint}/${id}`, { method: "DELETE" })
-          )
-        );
-        setSelectedIds([]);
-        router.refresh();
-      } catch (error) {
-        console.error("Bulk delete failed:", error);
-      }
-    });
-  };
-
-  const handleBulkStatusChange = async (newStatus: string) => {
-    startTransition(async () => {
-      try {
-        await Promise.all(
-          selectedIds.map(id =>
-            fetch(`${config.apiEndpoint}/${id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              // Use workflowStatus (new field) instead of status (legacy)
-              body: JSON.stringify({ workflowStatus: newStatus }),
-            })
-          )
-        );
-        setSelectedIds([]);
-        router.refresh();
-      } catch (error) {
-        console.error("Bulk status change failed:", error);
-      }
-    });
-  };
-
-  const handleBulkInternalCompanyChange = async (companyId: string | null) => {
-    startTransition(async () => {
-      try {
-        await Promise.all(
-          selectedIds.map(id =>
-            fetch(`${config.apiEndpoint}/${id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ internalCompanyId: companyId }),
-            })
-          )
-        );
-        setSelectedIds([]);
-        router.refresh();
-      } catch (error) {
-        console.error("Bulk internal company change failed:", error);
-      }
-    });
-  };
-
-  const handleBulkApprove = async () => {
-    startTransition(async () => {
-      try {
-        const res = await fetch(`${config.apiEndpoint}/batch/approve`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: selectedIds }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
-        setSelectedIds([]);
-        router.refresh();
-      } catch (error) {
-        console.error("Bulk approve failed:", error);
-        throw error;
-      }
-    });
-  };
-
-  const handleBulkReject = async (reason: string) => {
-    startTransition(async () => {
-      try {
-        const res = await fetch(`${config.apiEndpoint}/batch/reject`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: selectedIds, reason }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "เกิดข้อผิดพลาด");
-        }
-        setSelectedIds([]);
-        router.refresh();
-      } catch (error) {
-        console.error("Bulk reject failed:", error);
-        throw error;
-      }
-    });
-  };
-
-  // Check if selected items include pending approval status
-  const hasPendingItems = useMemo(() => {
-    return data
-      .filter(item => selectedIds.includes(item.id))
-      .some(item => item.approvalStatus === "PENDING");
-  }, [data, selectedIds]);
+  // Note: toggleSelectAll, toggleSelect, clearSelection, selectedItems are now from useSelection hook
+  // Note: selectedStatuses, selectedWorkflowContext, nextStatus, previousStatus, currentStatusLabel, hasPendingItems 
+  //       are now from useStatusCalculations hook
+  // Note: handleBulkDelete, handleBulkStatusChange, handleBulkInternalCompanyChange, handleBulkApprove, 
+  //       handleBulkReject, isPending are now from useBulkActions hook
 
   const SortableHeader = ({ field, children, align = "left" }: { field: string; children: React.ReactNode; align?: "left" | "center" | "right" }) => (
     <TableHead className={cn(
