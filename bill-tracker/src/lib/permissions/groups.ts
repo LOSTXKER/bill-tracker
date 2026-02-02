@@ -505,3 +505,56 @@ export function optimizePermissions(permissions: string[]): string[] {
   
   return Array.from(optimized);
 }
+
+/**
+ * Detect which role preset best matches the given permissions
+ * Returns the role preset with the most matching permissions
+ */
+export function detectRoleFromPermissions(permissions: string[]): RolePreset | null {
+  if (!permissions || permissions.length === 0) return null;
+  
+  let bestMatch: RolePreset | null = null;
+  let bestScore = 0;
+  
+  for (const preset of ROLE_PRESETS) {
+    // Count how many permissions match
+    const matchingPerms = preset.permissions.filter(p => permissions.includes(p));
+    const score = matchingPerms.length;
+    
+    // Check if this is an exact match or close match
+    if (score === preset.permissions.length && score === permissions.length) {
+      // Exact match - return immediately
+      return preset;
+    }
+    
+    // Check if this is the best match so far (at least 80% match)
+    const matchPercent = score / preset.permissions.length;
+    if (matchPercent >= 0.8 && score > bestScore) {
+      bestScore = score;
+      bestMatch = preset;
+    }
+  }
+  
+  return bestMatch;
+}
+
+/**
+ * Get role label from permissions array
+ * Used for displaying role name in UI
+ */
+export function getRoleLabelFromPermissions(permissions: string[], isOwner: boolean): string {
+  if (isOwner) return "เจ้าของ";
+  
+  const role = detectRoleFromPermissions(permissions);
+  return role?.label || "กำหนดเอง";
+}
+
+/**
+ * Get role icon from permissions array
+ */
+export function getRoleIconFromPermissions(permissions: string[], isOwner: boolean): LucideIcon {
+  if (isOwner) return Shield;
+  
+  const role = detectRoleFromPermissions(permissions);
+  return role?.icon || UsersIcon;
+}

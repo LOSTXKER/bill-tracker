@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { CreateMemberDialog } from "@/components/settings/create-member-dialog";
 import { useIsOwner } from "@/components/guards/permission-guard";
+import { getRoleLabelFromPermissions, getRoleIconFromPermissions } from "@/lib/permissions/groups";
 
 interface TeamMember {
   id: string;
@@ -129,19 +130,22 @@ export default function EmployeesPage() {
       key: "role",
       label: "ตำแหน่ง",
       width: "150px",
-      render: (member) => (
-        member.isOwner ? (
+      render: (member) => {
+        const roleLabel = getRoleLabelFromPermissions(member.permissions || [], member.isOwner);
+        const RoleIcon = getRoleIconFromPermissions(member.permissions || [], member.isOwner);
+        
+        return member.isOwner ? (
           <Badge variant="default" className="gap-1">
             <Crown className="h-3 w-3" />
             ผู้จัดการ
           </Badge>
         ) : (
           <Badge variant="outline" className="gap-1">
-            <Users className="h-3 w-3" />
-            พนักงาน
+            <RoleIcon className="h-3 w-3" />
+            {roleLabel}
           </Badge>
-        )
-      ),
+        );
+      },
     },
     {
       key: "status",
