@@ -522,12 +522,17 @@ export function UnifiedTransactionForm({
     });
 
     // Set contact (Prisma returns Contact with capital C)
-    const contactData = data.Contact || data.contact;
+    // Cast to any to access all fields from the API response
+    const contactData = (data.Contact || data.contact) as ContactSummary | undefined;
     if (contactData) {
       setSelectedContact({
         id: contactData.id,
         name: contactData.name,
         taxId: contactData.taxId,
+        // Delivery preferences
+        preferredDeliveryMethod: contactData.preferredDeliveryMethod,
+        deliveryEmail: contactData.deliveryEmail,
+        deliveryNotes: contactData.deliveryNotes,
       });
       setOneTimeContactName("");
     } else if (data.contactName) {
