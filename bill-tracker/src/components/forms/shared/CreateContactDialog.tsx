@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Lightbulb, Send } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
+import { DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 export interface ContactFormData {
@@ -707,10 +708,17 @@ export function CreateContactDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                    <SelectItem value="email">📧 อีเมล</SelectItem>
-                    <SelectItem value="physical">📬 ส่งตัวจริง (ไปรษณีย์/messenger)</SelectItem>
-                    <SelectItem value="line">💬 LINE</SelectItem>
-                    <SelectItem value="pickup">🏢 มารับเอง</SelectItem>
+                    {DELIVERY_METHODS.map((method) => {
+                      const Icon = method.Icon;
+                      return (
+                        <SelectItem key={method.value} value={method.value}>
+                          <span className="flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            {method.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

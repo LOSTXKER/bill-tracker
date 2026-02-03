@@ -1223,6 +1223,7 @@ export function UnifiedTransactionForm({
                         alternatives: suggestion.alternatives,
                       });
                     }}
+                    isWht={watchIsWht || false}
                   />
 
                   {/* Contact Defaults Suggestion */}
@@ -1414,6 +1415,7 @@ export function UnifiedTransactionForm({
                         alternatives: suggestion.alternatives,
                       });
                     } : undefined}
+                    isWht={watchIsWht || false}
                   />
 
                   <div className="border-t border-border" />

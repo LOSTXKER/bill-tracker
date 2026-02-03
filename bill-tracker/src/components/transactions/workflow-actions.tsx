@@ -31,6 +31,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { getPreviousStatus, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
+import { DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
 
 interface WorkflowActionsProps {
   companyCode: string;
@@ -498,13 +499,7 @@ export function WorkflowActions({
   );
 }
 
-// Delivery method options for WHT certificates
-const DELIVERY_METHODS = [
-  { value: "email", label: "อีเมล", icon: "📧" },
-  { value: "physical", label: "ส่งตัวจริง (ไปรษณีย์/messenger)", icon: "📬" },
-  { value: "line", label: "LINE", icon: "💬" },
-  { value: "pickup", label: "มารับเอง", icon: "🏢" },
-];
+// DELIVERY_METHODS is now imported from @/lib/constants/delivery-methods
 
 function ConfirmDialog({
   action,
@@ -546,18 +541,21 @@ function ConfirmDialog({
             <div>
               <Label>วิธีส่ง</Label>
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {DELIVERY_METHODS.map((method) => (
-                  <Button
-                    key={method.value}
-                    type="button"
-                    variant={deliveryMethod === method.value ? "default" : "outline"}
-                    className="justify-start gap-2 h-auto py-3"
-                    onClick={() => setDeliveryMethod(method.value)}
-                  >
-                    <span>{method.icon}</span>
-                    <span>{method.label}</span>
-                  </Button>
-                ))}
+                {DELIVERY_METHODS.map((method) => {
+                  const Icon = method.Icon;
+                  return (
+                    <Button
+                      key={method.value}
+                      type="button"
+                      variant={deliveryMethod === method.value ? "default" : "outline"}
+                      className="justify-start gap-2 h-auto py-3"
+                      onClick={() => setDeliveryMethod(method.value)}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{method.label}</span>
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -15,7 +15,8 @@ import { DatePicker } from "./DatePicker";
 import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
 import { AccountSelector } from "./account-selector";
 import type { ContactSummary } from "@/types";
-import { Plus, X, ExternalLink, Link2, Sparkles, Loader2 } from "lucide-react";
+import { Plus, X, ExternalLink, Link2, Sparkles, Loader2, Send } from "lucide-react";
+import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
 import { toast } from "sonner";
 
 // =============================================================================
@@ -116,6 +117,9 @@ export interface TransactionFieldsSectionProps {
       reason: string;
     }>;
   }) => void;
+  
+  // WHT info for showing delivery preferences
+  isWht?: boolean;
 }
 
 // =============================================================================
@@ -149,6 +153,7 @@ export function TransactionFieldsSection({
   onInternalCompanyChange,
   accessibleCompanies = [],
   onAiSuggestAccount,
+  isWht = false,
 }: TransactionFieldsSectionProps) {
   const isEditable = mode === "create" || mode === "edit";
   const watchStatus = watch("status") as string | undefined;
@@ -415,6 +420,41 @@ export function TransactionFieldsSection({
 
         {/* Row 4: Additional fields (Due Date removed) */}
         {renderAdditionalFields?.()}
+
+        {/* Row 5: WHT Delivery Info (expense only, when WHT is enabled) */}
+        {config.type === "expense" && isWht && selectedContact && (
+          selectedContact.preferredDeliveryMethod || selectedContact.deliveryNotes
+        ) && (
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                วิธีส่งเอกสาร (ใบหัก ณ ที่จ่าย)
+              </p>
+            </div>
+            <div className="space-y-2 text-sm">
+              {selectedContact.preferredDeliveryMethod && (() => {
+                const method = getDeliveryMethod(selectedContact.preferredDeliveryMethod);
+                if (!method) return null;
+                const Icon = method.Icon;
+                return (
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-foreground font-medium">{method.label}</span>
+                    {selectedContact.preferredDeliveryMethod === "email" && selectedContact.deliveryEmail && (
+                      <span className="text-muted-foreground">({selectedContact.deliveryEmail})</span>
+                    )}
+                  </div>
+                );
+              })()}
+              {selectedContact.deliveryNotes && (
+                <p className="text-muted-foreground pl-6">
+                  {selectedContact.deliveryNotes}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Row 6: Reference URLs */}
         {referenceUrls.length > 0 && (

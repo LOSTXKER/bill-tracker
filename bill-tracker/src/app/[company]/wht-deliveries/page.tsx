@@ -23,16 +23,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Send,
   FileText,
-  Mail,
-  Package,
-  MessageCircle,
-  Building2,
   ChevronDown,
   ChevronRight,
   CheckCircle,
   RefreshCw,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { DELIVERY_METHODS, getDeliveryMethod } from "@/lib/constants/delivery-methods";
 
 // Format date to Thai locale
 function formatDate(dateStr: string): string {
@@ -75,12 +72,7 @@ interface ContactGroup {
   count: number;
 }
 
-const DELIVERY_METHODS = [
-  { value: "email", label: "อีเมล", icon: Mail, emoji: "📧" },
-  { value: "physical", label: "ส่งตัวจริง", icon: Package, emoji: "📬" },
-  { value: "line", label: "LINE", icon: MessageCircle, emoji: "💬" },
-  { value: "pickup", label: "มารับเอง", icon: Building2, emoji: "🏢" },
-];
+// DELIVERY_METHODS is imported from @/lib/constants/delivery-methods
 
 export default function WhtDeliveriesPage() {
   const params = useParams();
@@ -194,9 +186,7 @@ export default function WhtDeliveriesPage() {
     }
   };
 
-  const getDeliveryMethodInfo = (method: string | null) => {
-    return DELIVERY_METHODS.find((m) => m.value === method);
-  };
+  // Use imported getDeliveryMethod from constants
 
   return (
     <PermissionGuard permission="expenses:read">
@@ -284,7 +274,7 @@ export default function WhtDeliveriesPage() {
               const isExpanded = expandedGroups.has(group.contactId);
               const allSelected = group.expenses.every((e) => selectedExpenses.has(e.id));
               const someSelected = group.expenses.some((e) => selectedExpenses.has(e.id));
-              const deliveryInfo = getDeliveryMethodInfo(group.deliveryMethod);
+              const deliveryInfo = getDeliveryMethod(group.deliveryMethod);
 
               return (
                 <Card key={group.contactId}>
@@ -314,15 +304,19 @@ export default function WhtDeliveriesPage() {
                             <Badge variant="secondary">{group.count} รายการ</Badge>
                           </CardTitle>
                           <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3">
-                            {deliveryInfo ? (
-                              <span className="flex items-center gap-1">
-                                {deliveryInfo.emoji} {deliveryInfo.label}
-                                {group.deliveryEmail && group.deliveryMethod === "email" && (
-                                  <span className="text-xs">({group.deliveryEmail})</span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-amber-600">⚠️ ยังไม่ระบุวิธีส่ง</span>
+                            {deliveryInfo ? (() => {
+                              const Icon = deliveryInfo.Icon;
+                              return (
+                                <span className="flex items-center gap-1">
+                                  <Icon className="h-4 w-4" />
+                                  {deliveryInfo.label}
+                                  {group.deliveryEmail && group.deliveryMethod === "email" && (
+                                    <span className="text-xs">({group.deliveryEmail})</span>
+                                  )}
+                                </span>
+                              );
+                            })() : (
+                              <span className="text-amber-600">ยังไม่ระบุวิธีส่ง</span>
                             )}
                             {group.deliveryNotes && (
                               <span className="text-xs">• {group.deliveryNotes}</span>
@@ -410,18 +404,21 @@ export default function WhtDeliveriesPage() {
               <div>
                 <Label>วิธีส่ง</Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  {DELIVERY_METHODS.map((method) => (
-                    <Button
-                      key={method.value}
-                      type="button"
-                      variant={selectedDeliveryMethod === method.value ? "default" : "outline"}
-                      className="justify-start gap-2 h-auto py-3"
-                      onClick={() => setSelectedDeliveryMethod(method.value)}
-                    >
-                      <span>{method.emoji}</span>
-                      <span>{method.label}</span>
-                    </Button>
-                  ))}
+                  {DELIVERY_METHODS.map((method) => {
+                    const Icon = method.Icon;
+                    return (
+                      <Button
+                        key={method.value}
+                        type="button"
+                        variant={selectedDeliveryMethod === method.value ? "default" : "outline"}
+                        className="justify-start gap-2 h-auto py-3"
+                        onClick={() => setSelectedDeliveryMethod(method.value)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{method.label}</span>
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
 
