@@ -4,11 +4,10 @@ import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { SettlementSummaryCards } from "./SettlementSummaryCards";
-import { SettlementGroupCard } from "./SettlementGroupCard";
-import { SettledGroupCard } from "./SettledGroupCard";
 import { SettlementRoundsTable } from "./SettlementRoundsTable";
+import { PendingMonthSection } from "./PendingMonthSection";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
@@ -55,7 +54,12 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
   const [tab, setTab] = useState<"pending" | "settled">("pending");
   const { mutate: globalMutate } = useSWRConfig();
   
-  // Filter state
+  // Filter state for pending tab
+  const [pendingMonth, setPendingMonth] = useState<string>("all");
+  const [pendingYear, setPendingYear] = useState<string>("all");
+  const [pendingEmployee, setPendingEmployee] = useState<string>("all");
+  
+  // Filter state for settled tab
   const [selectedMonth, setSelectedMonth] = useState<string>(String(currentMonth));
   const [selectedYear, setSelectedYear] = useState<string>(String(currentDate.getFullYear()));
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
@@ -78,6 +82,18 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     if (groupBy) {
       params.set("groupBy", groupBy);
     }
+    // Add date filters for pending tab
+    if (status === "PENDING") {
+      if (pendingMonth && pendingMonth !== "all") {
+        params.set("month", pendingMonth);
+      }
+      if (pendingYear && pendingYear !== "all") {
+        params.set("year", pendingYear);
+      }
+      if (pendingEmployee && pendingEmployee !== "all") {
+        params.set("userId", pendingEmployee);
+      }
+    }
     // Add date filters for settled tab
     if (status === "SETTLED") {
       if (selectedMonth && selectedMonth !== "all") {
@@ -93,11 +109,17 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     return `${settlementBasePath}?${params.toString()}`;
   };
 
-  // Fetch pending settlements (always fetch for employee list)
+  // Fetch pending settlements with month grouping
   const {
     data: pendingData,
     isLoading: pendingLoading,
-  } = useSWR(buildUrl("PENDING"), fetcher);
+  } = useSWR(buildUrl("PENDING", "monthPayer"), fetcher);
+  
+  // Also fetch without filters to get all employees for dropdown
+  const { data: allPendingData } = useSWR(
+    `${settlementBasePath}?status=PENDING&groupBy=monthPayer`,
+    fetcher
+  );
 
   // Fetch settled settlements with groupBy=round
   const {
@@ -114,17 +136,34 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     fetcher
   );
 
-  // Get unique employees from both pending and settled data for filter dropdown
-  const employeeOptions = useMemo(() => {
+  // Get unique employees from pending data for pending filter dropdown
+  const pendingEmployeeOptions = useMemo(() => {
     const employeeMap = new Map<string, string>();
     
-    // From pending groups
-    const pendingGroups = pendingData?.data?.groups || [];
-    pendingGroups.forEach((group: any) => {
-      if (group.payerId && group.payerType === "USER") {
-        employeeMap.set(group.payerId, group.payerName);
-      }
+    // From pending month groups
+    const monthGroups = allPendingData?.data?.monthGroups || [];
+    monthGroups.forEach((monthGroup: any) => {
+      monthGroup.payerGroups?.forEach((group: any) => {
+        if (group.payerId && group.payerType === "USER") {
+          employeeMap.set(group.payerId, group.payerName);
+        }
+      });
     });
+    
+    const employees: { value: string; label: string }[] = [
+      { value: "all", label: "พนักงานทั้งหมด" },
+    ];
+    
+    employeeMap.forEach((name, id) => {
+      employees.push({ value: id, label: name });
+    });
+    
+    return employees;
+  }, [allPendingData]);
+  
+  // Get unique employees from settled data for settled filter dropdown
+  const settledEmployeeOptions = useMemo(() => {
+    const employeeMap = new Map<string, string>();
     
     // From settled rounds (all data)
     const settledRounds = allSettledData?.data?.rounds || [];
@@ -145,7 +184,7 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     });
     
     return employees;
-  }, [pendingData, allSettledData]);
+  }, [allSettledData]);
 
   // OPTIMIZED: Single batch revalidation using global mutate with key matcher
   // This triggers a single revalidation pass instead of 3 separate API calls
@@ -166,25 +205,35 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     revalidateAllSettlements();
   }, [revalidateAllSettlements]);
 
-  const pendingGroups = pendingData?.data?.groups || [];
+  const pendingMonthGroups = pendingData?.data?.monthGroups || [];
   const settledRounds = settledData?.data?.rounds || [];
   const isLoading = tab === "pending" ? pendingLoading : settledLoading;
-  const groups = pendingGroups;
 
-  // Clear filters
-  const handleClearFilters = () => {
+  // Clear filters for pending tab
+  const handleClearPendingFilters = () => {
+    setPendingMonth("all");
+    setPendingYear("all");
+    setPendingEmployee("all");
+  };
+  
+  // Clear filters for settled tab
+  const handleClearSettledFilters = () => {
     setSelectedMonth(String(currentMonth));
     setSelectedYear(String(currentDate.getFullYear()));
     setSelectedEmployee("all");
   };
 
-  const hasActiveFilters = selectedEmployee !== "all" || 
+  const hasPendingActiveFilters = pendingMonth !== "all" || 
+    pendingYear !== "all" || 
+    pendingEmployee !== "all";
+    
+  const hasSettledActiveFilters = selectedEmployee !== "all" || 
     selectedMonth !== String(currentMonth) || 
     selectedYear !== String(currentDate.getFullYear());
 
   // Get filtered user name from groups (if filtering)
-  const filteredUserName = filterUserId && pendingGroups.length > 0 
-    ? pendingGroups[0]?.payerName 
+  const filteredUserName = filterUserId && pendingMonthGroups.length > 0 
+    ? pendingMonthGroups[0]?.payerGroups?.[0]?.payerName 
     : filterUserId && settledRounds.length > 0 
       ? settledRounds[0]?.payerSummary?.split(" (")[0] 
       : null;
@@ -249,6 +298,62 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
           </Button>
         </div>
 
+        {/* Filters for Pending Tab */}
+        {tab === "pending" && (
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={pendingMonth} onValueChange={setPendingMonth}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="เดือน" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกเดือน</SelectItem>
+                {months.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={pendingYear} onValueChange={setPendingYear}>
+              <SelectTrigger className="w-[100px] h-9">
+                <SelectValue placeholder="ปี" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกปี</SelectItem>
+                {years.map((year) => (
+                  <SelectItem key={year.value} value={year.value}>
+                    {year.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={pendingEmployee} onValueChange={setPendingEmployee}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="พนักงาน" />
+              </SelectTrigger>
+              <SelectContent>
+                {pendingEmployeeOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasPendingActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearPendingFilters}
+                className="h-9 text-muted-foreground"
+              >
+                <X className="h-4 w-4 mr-1" />
+                ล้างตัวกรอง
+              </Button>
+            )}
+          </div>
+        )}
+        
         {/* Filters for Settled Tab */}
         {tab === "settled" && (
           <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg">
@@ -283,18 +388,18 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
                 <SelectValue placeholder="พนักงาน" />
               </SelectTrigger>
               <SelectContent>
-                {employeeOptions.map((option) => (
+                {settledEmployeeOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {hasActiveFilters && (
+            {hasSettledActiveFilters && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleClearFilters}
+                onClick={handleClearSettledFilters}
                 className="h-9 text-muted-foreground"
               >
                 <X className="h-4 w-4 mr-1" />
@@ -313,20 +418,23 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
           ))}
         </div>
       ) : tab === "pending" ? (
-        groups.length === 0 ? (
+        pendingMonthGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Inbox className="h-12 w-12 mb-4" />
             <p className="text-lg font-medium">ไม่มีรายการรอโอนคืน</p>
             <p className="text-sm mt-1">
-              รายการที่จ่ายโดยพนักงานหรือคนภายนอกจะแสดงที่นี่
+              {hasPendingActiveFilters 
+                ? "ไม่พบรายการตามเงื่อนไขที่กรอง ลองเปลี่ยนตัวกรอง"
+                : "รายการที่จ่ายโดยพนักงานหรือคนภายนอกจะแสดงที่นี่"
+              }
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {groups.map((group: any, index: number) => (
-              <SettlementGroupCard
-                key={`${group.payerType}_${group.payerId || group.payerName}_${index}`}
-                group={group}
+            {pendingMonthGroups.map((monthGroup: any) => (
+              <PendingMonthSection
+                key={monthGroup.monthKey}
+                monthGroup={monthGroup}
                 companyCode={companyCode}
                 onSuccess={handleSettleSuccess}
               />

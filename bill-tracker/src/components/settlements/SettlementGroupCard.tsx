@@ -61,14 +61,16 @@ interface SettlementGroupCardProps {
   group: Group;
   companyCode: string;
   onSuccess: () => void;
+  compact?: boolean;
 }
 
 export function SettlementGroupCard({
   group,
   companyCode,
   onSuccess,
+  compact = false,
 }: SettlementGroupCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(!compact);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
 
@@ -84,31 +86,40 @@ export function SettlementGroupCard({
 
   return (
     <>
-      <Card>
+      <Card className={compact ? "border-0 shadow-none bg-muted/30" : ""}>
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <CardHeader className="pb-3">
+          <CardHeader className={compact ? "pb-2 pt-3 px-3" : "pb-3"}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
-                  <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div className={`rounded-full bg-blue-100 dark:bg-blue-900/30 ${compact ? "p-1.5" : "p-2"}`}>
+                  <User className={`text-blue-600 dark:text-blue-400 ${compact ? "h-4 w-4" : "h-5 w-5"}`} />
                 </div>
                 <div>
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className={`flex items-center gap-2 ${compact ? "text-sm" : "text-base"}`}>
                     {group.payerName}
-                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                      พนักงาน
-                    </Badge>
+                    {!compact && (
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        พนักงาน
+                      </Badge>
+                    )}
                   </CardTitle>
+                  {compact && (
+                    <p className="text-xs text-muted-foreground">
+                      {group.payments.length} รายการ
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-orange-600">
+                  <p className={`font-semibold text-orange-600 ${compact ? "text-base" : "text-lg"}`}>
                     ฿{group.totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {group.payments.length} รายการ
-                  </p>
+                  {!compact && (
+                    <p className="text-xs text-muted-foreground">
+                      {group.payments.length} รายการ
+                    </p>
+                  )}
                 </div>
                 <Button
                   size="sm"
@@ -132,8 +143,8 @@ export function SettlementGroupCard({
           </CardHeader>
 
           <CollapsibleContent>
-            <CardContent className="pt-0">
-              <div className="border rounded-lg divide-y">
+            <CardContent className={compact ? "pt-0 px-3 pb-3" : "pt-0"}>
+              <div className="border rounded-lg divide-y bg-background">
                 {group.payments.map((payment) => (
                   <div
                     key={payment.id}
