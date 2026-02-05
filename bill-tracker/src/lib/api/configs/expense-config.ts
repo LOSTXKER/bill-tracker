@@ -81,6 +81,10 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       whtCertUrls: data.whtCertUrls || [],
       otherDocUrls: data.otherDocUrls || [],
       referenceUrls: data.referenceUrls || [],
+      // WHT delivery method (override from contact)
+      whtDeliveryMethod: data.whtDeliveryMethod || null,
+      whtDeliveryEmail: data.whtDeliveryEmail || null,
+      whtDeliveryNotes: data.whtDeliveryNotes || null,
     };
   },
   
@@ -132,6 +136,11 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.otherDocUrls !== undefined) {
       updateData.otherDocUrls = data.otherDocUrls;
     }
+    
+    // WHT delivery method (override from contact)
+    if (data.whtDeliveryMethod !== undefined) updateData.whtDeliveryMethod = data.whtDeliveryMethod || null;
+    if (data.whtDeliveryEmail !== undefined) updateData.whtDeliveryEmail = data.whtDeliveryEmail || null;
+    if (data.whtDeliveryNotes !== undefined) updateData.whtDeliveryNotes = data.whtDeliveryNotes || null;
     
     // ==========================================================================
     // WHT Change Validation & Auto-adjust workflow status
@@ -207,16 +216,25 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
         });
 
         // Always update defaults to the latest transaction values
+        const updateData: any = {
+          defaultVatRate: item.vatRate,
+          defaultWhtEnabled: item.isWht,
+          defaultWhtRate: item.whtRate,
+          defaultWhtType: item.whtType,
+          descriptionTemplate: item.description,
+          defaultsLastUpdatedAt: new Date(),
+        };
+
+        // Update delivery preferences if requested
+        if (body.updateContactDelivery && item.whtDeliveryMethod) {
+          updateData.preferredDeliveryMethod = item.whtDeliveryMethod;
+          updateData.deliveryEmail = item.whtDeliveryEmail || null;
+          updateData.deliveryNotes = item.whtDeliveryNotes || null;
+        }
+
         await prisma.contact.update({
           where: { id: item.contactId },
-          data: {
-            defaultVatRate: item.vatRate,
-            defaultWhtEnabled: item.isWht,
-            defaultWhtRate: item.whtRate,
-            defaultWhtType: item.whtType,
-            descriptionTemplate: item.description,
-            defaultsLastUpdatedAt: new Date(),
-          },
+          data: updateData,
         });
       } catch (error) {
         // Log error but don't throw - defaults update should not break the main flow
@@ -392,6 +410,22 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
             });
           }
         }
+      }
+    }
+
+    // Update contact delivery preferences if requested
+    if (body.updateContactDelivery && item.contactId && item.whtDeliveryMethod) {
+      try {
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: {
+            preferredDeliveryMethod: item.whtDeliveryMethod,
+            deliveryEmail: item.whtDeliveryEmail || null,
+            deliveryNotes: item.whtDeliveryNotes || null,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to update contact delivery preferences:", error);
       }
     }
   },

@@ -49,6 +49,10 @@ interface ExpenseItem {
   whtAmount: number;
   whtRate: number;
   whtCertUrls: string[];
+  // Expense-level delivery method (override)
+  whtDeliveryMethod?: string | null;
+  whtDeliveryEmail?: string | null;
+  whtDeliveryNotes?: string | null;
 }
 
 interface ContactGroup {
@@ -345,37 +349,59 @@ export default function WhtDeliveriesPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {group.expenses.map((expense) => (
-                              <tr 
-                                key={expense.id}
-                                className="border-t hover:bg-muted/30 cursor-pointer"
-                                onClick={() => toggleExpense(expense.id)}
-                              >
-                                <td className="p-2">
-                                  <Checkbox
-                                    checked={selectedExpenses.has(expense.id)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onCheckedChange={() => toggleExpense(expense.id)}
-                                  />
-                                </td>
-                                <td className="p-2">{formatDate(expense.billDate)}</td>
-                                <td className="p-2">
-                                  <span 
-                                    className="hover:underline text-primary cursor-pointer"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/${companyCode}/expenses/${expense.id}`);
-                                    }}
-                                  >
-                                    {expense.description || "-"}
-                                  </span>
-                                </td>
-                                <td className="p-2 text-right">{expense.whtRate}%</td>
-                                <td className="p-2 text-right font-medium">
-                                  {formatCurrency(expense.whtAmount)}
-                                </td>
-                              </tr>
-                            ))}
+                            {group.expenses.map((expense) => {
+                              // Check if expense has its own delivery method
+                              const expenseDeliveryInfo = expense.whtDeliveryMethod 
+                                ? getDeliveryMethod(expense.whtDeliveryMethod) 
+                                : null;
+                              
+                              return (
+                                <tr 
+                                  key={expense.id}
+                                  className="border-t hover:bg-muted/30 cursor-pointer"
+                                  onClick={() => toggleExpense(expense.id)}
+                                >
+                                  <td className="p-2">
+                                    <Checkbox
+                                      checked={selectedExpenses.has(expense.id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onCheckedChange={() => toggleExpense(expense.id)}
+                                    />
+                                  </td>
+                                  <td className="p-2">{formatDate(expense.billDate)}</td>
+                                  <td className="p-2">
+                                    <div>
+                                      <span 
+                                        className="hover:underline text-primary cursor-pointer"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          router.push(`/${companyCode}/expenses/${expense.id}`);
+                                        }}
+                                      >
+                                        {expense.description || "-"}
+                                      </span>
+                                      {/* Show expense-specific delivery method if set */}
+                                      {expenseDeliveryInfo && (() => {
+                                        const Icon = expenseDeliveryInfo.Icon;
+                                        return (
+                                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                                            <Icon className="h-3 w-3" />
+                                            <span>{expenseDeliveryInfo.label}</span>
+                                            {expense.whtDeliveryMethod === "email" && expense.whtDeliveryEmail && (
+                                              <span>({expense.whtDeliveryEmail})</span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 text-right">{expense.whtRate}%</td>
+                                  <td className="p-2 text-right font-medium">
+                                    {formatCurrency(expense.whtAmount)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

@@ -32,6 +32,11 @@ export interface UseTransactionSubmissionProps {
   referenceUrls: string[];
   payers: PayerInfo[];
   internalCompanyId: string | null;
+  // WHT delivery method fields (expense only)
+  whtDeliveryMethod?: string | null;
+  whtDeliveryEmail?: string | null;
+  whtDeliveryNotes?: string | null;
+  updateContactDelivery?: boolean;
   watch: UseFormWatch<any>;
   reset: UseFormReset<any>;
   transaction: any | null;
@@ -56,6 +61,10 @@ export function useTransactionSubmission({
   referenceUrls,
   payers,
   internalCompanyId,
+  whtDeliveryMethod,
+  whtDeliveryEmail,
+  whtDeliveryNotes,
+  updateContactDelivery,
   watch,
   reset,
   transaction,
@@ -139,6 +148,13 @@ export function useTransactionSubmission({
           // Include payers and internal company for expense type
           ...(config.type === "expense" && payers.length > 0 ? { payers } : {}),
           ...(config.type === "expense" && internalCompanyId ? { internalCompanyId } : {}),
+          // Include WHT delivery method for expense type
+          ...(config.type === "expense" ? { 
+            whtDeliveryMethod: whtDeliveryMethod || null,
+            whtDeliveryEmail: whtDeliveryEmail || null,
+            whtDeliveryNotes: whtDeliveryNotes || null,
+            updateContactDelivery: updateContactDelivery || false,
+          } : {}),
           ...fileData,
         }),
       });
@@ -198,6 +214,13 @@ export function useTransactionSubmission({
           referenceUrls: referenceUrls.length > 0 ? referenceUrls : [],
           // Include payers and internal company for expense type
           ...(config.type === "expense" ? { payers, internalCompanyId: internalCompanyId || null } : {}),
+          // Include WHT delivery method for expense type
+          ...(config.type === "expense" ? {
+            whtDeliveryMethod: whtDeliveryMethod || null,
+            whtDeliveryEmail: whtDeliveryEmail || null,
+            whtDeliveryNotes: whtDeliveryNotes || null,
+            updateContactDelivery: updateContactDelivery || false,
+          } : {}),
         }),
       });
 

@@ -26,7 +26,19 @@ export const GET = withCompanyAccessFromParams(
         hasWhtCert: true,
         workflowStatus: "WHT_ISSUED", // Issued but not sent yet
       },
-      include: {
+      select: {
+        id: true,
+        billDate: true,
+        description: true,
+        amount: true,
+        whtAmount: true,
+        whtRate: true,
+        whtCertUrls: true,
+        contactId: true,
+        // Expense-level delivery method fields
+        whtDeliveryMethod: true,
+        whtDeliveryEmail: true,
+        whtDeliveryNotes: true,
         Contact: {
           select: {
             id: true,
@@ -57,14 +69,22 @@ export const GET = withCompanyAccessFromParams(
         const contactId = expense.contactId || "no-contact";
         const contactName = expense.contact?.name || "ไม่ระบุผู้ติดต่อ";
         
+        // Use expense-level delivery method if set, otherwise fall back to contact's preference
+        const expenseDeliveryMethod = expense.whtDeliveryMethod || expense.contact?.preferredDeliveryMethod || null;
+        const expenseDeliveryEmail = expense.whtDeliveryMethod === "email" 
+          ? (expense.whtDeliveryEmail || expense.contact?.deliveryEmail || expense.contact?.email)
+          : (expense.contact?.deliveryEmail || expense.contact?.email);
+        const expenseDeliveryNotes = expense.whtDeliveryNotes || expense.contact?.deliveryNotes || null;
+        
         if (!acc[contactId]) {
           acc[contactId] = {
             contactId,
             contactName,
             contact: expense.contact,
-            deliveryMethod: expense.contact?.preferredDeliveryMethod || null,
-            deliveryEmail: expense.contact?.deliveryEmail || expense.contact?.email || null,
-            deliveryNotes: expense.contact?.deliveryNotes || null,
+            // Initial delivery method from first expense (may be updated per-expense)
+            deliveryMethod: expenseDeliveryMethod,
+            deliveryEmail: expenseDeliveryEmail || null,
+            deliveryNotes: expenseDeliveryNotes,
             expenses: [],
             totalAmount: 0,
             totalWhtAmount: 0,
@@ -80,6 +100,10 @@ export const GET = withCompanyAccessFromParams(
           whtAmount: expense.whtAmount,
           whtRate: expense.whtRate,
           whtCertUrls: expense.whtCertUrls,
+          // Include expense-level delivery method for per-expense display
+          whtDeliveryMethod: expense.whtDeliveryMethod,
+          whtDeliveryEmail: expense.whtDeliveryEmail,
+          whtDeliveryNotes: expense.whtDeliveryNotes,
         });
         acc[contactId].totalAmount += Number(expense.amount) || 0;
         acc[contactId].totalWhtAmount += Number(expense.whtAmount) || 0;

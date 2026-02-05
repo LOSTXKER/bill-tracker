@@ -220,6 +220,10 @@ export interface ExpenseFormData extends BaseTransactionFormData {
   dueDate?: Date;
   status: ExpenseDocStatus;
   internalCompanyId?: string; // บริษัทภายใน (ถ้าต่างจากบริษัทที่บันทึก)
+  // WHT delivery method (override from contact)
+  whtDeliveryMethod?: string | null;
+  whtDeliveryEmail?: string | null;
+  whtDeliveryNotes?: string | null;
 }
 
 export interface IncomeFormData extends BaseTransactionFormData {

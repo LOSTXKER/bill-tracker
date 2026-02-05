@@ -300,6 +300,10 @@ model Expense {
   submittedBy                                String?
   // Internal company tracking (บริษัทจริงภายใน - ถ้าต่างจากที่บันทึก)
   internalCompanyId                          String?
+  // วิธีส่งใบหัก ณ ที่จ่าย (Override จาก Contact)
+  whtDeliveryMethod                          String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
+  whtDeliveryEmail                           String? // อีเมลสำหรับส่ง WHT (ถ้าวิธีส่งเป็น email)
+  whtDeliveryNotes                           String? // หมายเหตุการส่ง WHT
   Comment                                    Comment[]
   DocumentEvent                              DocumentEvent[]
   Account                                    Account?               @relation(fields: [accountId], references: [id])

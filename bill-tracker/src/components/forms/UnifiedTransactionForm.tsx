@@ -266,6 +266,12 @@ export function UnifiedTransactionForm({
   const [fetchedCompanies, setFetchedCompanies] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [internalCompanyId, setInternalCompanyId] = useState<string | null>(null);
   
+  // WHT delivery method (expense only)
+  const [whtDeliveryMethod, setWhtDeliveryMethod] = useState<string | null>(null);
+  const [whtDeliveryEmail, setWhtDeliveryEmail] = useState<string | null>(null);
+  const [whtDeliveryNotes, setWhtDeliveryNotes] = useState<string | null>(null);
+  const [updateContactDelivery, setUpdateContactDelivery] = useState(false);
+  
   // Use context companies if available, otherwise fetch from API
   const accessibleCompanies = contextCompanies.length > 0 
     ? contextCompanies 
@@ -343,6 +349,23 @@ export function UnifiedTransactionForm({
   useEffect(() => {
     setDefaultsSuggestionDismissed(false);
   }, [selectedContact?.id]);
+
+  // Auto-fill WHT delivery method from contact when contact is selected (expense only, create mode)
+  useEffect(() => {
+    if (config.type !== "expense" || mode !== "create") return;
+    if (!selectedContact) return;
+    
+    // Auto-fill delivery method from contact's preference
+    if (selectedContact.preferredDeliveryMethod && !whtDeliveryMethod) {
+      setWhtDeliveryMethod(selectedContact.preferredDeliveryMethod);
+      if (selectedContact.deliveryEmail) {
+        setWhtDeliveryEmail(selectedContact.deliveryEmail);
+      }
+      if (selectedContact.deliveryNotes) {
+        setWhtDeliveryNotes(selectedContact.deliveryNotes);
+      }
+    }
+  }, [selectedContact, config.type, mode, whtDeliveryMethod]);
 
 
   // Account
@@ -452,6 +475,10 @@ export function UnifiedTransactionForm({
     referenceUrls,
     payers,
     internalCompanyId,
+    whtDeliveryMethod,
+    whtDeliveryEmail,
+    whtDeliveryNotes,
+    updateContactDelivery,
     watch,
     reset,
     transaction,
@@ -549,6 +576,17 @@ export function UnifiedTransactionForm({
     // Set internal company (expense only)
     if (data.internalCompanyId) {
       setInternalCompanyId(data.internalCompanyId);
+    }
+
+    // Set WHT delivery method (expense only)
+    if (data.whtDeliveryMethod) {
+      setWhtDeliveryMethod(data.whtDeliveryMethod);
+    }
+    if (data.whtDeliveryEmail) {
+      setWhtDeliveryEmail(data.whtDeliveryEmail);
+    }
+    if (data.whtDeliveryNotes) {
+      setWhtDeliveryNotes(data.whtDeliveryNotes);
     }
 
     // Set categorized files (normalize other docs for backward compatibility)
@@ -1218,6 +1256,15 @@ export function UnifiedTransactionForm({
                     internalCompanyId={internalCompanyId}
                     onInternalCompanyChange={config.type === "expense" ? setInternalCompanyId : undefined}
                     accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
+                    isWht={watchIsWht || false}
+                    whtDeliveryMethod={whtDeliveryMethod}
+                    onWhtDeliveryMethodChange={config.type === "expense" ? setWhtDeliveryMethod : undefined}
+                    whtDeliveryEmail={whtDeliveryEmail}
+                    onWhtDeliveryEmailChange={config.type === "expense" ? setWhtDeliveryEmail : undefined}
+                    whtDeliveryNotes={whtDeliveryNotes}
+                    onWhtDeliveryNotesChange={config.type === "expense" ? setWhtDeliveryNotes : undefined}
+                    updateContactDelivery={updateContactDelivery}
+                    onUpdateContactDeliveryChange={config.type === "expense" ? setUpdateContactDelivery : undefined}
                     onAiSuggestAccount={(suggestion) => {
                       setAccountSuggestion({
                         accountId: suggestion.accountId,
@@ -1228,7 +1275,6 @@ export function UnifiedTransactionForm({
                         alternatives: suggestion.alternatives,
                       });
                     }}
-                    isWht={watchIsWht || false}
                   />
 
                   {/* Contact Defaults Suggestion */}
@@ -1410,6 +1456,15 @@ export function UnifiedTransactionForm({
                     internalCompanyId={internalCompanyId}
                     onInternalCompanyChange={config.type === "expense" && mode === "edit" ? setInternalCompanyId : undefined}
                     accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
+                    isWht={config.type === "expense" ? transaction?.isWht : transaction?.isWhtDeducted}
+                    whtDeliveryMethod={whtDeliveryMethod}
+                    onWhtDeliveryMethodChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryMethod : undefined}
+                    whtDeliveryEmail={whtDeliveryEmail}
+                    onWhtDeliveryEmailChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryEmail : undefined}
+                    whtDeliveryNotes={whtDeliveryNotes}
+                    onWhtDeliveryNotesChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryNotes : undefined}
+                    updateContactDelivery={updateContactDelivery}
+                    onUpdateContactDeliveryChange={config.type === "expense" && mode === "edit" ? setUpdateContactDelivery : undefined}
                     onAiSuggestAccount={mode === "edit" ? (suggestion) => {
                       setAccountSuggestion({
                         accountId: suggestion.accountId,
@@ -1420,7 +1475,6 @@ export function UnifiedTransactionForm({
                         alternatives: suggestion.alternatives,
                       });
                     } : undefined}
-                    isWht={watchIsWht || false}
                   />
 
                   <div className="border-t border-border" />
