@@ -109,13 +109,13 @@ const NEXT_ACTIONS: Record<string, Record<string, ActionConfig>> = {
   income: {
     RECEIVED: {
       action: "issue_invoice",
-      label: "ออกใบกำกับภาษีแล้ว",
+      label: "ออกบิลแล้ว",
       icon: <FileText className="h-4 w-4" />,
       description: "ออกใบกำกับภาษี/ใบเสร็จให้ลูกค้า",
     },
     WAITING_INVOICE_ISSUE: {
       action: "issue_invoice",
-      label: "ออกใบกำกับภาษีแล้ว",
+      label: "ออกบิลแล้ว",
       icon: <FileText className="h-4 w-4" />,
       description: "ออกใบกำกับภาษี/ใบเสร็จให้ลูกค้า",
     },

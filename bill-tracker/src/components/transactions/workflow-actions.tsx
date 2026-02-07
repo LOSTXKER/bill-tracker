@@ -86,13 +86,13 @@ const EXPENSE_ACTIONS: Record<string, ActionConfig[]> = {
 
 const INCOME_ACTIONS: Record<string, ActionConfig[]> = {
   RECEIVED: [
-    { action: "issue_invoice", label: "ออกใบกำกับ", icon: <FileText className="h-4 w-4" />, description: "ออกใบกำกับภาษี/ใบเสร็จให้ลูกค้า" },
+    { action: "issue_invoice", label: "ออกบิล", icon: <FileText className="h-4 w-4" />, description: "ออกใบกำกับภาษี/ใบเสร็จให้ลูกค้า" },
   ],
   NO_INVOICE_NEEDED: [
     { action: "send_to_accounting", label: "ส่งบัญชี", icon: <Send className="h-4 w-4" />, description: "ส่งเอกสารให้ฝ่ายบัญชี" },
   ],
   WAITING_INVOICE_ISSUE: [
-    { action: "issue_invoice", label: "ออกใบกำกับ", icon: <FileText className="h-4 w-4" />, description: "ออกใบกำกับภาษี/ใบเสร็จให้ลูกค้า" },
+    { action: "issue_invoice", label: "ออกบิล", icon: <FileText className="h-4 w-4" />, description: "ออกใบกำกับภาษี/ใบเสร็จให้ลูกค้า" },
   ],
   INVOICE_ISSUED: [
     { action: "send_invoice", label: "ส่งบิลให้ลูกค้า", icon: <Send className="h-4 w-4" />, description: "ส่งใบกำกับภาษีให้ลูกค้าแล้ว" },
