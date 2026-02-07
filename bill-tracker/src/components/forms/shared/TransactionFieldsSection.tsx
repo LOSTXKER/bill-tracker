@@ -432,7 +432,7 @@ export function TransactionFieldsSection({
         {config.descriptionField && (
           <div>
             <p className="text-sm text-muted-foreground mb-1">{config.descriptionField.label}</p>
-            <p className="text-base text-foreground leading-relaxed">
+            <p className="text-base text-foreground leading-relaxed whitespace-pre-wrap">
               {(watch(config.descriptionField.name) as string) || <span className="text-muted-foreground">-</span>}
             </p>
           </div>
@@ -474,7 +474,7 @@ export function TransactionFieldsSection({
                   );
                 })()}
                 {displayNotes && (
-                  <p className="text-muted-foreground pl-6">
+                  <p className="text-muted-foreground pl-6 whitespace-pre-wrap">
                     {displayNotes}
                   </p>
                 )}

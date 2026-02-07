@@ -505,7 +505,7 @@ export function TransactionPreviewSheet({
                         <p className="text-xs text-muted-foreground">
                           {transactionType === "expense" ? "รายละเอียด" : "แหล่งที่มา"}
                         </p>
-                        <p className="font-medium">{transactionType === "expense" ? data.description : data.source}</p>
+                        <p className="font-medium whitespace-pre-wrap">{transactionType === "expense" ? data.description : data.source}</p>
                       </div>
                     )}
 
@@ -529,7 +529,7 @@ export function TransactionPreviewSheet({
                     {data.notes && (
                       <div className="col-span-2">
                         <p className="text-xs text-muted-foreground">หมายเหตุ</p>
-                        <p className="font-medium text-muted-foreground">{data.notes}</p>
+                        <p className="font-medium text-muted-foreground whitespace-pre-wrap">{data.notes}</p>
                       </div>
                     )}
 

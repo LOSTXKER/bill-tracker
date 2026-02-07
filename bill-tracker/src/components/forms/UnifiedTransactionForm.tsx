@@ -1527,7 +1527,7 @@ export function UnifiedTransactionForm({
                         className="bg-muted/30 resize-none"
                       />
                     ) : (
-                      <p className="text-muted-foreground">
+                      <p className="text-muted-foreground whitespace-pre-wrap">
                         {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
                       </p>
                     )}
