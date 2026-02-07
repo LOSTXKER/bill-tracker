@@ -38,17 +38,7 @@ export async function handleTextMessage(
     return;
   }
 
-  // Default: Unknown command
-  await replyToLine(
-    replyToken,
-    [
-      {
-        type: "text",
-        text: '❓ ไม่เข้าใจคำสั่ง\n\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้',
-      },
-    ],
-    channelAccessToken
-  );
+  // Default: Ignore unknown messages (do not reply)
 }
 
 /**
