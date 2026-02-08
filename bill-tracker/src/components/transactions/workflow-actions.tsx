@@ -29,6 +29,8 @@ import {
   CheckCircle,
   Bell,
   ArrowLeft,
+  Clock,
+  Undo2,
 } from "lucide-react";
 import { getPreviousStatus, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
 import { DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
@@ -43,6 +45,7 @@ interface WorkflowActionsProps {
   isWht?: boolean;
   isWhtDeducted?: boolean; // for income type
   documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
+  taxInvoiceRequestedAt?: string | Date | null;
   onActionComplete?: () => void;
   variant?: "default" | "compact";
   isOwner?: boolean; // Owner can revert status
@@ -59,9 +62,11 @@ interface ActionConfig {
 const EXPENSE_ACTIONS: Record<string, ActionConfig[]> = {
   PAID: [
     { action: "receive_tax_invoice", label: "ได้รับเอกสาร", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับเอกสารจากร้านค้าแล้ว" },
+    { action: "mark_tax_invoice_requested", label: "ขอใบกำกับแล้ว", icon: <Clock className="h-4 w-4" />, description: "บันทึกว่าได้ขอใบกำกับจาก Vendor แล้ว" },
   ],
   WAITING_TAX_INVOICE: [
     { action: "receive_tax_invoice", label: "ได้รับเอกสาร", icon: <Receipt className="h-4 w-4" />, description: "บันทึกว่าได้รับเอกสารจากร้านค้าแล้ว" },
+    { action: "mark_tax_invoice_requested", label: "ขอใบกำกับแล้ว", icon: <Clock className="h-4 w-4" />, description: "บันทึกว่าได้ขอใบกำกับจาก Vendor แล้ว" },
   ],
   TAX_INVOICE_RECEIVED: [
     { action: "issue_wht", label: "ออก 50 ทวิแล้ว", icon: <FileText className="h-4 w-4" />, description: "บันทึกว่าออกหนังสือรับรองหัก ณ ที่จ่ายแล้ว" },
@@ -126,6 +131,7 @@ export function WorkflowActions({
   isWht,
   isWhtDeducted,
   documentType = "TAX_INVOICE",
+  taxInvoiceRequestedAt,
   onActionComplete,
   variant = "default",
   isOwner = false,
@@ -201,8 +207,31 @@ export function WorkflowActions({
     if (action.action.includes("wht") && !isWht) {
       return false;
     }
+    // Hide "ขอใบกำกับแล้ว" for non-TAX_INVOICE document types
+    if (action.action === "mark_tax_invoice_requested" && documentType !== "TAX_INVOICE") {
+      return false;
+    }
+    // Hide "ขอใบกำกับแล้ว" if already requested (show cancel instead)
+    if (action.action === "mark_tax_invoice_requested" && !!taxInvoiceRequestedAt) {
+      return false;
+    }
     return true;
   });
+
+  // Add "ยกเลิกการขอใบกำกับ" if tax invoice was already requested
+  if (
+    txType === "expense" &&
+    documentType === "TAX_INVOICE" &&
+    (status === "WAITING_TAX_INVOICE" || status === "PAID") &&
+    !!taxInvoiceRequestedAt
+  ) {
+    filteredActions.push({
+      action: "cancel_tax_invoice_request",
+      label: "ยกเลิกการขอใบกำกับ",
+      icon: <Undo2 className="h-4 w-4" />,
+      description: "ยกเลิกบันทึกการขอใบกำกับ กลับเป็นสถานะรอขอ",
+    });
+  }
 
   const handleAction = async (action: ActionConfig) => {
     if (action.requiresConfirm) {
@@ -217,6 +246,54 @@ export function WorkflowActions({
     const toastId = toast.loading("กำลังดำเนินการ...");
     
     try {
+      // Special handling for cancel tax invoice request
+      if (action === "cancel_tax_invoice_request") {
+        const res = await fetch(`/api/${companyCode}/tax-invoice-follow-ups`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            expenseIds: [transactionId],
+            action: "cancel_requested",
+            notes: actionNotes || notes || undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "เกิดข้อผิดพลาด");
+        }
+
+        toast.success("ยกเลิกการขอใบกำกับสำเร็จ", { id: toastId });
+        setConfirmDialog(null);
+        setNotes("");
+        onActionComplete?.();
+        return;
+      }
+
+      // Special handling for tax invoice request action
+      if (action === "mark_tax_invoice_requested") {
+        const res = await fetch(`/api/${companyCode}/tax-invoice-follow-ups`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            expenseIds: [transactionId],
+            action: "mark_requested",
+            notes: actionNotes || notes || undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || "เกิดข้อผิดพลาด");
+        }
+
+        toast.success("บันทึกการขอใบกำกับสำเร็จ", { id: toastId });
+        setConfirmDialog(null);
+        setNotes("");
+        onActionComplete?.();
+        return;
+      }
+
       // Include delivery method in metadata for send_wht action
       const metadata = action === "send_wht" && deliveryMethod 
         ? { deliveryMethod } 

@@ -175,6 +175,10 @@ export interface ContactSummary {
   preferredDeliveryMethod?: string | null;
   deliveryEmail?: string | null;
   deliveryNotes?: string | null;
+  // Tax Invoice Request preferences
+  taxInvoiceRequestMethod?: string | null;
+  taxInvoiceRequestEmail?: string | null;
+  taxInvoiceRequestNotes?: string | null;
 }
 
 export interface CategorySummary {

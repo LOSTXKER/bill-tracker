@@ -10,6 +10,7 @@ export interface SidebarBadges {
   pendingApprovals: number;
   pendingReimbursements: number;
   pendingSettlements: number;
+  pendingTaxInvoices: number;
   pendingWhtDeliveries: number;
   unreadNotifications: number;
 }
@@ -35,6 +36,7 @@ export function useSidebarBadges(
     pendingApprovals: 0,
     pendingReimbursements: 0,
     pendingSettlements: 0,
+    pendingTaxInvoices: 0,
     pendingWhtDeliveries: 0,
     unreadNotifications: 0,
   });

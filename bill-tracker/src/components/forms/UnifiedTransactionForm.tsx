@@ -33,9 +33,12 @@ import {
   Calendar,
   User,
   AlertCircle,
+  Phone,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
 
 // Hooks
 import { useContacts } from "@/hooks/use-contacts";
@@ -272,6 +275,12 @@ export function UnifiedTransactionForm({
   const [whtDeliveryNotes, setWhtDeliveryNotes] = useState<string | null>(null);
   const [updateContactDelivery, setUpdateContactDelivery] = useState(false);
   
+  // Tax invoice request method (expense only)
+  const [taxInvoiceRequestMethod, setTaxInvoiceRequestMethod] = useState<string | null>(null);
+  const [taxInvoiceRequestEmail, setTaxInvoiceRequestEmail] = useState<string | null>(null);
+  const [taxInvoiceRequestNotes, setTaxInvoiceRequestNotes] = useState<string | null>(null);
+  const [updateContactTaxInvoiceRequest, setUpdateContactTaxInvoiceRequest] = useState(false);
+  
   // Use context companies if available, otherwise fetch from API
   const accessibleCompanies = contextCompanies.length > 0 
     ? contextCompanies 
@@ -367,6 +376,22 @@ export function UnifiedTransactionForm({
     }
   }, [selectedContact, config.type, mode, whtDeliveryMethod]);
 
+  // Auto-fill tax invoice request method from contact when contact is selected (expense only, create mode)
+  useEffect(() => {
+    if (config.type !== "expense" || mode !== "create") return;
+    if (!selectedContact) return;
+    
+    // Auto-fill tax invoice request method from contact's preference
+    if (selectedContact.taxInvoiceRequestMethod && !taxInvoiceRequestMethod) {
+      setTaxInvoiceRequestMethod(selectedContact.taxInvoiceRequestMethod);
+      if (selectedContact.taxInvoiceRequestEmail) {
+        setTaxInvoiceRequestEmail(selectedContact.taxInvoiceRequestEmail);
+      }
+      if (selectedContact.taxInvoiceRequestNotes) {
+        setTaxInvoiceRequestNotes(selectedContact.taxInvoiceRequestNotes);
+      }
+    }
+  }, [selectedContact, config.type, mode, taxInvoiceRequestMethod]);
 
   // Account
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
@@ -479,6 +504,10 @@ export function UnifiedTransactionForm({
     whtDeliveryEmail,
     whtDeliveryNotes,
     updateContactDelivery,
+    taxInvoiceRequestMethod,
+    taxInvoiceRequestEmail,
+    taxInvoiceRequestNotes,
+    updateContactTaxInvoiceRequest,
     watch,
     reset,
     transaction,
@@ -587,6 +616,17 @@ export function UnifiedTransactionForm({
     }
     if (data.whtDeliveryNotes) {
       setWhtDeliveryNotes(data.whtDeliveryNotes);
+    }
+
+    // Set tax invoice request method (expense only)
+    if (data.taxInvoiceRequestMethod) {
+      setTaxInvoiceRequestMethod(data.taxInvoiceRequestMethod);
+    }
+    if (data.taxInvoiceRequestEmail) {
+      setTaxInvoiceRequestEmail(data.taxInvoiceRequestEmail);
+    }
+    if (data.taxInvoiceRequestNotes) {
+      setTaxInvoiceRequestNotes(data.taxInvoiceRequestNotes);
     }
 
     // Set categorized files (normalize other docs for backward compatibility)
@@ -1159,6 +1199,7 @@ export function UnifiedTransactionForm({
                       isWht={config.type === "expense" ? transaction.isWht : undefined}
                       isWhtDeducted={config.type === "income" ? transaction.isWhtDeducted : undefined}
                       documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") : undefined}
+                      taxInvoiceRequestedAt={config.type === "expense" ? (transaction.taxInvoiceRequestedAt as string | null | undefined) : undefined}
                       onActionComplete={() => {
                         refreshAll();
                       }}
@@ -1193,9 +1234,60 @@ export function UnifiedTransactionForm({
                 isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
                 approvalStatus={transaction.approvalStatus as ApprovalStatus | undefined}
                 documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT" | undefined) : undefined}
+                taxInvoiceRequestedAt={config.type === "expense" ? (transaction.taxInvoiceRequestedAt as string | null | undefined) : undefined}
               />
             </div>
           )}
+
+          {/* Tax Invoice Request Info Banner - shown when WAITING_TAX_INVOICE */}
+          {config.type === "expense" && transaction?.workflowStatus === "WAITING_TAX_INVOICE" && (() => {
+            const method = taxInvoiceRequestMethod || selectedContact?.taxInvoiceRequestMethod;
+            const email = taxInvoiceRequestMethod === "email"
+              ? (taxInvoiceRequestEmail || selectedContact?.taxInvoiceRequestEmail || selectedContact?.email)
+              : (selectedContact?.taxInvoiceRequestEmail || selectedContact?.email);
+            const notes = taxInvoiceRequestNotes || selectedContact?.taxInvoiceRequestNotes;
+            const phone = selectedContact?.phone;
+            const methodInfo = getDeliveryMethod(method);
+
+            return (
+              <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-300 dark:border-orange-700 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
+                    รอใบกำกับภาษี — ช่องทางติดต่อ
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {methodInfo ? (() => {
+                    const Icon = methodInfo.Icon;
+                    return (
+                      <span className="flex items-center gap-1.5 font-medium text-orange-800 dark:text-orange-200">
+                        <Icon className="h-4 w-4" />
+                        {methodInfo.label}
+                        {method === "email" && email && (
+                          <span className="font-normal text-orange-700 dark:text-orange-300">({email})</span>
+                        )}
+                      </span>
+                    );
+                  })() : (
+                    <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="h-4 w-4" />
+                      ยังไม่ระบุช่องทาง
+                    </span>
+                  )}
+                  {phone && (
+                    <span className="flex items-center gap-1 text-orange-700 dark:text-orange-300">
+                      <Phone className="h-3.5 w-3.5" />
+                      {phone}
+                    </span>
+                  )}
+                  {notes && (
+                    <span className="text-orange-700 dark:text-orange-300">• {notes}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1265,6 +1357,14 @@ export function UnifiedTransactionForm({
                     onWhtDeliveryNotesChange={config.type === "expense" ? setWhtDeliveryNotes : undefined}
                     updateContactDelivery={updateContactDelivery}
                     onUpdateContactDeliveryChange={config.type === "expense" ? setUpdateContactDelivery : undefined}
+                    taxInvoiceRequestMethod={taxInvoiceRequestMethod}
+                    onTaxInvoiceRequestMethodChange={config.type === "expense" ? setTaxInvoiceRequestMethod : undefined}
+                    taxInvoiceRequestEmail={taxInvoiceRequestEmail}
+                    onTaxInvoiceRequestEmailChange={config.type === "expense" ? setTaxInvoiceRequestEmail : undefined}
+                    taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+                    onTaxInvoiceRequestNotesChange={config.type === "expense" ? setTaxInvoiceRequestNotes : undefined}
+                    updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
+                    onUpdateContactTaxInvoiceRequestChange={config.type === "expense" ? setUpdateContactTaxInvoiceRequest : undefined}
                     onAiSuggestAccount={(suggestion) => {
                       setAccountSuggestion({
                         accountId: suggestion.accountId,
@@ -1465,6 +1565,14 @@ export function UnifiedTransactionForm({
                     onWhtDeliveryNotesChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryNotes : undefined}
                     updateContactDelivery={updateContactDelivery}
                     onUpdateContactDeliveryChange={config.type === "expense" && mode === "edit" ? setUpdateContactDelivery : undefined}
+                    taxInvoiceRequestMethod={taxInvoiceRequestMethod}
+                    onTaxInvoiceRequestMethodChange={config.type === "expense" && mode === "edit" ? setTaxInvoiceRequestMethod : undefined}
+                    taxInvoiceRequestEmail={taxInvoiceRequestEmail}
+                    onTaxInvoiceRequestEmailChange={config.type === "expense" && mode === "edit" ? setTaxInvoiceRequestEmail : undefined}
+                    taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+                    onTaxInvoiceRequestNotesChange={config.type === "expense" && mode === "edit" ? setTaxInvoiceRequestNotes : undefined}
+                    updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
+                    onUpdateContactTaxInvoiceRequestChange={config.type === "expense" && mode === "edit" ? setUpdateContactTaxInvoiceRequest : undefined}
                     onAiSuggestAccount={mode === "edit" ? (suggestion) => {
                       setAccountSuggestion({
                         accountId: suggestion.accountId,

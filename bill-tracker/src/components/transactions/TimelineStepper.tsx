@@ -15,6 +15,7 @@ interface TimelineStepperProps {
   isWht?: boolean;
   approvalStatus?: ApprovalStatus;
   documentType?: ExpenseDocumentType;
+  taxInvoiceRequestedAt?: string | Date | null;
   className?: string;
 }
 
@@ -141,10 +142,14 @@ export function TimelineStepper({
   isWht = false,
   approvalStatus,
   documentType,
+  taxInvoiceRequestedAt,
   className,
 }: TimelineStepperProps) {
   // Check if still in DRAFT status
   const isDraft = currentStatus === "DRAFT";
+  
+  // Check if tax invoice has been requested (for WAITING_TAX_INVOICE status)
+  const isRequested = currentStatus === "WAITING_TAX_INVOICE" && !!taxInvoiceRequestedAt;
   
   // Get base steps based on type, WHT, and document type
   const getExpenseSteps = (): Step[] => {
@@ -200,6 +205,12 @@ export function TimelineStepper({
             const isCompleted = index < currentIndex;
             const isCurrent = index === currentIndex;
             const isPending = index > currentIndex;
+            // Determine label: override for "requested" state
+            const displayLabel = isCurrent && isRequested
+              ? "ขอใบกำกับแล้ว"
+              : isCurrent && isRejected
+                ? "ถูกปฏิเสธ"
+                : step.label;
 
             return (
               <React.Fragment key={step.key}>
@@ -211,7 +222,8 @@ export function TimelineStepper({
                       "w-8 h-8 rounded-full flex items-center justify-center transition-all",
                       isCompleted && "bg-emerald-500 text-white",
                       isCurrent && !isWaiting && !isRejected && "bg-primary text-white ring-2 ring-primary/20",
-                      isCurrent && isWaiting && !isRejected && "bg-amber-500 text-white ring-2 ring-amber-500/20",
+                      isCurrent && isWaiting && isRequested && !isRejected && "bg-orange-500 text-white ring-2 ring-orange-500/20",
+                      isCurrent && isWaiting && !isRequested && !isRejected && "bg-amber-500 text-white ring-2 ring-amber-500/20",
                       isCurrent && isRejected && "bg-red-500 text-white ring-2 ring-red-500/20",
                       isPending && "bg-muted text-muted-foreground border border-border"
                     )}
@@ -231,12 +243,13 @@ export function TimelineStepper({
                       "text-xs font-medium text-center whitespace-nowrap",
                       isCompleted && "text-emerald-600 dark:text-emerald-400",
                       isCurrent && !isWaiting && !isRejected && "text-primary font-semibold",
-                      isCurrent && isWaiting && !isRejected && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isCurrent && isWaiting && isRequested && !isRejected && "text-orange-600 dark:text-orange-400 font-semibold",
+                      isCurrent && isWaiting && !isRequested && !isRejected && "text-amber-600 dark:text-amber-400 font-semibold",
                       isCurrent && isRejected && "text-red-600 dark:text-red-400 font-semibold",
                       isPending && "text-slate-400 dark:text-slate-500"
                     )}
                   >
-                    {isCurrent && isRejected ? "ถูกปฏิเสธ" : step.label}
+                    {displayLabel}
                   </span>
                 </div>
 
@@ -248,8 +261,13 @@ export function TimelineStepper({
                         "h-full rounded-full transition-all",
                         index < currentIndex 
                           ? "bg-emerald-500" 
-                          : "bg-border"
+                          : isCurrent && isRequested
+                            ? "bg-orange-400 dark:bg-orange-500"
+                            : "bg-border"
                       )}
+                      style={isCurrent && isRequested ? {
+                        backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 4px, var(--color-background, white) 4px, var(--color-background, white) 8px)",
+                      } : undefined}
                     />
                   </div>
                 )}
@@ -267,7 +285,7 @@ export function TimelineStepper({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
-                  isRejected ? "bg-red-500" : isWaiting ? "bg-amber-500" : "bg-emerald-500"
+                  isRejected ? "bg-red-500" : isRequested ? "bg-orange-500" : isWaiting ? "bg-amber-500" : "bg-emerald-500"
                 )}
                 style={{
                   width: `${Math.max(0, (currentIndex / (steps.length - 1)) * 100)}%`
@@ -282,6 +300,12 @@ export function TimelineStepper({
               const isCompleted = index < currentIndex;
               const isCurrent = index === currentIndex;
               const isPending = index > currentIndex;
+              // Determine mobile label: override for "requested" state
+              const mobileLabel = isCurrent && isRequested
+                ? "ขอใบกำกับแล้ว"
+                : isCurrent && isRejected
+                  ? "ปฏิเสธ"
+                  : step.label.split("แล้ว")[0];
 
               return (
                 <div key={step.key} className="flex flex-col items-center gap-1.5 flex-1">
@@ -290,7 +314,8 @@ export function TimelineStepper({
                       "w-8 h-8 rounded-full flex items-center justify-center transition-all",
                       isCompleted && "bg-emerald-500 text-white",
                       isCurrent && !isWaiting && !isRejected && "bg-primary text-white ring-2 ring-primary/30",
-                      isCurrent && isWaiting && !isRejected && "bg-amber-500 text-white ring-2 ring-amber-500/30",
+                      isCurrent && isWaiting && isRequested && !isRejected && "bg-orange-500 text-white ring-2 ring-orange-500/30",
+                      isCurrent && isWaiting && !isRequested && !isRejected && "bg-amber-500 text-white ring-2 ring-amber-500/30",
                       isCurrent && isRejected && "bg-red-500 text-white ring-2 ring-red-500/30",
                       isPending && "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500"
                     )}
@@ -308,12 +333,13 @@ export function TimelineStepper({
                       "text-[10px] font-medium text-center leading-tight px-0.5",
                       isCompleted && "text-emerald-600 dark:text-emerald-400",
                       isCurrent && !isWaiting && !isRejected && "text-primary font-semibold",
-                      isCurrent && isWaiting && !isRejected && "text-amber-600 dark:text-amber-400 font-semibold",
+                      isCurrent && isWaiting && isRequested && !isRejected && "text-orange-600 dark:text-orange-400 font-semibold",
+                      isCurrent && isWaiting && !isRequested && !isRejected && "text-amber-600 dark:text-amber-400 font-semibold",
                       isCurrent && isRejected && "text-red-600 dark:text-red-400 font-semibold",
                       isPending && "text-slate-400 dark:text-slate-500"
                     )}
                   >
-                    {isCurrent && isRejected ? "ปฏิเสธ" : step.label.split("แล้ว")[0]}
+                    {mobileLabel}
                   </span>
                 </div>
               );

@@ -37,6 +37,11 @@ export interface UseTransactionSubmissionProps {
   whtDeliveryEmail?: string | null;
   whtDeliveryNotes?: string | null;
   updateContactDelivery?: boolean;
+  // Tax invoice request method fields (expense only)
+  taxInvoiceRequestMethod?: string | null;
+  taxInvoiceRequestEmail?: string | null;
+  taxInvoiceRequestNotes?: string | null;
+  updateContactTaxInvoiceRequest?: boolean;
   watch: UseFormWatch<any>;
   reset: UseFormReset<any>;
   transaction: any | null;
@@ -65,6 +70,10 @@ export function useTransactionSubmission({
   whtDeliveryEmail,
   whtDeliveryNotes,
   updateContactDelivery,
+  taxInvoiceRequestMethod,
+  taxInvoiceRequestEmail,
+  taxInvoiceRequestNotes,
+  updateContactTaxInvoiceRequest,
   watch,
   reset,
   transaction,
@@ -155,6 +164,13 @@ export function useTransactionSubmission({
             whtDeliveryNotes: whtDeliveryNotes || null,
             updateContactDelivery: updateContactDelivery || false,
           } : {}),
+          // Include tax invoice request method for expense type
+          ...(config.type === "expense" ? {
+            taxInvoiceRequestMethod: taxInvoiceRequestMethod || null,
+            taxInvoiceRequestEmail: taxInvoiceRequestEmail || null,
+            taxInvoiceRequestNotes: taxInvoiceRequestNotes || null,
+            updateContactTaxInvoiceRequest: updateContactTaxInvoiceRequest || false,
+          } : {}),
           ...fileData,
         }),
       });
@@ -220,6 +236,13 @@ export function useTransactionSubmission({
             whtDeliveryEmail: whtDeliveryEmail || null,
             whtDeliveryNotes: whtDeliveryNotes || null,
             updateContactDelivery: updateContactDelivery || false,
+          } : {}),
+          // Include tax invoice request method for expense type
+          ...(config.type === "expense" ? {
+            taxInvoiceRequestMethod: taxInvoiceRequestMethod || null,
+            taxInvoiceRequestEmail: taxInvoiceRequestEmail || null,
+            taxInvoiceRequestNotes: taxInvoiceRequestNotes || null,
+            updateContactTaxInvoiceRequest: updateContactTaxInvoiceRequest || false,
           } : {}),
         }),
       });

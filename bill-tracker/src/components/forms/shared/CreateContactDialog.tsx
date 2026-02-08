@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Lightbulb, Send } from "lucide-react";
+import { Loader2, Lightbulb, Send, FileText } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
 import { DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
@@ -63,6 +63,10 @@ export interface ContactFormData {
   preferredDeliveryMethod: string;
   deliveryEmail: string;
   deliveryNotes: string;
+  // Tax Invoice Request Preferences
+  taxInvoiceRequestMethod: string;
+  taxInvoiceRequestEmail: string;
+  taxInvoiceRequestNotes: string;
 }
 
 /**
@@ -111,6 +115,10 @@ export interface Contact {
   preferredDeliveryMethod?: string | null;
   deliveryEmail?: string | null;
   deliveryNotes?: string | null;
+  // Tax Invoice Request Preferences
+  taxInvoiceRequestMethod?: string | null;
+  taxInvoiceRequestEmail?: string | null;
+  taxInvoiceRequestNotes?: string | null;
 }
 
 /**
@@ -154,6 +162,10 @@ function contactToFormData(contact: Contact): ContactFormData {
     preferredDeliveryMethod: contact.preferredDeliveryMethod || "",
     deliveryEmail: contact.deliveryEmail || "",
     deliveryNotes: contact.deliveryNotes || "",
+    // Tax Invoice Request Preferences
+    taxInvoiceRequestMethod: contact.taxInvoiceRequestMethod || "",
+    taxInvoiceRequestEmail: contact.taxInvoiceRequestEmail || "",
+    taxInvoiceRequestNotes: contact.taxInvoiceRequestNotes || "",
   };
 }
 
@@ -201,6 +213,10 @@ const defaultFormData: ContactFormData = {
   preferredDeliveryMethod: "",
   deliveryEmail: "",
   deliveryNotes: "",
+  // Tax Invoice Request Preferences
+  taxInvoiceRequestMethod: "",
+  taxInvoiceRequestEmail: "",
+  taxInvoiceRequestNotes: "",
 };
 
 export function CreateContactDialog({
@@ -253,6 +269,10 @@ export function CreateContactDialog({
         preferredDeliveryMethod: formData.preferredDeliveryMethod || null,
         deliveryEmail: formData.deliveryEmail || null,
         deliveryNotes: formData.deliveryNotes || null,
+        // Tax Invoice Request Preferences
+        taxInvoiceRequestMethod: formData.taxInvoiceRequestMethod || null,
+        taxInvoiceRequestEmail: formData.taxInvoiceRequestEmail || null,
+        taxInvoiceRequestNotes: formData.taxInvoiceRequestNotes || null,
         ...(editingContact && { id: editingContact.id }),
       };
 
@@ -747,6 +767,75 @@ export function CreateContactDialog({
                   value={formData.deliveryNotes}
                   onChange={(e) => setFormData({ ...formData, deliveryNotes: e.target.value })}
                   placeholder="เช่น ส่งถึงคุณสมชาย ฝ่ายบัญชี"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Tax Invoice Request Preferences */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange-500" />
+              <h3 className="font-medium text-sm">วิธีขอใบกำกับภาษี</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              กำหนดช่องทางการขอใบกำกับภาษีจากผู้ติดต่อนี้ (เพื่อให้พนักงานบัญชีรู้ว่าต้องติดต่อทางไหน)
+            </p>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact-taxInvoiceRequestMethod">ช่องทางขอใบกำกับ</Label>
+                <Select
+                  value={formData.taxInvoiceRequestMethod || "__NONE__"}
+                  onValueChange={(value) => setFormData({ ...formData, taxInvoiceRequestMethod: value === "__NONE__" ? "" : value })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="ไม่ระบุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
+                    {DELIVERY_METHODS.map((method) => {
+                      const Icon = method.Icon;
+                      return (
+                        <SelectItem key={method.value} value={method.value}>
+                          <span className="flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            {method.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.taxInvoiceRequestMethod === "email" && (
+                <div className="space-y-2">
+                  <Label htmlFor="contact-taxInvoiceRequestEmail">อีเมลสำหรับขอใบกำกับ</Label>
+                  <Input
+                    id="contact-taxInvoiceRequestEmail"
+                    type="email"
+                    value={formData.taxInvoiceRequestEmail}
+                    onChange={(e) => setFormData({ ...formData, taxInvoiceRequestEmail: e.target.value })}
+                    placeholder={formData.email || "email@example.com"}
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    หากไม่ระบุจะใช้อีเมลหลักของผู้ติดต่อ
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="contact-taxInvoiceRequestNotes">หมายเหตุการขอใบกำกับ</Label>
+                <Input
+                  id="contact-taxInvoiceRequestNotes"
+                  value={formData.taxInvoiceRequestNotes}
+                  onChange={(e) => setFormData({ ...formData, taxInvoiceRequestNotes: e.target.value })}
+                  placeholder="เช่น ติดต่อคุณสมชาย 081-xxx-xxxx ฝ่ายบัญชี"
                   className="h-10"
                 />
               </div>

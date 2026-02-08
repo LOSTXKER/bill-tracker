@@ -102,6 +102,10 @@ export const POST = withCompanyAccess(
         preferredDeliveryMethod: body.preferredDeliveryMethod || null,
         deliveryEmail: body.deliveryEmail || null,
         deliveryNotes: body.deliveryNotes || null,
+        // Tax Invoice Request preferences
+        taxInvoiceRequestMethod: body.taxInvoiceRequestMethod || null,
+        taxInvoiceRequestEmail: body.taxInvoiceRequestEmail || null,
+        taxInvoiceRequestNotes: body.taxInvoiceRequestNotes || null,
         updatedAt: new Date(),
       },
     });
@@ -186,6 +190,10 @@ export const PATCH = withCompanyAccess(
         preferredDeliveryMethod: data.preferredDeliveryMethod !== undefined ? data.preferredDeliveryMethod : existing.preferredDeliveryMethod,
         deliveryEmail: data.deliveryEmail !== undefined ? data.deliveryEmail : existing.deliveryEmail,
         deliveryNotes: data.deliveryNotes !== undefined ? data.deliveryNotes : existing.deliveryNotes,
+        // Tax Invoice Request preferences
+        taxInvoiceRequestMethod: data.taxInvoiceRequestMethod !== undefined ? data.taxInvoiceRequestMethod : existing.taxInvoiceRequestMethod,
+        taxInvoiceRequestEmail: data.taxInvoiceRequestEmail !== undefined ? data.taxInvoiceRequestEmail : existing.taxInvoiceRequestEmail,
+        taxInvoiceRequestNotes: data.taxInvoiceRequestNotes !== undefined ? data.taxInvoiceRequestNotes : existing.taxInvoiceRequestNotes,
       },
     });
 

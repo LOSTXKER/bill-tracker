@@ -38,6 +38,7 @@ import {
   Coins,
   ClipboardCheck,
   Send,
+  FileSearch,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -174,6 +175,13 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: Wallet,
           permission: "reimbursements:read",
           badgeKey: "pendingReimbursements",
+        },
+        {
+          name: "ตามใบกำกับ",
+          href: `/${companyCode}/tax-invoice-follow-ups`,
+          icon: FileSearch,
+          permission: "expenses:read",
+          badgeKey: "pendingTaxInvoices",
         },
         {
           name: "รอส่ง 50 ทวิ",

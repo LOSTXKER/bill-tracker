@@ -64,6 +64,7 @@ async function handleGet(
     pendingApprovals: 0,
     pendingReimbursements: 0,
     pendingSettlements: 0,
+    pendingTaxInvoices: 0,
     pendingWhtDeliveries: 0,
     unreadNotifications: 0,
   };
@@ -182,6 +183,20 @@ async function handleGet(
             isWht: true,
             hasWhtCert: true,
             workflowStatus: "WHT_ISSUED", // Issued but not sent
+          },
+        });
+      })()
+    );
+
+    // 4b. Pending Tax Invoices - expenses waiting for tax invoice from vendor
+    queries.push(
+      (async () => {
+        badges.pendingTaxInvoices = await prisma.expense.count({
+          where: {
+            companyId: company.id,
+            deletedAt: null,
+            documentType: "TAX_INVOICE",
+            workflowStatus: "WAITING_TAX_INVOICE",
           },
         });
       })()

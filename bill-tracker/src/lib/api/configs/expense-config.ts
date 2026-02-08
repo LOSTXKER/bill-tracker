@@ -85,6 +85,10 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       whtDeliveryMethod: data.whtDeliveryMethod || null,
       whtDeliveryEmail: data.whtDeliveryEmail || null,
       whtDeliveryNotes: data.whtDeliveryNotes || null,
+      // Tax invoice request method (override from contact)
+      taxInvoiceRequestMethod: data.taxInvoiceRequestMethod || null,
+      taxInvoiceRequestEmail: data.taxInvoiceRequestEmail || null,
+      taxInvoiceRequestNotes: data.taxInvoiceRequestNotes || null,
     };
   },
   
@@ -141,6 +145,10 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.whtDeliveryMethod !== undefined) updateData.whtDeliveryMethod = data.whtDeliveryMethod || null;
     if (data.whtDeliveryEmail !== undefined) updateData.whtDeliveryEmail = data.whtDeliveryEmail || null;
     if (data.whtDeliveryNotes !== undefined) updateData.whtDeliveryNotes = data.whtDeliveryNotes || null;
+    // Tax invoice request method (override from contact)
+    if (data.taxInvoiceRequestMethod !== undefined) updateData.taxInvoiceRequestMethod = data.taxInvoiceRequestMethod || null;
+    if (data.taxInvoiceRequestEmail !== undefined) updateData.taxInvoiceRequestEmail = data.taxInvoiceRequestEmail || null;
+    if (data.taxInvoiceRequestNotes !== undefined) updateData.taxInvoiceRequestNotes = data.taxInvoiceRequestNotes || null;
     
     // ==========================================================================
     // WHT Change Validation & Auto-adjust workflow status
@@ -230,6 +238,13 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
           updateData.preferredDeliveryMethod = item.whtDeliveryMethod;
           updateData.deliveryEmail = item.whtDeliveryEmail || null;
           updateData.deliveryNotes = item.whtDeliveryNotes || null;
+        }
+
+        // Update tax invoice request preferences if requested
+        if (body.updateContactTaxInvoiceRequest && item.taxInvoiceRequestMethod) {
+          updateData.taxInvoiceRequestMethod = item.taxInvoiceRequestMethod;
+          updateData.taxInvoiceRequestEmail = item.taxInvoiceRequestEmail || null;
+          updateData.taxInvoiceRequestNotes = item.taxInvoiceRequestNotes || null;
         }
 
         await prisma.contact.update({
@@ -426,6 +441,22 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
         });
       } catch (error) {
         console.error("Failed to update contact delivery preferences:", error);
+      }
+    }
+
+    // Update contact tax invoice request preferences if requested
+    if (body.updateContactTaxInvoiceRequest && item.contactId && item.taxInvoiceRequestMethod) {
+      try {
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: {
+            taxInvoiceRequestMethod: item.taxInvoiceRequestMethod,
+            taxInvoiceRequestEmail: item.taxInvoiceRequestEmail || null,
+            taxInvoiceRequestNotes: item.taxInvoiceRequestNotes || null,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to update contact tax invoice request preferences:", error);
       }
     }
   },

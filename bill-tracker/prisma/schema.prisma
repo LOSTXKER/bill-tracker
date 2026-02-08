@@ -205,6 +205,11 @@ model Contact {
   deliveryEmail           String? // อีเมลสำหรับส่งเอกสาร (อาจแตกต่างจาก email หลัก)
   deliveryNotes           String? // หมายเหตุการส่งเอกสาร
 
+  // วิธีขอใบกำกับภาษี (Tax Invoice Request Preferences)
+  taxInvoiceRequestMethod String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
+  taxInvoiceRequestEmail  String? // อีเมลสำหรับขอใบกำกับ
+  taxInvoiceRequestNotes  String? // หมายเหตุการขอใบกำกับ เช่น "ติดต่อคุณสมชาย 081-xxx-xxxx"
+
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Expense              Expense[]
   Income               Income[]
@@ -304,6 +309,11 @@ model Expense {
   whtDeliveryMethod                          String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
   whtDeliveryEmail                           String? // อีเมลสำหรับส่ง WHT (ถ้าวิธีส่งเป็น email)
   whtDeliveryNotes                           String? // หมายเหตุการส่ง WHT
+  // วิธีขอใบกำกับภาษี (Override จาก Contact)
+  taxInvoiceRequestMethod                    String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
+  taxInvoiceRequestEmail                     String? // อีเมลสำหรับขอใบกำกับ (ถ้าวิธีเป็น email)
+  taxInvoiceRequestNotes                     String? // หมายเหตุการขอใบกำกับ
+  taxInvoiceRequestedAt                      DateTime? // วันที่ขอใบกำกับล่าสุด
   Comment                                    Comment[]
   DocumentEvent                              DocumentEvent[]
   Account                                    Account?               @relation(fields: [accountId], references: [id])
