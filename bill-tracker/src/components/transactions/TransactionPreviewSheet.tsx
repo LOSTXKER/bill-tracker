@@ -106,7 +106,14 @@ function ImageViewer({
 
   const currentUrl = urls[currentIndex];
   const urlString = typeof currentUrl === "string" ? currentUrl : String(currentUrl || "");
-  const isPdf = urlString.toLowerCase().endsWith(".pdf");
+  const isPdf = (() => {
+    try {
+      const pathname = new URL(urlString).pathname;
+      return pathname.toLowerCase().endsWith(".pdf");
+    } catch {
+      return urlString.toLowerCase().endsWith(".pdf");
+    }
+  })();
 
   return (
     <div className="space-y-2">
@@ -161,7 +168,14 @@ function ImageViewer({
           <div className="flex gap-1 p-2 overflow-x-auto">
             {urls.map((url, index) => {
               const thumbUrlStr = typeof url === "string" ? url : String(url || "");
-              const isThumbPdf = thumbUrlStr.toLowerCase().endsWith(".pdf");
+              const isThumbPdf = (() => {
+                try {
+                  const pathname = new URL(thumbUrlStr).pathname;
+                  return pathname.toLowerCase().endsWith(".pdf");
+                } catch {
+                  return thumbUrlStr.toLowerCase().endsWith(".pdf");
+                }
+              })();
               return (
                 <button
                   key={index}
@@ -360,7 +374,12 @@ export function TransactionPreviewSheet({
       if (data.whtCertUrls?.length) docs.push({ title: "ใบหัก ณ ที่จ่าย", urls: data.whtCertUrls });
     }
     
-    if (data.otherDocUrls?.length) docs.push({ title: "เอกสารอื่นๆ", urls: data.otherDocUrls });
+    if (data.otherDocUrls?.length) {
+      const otherUrls = (data.otherDocUrls as any[]).map((item: any) =>
+        typeof item === "string" ? item : item?.url
+      ).filter(Boolean);
+      if (otherUrls.length) docs.push({ title: "เอกสารอื่นๆ", urls: otherUrls });
+    }
     
     return docs;
   };
