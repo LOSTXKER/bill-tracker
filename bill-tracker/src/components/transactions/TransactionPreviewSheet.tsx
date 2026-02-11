@@ -113,20 +113,13 @@ function ImageViewer({
       <p className="text-sm font-medium text-muted-foreground">{title}</p>
       <div className="relative rounded-lg border bg-muted/30 overflow-hidden">
         {/* Main Image/PDF Preview */}
-        <div className="relative aspect-video flex items-center justify-center bg-muted/50">
+        <div className={`relative flex items-center justify-center bg-muted/50 ${isPdf ? "aspect-[3/4]" : "aspect-video"}`}>
           {isPdf ? (
-            <div className="flex flex-col items-center justify-center p-4 text-muted-foreground">
-              <FileText className="h-12 w-12 mb-2" />
-              <p className="text-sm">PDF Document</p>
-              <a
-                href={urlString}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline mt-1"
-              >
-                เปิดดู PDF
-              </a>
-            </div>
+            <iframe
+              src={`${urlString}#toolbar=0&navpanes=0`}
+              className="w-full h-full border-0"
+              title={`${title} ${currentIndex + 1}`}
+            />
           ) : (
             <img
               src={urlString}
@@ -141,13 +134,13 @@ function ImageViewer({
             <>
               <button
                 onClick={() => setCurrentIndex((i) => (i > 0 ? i - 1 : urls.length - 1))}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setCurrentIndex((i) => (i < urls.length - 1 ? i + 1 : 0))}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -155,14 +148,12 @@ function ImageViewer({
           )}
 
           {/* Fullscreen Button */}
-          {!isPdf && (
-            <button
-              onClick={() => setShowFullscreen(true)}
-              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            onClick={() => setShowFullscreen(true)}
+            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Thumbnails */}
@@ -205,23 +196,32 @@ function ImageViewer({
       </div>
 
       {/* Fullscreen Modal */}
-      {showFullscreen && !isPdf && (
+      {showFullscreen && (
         <div
           className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center"
           onClick={() => setShowFullscreen(false)}
         >
           <button
             onClick={() => setShowFullscreen(false)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
           >
             <X className="h-6 w-6" />
           </button>
-          <img
-            src={urlString}
-            alt="Fullscreen"
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {isPdf ? (
+            <iframe
+              src={urlString}
+              className="w-[90vw] h-[90vh] border-0 rounded-lg bg-white"
+              title="PDF Fullscreen"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={urlString}
+              alt="Fullscreen"
+              className="max-h-[90vh] max-w-[90vw] object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
           {urls.length > 1 && (
             <>
               <button
