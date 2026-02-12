@@ -72,6 +72,10 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
       whtCertUrls: data.whtCertUrls || [],
       otherDocUrls: data.otherDocUrls || [],
       referenceUrls: data.referenceUrls || [],
+      // Currency conversion info (เก็บข้อมูลสกุลเงินต้นทาง)
+      originalCurrency: data.originalCurrency || null,
+      originalAmount: data.originalAmount || null,
+      exchangeRate: data.exchangeRate || null,
     };
   },
   
@@ -98,6 +102,10 @@ export const incomeRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pri
     // status is legacy field (IncomeDocStatus enum) - don't update from new workflow values
     if (data.workflowStatus !== undefined) updateData.workflowStatus = data.workflowStatus;
     if (data.notes !== undefined) updateData.notes = data.notes;
+    // Currency conversion info
+    if (data.originalCurrency !== undefined) updateData.originalCurrency = data.originalCurrency || null;
+    if (data.originalAmount !== undefined) updateData.originalAmount = data.originalAmount || null;
+    if (data.exchangeRate !== undefined) updateData.exchangeRate = data.exchangeRate || null;
     
     // Handle multiple file URLs
     if (data.customerSlipUrls !== undefined) updateData.customerSlipUrls = data.customerSlipUrls;

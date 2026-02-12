@@ -70,7 +70,7 @@ export function CurrencyConversionNote({ currencyConversion, onRateChange }: Cur
       return;
     }
     
-    const newConvertedAmount = Math.round(originalAmount * newRate * 100) / 100;
+    const newConvertedAmount = Math.trunc(originalAmount * newRate * 100) / 100;
     onRateChange?.(newRate, newConvertedAmount);
     setIsEditing(false);
   };
@@ -84,7 +84,7 @@ export function CurrencyConversionNote({ currencyConversion, onRateChange }: Cur
 
   // Calculate preview amount when editing
   const previewAmount = isEditing && editRate 
-    ? Math.round(originalAmount * parseFloat(editRate) * 100) / 100 
+    ? Math.trunc(originalAmount * parseFloat(editRate) * 100) / 100 
     : null;
 
   return (

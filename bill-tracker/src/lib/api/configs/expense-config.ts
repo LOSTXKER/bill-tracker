@@ -89,6 +89,10 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
       taxInvoiceRequestMethod: data.taxInvoiceRequestMethod || null,
       taxInvoiceRequestEmail: data.taxInvoiceRequestEmail || null,
       taxInvoiceRequestNotes: data.taxInvoiceRequestNotes || null,
+      // Currency conversion info (เก็บข้อมูลสกุลเงินต้นทาง)
+      originalCurrency: data.originalCurrency || null,
+      originalAmount: data.originalAmount || null,
+      exchangeRate: data.exchangeRate || null,
     };
   },
   
@@ -149,6 +153,10 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
     if (data.taxInvoiceRequestMethod !== undefined) updateData.taxInvoiceRequestMethod = data.taxInvoiceRequestMethod || null;
     if (data.taxInvoiceRequestEmail !== undefined) updateData.taxInvoiceRequestEmail = data.taxInvoiceRequestEmail || null;
     if (data.taxInvoiceRequestNotes !== undefined) updateData.taxInvoiceRequestNotes = data.taxInvoiceRequestNotes || null;
+    // Currency conversion info
+    if (data.originalCurrency !== undefined) updateData.originalCurrency = data.originalCurrency || null;
+    if (data.originalAmount !== undefined) updateData.originalAmount = data.originalAmount || null;
+    if (data.exchangeRate !== undefined) updateData.exchangeRate = data.exchangeRate || null;
     
     // ==========================================================================
     // WHT Change Validation & Auto-adjust workflow status

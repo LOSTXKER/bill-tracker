@@ -42,6 +42,15 @@ export interface UseTransactionSubmissionProps {
   taxInvoiceRequestEmail?: string | null;
   taxInvoiceRequestNotes?: string | null;
   updateContactTaxInvoiceRequest?: boolean;
+  // Currency conversion info
+  currencyConversion?: {
+    detected: boolean;
+    currency: string | null;
+    originalAmount: number | null;
+    convertedAmount: number | null;
+    exchangeRate: number | null;
+    conversionNote: string | null;
+  } | null;
   watch: UseFormWatch<any>;
   reset: UseFormReset<any>;
   transaction: any | null;
@@ -74,6 +83,7 @@ export function useTransactionSubmission({
   taxInvoiceRequestEmail,
   taxInvoiceRequestNotes,
   updateContactTaxInvoiceRequest,
+  currencyConversion,
   watch,
   reset,
   transaction,
@@ -171,6 +181,12 @@ export function useTransactionSubmission({
             taxInvoiceRequestNotes: taxInvoiceRequestNotes || null,
             updateContactTaxInvoiceRequest: updateContactTaxInvoiceRequest || false,
           } : {}),
+          // Include currency conversion info (if foreign currency)
+          ...(currencyConversion && currencyConversion.currency && currencyConversion.currency !== "THB" ? {
+            originalCurrency: currencyConversion.currency,
+            originalAmount: currencyConversion.originalAmount,
+            exchangeRate: currencyConversion.exchangeRate,
+          } : {}),
           ...fileData,
         }),
       });
@@ -243,6 +259,12 @@ export function useTransactionSubmission({
             taxInvoiceRequestEmail: taxInvoiceRequestEmail || null,
             taxInvoiceRequestNotes: taxInvoiceRequestNotes || null,
             updateContactTaxInvoiceRequest: updateContactTaxInvoiceRequest || false,
+          } : {}),
+          // Include currency conversion info (if foreign currency)
+          ...(currencyConversion && currencyConversion.currency && currencyConversion.currency !== "THB" ? {
+            originalCurrency: currencyConversion.currency,
+            originalAmount: currencyConversion.originalAmount,
+            exchangeRate: currencyConversion.exchangeRate,
           } : {}),
         }),
       });

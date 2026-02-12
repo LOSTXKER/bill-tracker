@@ -211,7 +211,7 @@ export function TransactionFieldsSection({
     // Only update if amount changed externally
     if (formAmount !== undefined && formAmount !== null) {
       if (amountInputMode === "includingVat" && vatRate > 0) {
-        const includingVat = Math.round(formAmount * (1 + vatRate / 100) * 100) / 100;
+        const includingVat = Math.trunc(formAmount * (1 + vatRate / 100) * 100) / 100;
         setDisplayAmount(String(includingVat));
       } else {
         setDisplayAmount(String(formAmount));
@@ -220,17 +220,22 @@ export function TransactionFieldsSection({
   }, [formAmount, amountInputMode, vatRate]);
   
   // Handle amount input change
-  // Use precise decimal handling to avoid floating-point errors
+  // Limit to 2 decimal places without rounding
   const handleAmountInput = (value: string) => {
-    setDisplayAmount(value);
+    // Truncate to 2 decimal places if user typed more
+    const dotIndex = value.indexOf(".");
+    const truncatedValue = dotIndex !== -1 && value.length - dotIndex > 3
+      ? value.slice(0, dotIndex + 3)
+      : value;
     
-    // Parse and round to 2 decimal places to avoid floating-point precision issues
-    const parsed = parseFloat(value);
-    const numValue = isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
+    setDisplayAmount(truncatedValue);
+    
+    const parsed = parseFloat(truncatedValue);
+    const numValue = isNaN(parsed) ? 0 : parsed;
     
     if (amountInputMode === "includingVat" && vatRate > 0) {
       // Convert from including VAT to before VAT
-      const beforeVat = Math.round((numValue / (1 + vatRate / 100)) * 100) / 100;
+      const beforeVat = Math.trunc((numValue / (1 + vatRate / 100)) * 100) / 100;
       setValue("amount", beforeVat);
     } else {
       setValue("amount", numValue);
@@ -246,11 +251,11 @@ export function TransactionFieldsSection({
     
     if (newMode === "includingVat" && vatRate > 0) {
       // Switching to "including VAT" - multiply by (1 + rate)
-      const includingVat = Math.round(currentValue * (1 + vatRate / 100) * 100) / 100;
+      const includingVat = Math.trunc(currentValue * (1 + vatRate / 100) * 100) / 100;
       setDisplayAmount(String(includingVat));
     } else if (newMode === "beforeVat" && vatRate > 0) {
       // Switching to "before VAT" - divide by (1 + rate)
-      const beforeVat = Math.round((currentValue / (1 + vatRate / 100)) * 100) / 100;
+      const beforeVat = Math.trunc((currentValue / (1 + vatRate / 100)) * 100) / 100;
       setDisplayAmount(String(beforeVat));
     }
     

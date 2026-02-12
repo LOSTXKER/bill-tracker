@@ -180,6 +180,11 @@ export interface TransactionRequestBody {
   internalCompanyId?: string;
   status?: string;
   
+  // Currency conversion fields
+  originalCurrency?: string;
+  originalAmount?: number;
+  exchangeRate?: number;
+  
   // Allow additional fields
   [key: string]: unknown;
 }

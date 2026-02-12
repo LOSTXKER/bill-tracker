@@ -265,10 +265,14 @@ export function TransactionAmountCard({
             step="0.01"
             value={amount || ""}
             onChange={(e) => {
-              // Round to 2 decimal places to avoid floating-point precision issues
-              const parsed = parseFloat(e.target.value);
-              const rounded = isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
-              onAmountChange?.(rounded);
+              // Limit to 2 decimal places without rounding
+              let value = e.target.value;
+              const dotIndex = value.indexOf(".");
+              if (dotIndex !== -1 && value.length - dotIndex > 3) {
+                value = value.slice(0, dotIndex + 3);
+              }
+              const parsed = parseFloat(value);
+              onAmountChange?.(isNaN(parsed) ? 0 : parsed);
             }}
             className="w-40 h-9 text-right bg-background"
             placeholder="0.00"

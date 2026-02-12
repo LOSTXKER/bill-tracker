@@ -249,6 +249,16 @@ export function UnifiedTransactionForm({
   const [aiResult, setAiResult] = useState<MultiDocAnalysisResult | null>(null);
   const [aiApplied, setAiApplied] = useState(false);
 
+  // Currency conversion state (persists across view/edit modes, populated from AI result or DB)
+  const [currencyConversion, setCurrencyConversion] = useState<{
+    detected: boolean;
+    currency: string | null;
+    originalAmount: number | null;
+    convertedAmount: number | null;
+    exchangeRate: number | null;
+    conversionNote: string | null;
+  } | null>(null);
+
   // Merge Dialog State
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   // Note: pendingAiResult, existingFormData, newAiData, pendingConflicts, pendingMergedData, 
@@ -508,6 +518,7 @@ export function UnifiedTransactionForm({
     taxInvoiceRequestEmail,
     taxInvoiceRequestNotes,
     updateContactTaxInvoiceRequest,
+    currencyConversion,
     watch,
     reset,
     transaction,
@@ -641,6 +652,18 @@ export function UnifiedTransactionForm({
     // Set reference URLs
     if (data.referenceUrls && Array.isArray(data.referenceUrls)) {
       setReferenceUrls(data.referenceUrls);
+    }
+
+    // Set currency conversion info from DB (if transaction was in foreign currency)
+    if (data.originalCurrency && data.originalCurrency !== "THB") {
+      setCurrencyConversion({
+        detected: true,
+        currency: data.originalCurrency,
+        originalAmount: Number(data.originalAmount) || 0,
+        convertedAmount: Number(data.amount) || 0,
+        exchangeRate: Number(data.exchangeRate) || 0,
+        conversionNote: null,
+      });
     }
     
     setFormPopulated(true);
@@ -874,6 +897,11 @@ export function UnifiedTransactionForm({
     (result: MultiDocAnalysisResult) => {
       setAiResult(result);
       setAiApplied(false);
+
+      // Sync currency conversion state from AI result
+      if (result.currencyConversion && result.currencyConversion.currency !== "THB") {
+        setCurrencyConversion(result.currencyConversion);
+      }
 
       if (hasExistingData()) {
         setPendingAiResult(result);
@@ -1387,23 +1415,32 @@ export function UnifiedTransactionForm({
                     />
                   )}
 
-                  {/* Currency Conversion Note */}
-                  {aiResult?.currencyConversion && (
+                  {/* Currency Conversion Note - show in create mode when currency data exists */}
+                  {currencyConversion && (
                     <CurrencyConversionNote 
-                      currencyConversion={aiResult.currencyConversion}
+                      currencyConversion={currencyConversion}
                       onRateChange={(newRate, newConvertedAmount) => {
                         // Update the amount field with new converted amount
                         setValue("amount", newConvertedAmount);
-                        // Update the AI result with new rate
-                        setAiResult((prev) => prev ? {
+                        // Update currency conversion state
+                        setCurrencyConversion((prev) => prev ? {
                           ...prev,
-                          currencyConversion: {
-                            ...prev.currencyConversion!,
-                            exchangeRate: newRate,
-                            convertedAmount: newConvertedAmount,
-                            conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                          },
+                          exchangeRate: newRate,
+                          convertedAmount: newConvertedAmount,
+                          conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
                         } : null);
+                        // Also update AI result if it exists
+                        if (aiResult?.currencyConversion) {
+                          setAiResult((prev) => prev ? {
+                            ...prev,
+                            currencyConversion: {
+                              ...prev.currencyConversion!,
+                              exchangeRate: newRate,
+                              convertedAmount: newConvertedAmount,
+                              conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
+                            },
+                          } : null);
+                        }
                       }}
                     />
                   )}
@@ -1584,6 +1621,24 @@ export function UnifiedTransactionForm({
                       });
                     } : undefined}
                   />
+
+                  {/* Currency Conversion Note - show in view/edit mode when currency data exists */}
+                  {currencyConversion && (
+                    <CurrencyConversionNote 
+                      currencyConversion={currencyConversion}
+                      onRateChange={mode === "edit" ? (newRate, newConvertedAmount) => {
+                        // Update the amount field with new converted amount
+                        setValue("amount", newConvertedAmount);
+                        // Update currency conversion state
+                        setCurrencyConversion((prev) => prev ? {
+                          ...prev,
+                          exchangeRate: newRate,
+                          convertedAmount: newConvertedAmount,
+                          conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
+                        } : null);
+                      } : undefined}
+                    />
+                  )}
 
                   <div className="border-t border-border" />
 
