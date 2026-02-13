@@ -32,7 +32,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
-import { DELIVERY_METHODS, getDeliveryMethod } from "@/lib/constants/delivery-methods";
+import { TAX_INVOICE_REQUEST_METHODS, getTaxInvoiceRequestMethod } from "@/lib/constants/delivery-methods";
 import { PermissionGuard } from "@/components/guards/permission-guard";
 
 // Format date to Thai locale
@@ -357,7 +357,7 @@ export default function TaxInvoiceFollowUpsPage() {
               const isExpanded = expandedGroups.has(group.contactId);
               const allSelected = group.expenses.every((e) => selectedExpenses.has(e.id));
               const someSelected = group.expenses.some((e) => selectedExpenses.has(e.id));
-              const requestMethodInfo = getDeliveryMethod(group.requestMethod);
+              const requestMethodInfo = getTaxInvoiceRequestMethod(group.requestMethod);
 
               return (
                 <Card key={group.contactId}>
@@ -447,7 +447,7 @@ export default function TaxInvoiceFollowUpsPage() {
                           <tbody>
                             {group.expenses.map((expense) => {
                               const expenseMethodInfo = expense.taxInvoiceRequestMethod
-                                ? getDeliveryMethod(expense.taxInvoiceRequestMethod)
+                                ? getTaxInvoiceRequestMethod(expense.taxInvoiceRequestMethod)
                                 : null;
 
                               return (
@@ -529,7 +529,7 @@ export default function TaxInvoiceFollowUpsPage() {
               <div>
                 <Label>ขอผ่านช่องทาง (ถ้ามี)</Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  {DELIVERY_METHODS.map((method) => {
+                  {TAX_INVOICE_REQUEST_METHODS.map((method) => {
                     const Icon = method.Icon;
                     return (
                       <Button

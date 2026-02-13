@@ -24,7 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Lightbulb, Send, FileText } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
-import { DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
+import { DELIVERY_METHODS, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
 
 export interface ContactFormData {
@@ -797,7 +797,7 @@ export function CreateContactDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                    {DELIVERY_METHODS.map((method) => {
+                    {TAX_INVOICE_REQUEST_METHODS.map((method) => {
                       const Icon = method.Icon;
                       return (
                         <SelectItem key={method.value} value={method.value}>
@@ -829,16 +829,42 @@ export function CreateContactDialog({
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="contact-taxInvoiceRequestNotes">หมายเหตุการขอใบกำกับ</Label>
-                <Input
-                  id="contact-taxInvoiceRequestNotes"
-                  value={formData.taxInvoiceRequestNotes}
-                  onChange={(e) => setFormData({ ...formData, taxInvoiceRequestNotes: e.target.value })}
-                  placeholder="เช่น ติดต่อคุณสมชาย 081-xxx-xxxx ฝ่ายบัญชี"
-                  className="h-10"
-                />
-              </div>
+              {formData.taxInvoiceRequestMethod === "shopee" && (
+                <div className="space-y-2">
+                  <Label htmlFor="contact-taxInvoiceRequestNotes">
+                    ชื่อแชทร้าน / ลิงค์ Shopee <span className="text-orange-500">(จำเป็น)</span>
+                  </Label>
+                  <Input
+                    id="contact-taxInvoiceRequestNotes"
+                    value={formData.taxInvoiceRequestNotes}
+                    onChange={(e) => setFormData({ ...formData, taxInvoiceRequestNotes: e.target.value })}
+                    placeholder="เช่น ชื่อร้าน Shopee หรือ https://shopee.co.th/..."
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    ระบุชื่อแชทร้านหรือลิงค์ เพื่อให้บัญชีไปตามทวงใบกำกับได้
+                  </p>
+                </div>
+              )}
+
+              {formData.taxInvoiceRequestMethod !== "shopee" && (
+                <div className="space-y-2">
+                  <Label htmlFor="contact-taxInvoiceRequestNotes">
+                    {formData.taxInvoiceRequestMethod === "other" ? "ระบุช่องทาง / รายละเอียด" : "หมายเหตุการขอใบกำกับ"}
+                  </Label>
+                  <Input
+                    id="contact-taxInvoiceRequestNotes"
+                    value={formData.taxInvoiceRequestNotes}
+                    onChange={(e) => setFormData({ ...formData, taxInvoiceRequestNotes: e.target.value })}
+                    placeholder={
+                      formData.taxInvoiceRequestMethod === "other"
+                        ? "ระบุช่องทาง เช่น Facebook, Lazada, เว็บไซต์ร้านค้า..."
+                        : "เช่น ติดต่อคุณสมชาย 081-xxx-xxxx ฝ่ายบัญชี"
+                    }
+                    className="h-10"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

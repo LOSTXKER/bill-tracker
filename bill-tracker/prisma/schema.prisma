@@ -206,9 +206,9 @@ model Contact {
   deliveryNotes           String? // หมายเหตุการส่งเอกสาร
 
   // วิธีขอใบกำกับภาษี (Tax Invoice Request Preferences)
-  taxInvoiceRequestMethod String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
+  taxInvoiceRequestMethod String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive' | 'shopee' | 'other'
   taxInvoiceRequestEmail  String? // อีเมลสำหรับขอใบกำกับ
-  taxInvoiceRequestNotes  String? // หมายเหตุการขอใบกำกับ เช่น "ติดต่อคุณสมชาย 081-xxx-xxxx"
+  taxInvoiceRequestNotes  String? // หมายเหตุการขอใบกำกับ เช่น "ติดต่อคุณสมชาย 081-xxx-xxxx" หรือ ชื่อแชทร้าน Shopee / ลิงค์
 
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Expense              Expense[]
@@ -310,9 +310,9 @@ model Expense {
   whtDeliveryEmail                           String? // อีเมลสำหรับส่ง WHT (ถ้าวิธีส่งเป็น email)
   whtDeliveryNotes                           String? // หมายเหตุการส่ง WHT
   // วิธีขอใบกำกับภาษี (Override จาก Contact)
-  taxInvoiceRequestMethod                    String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
+  taxInvoiceRequestMethod                    String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive' | 'shopee' | 'other'
   taxInvoiceRequestEmail                     String? // อีเมลสำหรับขอใบกำกับ (ถ้าวิธีเป็น email)
-  taxInvoiceRequestNotes                     String? // หมายเหตุการขอใบกำกับ
+  taxInvoiceRequestNotes                     String? // หมายเหตุการขอใบกำกับ หรือ ชื่อแชทร้าน Shopee / ลิงค์
   taxInvoiceRequestedAt                      DateTime? // วันที่ขอใบกำกับล่าสุด
   // สกุลเงินต้นทาง (ถ้าไม่ใช่ THB)
   originalCurrency                           String? // เช่น "USD", "AED"

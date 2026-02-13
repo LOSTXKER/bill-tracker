@@ -16,7 +16,7 @@ import { ContactSelector, type AiVendorSuggestion } from "./ContactSelector";
 import { AccountSelector } from "./account-selector";
 import type { ContactSummary } from "@/types";
 import { Plus, X, ExternalLink, Link2, Sparkles, Loader2, Send, FileText } from "lucide-react";
-import { getDeliveryMethod, DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
+import { getDeliveryMethod, DELIVERY_METHODS, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -866,7 +866,7 @@ export function TransactionFieldsSection({
           
           {/* Request Method Selection */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {DELIVERY_METHODS.map((method) => {
+            {TAX_INVOICE_REQUEST_METHODS.map((method) => {
               const Icon = method.Icon;
               const isSelected = taxInvoiceRequestMethod === method.value;
               return (
@@ -904,14 +904,36 @@ export function TransactionFieldsSection({
             </div>
           )}
 
-          {/* Notes field */}
-          {onTaxInvoiceRequestNotesChange && (
+          {/* Shopee info field - only show when shopee is selected */}
+          {taxInvoiceRequestMethod === "shopee" && onTaxInvoiceRequestNotesChange && (
             <div className="space-y-2">
               <Label className="text-sm text-orange-900 dark:text-orange-100">
-                หมายเหตุการขอใบกำกับ (ถ้ามี)
+                ชื่อแชทร้าน / ลิงค์ Shopee <span className="text-orange-400">(จำเป็น)</span>
+              </Label>
+              <Input
+                placeholder="เช่น ชื่อร้าน Shopee หรือ https://shopee.co.th/..."
+                value={taxInvoiceRequestNotes || ""}
+                onChange={(e) => onTaxInvoiceRequestNotesChange(e.target.value || null)}
+                className="h-10 bg-white dark:bg-background border-orange-200 dark:border-orange-800"
+              />
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                ระบุชื่อแชทร้านหรือลิงค์ เพื่อให้บัญชีไปตามทวงใบกำกับได้
+              </p>
+            </div>
+          )}
+
+          {/* Notes field - show for all methods except shopee (shopee uses notes for shop info above) */}
+          {taxInvoiceRequestMethod !== "shopee" && onTaxInvoiceRequestNotesChange && (
+            <div className="space-y-2">
+              <Label className="text-sm text-orange-900 dark:text-orange-100">
+                {taxInvoiceRequestMethod === "other" ? "ระบุช่องทาง / รายละเอียด" : "หมายเหตุการขอใบกำกับ (ถ้ามี)"}
               </Label>
               <Textarea
-                placeholder="เช่น ติดต่อคุณสมชาย 081-xxx-xxxx ฝ่ายบัญชี..."
+                placeholder={
+                  taxInvoiceRequestMethod === "other"
+                    ? "ระบุช่องทาง เช่น Facebook, Lazada, เว็บไซต์ร้านค้า..."
+                    : "เช่น ติดต่อคุณสมชาย 081-xxx-xxxx ฝ่ายบัญชี..."
+                }
                 value={taxInvoiceRequestNotes || ""}
                 onChange={(e) => onTaxInvoiceRequestNotesChange(e.target.value || null)}
                 className="min-h-[60px] bg-white dark:bg-background border-orange-200 dark:border-orange-800"
