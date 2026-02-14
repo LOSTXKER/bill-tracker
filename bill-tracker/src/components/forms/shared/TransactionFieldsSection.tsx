@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -202,13 +202,22 @@ export function TransactionFieldsSection({
   const [amountInputMode, setAmountInputMode] = useState<AmountInputMode>("beforeVat");
   const [displayAmount, setDisplayAmount] = useState<string>("");
   
+  // Track whether the amount change came from user input (to avoid feedback loop)
+  const isUserInputRef = useRef(false);
+  
   // AI suggest account state
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
   
-  // Sync display amount with form amount when form changes (e.g., from AI)
+  // Sync display amount with form amount when form changes externally (e.g., from AI)
   const formAmount = watch("amount") as number | undefined;
   useEffect(() => {
-    // Only update if amount changed externally
+    // Skip sync if the change came from user typing (prevents feedback loop
+    // where round-trip VAT conversion causes the displayed value to shrink)
+    if (isUserInputRef.current) {
+      isUserInputRef.current = false;
+      return;
+    }
+    
     if (formAmount !== undefined && formAmount !== null) {
       if (amountInputMode === "includingVat" && vatRate > 0) {
         const includingVat = Math.trunc(formAmount * (1 + vatRate / 100) * 100) / 100;
@@ -232,6 +241,9 @@ export function TransactionFieldsSection({
     
     const parsed = parseFloat(truncatedValue);
     const numValue = isNaN(parsed) ? 0 : parsed;
+    
+    // Mark that this change came from user input so the useEffect won't overwrite displayAmount
+    isUserInputRef.current = true;
     
     if (amountInputMode === "includingVat" && vatRate > 0) {
       // Convert from including VAT to before VAT
