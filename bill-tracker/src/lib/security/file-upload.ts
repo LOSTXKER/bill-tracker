@@ -16,7 +16,7 @@ export const ALLOWED_DOCUMENT_TYPES = [
 
 // Max file sizes
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-export const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
+export const MAX_DOCUMENT_SIZE = 30 * 1024 * 1024; // 30MB
 
 // Magic bytes for file type verification
 const FILE_SIGNATURES: Record<string, number[][]> = {

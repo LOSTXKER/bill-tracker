@@ -108,7 +108,7 @@ export function validateFile(file: File): boolean {
   const validTypes = [...imageTypes, ...pdfTypes];
   
   const maxImageSize = 5 * 1024 * 1024; // 5MB for images
-  const maxPdfSize = 10 * 1024 * 1024; // 10MB for PDF
+  const maxPdfSize = 30 * 1024 * 1024; // 30MB for PDF
 
   if (!validTypes.includes(file.type)) {
     throw new Error("ไฟล์ต้องเป็นรูปภาพ (JPEG, PNG, WebP) หรือ PDF เท่านั้น");
@@ -118,7 +118,7 @@ export function validateFile(file: File): boolean {
   const maxSize = isPdf ? maxPdfSize : maxImageSize;
   
   if (file.size > maxSize) {
-    throw new Error(`ไฟล์ต้องมีขนาดไม่เกิน ${isPdf ? "10MB" : "5MB"}`);
+    throw new Error(`ไฟล์ต้องมีขนาดไม่เกิน ${isPdf ? "30MB" : "5MB"}`);
   }
 
   return true;

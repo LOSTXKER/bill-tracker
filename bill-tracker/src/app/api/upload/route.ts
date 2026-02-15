@@ -26,11 +26,11 @@ export async function POST(request: Request) {
       return apiResponse.badRequest("ไฟล์ต้องเป็นรูปภาพหรือ PDF เท่านั้น");
     }
 
-    // Validate file size (10MB for PDF, 5MB for images)
-    const maxSize = file.type === "application/pdf" ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    // Validate file size (30MB for PDF, 5MB for images)
+    const maxSize = file.type === "application/pdf" ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
     if (file.size > maxSize) {
       return apiResponse.badRequest(
-        `ไฟล์ต้องมีขนาดไม่เกิน ${file.type === "application/pdf" ? "10MB" : "5MB"}`
+        `ไฟล์ต้องมีขนาดไม่เกิน ${file.type === "application/pdf" ? "30MB" : "5MB"}`
       );
     }
 
