@@ -75,6 +75,9 @@ export interface TransactionAmountCardProps {
   totalWithVat: number;
   netAmount: number;
   netAmountLabel: string;
+
+  // Layout options
+  showCalculationSummary?: boolean;
 }
 
 // =============================================================================
@@ -103,6 +106,7 @@ export function TransactionAmountCard({
   totalWithVat,
   netAmount,
   netAmountLabel,
+  showCalculationSummary = true,
 }: TransactionAmountCardProps) {
   const isEditable = mode === "create" || mode === "edit";
   
@@ -155,8 +159,6 @@ export function TransactionAmountCard({
   if (mode === "create") {
     return (
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">ภาษีและยอดเงิน</h3>
-        
         <VatToggle value={vatRate} onChange={(value) => onVatRateChange?.(value)} />
 
         {/* Show document type selector for VAT 0% expenses */}
@@ -183,19 +185,22 @@ export function TransactionAmountCard({
           />
         )}
 
-        <Separator />
-
-        <CalculationSummary
-          baseAmount={amount}
-          vatRate={vatRate}
-          vatAmount={vatAmount}
-          totalWithVat={totalWithVat}
-          whtRate={whtRate}
-          whtAmount={whtAmount}
-          netAmount={netAmount}
-          type={type}
-          showWhtNote={showWhtSection && whtEnabled && !!whtRate}
-        />
+        {showCalculationSummary && (
+          <>
+            <Separator />
+            <CalculationSummary
+              baseAmount={amount}
+              vatRate={vatRate}
+              vatAmount={vatAmount}
+              totalWithVat={totalWithVat}
+              whtRate={whtRate}
+              whtAmount={whtAmount}
+              netAmount={netAmount}
+              type={type}
+              showWhtNote={showWhtSection && whtEnabled && !!whtRate}
+            />
+          </>
+        )}
       </div>
     );
   }

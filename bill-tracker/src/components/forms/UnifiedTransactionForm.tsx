@@ -58,6 +58,7 @@ import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } fr
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionFieldsSection, TransactionFieldsConfig } from "./shared/TransactionFieldsSection";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
+import { CalculationSummary } from "./shared/CalculationSummary";
 import { PayerSection, PayerInfo } from "./shared/PayerSection";
 import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 
@@ -1334,6 +1335,37 @@ export function UnifiedTransactionForm({
             </CardHeader>
             <CardContent className="grid lg:grid-cols-5 gap-6">
               <div className="lg:col-span-3 space-y-6">
+                  {/* Tax Settings (VAT / WHT) - ตั้งค่าภาษีก่อนกรอกยอดเงิน */}
+                  <TransactionAmountCard
+                    mode={mode}
+                    type={config.type}
+                    amount={watchAmount || 0}
+                    onAmountChange={(value) => setValue("amount", value)}
+                    vatRate={watchVatRate || 0}
+                    onVatRateChange={(value) => setValue("vatRate", value)}
+                    vatAmount={calculation.vatAmount}
+                    whtEnabled={watchIsWht || false}
+                    onWhtToggle={handleWhtToggle}
+                    whtRate={watchWhtRate}
+                    whtType={watchWhtType}
+                    onWhtRateSelect={(rate, type) => {
+                      setValue("whtRate", rate);
+                      setValue("whtType", type);
+                    }}
+                    whtAmount={calculation.whtAmount}
+                    whtLabel={config.fields.whtField.label}
+                    whtDescription={config.fields.whtField.description}
+                    whtChangeInfo={whtChangeInfo}
+                    documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
+                    onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
+                    totalWithVat={calculation.totalWithVat}
+                    netAmount={calculation.netAmount}
+                    netAmountLabel={config.fields.netAmountLabel}
+                    showCalculationSummary={false}
+                  />
+
+                  <div className="border-t border-border" />
+
                   {/* Fields Section */}
                   <TransactionFieldsSection
                     config={fieldsConfig}
@@ -1448,32 +1480,17 @@ export function UnifiedTransactionForm({
                   {/* Divider */}
                   <div className="border-t border-border" />
 
-                  {/* Tax & Amount Section */}
-                  <TransactionAmountCard
-                    mode={mode}
-                    type={config.type}
-                    amount={watchAmount || 0}
-                    onAmountChange={(value) => setValue("amount", value)}
+                  {/* Calculation Summary */}
+                  <CalculationSummary
+                    baseAmount={watchAmount || 0}
                     vatRate={watchVatRate || 0}
-                    onVatRateChange={(value) => setValue("vatRate", value)}
                     vatAmount={calculation.vatAmount}
-                    whtEnabled={watchIsWht || false}
-                    onWhtToggle={handleWhtToggle}
-                    whtRate={watchWhtRate}
-                    whtType={watchWhtType}
-                    onWhtRateSelect={(rate, type) => {
-                      setValue("whtRate", rate);
-                      setValue("whtType", type);
-                    }}
-                    whtAmount={calculation.whtAmount}
-                    whtLabel={config.fields.whtField.label}
-                    whtDescription={config.fields.whtField.description}
-                    whtChangeInfo={whtChangeInfo}
-                    documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
-                    onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
                     totalWithVat={calculation.totalWithVat}
+                    whtRate={watchWhtRate}
+                    whtAmount={calculation.whtAmount}
                     netAmount={calculation.netAmount}
-                    netAmountLabel={config.fields.netAmountLabel}
+                    type={config.type}
+                    showWhtNote={(watchIsWht || false) && !!(watchWhtRate)}
                   />
 
                   {/* Payer Section (expense only, create mode) */}
