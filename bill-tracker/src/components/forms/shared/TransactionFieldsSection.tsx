@@ -257,20 +257,21 @@ export function TransactionFieldsSection({
   // Handle input mode toggle
   const handleInputModeToggle = (newMode: AmountInputMode) => {
     if (newMode === amountInputMode) return;
-    
-    // Convert current display amount to new mode
+
+    // Keep the displayed number as-is; only reinterpret it under the new mode
     const currentValue = parseFloat(displayAmount) || 0;
-    
+
+    isUserInputRef.current = true;
+
     if (newMode === "includingVat" && vatRate > 0) {
-      // Switching to "including VAT" - multiply by (1 + rate)
-      const includingVat = Math.trunc(currentValue * (1 + vatRate / 100) * 100) / 100;
-      setDisplayAmount(String(includingVat));
-    } else if (newMode === "beforeVat" && vatRate > 0) {
-      // Switching to "before VAT" - divide by (1 + rate)
+      // The displayed value is now treated as including VAT → store base amount
       const beforeVat = Math.trunc((currentValue / (1 + vatRate / 100)) * 100) / 100;
-      setDisplayAmount(String(beforeVat));
+      setValue("amount", beforeVat);
+    } else {
+      // The displayed value is now treated as before VAT → store as-is
+      setValue("amount", currentValue);
     }
-    
+
     setAmountInputMode(newMode);
   };
   
