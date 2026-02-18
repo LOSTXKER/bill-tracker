@@ -247,7 +247,7 @@ export function TransactionFieldsSection({
     
     if (amountInputMode === "includingVat" && vatRate > 0) {
       // Convert from including VAT to before VAT
-      const beforeVat = Math.trunc((numValue / (1 + vatRate / 100)) * 100) / 100;
+      const beforeVat = Math.round((numValue / (1 + vatRate / 100)) * 100) / 100;
       setValue("amount", beforeVat);
     } else {
       setValue("amount", numValue);
@@ -265,7 +265,7 @@ export function TransactionFieldsSection({
 
     if (newMode === "includingVat" && vatRate > 0) {
       // The displayed value is now treated as including VAT → store base amount
-      const beforeVat = Math.trunc((currentValue / (1 + vatRate / 100)) * 100) / 100;
+      const beforeVat = Math.round((currentValue / (1 + vatRate / 100)) * 100) / 100;
       setValue("amount", beforeVat);
     } else {
       // The displayed value is now treated as before VAT → store as-is
