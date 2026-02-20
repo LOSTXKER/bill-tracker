@@ -66,7 +66,7 @@ export const POST = withCompanyAccessFromParams(
       where: { id: params.paymentId },
       include: {
         Expense: {
-          select: { id: true, companyId: true, description: true },
+          select: { id: true, companyId: true, description: true, approvalStatus: true },
         },
         PaidByUser: {
           select: { id: true, name: true },
@@ -81,6 +81,12 @@ export const POST = withCompanyAccessFromParams(
     // Check company access
     if (payment.Expense.companyId !== company.id) {
       return apiResponse.forbidden("ไม่มีสิทธิ์แก้ไขข้อมูลนี้");
+    }
+
+    // Prevent settling payments for unapproved expenses
+    const approvalStatus = payment.Expense.approvalStatus;
+    if (approvalStatus === "PENDING" || approvalStatus === "REJECTED") {
+      return apiResponse.badRequest("ไม่สามารถโอนคืนได้ เนื่องจากรายจ่ายยังไม่ได้รับอนุมัติ");
     }
 
     // Check if already settled

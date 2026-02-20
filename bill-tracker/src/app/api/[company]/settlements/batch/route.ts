@@ -29,13 +29,14 @@ export const POST = withCompanyAccessFromParams(
       return apiResponse.badRequest("กรุณาระบุรายการที่ต้องการโอนคืน");
     }
 
-    // Find all payments
+    // Find all payments (only for approved / not-required expenses)
     const payments = await prisma.expensePayment.findMany({
       where: {
         id: { in: paymentIds },
         Expense: {
           companyId: company.id,
           deletedAt: null,
+          approvalStatus: { in: ["APPROVED", "NOT_REQUIRED"] },
         },
       },
       include: {

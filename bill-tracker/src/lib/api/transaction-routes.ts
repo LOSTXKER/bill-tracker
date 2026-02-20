@@ -605,18 +605,26 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     }
 
     // For expenses: Check if any payment is SETTLED (prevent editing payer-related fields)
+    // Only block when the expense is already approved/not-required AND has settled payments
+    // Unapproved expenses (PENDING/REJECTED) should always be editable
     if (config.modelName === "expense") {
-      const settledPayments = await prisma.expensePayment.findFirst({
-        where: {
-          expenseId: id,
-          settlementStatus: "SETTLED",
-        },
-      });
+      const approvalDone =
+        existingItem.approvalStatus === "APPROVED" ||
+        existingItem.approvalStatus === "NOT_REQUIRED";
 
-      if (settledPayments) {
-        throw ApiErrors.badRequest(
-          "ไม่สามารถแก้ไขรายจ่ายนี้ได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
-        );
+      if (approvalDone) {
+        const settledPayments = await prisma.expensePayment.findFirst({
+          where: {
+            expenseId: id,
+            settlementStatus: "SETTLED",
+          },
+        });
+
+        if (settledPayments) {
+          throw ApiErrors.badRequest(
+            "ไม่สามารถแก้ไขรายจ่ายนี้ได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
+          );
+        }
       }
     }
 
