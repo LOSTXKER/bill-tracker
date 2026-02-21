@@ -604,9 +604,9 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       throw ApiErrors.forbidden();
     }
 
-    // For expenses: Check if any payment is SETTLED (prevent editing payer-related fields)
-    // Only block when the expense is already approved/not-required AND has settled payments
-    // Unapproved expenses (PENDING/REJECTED) should always be editable
+    // For expenses: Check if any payment is SETTLED
+    // Only block changes to financial fields — metadata (contact, description, notes, etc.) can
+    // always be corrected even after settlement.
     if (config.modelName === "expense") {
       const approvalDone =
         existingItem.approvalStatus === "APPROVED" ||
@@ -621,9 +621,21 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
         });
 
         if (settledPayments) {
-          throw ApiErrors.badRequest(
-            "ไม่สามารถแก้ไขรายจ่ายนี้ได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
+          // Financial fields that must not change after settlement
+          const lockedFinancialFields = [
+            "amount", "vatRate", "vatAmount", "netPaid",
+            "isWht", "whtRate", "whtAmount", "whtType",
+            "paymentMethod", "internalCompanyId",
+          ];
+          const changedFinancialFields = lockedFinancialFields.filter(
+            (f) => bodyForCheck[f] !== undefined &&
+                   JSON.stringify(bodyForCheck[f]) !== JSON.stringify(existingItem[f])
           );
+          if (changedFinancialFields.length > 0) {
+            throw ApiErrors.badRequest(
+              "ไม่สามารถแก้ไขยอดเงินหรือข้อมูลการชำระเงินได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
+            );
+          }
         }
       }
     }
