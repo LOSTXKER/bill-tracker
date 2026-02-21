@@ -20,7 +20,6 @@ import {
   MinusCircle,
   Loader2,
   RotateCcw,
-  Filter,
 } from "lucide-react";
 import { ImportPanel, type AccountingRow } from "./ImportPanel";
 import { ReconcileTable, type MatchedPair, type SystemItem, type MatchStatus } from "./ReconcileTable";
@@ -164,7 +163,6 @@ function runAutoMatch(
   return pairs;
 }
 
-type FilterMode = "all" | "matched" | "unmatched" | "ai";
 
 // ---------------------------------------------------------------------------
 // Summary Bar Component
@@ -297,7 +295,6 @@ export function ReconcileView({
   const [pairs, setPairs] = useState<MatchedPair[]>([]);
   const [showImport, setShowImport] = useState(false);
   const [isAILoading, setIsAILoading] = useState(false);
-  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [selectedAccountingIndex, setSelectedAccountingIndex] = useState<number | null>(null);
 
@@ -495,27 +492,9 @@ export function ReconcileView({
     setPairs([]);
     setSelectedSystemId(null);
     setSelectedAccountingIndex(null);
-    setFilterMode("all");
   };
 
-  const filteredPairs = useMemo(() => {
-    if (filterMode === "all") return pairs;
-    if (filterMode === "matched")
-      return pairs.filter(
-        (p) =>
-          p.status === "exact" ||
-          p.status === "strong" ||
-          p.status === "fuzzy" ||
-          (p.status === "ai" && p.userConfirmed)
-      );
-    if (filterMode === "unmatched")
-      return pairs.filter(
-        (p) => p.status === "system-only" || p.status === "accounting-only"
-      );
-    if (filterMode === "ai")
-      return pairs.filter((p) => p.status === "ai");
-    return pairs;
-  }, [pairs, filterMode]);
+  const filteredPairs = useMemo(() => pairs, [pairs]);
 
   const unmatchedSystemCount = pairs.filter((p) => p.status === "system-only").length;
   const unmatchedAccountingCount = pairs.filter((p) => p.status === "accounting-only").length;
@@ -578,20 +557,6 @@ export function ReconcileView({
 
         {accountingItems.length > 0 && (
           <>
-            {/* Filter */}
-            <Select value={filterMode} onValueChange={(v) => setFilterMode(v as FilterMode)}>
-              <SelectTrigger className="h-9 w-40 gap-1">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                <SelectItem value="matched">ตรงกันแล้ว</SelectItem>
-                <SelectItem value="unmatched">ยังไม่ตรง</SelectItem>
-                <SelectItem value="ai">AI แนะนำ</SelectItem>
-              </SelectContent>
-            </Select>
-
             {/* AI Match button */}
             <Button
               variant="outline"
@@ -643,30 +608,6 @@ export function ReconcileView({
         systemItems={systemItems}
         accountingItems={accountingItems}
       />
-
-      {/* Manual link hint */}
-      {selectedSystemId && selectedAccountingIndex === null && (
-        <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-2">
-          <span className="text-primary font-medium">เลือกรายการในระบบแล้ว</span>
-          — คลิกที่รายการในรายงานบัญชีฝั่งขวาเพื่อจับคู่ด้วยตนเอง
-        </div>
-      )}
-      {selectedAccountingIndex !== null && selectedSystemId === null && (
-        <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-2">
-          <span className="text-primary font-medium">เลือกรายการรายงานบัญชีแล้ว</span>
-          — คลิกที่รายการในระบบเว็บฝั่งซ้ายเพื่อจับคู่ด้วยตนเอง
-        </div>
-      )}
-      {selectedSystemId && selectedAccountingIndex !== null && (
-        <div className="text-xs bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 flex items-center gap-2">
-          <span className="text-primary font-medium">เลือกทั้ง 2 ฝั่งแล้ว</span>
-          — กดปุ่ม
-          <span className="inline-flex items-center gap-0.5 text-primary font-medium">
-            🔗 เชื่อม
-          </span>
-          ที่ตรงกลางเพื่อจับคู่
-        </div>
-      )}
 
       {/* Main table */}
       <ReconcileTable
