@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, Plus, Trash2, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, FileText, Plus, Trash2, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface AccountingRow {
@@ -83,10 +83,11 @@ interface ImportPanelProps {
   open: boolean;
   onClose: () => void;
   onImport: (rows: AccountingRow[]) => void;
+  companyCode?: string;
 }
 
-export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
-  const [step, setStep] = useState<"choose" | "mapping" | "preview" | "manual">("choose");
+export function ImportPanel({ open, onClose, onImport, companyCode }: ImportPanelProps) {
+  const [step, setStep] = useState<"choose" | "mapping" | "preview" | "manual" | "pdf-loading">("choose");
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [rawData, setRawData] = useState<string[][]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
@@ -111,6 +112,7 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
   ]);
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [pdfFileName, setPdfFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
@@ -120,6 +122,7 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
     setColumnMapping({ date: "", invoiceNumber: "", vendorName: "", taxId: "", baseAmount: "", vatAmount: "" });
     setPreview([]);
     setFileError("");
+    setPdfFileName("");
   };
 
   const handleClose = () => {
@@ -141,7 +144,41 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
     return mapping;
   };
 
-  const parseFile = async (file: File) => {
+  const parsePdf = async (file: File) => {
+    if (!companyCode) {
+      setFileError("ไม่พบรหัสบริษัท กรุณาลองใหม่");
+      return;
+    }
+    setFileError("");
+    setPdfFileName(file.name);
+    setStep("pdf-loading");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/${companyCode}/reconcile/extract-pdf`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setStep("choose");
+        setFileError(data.error ?? "AI ไม่สามารถอ่าน PDF ได้");
+        return;
+      }
+
+      setPreview(data.rows as AccountingRow[]);
+      setStep("preview");
+    } catch {
+      setStep("choose");
+      setFileError("เกิดข้อผิดพลาดในการส่งไฟล์ กรุณาลองใหม่");
+    }
+  };
+
+  const parseExcel = async (file: File) => {
     setFileError("");
     try {
       const XLSX = await import("xlsx");
@@ -175,9 +212,19 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
     }
   };
 
+  const parseFile = async (file: File) => {
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      await parsePdf(file);
+    } else {
+      await parseExcel(file);
+    }
+  };
+
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) parseFile(file);
+    // Reset input so same file can be re-uploaded
+    e.target.value = "";
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -305,11 +352,18 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
             >
               <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
               <p className="font-medium text-foreground">วางไฟล์ที่นี่ หรือคลิกเพื่อเลือกไฟล์</p>
-              <p className="text-sm text-muted-foreground mt-1">รองรับ .xlsx, .xls, .csv</p>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="inline-flex items-center gap-1 text-xs bg-muted text-muted-foreground rounded px-2 py-0.5">
+                  <FileSpreadsheet className="h-3 w-3" /> .xlsx / .xls / .csv
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5">
+                  <FileText className="h-3 w-3" /> .pdf (AI อ่าน)
+                </span>
+              </div>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,.pdf"
                 className="hidden"
                 onChange={handleFileInput}
               />
@@ -339,6 +393,25 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
               <Plus className="h-4 w-4" />
               กรอกข้อมูลเองทีละแถว
             </Button>
+          </div>
+        )}
+
+        {/* Step: PDF Loading */}
+        {step === "pdf-loading" && (
+          <div className="py-12 flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="h-16 w-16 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
+                <FileText className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                <Loader2 className="h-3.5 w-3.5 text-primary-foreground animate-spin" />
+              </div>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="font-semibold text-foreground">AI กำลังอ่าน PDF...</p>
+              <p className="text-sm text-muted-foreground">{pdfFileName}</p>
+              <p className="text-xs text-muted-foreground">Gemini กำลัง extract ตารางภาษี อาจใช้เวลา 10-30 วินาที</p>
+            </div>
           </div>
         )}
 
@@ -431,7 +504,18 @@ export function ImportPanel({ open, onClose, onImport }: ImportPanelProps) {
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-2 text-sm bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
               <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-              <span>พร้อมนำเข้า <strong>{preview.length}</strong> รายการ</span>
+              <span>
+                {pdfFileName ? (
+                  <>AI อ่าน PDF สำเร็จ — พบ <strong>{preview.length}</strong> รายการ</>
+                ) : (
+                  <>พร้อมนำเข้า <strong>{preview.length}</strong> รายการ</>
+                )}
+              </span>
+              {pdfFileName && (
+                <span className="ml-auto inline-flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 rounded px-1.5 py-0.5">
+                  <FileText className="h-3 w-3" /> PDF
+                </span>
+              )}
             </div>
 
             <div className="rounded-lg border overflow-hidden max-h-[300px] overflow-y-auto">

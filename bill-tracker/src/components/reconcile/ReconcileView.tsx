@@ -686,6 +686,7 @@ export function ReconcileView({
         open={showImport}
         onClose={() => setShowImport(false)}
         onImport={handleImport}
+        companyCode={companyCode}
       />
     </div>
   );
