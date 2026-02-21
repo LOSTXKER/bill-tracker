@@ -160,7 +160,7 @@ async function VATReport({
         vatRate: { gt: 0 },
         deletedAt: null,
       },
-      include: { Company: true, InternalCompany: true },
+      include: { Company: true, InternalCompany: true, Contact: true },
       orderBy: { billDate: "asc" },
     }),
     // Income doesn't have internalCompanyId yet, always filter by companyId
@@ -171,6 +171,7 @@ async function VATReport({
         vatRate: { gt: 0 },
         deletedAt: null,
       },
+      include: { Contact: true },
       orderBy: { receiveDate: "asc" },
     }),
   ]);
@@ -271,7 +272,8 @@ async function VATReport({
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
                   <TableHead className="text-muted-foreground font-medium">เลขที่ใบกำกับ</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ติดต่อ</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">คำอธิบายรายการ</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">ยอดก่อน VAT</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
                 </TableRow>
@@ -279,11 +281,22 @@ async function VATReport({
               <TableBody>
                 {expenses.map((expense: typeof expenses[number]) => (
                   <TableRow key={expense.id}>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
-                    <TableCell>{expense.invoiceNumber || "-"}</TableCell>
-                    <TableCell>{expense.description || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {expense.invoiceNumber || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {expense.Contact?.name ? (
+                        <span className="font-medium">{expense.Contact.name}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                      {expense.description || "-"}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(expense.amount))}
                     </TableCell>
@@ -318,7 +331,8 @@ async function VATReport({
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
                   <TableHead className="text-muted-foreground font-medium">เลขที่ใบกำกับ</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ผู้ติดต่อ</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">คำอธิบายรายการ</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">ยอดก่อน VAT</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
                 </TableRow>
@@ -326,11 +340,22 @@ async function VATReport({
               <TableBody>
                 {incomes.map((income: typeof incomes[number]) => (
                   <TableRow key={income.id}>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
-                    <TableCell>{income.invoiceNumber || "-"}</TableCell>
-                    <TableCell>{income.source || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {income.invoiceNumber || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {income.Contact?.name ? (
+                        <span className="font-medium">{income.Contact.name}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                      {income.source || "-"}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(income.amount))}
                     </TableCell>
