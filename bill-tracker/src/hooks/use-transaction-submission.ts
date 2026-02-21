@@ -269,9 +269,11 @@ export function useTransactionSubmission({
         }),
       });
 
-      if (!res.ok) throw new Error(`Failed to update ${config.type}`);
-
       const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || `ไม่สามารถบันทึกการแก้ไขได้`);
+      }
       const updatedData = result.data?.[config.type] || result[config.type];
       
       // Update local state

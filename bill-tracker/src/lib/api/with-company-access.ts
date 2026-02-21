@@ -141,12 +141,12 @@ export function withCompanyAccess(
       });
 
       if (!access) {
-        throw ApiErrors.forbidden("You don't have access to this company");
+        throw ApiErrors.forbidden("คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้");
       }
 
       // Check if owner is required
       if (options.requireOwner && !access.isOwner) {
-        throw ApiErrors.forbidden("Owner access required");
+        throw ApiErrors.forbidden("เฉพาะเจ้าของบริษัทเท่านั้นที่ดำเนินการนี้ได้");
       }
 
       // OPTIMIZED: Check permission using already-fetched access data
@@ -156,7 +156,7 @@ export function withCompanyAccess(
 
         if (!hasAccess) {
           throw ApiErrors.forbidden(
-            `Missing permission: ${options.permission}`
+            "คุณไม่มีสิทธิ์ดำเนินการนี้"
           );
         }
       }

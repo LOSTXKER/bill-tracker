@@ -521,7 +521,7 @@ export function createGetHandler<TModel>(config: TransactionRouteConfig<TModel, 
     );
 
     if (!hasAccess) {
-      throw ApiErrors.forbidden();
+      throw ApiErrors.forbidden("คุณไม่มีสิทธิ์ดูรายการนี้");
     }
 
     return apiResponse.success({ [config.modelName]: item });
@@ -601,7 +601,7 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
     }
 
     if (!hasAccess) {
-      throw ApiErrors.forbidden();
+      throw ApiErrors.forbidden("คุณไม่มีสิทธิ์แก้ไขรายการนี้ เฉพาะเจ้าของหรือผู้มีสิทธิ์เท่านั้น");
     }
 
     // For expenses: Block changes to financial fields when payment is SETTLED.

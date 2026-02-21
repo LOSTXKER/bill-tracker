@@ -14,12 +14,12 @@ export class ApiError extends Error {
 }
 
 export const ApiErrors = {
-  unauthorized: () => new ApiError(401, "Unauthorized", "UNAUTHORIZED"),
-  forbidden: (message = "Access denied") => new ApiError(403, message, "FORBIDDEN"),
-  notFound: (resource = "Resource") => new ApiError(404, `${resource} not found`, "NOT_FOUND"),
-  badRequest: (message = "Bad request") => new ApiError(400, message, "BAD_REQUEST"),
-  tooManyRequests: () => new ApiError(429, "Too many requests", "RATE_LIMITED"),
-  internal: (message = "Internal server error") => new ApiError(500, message, "INTERNAL_ERROR"),
-  conflict: (message = "Conflict") => new ApiError(409, message, "CONFLICT"),
-  unprocessable: (message = "Unprocessable entity") => new ApiError(422, message, "UNPROCESSABLE"),
+  unauthorized: () => new ApiError(401, "กรุณาเข้าสู่ระบบ", "UNAUTHORIZED"),
+  forbidden: (message = "คุณไม่มีสิทธิ์ดำเนินการนี้") => new ApiError(403, message, "FORBIDDEN"),
+  notFound: (resource = "รายการ") => new ApiError(404, `ไม่พบ${resource}`, "NOT_FOUND"),
+  badRequest: (message = "ข้อมูลไม่ถูกต้อง") => new ApiError(400, message, "BAD_REQUEST"),
+  tooManyRequests: () => new ApiError(429, "คำขอมากเกินไป กรุณารอสักครู่", "RATE_LIMITED"),
+  internal: (message = "เกิดข้อผิดพลาดภายในระบบ") => new ApiError(500, message, "INTERNAL_ERROR"),
+  conflict: (message = "ข้อมูลขัดแย้ง") => new ApiError(409, message, "CONFLICT"),
+  unprocessable: (message = "ไม่สามารถประมวลผลได้") => new ApiError(422, message, "UNPROCESSABLE"),
 };
