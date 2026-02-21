@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -186,6 +187,10 @@ export function TransactionTableRow({
     transactionId: transaction.id,
   });
 
+  // Detail page URL — used for both overlay link (right-click) and onClick
+  const detailPath = config.type === "expense" ? "expenses" : "incomes";
+  const detailUrl = `/${companyCode}/${detailPath}/${transaction.id}`;
+
   // Handle row click - open preview if available, otherwise navigate
   const handleClick = () => {
     if (onPreview) {
@@ -229,12 +234,12 @@ export function TransactionTableRow({
 
   return (
     <TableRow
-      className="cursor-pointer hover:bg-muted/50 transition-colors border-b border-border/50"
+      className="relative cursor-pointer hover:bg-muted/50 transition-colors border-b border-border/50"
       onClick={handleClick}
     >
-      {/* Selection checkbox */}
+      {/* Selection checkbox — above overlay link */}
       {onToggleSelect && (
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={selected}
             onCheckedChange={onToggleSelect}
@@ -243,15 +248,20 @@ export function TransactionTableRow({
         </TableCell>
       )}
 
-      {/* Created At - when the record was created */}
+      {/* Created At — first non-checkbox cell: contains invisible overlay link covering full row */}
       {config.showCreatedAt && (
-        <TableCell className="whitespace-nowrap text-muted-foreground text-sm">
+        <TableCell className="relative whitespace-nowrap text-muted-foreground text-sm">
+          {/* Overlay link: enables right-click "Open in new tab" for the whole row */}
+          <Link href={detailUrl} className="absolute inset-0" tabIndex={-1} aria-hidden />
           {transaction.createdAt ? formatThaiDate(new Date(transaction.createdAt)) : "-"}
         </TableCell>
       )}
 
       {/* Bill/Receive Date */}
-      <TableCell className="whitespace-nowrap text-foreground">
+      <TableCell className={config.showCreatedAt ? "whitespace-nowrap text-foreground" : "relative whitespace-nowrap text-foreground"}>
+        {!config.showCreatedAt && (
+          <Link href={detailUrl} className="absolute inset-0" tabIndex={-1} aria-hidden />
+        )}
         {date ? formatThaiDate(date) : "-"}
       </TableCell>
 
@@ -282,7 +292,7 @@ export function TransactionTableRow({
 
       {/* Contact (for expense/income) or Requester (for reimbursement) */}
       {config.showRequester ? (
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
           {transaction.requester ? (
             <span className="text-sm font-medium">{transaction.requester.name}</span>
           ) : (
@@ -337,7 +347,7 @@ export function TransactionTableRow({
 
       {/* Creator (for expense/income) */}
       {config.showCreator && (
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
           {transaction.creator ? (
             <UserBadge user={transaction.creator} showEmail />
           ) : (
@@ -399,7 +409,7 @@ export function TransactionTableRow({
 
       {/* LINE Notification (for expense/income) */}
       {config.showLineButton && (
-        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+        <TableCell className="relative z-10 text-center" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"

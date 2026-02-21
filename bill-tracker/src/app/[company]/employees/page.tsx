@@ -300,6 +300,7 @@ export default function EmployeesPage() {
           title="รายชื่อพนักงาน"
           total={filteredMembers.length}
           onRowClick={handleRowClick}
+          getRowHref={(member) => `/${companyCode.toLowerCase()}/employees/${member.id}`}
           rowClassName={() => "cursor-pointer"}
           headerActions={
             <div className="flex gap-2">

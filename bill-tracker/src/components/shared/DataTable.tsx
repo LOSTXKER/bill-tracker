@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -68,6 +69,8 @@ export interface DataTableProps<T> {
   // Row
   onRowClick?: (item: T) => void;
   rowClassName?: (item: T) => string;
+  /** Return an href to enable right-click "Open in new tab" for the row */
+  getRowHref?: (item: T) => string;
 }
 
 // ============================================================================
@@ -148,6 +151,7 @@ export function DataTable<T>({
   onSort,
   onRowClick,
   rowClassName,
+  getRowHref,
 }: DataTableProps<T>) {
   // Convert selectedIds to Set for efficient lookup
   const selectedSet =
@@ -297,19 +301,21 @@ export function DataTable<T>({
                 const canSelect = !isRowSelectable || isRowSelectable(item);
                 const customClassName = rowClassName?.(item) || "";
 
+                const rowHref = getRowHref?.(item);
+
                 return (
                   <TableRow
                     key={rowId}
                     className={cn(
                       "transition-colors",
-                      onRowClick && "cursor-pointer",
+                      (onRowClick || rowHref) && "relative cursor-pointer",
                       isSelected && "bg-primary/5",
                       customClassName
                     )}
                     onClick={() => onRowClick?.(item)}
                   >
                     {selectable && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
                         {canSelect && (
                           <Checkbox
                             checked={isSelected}
@@ -318,15 +324,21 @@ export function DataTable<T>({
                         )}
                       </TableCell>
                     )}
-                    {columns.map((column) => (
+                    {columns.map((column, colIndex) => (
                       <TableCell
                         key={column.key}
                         className={cn(
+                          /* First content column holds the invisible overlay link */
+                          !selectable && colIndex === 0 && rowHref && "relative",
                           column.align === "center" && "text-center",
                           column.align === "right" && "text-right",
                           column.className
                         )}
                       >
+                        {/* Overlay link on the first column — stretches across full row via tr position:relative */}
+                        {!selectable && colIndex === 0 && rowHref && (
+                          <Link href={rowHref} className="absolute inset-0" tabIndex={-1} aria-hidden />
+                        )}
                         {column.render
                           ? column.render(item, index)
                           : String((item as Record<string, unknown>)[column.key] ?? "-")}

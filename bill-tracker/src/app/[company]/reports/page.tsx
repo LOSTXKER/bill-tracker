@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -279,8 +280,9 @@ async function VATReport({
               </TableHeader>
               <TableBody>
                 {expenses.map((expense: typeof expenses[number]) => (
-                  <TableRow key={expense.id}>
-                    <TableCell className="whitespace-nowrap">
+                  <TableRow key={expense.id} className="relative hover:bg-muted/50 cursor-pointer">
+                    <TableCell className="relative whitespace-nowrap">
+                      <Link href={`/${companyCode}/expenses/${expense.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>
@@ -334,8 +336,9 @@ async function VATReport({
               </TableHeader>
               <TableBody>
                 {incomes.map((income: typeof incomes[number]) => (
-                  <TableRow key={income.id}>
-                    <TableCell className="whitespace-nowrap">
+                  <TableRow key={income.id} className="relative hover:bg-muted/50 cursor-pointer">
+                    <TableCell className="relative whitespace-nowrap">
+                      <Link href={`/${companyCode}/incomes/${income.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>
@@ -514,8 +517,9 @@ async function WHTReport({
               </TableHeader>
               <TableBody>
                 {expenses.map((expense: typeof expenses[number]) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>
+                  <TableRow key={expense.id} className="relative hover:bg-muted/50 cursor-pointer">
+                    <TableCell className="relative">
+                      <Link href={`/${companyCode}/expenses/${expense.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>{expense.description || "-"}</TableCell>
@@ -568,8 +572,9 @@ async function WHTReport({
               </TableHeader>
               <TableBody>
                 {incomes.map((income: typeof incomes[number]) => (
-                  <TableRow key={income.id}>
-                    <TableCell>
+                  <TableRow key={income.id} className="relative hover:bg-muted/50 cursor-pointer">
+                    <TableCell className="relative">
+                      <Link href={`/${companyCode}/incomes/${income.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>{income.source || "-"}</TableCell>
@@ -848,8 +853,9 @@ async function MonthlySummary({
               </TableHeader>
               <TableBody>
                 {allExpenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell className="whitespace-nowrap">
+                  <TableRow key={expense.id} className="relative hover:bg-muted/50 cursor-pointer">
+                    <TableCell className="relative whitespace-nowrap">
+                      <Link href={`/${companyCode}/expenses/${expense.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate">
@@ -906,8 +912,9 @@ async function MonthlySummary({
               </TableHeader>
               <TableBody>
                 {allIncomes.map((income) => (
-                  <TableRow key={income.id}>
-                    <TableCell className="whitespace-nowrap">
+                  <TableRow key={income.id} className="relative hover:bg-muted/50 cursor-pointer">
+                    <TableCell className="relative whitespace-nowrap">
+                      <Link href={`/${companyCode}/incomes/${income.id}`} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate">

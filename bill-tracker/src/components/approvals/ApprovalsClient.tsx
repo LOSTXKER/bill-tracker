@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpCircle, ArrowDownCircle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -299,20 +300,25 @@ export function ApprovalsClient({
                 const date = item.submittedAt ? new Date(item.submittedAt) : null;
                 const submitterName = item.submittedByUser?.name || item.creator?.name || "ไม่ระบุ";
 
+                const itemBasePath = item._type === "expense" ? "expenses" : "incomes";
+                const rowHref = `/${companyCode}/${itemBasePath}/${item.id}`;
+
                 return (
                   <TableRow
                     key={item.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="relative cursor-pointer hover:bg-muted/50"
                     onClick={() => handleRowClick(item)}
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
                         onCheckedChange={() => toggleSelect(item.id)}
                         aria-label="เลือกรายการ"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="relative">
+                      {/* Overlay link: enables right-click "Open in new tab" for full row */}
+                      <Link href={rowHref} className="absolute inset-0" tabIndex={-1} aria-hidden />
                       <Badge
                         variant="outline"
                         className={cn(
@@ -350,7 +356,7 @@ export function ApprovalsClient({
                     )}>
                       {formatCurrency(amount)}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
                       <QuickApprovalCell
                         transactionId={item.id}
                         transactionType={item._type as "expense" | "income"}
