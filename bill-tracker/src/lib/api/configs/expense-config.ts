@@ -366,18 +366,26 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
         }
       }
 
-      // Delete existing payments (except SETTLED user payments)
+      // Find SETTLED user payments that must be preserved
+      const settledUserPayments = existingPayments.filter(
+        (p) => p.paidByType === "USER" && p.settlementStatus === "SETTLED"
+      );
+      const settledUserIds = new Set(settledUserPayments.map((p) => p.paidByUserId));
+
+      // Delete all non-settled payments
       await prisma.expensePayment.deleteMany({
         where: {
           expenseId: item.id,
-          OR: [
-            { settlementStatus: { not: "SETTLED" } },
-            { paidByType: { not: "USER" } },
-          ],
+          NOT: {
+            AND: [
+              { paidByType: "USER" },
+              { settlementStatus: "SETTLED" },
+            ],
+          },
         },
       });
 
-      // Create new payments
+      // Create new payments — skip if an identical settled payment already exists
       if (body.payers.length > 0) {
         for (const payer of body.payers as Array<{
           paidByType: PaidByType;
@@ -388,6 +396,11 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
           paidByBankAccount?: string | null;
           amount: number;
         }>) {
+          // Skip if this payer already has a SETTLED payment (avoid duplicates)
+          if (payer.paidByType === "USER" && payer.paidByUserId && settledUserIds.has(payer.paidByUserId)) {
+            continue;
+          }
+
           // Determine settlement status based on payer type
           let settlementStatus: SettlementStatus = "NOT_REQUIRED";
           if (payer.paidByType === "USER") {
