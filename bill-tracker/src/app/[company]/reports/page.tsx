@@ -271,7 +271,6 @@ async function VATReport({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">เลขที่ใบกำกับ</TableHead>
                   <TableHead className="text-muted-foreground font-medium">ผู้ติดต่อ</TableHead>
                   <TableHead className="text-muted-foreground font-medium">คำอธิบายรายการ</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">ยอดก่อน VAT</TableHead>
@@ -283,9 +282,6 @@ async function VATReport({
                   <TableRow key={expense.id}>
                     <TableCell className="whitespace-nowrap">
                       {expense.billDate.toLocaleDateString("th-TH")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {expense.invoiceNumber || "-"}
                     </TableCell>
                     <TableCell>
                       {expense.Contact?.name ? (
@@ -330,7 +326,6 @@ async function VATReport({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">เลขที่ใบกำกับ</TableHead>
                   <TableHead className="text-muted-foreground font-medium">ผู้ติดต่อ</TableHead>
                   <TableHead className="text-muted-foreground font-medium">คำอธิบายรายการ</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">ยอดก่อน VAT</TableHead>
@@ -342,9 +337,6 @@ async function VATReport({
                   <TableRow key={income.id}>
                     <TableCell className="whitespace-nowrap">
                       {income.receiveDate.toLocaleDateString("th-TH")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {income.invoiceNumber || "-"}
                     </TableCell>
                     <TableCell>
                       {income.Contact?.name ? (
