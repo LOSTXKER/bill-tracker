@@ -621,17 +621,25 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
         });
 
         if (settledPayments) {
-          // These fields affect the actual settlement amount — block after settlement
-          const lockedFinancialFields = [
+          // Numeric fields use Number() comparison (Prisma Decimal vs JS number)
+          const numericFields = [
             "amount", "vatRate", "vatAmount", "netPaid",
-            "isWht", "whtRate", "whtAmount", "whtType",
-            "paymentMethod", "internalCompanyId", "payers",
+            "whtRate", "whtAmount",
           ];
-          const changedFinancialFields = lockedFinancialFields.filter((f) => {
+          const otherLockedFields = [
+            "isWht", "whtType", "paymentMethod", "internalCompanyId", "payers",
+          ];
+
+          const hasNumericChange = numericFields.some((f) => {
+            if (bodyForCheck[f] === undefined) return false;
+            return Number(bodyForCheck[f] ?? 0) !== Number(existingItem[f] ?? 0);
+          });
+          const hasOtherChange = otherLockedFields.some((f) => {
             if (bodyForCheck[f] === undefined) return false;
             return JSON.stringify(bodyForCheck[f]) !== JSON.stringify(existingItem[f]);
           });
-          if (changedFinancialFields.length > 0) {
+
+          if (hasNumericChange || hasOtherChange) {
             throw ApiErrors.badRequest(
               "ไม่สามารถแก้ไขยอดเงินหรือข้อมูลการชำระเงินได้ เนื่องจากมีการโอนคืนแล้ว กรุณายกเลิกการโอนคืนก่อน"
             );
