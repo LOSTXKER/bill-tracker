@@ -8,6 +8,7 @@
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import type { AuditAction } from "@prisma/client";
+import { EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 interface CreateAuditLogParams {
   userId: string;
@@ -470,7 +471,10 @@ export async function logWhtChange(
   
   let description = `${changeDesc}${typeLabel}${name}`;
   if (statusRollback) {
-    description += ` (ย้อนสถานะ: ${statusRollback.from} → ${statusRollback.to})`;
+    const wfInfo = entityType === "Expense" ? EXPENSE_WORKFLOW_INFO : INCOME_WORKFLOW_INFO;
+    const fromLabel = (wfInfo as Record<string, { label: string }>)[statusRollback.from]?.label || statusRollback.from;
+    const toLabel = (wfInfo as Record<string, { label: string }>)[statusRollback.to]?.label || statusRollback.to;
+    description += ` (ย้อนสถานะ: ${fromLabel} → ${toLabel})`;
   }
   
   await createAuditLog({

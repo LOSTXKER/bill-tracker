@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { getPreviousStatus, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
 import { DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
+import { EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
 
 interface WorkflowActionsProps {
   companyCode: string;
@@ -145,6 +146,15 @@ export function WorkflowActions({
   // Support both prop names
   const txType = type || transactionType || "expense";
   const status = currentStatus || workflowStatus || "";
+
+  // Get Thai label for a workflow status
+  const getStatusLabel = (s: string) => {
+    const info = txType === "expense"
+      ? EXPENSE_WORKFLOW_INFO[s as keyof typeof EXPENSE_WORKFLOW_INFO]
+      : INCOME_WORKFLOW_INFO[s as keyof typeof INCOME_WORKFLOW_INFO];
+    return info?.label || s;
+  };
+  const statusLabel = getStatusLabel(status);
 
   // Build workflow context for getting previous status
   const workflowContext: TransactionWorkflowContext = {
@@ -343,7 +353,7 @@ export function WorkflowActions({
           transactionId,
           action: "revert",
           targetStatus: previousStatus.value,
-          notes: notes || `ย้อนสถานะจาก ${status} ไปเป็น ${previousStatus.value}`,
+          notes: notes || `ย้อนสถานะจาก "${statusLabel}" ไปเป็น "${previousStatus.label}"`,
         }),
       });
 
@@ -395,7 +405,7 @@ export function WorkflowActions({
             ย้อนสถานะ
           </DialogTitle>
           <DialogDescription>
-            ต้องการย้อนสถานะจาก <strong>"{status}"</strong> กลับไปเป็น <strong>"{previousStatus?.label}"</strong> ใช่หรือไม่?
+            ต้องการย้อนสถานะจาก <strong>"{statusLabel}"</strong> กลับไปเป็น <strong>"{previousStatus?.label}"</strong> ใช่หรือไม่?
           </DialogDescription>
         </DialogHeader>
 
