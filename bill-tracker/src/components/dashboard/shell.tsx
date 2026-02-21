@@ -39,6 +39,7 @@ import {
   ClipboardCheck,
   Send,
   FileSearch,
+  GitCompare,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -224,6 +225,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           href: `/${companyCode}/reports/contacts`,
           icon: Users,
           permission: "expenses:read",
+        },
+        {
+          name: "เทียบรายงานบัญชี",
+          href: `/${companyCode}/reconcile`,
+          icon: GitCompare,
+          permission: "reports:read",
         },
       ],
     },
