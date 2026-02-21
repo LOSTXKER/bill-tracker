@@ -626,8 +626,10 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
             "amount", "vatRate", "vatAmount", "netPaid",
             "whtRate", "whtAmount",
           ];
+          // "payers" is excluded — it's not a Prisma model field (stored in ExpensePayment table)
+          // and afterUpdate already skips deletion of SETTLED payments.
           const otherLockedFields = [
-            "isWht", "whtType", "paymentMethod", "internalCompanyId", "payers",
+            "isWht", "whtType", "paymentMethod", "internalCompanyId",
           ];
 
           const hasNumericChange = numericFields.some((f) => {
