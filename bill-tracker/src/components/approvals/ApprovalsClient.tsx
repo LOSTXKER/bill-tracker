@@ -304,21 +304,20 @@ export function ApprovalsClient({
                 const rowHref = `/${companyCode}/${itemBasePath}/${item.id}`;
 
                 return (
-                  <TableRow
+                  <Link
                     key={item.id}
-                    className="relative cursor-pointer hover:bg-muted/50"
+                    href={rowHref}
                     onClick={() => handleRowClick(item)}
+                    className="table-row cursor-pointer hover:bg-muted/50 transition-colors border-b"
                   >
-                    <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
                         onCheckedChange={() => toggleSelect(item.id)}
                         aria-label="เลือกรายการ"
                       />
                     </TableCell>
-                    <TableCell className="relative">
-                      {/* Overlay link: enables right-click "Open in new tab" for full row */}
-                      <Link href={rowHref} className="absolute inset-0" tabIndex={-1} aria-hidden />
+                    <TableCell>
                       <Badge
                         variant="outline"
                         className={cn(
@@ -356,7 +355,7 @@ export function ApprovalsClient({
                     )}>
                       {formatCurrency(amount)}
                     </TableCell>
-                    <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <QuickApprovalCell
                         transactionId={item.id}
                         transactionType={item._type as "expense" | "income"}
@@ -367,7 +366,7 @@ export function ApprovalsClient({
                         onSuccess={() => router.refresh()}
                       />
                     </TableCell>
-                  </TableRow>
+                  </Link>
                 );
               })}
             </TableBody>

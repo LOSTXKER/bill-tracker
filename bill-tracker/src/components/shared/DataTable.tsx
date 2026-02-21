@@ -302,20 +302,10 @@ export function DataTable<T>({
                 const customClassName = rowClassName?.(item) || "";
 
                 const rowHref = getRowHref?.(item);
-
-                return (
-                  <TableRow
-                    key={rowId}
-                    className={cn(
-                      "transition-colors",
-                      (onRowClick || rowHref) && "relative cursor-pointer",
-                      isSelected && "bg-primary/5",
-                      customClassName
-                    )}
-                    onClick={() => onRowClick?.(item)}
-                  >
+                const rowCells = (
+                  <>
                     {selectable && (
-                      <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         {canSelect && (
                           <Checkbox
                             checked={isSelected}
@@ -324,26 +314,54 @@ export function DataTable<T>({
                         )}
                       </TableCell>
                     )}
-                    {columns.map((column, colIndex) => (
+                    {columns.map((column) => (
                       <TableCell
                         key={column.key}
                         className={cn(
-                          /* First content column holds the invisible overlay link */
-                          !selectable && colIndex === 0 && rowHref && "relative",
                           column.align === "center" && "text-center",
                           column.align === "right" && "text-right",
                           column.className
                         )}
                       >
-                        {/* Overlay link on the first column — stretches across full row via tr position:relative */}
-                        {!selectable && colIndex === 0 && rowHref && (
-                          <Link href={rowHref} className="absolute inset-0" tabIndex={-1} aria-hidden />
-                        )}
                         {column.render
                           ? column.render(item, index)
                           : String((item as Record<string, unknown>)[column.key] ?? "-")}
                       </TableCell>
                     ))}
+                  </>
+                );
+
+                // When a href is provided, render the row as <Link display:table-row>
+                // so right-click "Open in new tab" works natively anywhere on the row.
+                if (rowHref) {
+                  return (
+                    <Link
+                      key={rowId}
+                      href={rowHref}
+                      onClick={() => onRowClick?.(item)}
+                      className={cn(
+                        "table-row transition-colors cursor-pointer hover:bg-muted/50",
+                        isSelected && "bg-primary/5",
+                        customClassName
+                      )}
+                    >
+                      {rowCells}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <TableRow
+                    key={rowId}
+                    className={cn(
+                      "transition-colors",
+                      onRowClick && "cursor-pointer",
+                      isSelected && "bg-primary/5",
+                      customClassName
+                    )}
+                    onClick={() => onRowClick?.(item)}
+                  >
+                    {rowCells}
                   </TableRow>
                 );
               })}
