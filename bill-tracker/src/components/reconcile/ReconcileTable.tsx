@@ -2,7 +2,15 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Zap, Link2, Unlink2, Check, X, AlertTriangle } from "lucide-react";
+import {
+  CheckCircle2,
+  Zap,
+  Link2,
+  Unlink2,
+  Check,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AccountingRow } from "./ImportPanel";
 
@@ -50,13 +58,13 @@ interface ReconcileTableProps {
   onSelectAccounting: (index: number | null) => void;
 }
 
-function formatAmt(n?: number) {
-  if (n === undefined || n === null) return "—";
+function fmt(n?: number) {
+  if (n === undefined || n === null) return "";
   return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatDate(iso?: string) {
-  if (!iso) return "—";
+function fmtDate(iso?: string) {
+  if (!iso) return "";
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
@@ -66,196 +74,60 @@ function formatDate(iso?: string) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// ItemCard — clickable card for unmatched items
-// ---------------------------------------------------------------------------
-function ItemCard({
-  date,
-  vendorName,
-  invoiceNumber,
-  baseAmount,
-  vatAmount,
-  selected,
-  onClick,
-  side,
-}: {
-  date?: string;
-  vendorName?: string;
-  invoiceNumber?: string;
-  baseAmount?: number;
-  vatAmount?: number;
-  selected: boolean;
-  onClick: () => void;
-  side: "system" | "accounting";
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "w-full text-left rounded-lg border px-3 py-2.5 transition-all duration-150 focus:outline-none",
-        selected
-          ? side === "system"
-            ? "border-primary bg-primary/8 ring-2 ring-primary/30 shadow-sm"
-            : "border-amber-500 bg-amber-50/70 dark:bg-amber-950/30 ring-2 ring-amber-400/30 shadow-sm"
-          : "border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/40"
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate leading-tight">
-            {vendorName || "—"}
-          </p>
-          {invoiceNumber && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">{invoiceNumber}</p>
-          )}
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold font-mono">{formatAmt(baseAmount)}</p>
-          {(vatAmount ?? 0) > 0 && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">+{formatAmt(vatAmount)}</p>
-          )}
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground mt-1">{formatDate(date)}</p>
-    </button>
-  );
+// Status badge shown in center column
+function StatusBadge({ pair }: { pair: MatchedPair }) {
+  if (pair.status === "exact" || pair.status === "strong") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        ตรงกัน
+      </span>
+    );
+  }
+  if (pair.status === "fuzzy") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        ใกล้เคียง
+      </span>
+    );
+  }
+  if (pair.status === "ai") {
+    if (pair.userConfirmed) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          ยืนยันแล้ว
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+        <Zap className="h-3.5 w-3.5" />
+        AI แนะนำ
+        {pair.confidence !== undefined && (
+          <span className="opacity-60 font-normal">{Math.round(pair.confidence * 100)}%</span>
+        )}
+      </span>
+    );
+  }
+  if (pair.status === "system-only") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60">
+        — ไม่พบ
+      </span>
+    );
+  }
+  if (pair.status === "accounting-only") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/60">
+        — ไม่พบ
+      </span>
+    );
+  }
+  return null;
 }
 
-// ---------------------------------------------------------------------------
-// MatchedRow — row in the matched section
-// ---------------------------------------------------------------------------
-function MatchedRow({
-  pair,
-  onUnlink,
-  onConfirmAI,
-  onRejectAI,
-}: {
-  pair: MatchedPair;
-  onUnlink: (id: string) => void;
-  onConfirmAI: (id: string) => void;
-  onRejectAI: (id: string) => void;
-}) {
-  const isAIPending = pair.status === "ai" && pair.userConfirmed === undefined;
-  const amtDiff =
-    pair.systemItem && pair.accountingItem
-      ? Math.abs(pair.systemItem.baseAmount - pair.accountingItem.baseAmount)
-      : 0;
-  const hasDiff = amtDiff > 0.01;
-
-  return (
-    <div
-      className={cn(
-        "rounded-lg border overflow-hidden",
-        isAIPending
-          ? "border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20"
-          : hasDiff
-          ? "border-orange-200 dark:border-orange-800"
-          : "border-border bg-card"
-      )}
-    >
-      {/* AI pending banner */}
-      {isAIPending && (
-        <div className="flex items-center justify-between px-3 py-1.5 bg-amber-100/70 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-            <Zap className="h-3.5 w-3.5" />
-            <span className="font-medium">AI แนะนำ</span>
-            {pair.confidence !== undefined && (
-              <span className="opacity-70">({Math.round(pair.confidence * 100)}% มั่นใจ)</span>
-            )}
-            {pair.aiReason && (
-              <span className="opacity-70 hidden sm:inline">— {pair.aiReason}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 px-2 text-xs gap-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-              onClick={() => onRejectAI(pair.id)}
-            >
-              <X className="h-3 w-3" />
-              ไม่ใช่
-            </Button>
-            <Button
-              size="sm"
-              className="h-6 px-2 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => onConfirmAI(pair.id)}
-            >
-              <Check className="h-3 w-3" />
-              ใช่
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Pair content */}
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
-        {/* System side */}
-        <div className="px-3 py-2">
-          <p className="text-xs text-muted-foreground">{formatDate(pair.systemItem?.date)} · ระบบ</p>
-          <p className="text-sm font-medium truncate mt-0.5">{pair.systemItem?.vendorName || "—"}</p>
-          {pair.systemItem?.invoiceNumber && (
-            <p className="text-xs text-muted-foreground truncate">{pair.systemItem.invoiceNumber}</p>
-          )}
-          <p className="text-sm font-semibold font-mono mt-1">{formatAmt(pair.systemItem?.baseAmount)}</p>
-        </div>
-
-        {/* Center connector */}
-        <div className="flex flex-col items-center justify-center px-2 py-2 gap-1">
-          <div className="h-px w-6 bg-muted-foreground/20" />
-          {!isAIPending && (
-            <div className={cn(
-              "h-5 w-5 rounded-full flex items-center justify-center",
-              pair.status === "exact" || pair.status === "strong"
-                ? "bg-emerald-100 dark:bg-emerald-900/40"
-                : "bg-blue-100 dark:bg-blue-900/40"
-            )}>
-              <CheckCircle2 className={cn(
-                "h-3 w-3",
-                pair.status === "exact" || pair.status === "strong"
-                  ? "text-emerald-600"
-                  : "text-blue-600"
-              )} />
-            </div>
-          )}
-          {hasDiff && (
-            <Badge variant="outline" className="text-[9px] px-1 h-3.5 text-orange-600 border-orange-300 whitespace-nowrap">
-              ต่าง {formatAmt(amtDiff)}
-            </Badge>
-          )}
-          <div className="h-px w-6 bg-muted-foreground/20" />
-        </div>
-
-        {/* Accounting side */}
-        <div className="px-3 py-2 border-l border-dashed border-muted">
-          <p className="text-xs text-muted-foreground">{formatDate(pair.accountingItem?.date)} · รายงาน</p>
-          <p className="text-sm font-medium truncate mt-0.5">{pair.accountingItem?.vendorName || "—"}</p>
-          {pair.accountingItem?.invoiceNumber && (
-            <p className="text-xs text-muted-foreground truncate">{pair.accountingItem.invoiceNumber}</p>
-          )}
-          <p className="text-sm font-semibold font-mono mt-1">{formatAmt(pair.accountingItem?.baseAmount)}</p>
-        </div>
-      </div>
-
-      {/* Unlink footer */}
-      {!isAIPending && (
-        <div className="flex justify-end px-3 py-1 border-t border-muted/50">
-          <button
-            onClick={() => onUnlink(pair.id)}
-            className="text-[11px] text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-          >
-            <Unlink2 className="h-3 w-3" />
-            ยกเลิกการจับคู่
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main ReconcileTable
-// ---------------------------------------------------------------------------
 export function ReconcileTable({
   pairs,
   onConfirmAI,
@@ -267,21 +139,6 @@ export function ReconcileTable({
   onSelectSystem,
   onSelectAccounting,
 }: ReconcileTableProps) {
-  const unmatchedSystem = pairs.filter((p) => p.status === "system-only");
-  const unmatchedAccounting = pairs.filter((p) => p.status === "accounting-only");
-  const matched = pairs.filter(
-    (p) =>
-      p.status !== "system-only" && p.status !== "accounting-only"
-  );
-
-  const selectedSystem = unmatchedSystem.find((p) => p.systemItem?.id === selectedSystemId);
-  const selectedAccounting = unmatchedAccounting.find(
-    (p) => p.accountingIndex === selectedAccountingIndex
-  );
-  const canLink = !!selectedSystem && !!selectedAccounting;
-
-  const hasAnyUnmatched = unmatchedSystem.length > 0 || unmatchedAccounting.length > 0;
-
   if (pairs.length === 0) {
     return (
       <div className="rounded-xl border bg-card py-20 text-center text-muted-foreground text-sm">
@@ -290,166 +147,498 @@ export function ReconcileTable({
     );
   }
 
+  // Separate by group for section headers
+  const unmatchedPairs = pairs.filter(
+    (p) => p.status === "system-only" || p.status === "accounting-only"
+  );
+  const aiPairs = pairs.filter((p) => p.status === "ai" && p.userConfirmed === undefined);
+  const matchedPairs = pairs.filter(
+    (p) =>
+      p.status === "exact" ||
+      p.status === "strong" ||
+      p.status === "fuzzy" ||
+      (p.status === "ai" && p.userConfirmed === true)
+  );
+
+  const canLink =
+    selectedSystemId !== null && selectedAccountingIndex !== null;
+
+  const selectedSysItem = unmatchedPairs.find(
+    (p) => p.systemItem?.id === selectedSystemId
+  )?.systemItem;
+  const selectedAccItem = unmatchedPairs.find(
+    (p) => p.accountingIndex === selectedAccountingIndex
+  )?.accountingItem;
+
   return (
-    <div className="space-y-5">
-      {/* ===== UNMATCHED SECTION ===== */}
-      {hasAnyUnmatched && (
-        <div className="rounded-xl border border-dashed border-muted-foreground/30 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30 border-b border-dashed border-muted-foreground/20">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-              <span className="text-sm font-semibold text-foreground">รายการที่ยังไม่ตรงกัน</span>
-              <Badge variant="secondary" className="text-xs">
-                {Math.max(unmatchedSystem.length, unmatchedAccounting.length)} รายการ
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground hidden sm:block">
-              คลิกเลือก 1 รายการจากแต่ละฝั่ง แล้วกด "จับคู่"
-            </p>
-          </div>
+    <div className="space-y-1 rounded-xl border bg-card overflow-hidden">
+      {/* Sticky table with column headers */}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-collapse text-sm">
+          {/* ---- THEAD ---- */}
+          <thead>
+            <tr className="bg-muted/60 border-b">
+              {/* Left: System columns */}
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground w-[90px]">
+                วันที่ (ระบบ)
+              </th>
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">
+                ผู้ขาย / ผู้ติดต่อ
+              </th>
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground w-[110px]">
+                เลขที่ใบกำกับ
+              </th>
+              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground w-[90px]">
+                ยอด (ระบบ)
+              </th>
+              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground w-[80px]">
+                VAT
+              </th>
 
-          {/* Two-column list */}
-          <div className="grid grid-cols-2 divide-x">
-            {/* System unmatched */}
-            <div className="p-3 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                ระบบเว็บ ({unmatchedSystem.length})
-              </p>
-              {unmatchedSystem.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic px-1 py-3 text-center">
-                  ✓ ทุกรายการตรงกันแล้ว
-                </p>
-              ) : (
-                unmatchedSystem.map((p) => (
-                  <ItemCard
-                    key={p.id}
-                    date={p.systemItem?.date}
-                    vendorName={p.systemItem?.vendorName}
-                    invoiceNumber={p.systemItem?.invoiceNumber}
-                    baseAmount={p.systemItem?.baseAmount}
-                    vatAmount={p.systemItem?.vatAmount}
-                    selected={p.systemItem?.id === selectedSystemId}
-                    onClick={() =>
-                      onSelectSystem(
-                        p.systemItem?.id === selectedSystemId ? null : (p.systemItem?.id ?? null)
-                      )
-                    }
-                    side="system"
-                  />
-                ))
-              )}
-            </div>
+              {/* Center divider */}
+              <th className="px-2 py-2.5 text-center text-xs font-semibold text-muted-foreground w-[100px] border-x border-muted">
+                สถานะ
+              </th>
 
-            {/* Accounting unmatched */}
-            <div className="p-3 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                รายงานบัญชี ({unmatchedAccounting.length})
-              </p>
-              {unmatchedAccounting.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic px-1 py-3 text-center">
-                  ✓ ทุกรายการตรงกันแล้ว
-                </p>
-              ) : (
-                unmatchedAccounting.map((p) => (
-                  <ItemCard
-                    key={p.id}
-                    date={p.accountingItem?.date}
-                    vendorName={p.accountingItem?.vendorName}
-                    invoiceNumber={p.accountingItem?.invoiceNumber}
-                    baseAmount={p.accountingItem?.baseAmount}
-                    vatAmount={p.accountingItem?.vatAmount}
-                    selected={p.accountingIndex === selectedAccountingIndex}
-                    onClick={() =>
-                      onSelectAccounting(
-                        p.accountingIndex === selectedAccountingIndex
-                          ? null
-                          : (p.accountingIndex ?? null)
-                      )
-                    }
-                    side="accounting"
-                  />
-                ))
-              )}
-            </div>
-          </div>
+              {/* Right: Accounting columns */}
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground w-[90px]">
+                วันที่ (รายงาน)
+              </th>
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">
+                ชื่อในรายงานบัญชี
+              </th>
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground w-[110px]">
+                เลขที่ (รายงาน)
+              </th>
+              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground w-[90px]">
+                ยอด (รายงาน)
+              </th>
+              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground w-[80px]">
+                VAT
+              </th>
 
-          {/* Link action bar — sticks at bottom of unmatched section */}
-          <div
-            className={cn(
-              "px-4 py-3 border-t flex items-center justify-between gap-3 transition-colors",
-              canLink
-                ? "bg-primary/5 border-primary/20"
-                : "bg-muted/20 border-muted-foreground/10"
-            )}
-          >
-            {canLink ? (
+              {/* Actions col */}
+              <th className="px-2 py-2.5 w-[60px]" />
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-border">
+
+            {/* ===== SECTION: AI Suggestions ===== */}
+            {aiPairs.length > 0 && (
               <>
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium truncate">
-                      {selectedSystem.systemItem?.vendorName}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {formatAmt(selectedSystem.systemItem?.baseAmount)}
-                    </p>
-                  </div>
-                  <Link2 className="h-4 w-4 text-primary flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium truncate">
-                      {selectedAccounting.accountingItem?.vendorName}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {formatAmt(selectedAccounting.accountingItem?.baseAmount)}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  className="gap-1.5 flex-shrink-0"
-                  onClick={() =>
-                    onManualLink(
-                      selectedSystem.systemItem!.id,
-                      selectedAccounting.accountingIndex!
-                    )
-                  }
-                >
-                  <Link2 className="h-3.5 w-3.5" />
-                  จับคู่รายการนี้
-                </Button>
+                <tr className="bg-amber-50/60 dark:bg-amber-950/20">
+                  <td
+                    colSpan={12}
+                    className="px-3 py-1.5 border-y border-amber-200 dark:border-amber-800"
+                  >
+                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                      <Zap className="h-3.5 w-3.5" />
+                      AI แนะนำ — รอการยืนยัน ({aiPairs.length} รายการ)
+                    </div>
+                  </td>
+                </tr>
+                {aiPairs.map((pair) => {
+                  const amtDiff =
+                    pair.systemItem && pair.accountingItem
+                      ? Math.abs(pair.systemItem.baseAmount - pair.accountingItem.baseAmount)
+                      : 0;
+                  return (
+                    <tr
+                      key={pair.id}
+                      className="bg-amber-50/40 dark:bg-amber-950/10 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 transition-colors"
+                    >
+                      {/* System side */}
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {fmtDate(pair.systemItem?.date)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-sm font-medium truncate max-w-[180px]">
+                          {pair.systemItem?.vendorName || "—"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[110px]">
+                        {pair.systemItem?.invoiceNumber || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-sm font-mono font-medium">
+                        {fmt(pair.systemItem?.baseAmount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400">
+                        {fmt(pair.systemItem?.vatAmount)}
+                      </td>
+
+                      {/* Status center */}
+                      <td className="px-2 py-2.5 border-x border-muted text-center">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <StatusBadge pair={pair} />
+                          {pair.aiReason && (
+                            <p className="text-[10px] text-muted-foreground leading-tight text-center max-w-[90px] truncate">
+                              {pair.aiReason}
+                            </p>
+                          )}
+                          {amtDiff > 0.01 && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1 h-4 text-orange-600 border-orange-300"
+                            >
+                              ต่าง {fmt(amtDiff)}
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Accounting side */}
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {fmtDate(pair.accountingItem?.date)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-sm font-medium truncate max-w-[180px]">
+                          {pair.accountingItem?.vendorName || "—"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[110px]">
+                        {pair.accountingItem?.invoiceNumber || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-sm font-mono font-medium">
+                        {fmt(pair.accountingItem?.baseAmount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400">
+                        {fmt(pair.accountingItem?.vatAmount)}
+                      </td>
+
+                      {/* AI confirm/reject actions */}
+                      <td className="px-2 py-2.5">
+                        <div className="flex items-center gap-1 justify-end">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 rounded-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            title="ไม่ใช่"
+                            onClick={() => onRejectAI(pair.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 rounded-full text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                            title="ใช่ ยืนยัน"
+                            onClick={() => onConfirmAI(pair.id)}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {selectedSystemId && !selectedAccountingIndex
-                  ? "เลือกรายการจากรายงานบัญชีด้านขวา →"
-                  : selectedAccountingIndex !== null && !selectedSystemId
-                  ? "← เลือกรายการจากระบบเว็บด้านซ้าย"
-                  : "คลิกเลือก 1 รายการจากแต่ละฝั่งเพื่อจับคู่ด้วยตนเอง"}
-              </p>
             )}
+
+            {/* ===== SECTION: Unmatched ===== */}
+            {unmatchedPairs.length > 0 && (
+              <>
+                <tr className="bg-muted/30">
+                  <td colSpan={12} className="px-3 py-1.5 border-y border-muted">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                      ยังไม่ตรงกัน ({unmatchedPairs.length} รายการ)
+                      <span className="font-normal">— คลิกเลือก 1 แถวจากระบบ และ 1 แถวจากรายงาน เพื่อจับคู่</span>
+                    </div>
+                  </td>
+                </tr>
+                {unmatchedPairs.map((pair) => {
+                  const isSysRow = pair.status === "system-only";
+                  const isAccRow = pair.status === "accounting-only";
+                  const isSysSelected = isSysRow && pair.systemItem?.id === selectedSystemId;
+                  const isAccSelected =
+                    isAccRow && pair.accountingIndex === selectedAccountingIndex;
+                  const isSelected = isSysSelected || isAccSelected;
+
+                  return (
+                    <tr
+                      key={pair.id}
+                      className={cn(
+                        "transition-colors",
+                        isSelected
+                          ? isSysSelected
+                            ? "bg-primary/8 ring-1 ring-inset ring-primary/30"
+                            : "bg-amber-50/60 dark:bg-amber-950/20 ring-1 ring-inset ring-amber-400/40"
+                          : "hover:bg-muted/30",
+                        isSysRow ? "cursor-pointer" : "",
+                        isAccRow ? "cursor-pointer" : ""
+                      )}
+                      onClick={() => {
+                        if (isSysRow && pair.systemItem) {
+                          onSelectSystem(
+                            pair.systemItem.id === selectedSystemId ? null : pair.systemItem.id
+                          );
+                        } else if (isAccRow && pair.accountingIndex !== undefined) {
+                          onSelectAccounting(
+                            pair.accountingIndex === selectedAccountingIndex
+                              ? null
+                              : pair.accountingIndex
+                          );
+                        }
+                      }}
+                    >
+                      {/* System side */}
+                      <td className={cn("px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap", isAccRow && "opacity-30")}>
+                        {isSysRow ? fmtDate(pair.systemItem?.date) : ""}
+                      </td>
+                      <td className={cn("px-3 py-2.5", isAccRow && "opacity-30")}>
+                        {isSysRow ? (
+                          <p className="text-sm font-medium truncate max-w-[180px]">
+                            {pair.systemItem?.vendorName || "—"}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">ไม่พบในระบบ</p>
+                        )}
+                      </td>
+                      <td className={cn("px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[110px]", isAccRow && "opacity-30")}>
+                        {isSysRow ? (pair.systemItem?.invoiceNumber || "—") : ""}
+                      </td>
+                      <td className={cn("px-3 py-2.5 text-right text-sm font-mono font-medium", isAccRow && "opacity-30")}>
+                        {isSysRow ? fmt(pair.systemItem?.baseAmount) : ""}
+                      </td>
+                      <td className={cn("px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400", isAccRow && "opacity-30")}>
+                        {isSysRow ? fmt(pair.systemItem?.vatAmount) : ""}
+                      </td>
+
+                      {/* Status center */}
+                      <td className="px-2 py-2.5 border-x border-muted text-center">
+                        <StatusBadge pair={pair} />
+                      </td>
+
+                      {/* Accounting side */}
+                      <td className={cn("px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap", isSysRow && "opacity-30")}>
+                        {isAccRow ? fmtDate(pair.accountingItem?.date) : ""}
+                      </td>
+                      <td className={cn("px-3 py-2.5", isSysRow && "opacity-30")}>
+                        {isAccRow ? (
+                          <p className="text-sm font-medium truncate max-w-[180px]">
+                            {pair.accountingItem?.vendorName || "—"}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">ไม่พบในรายงาน</p>
+                        )}
+                      </td>
+                      <td className={cn("px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[110px]", isSysRow && "opacity-30")}>
+                        {isAccRow ? (pair.accountingItem?.invoiceNumber || "—") : ""}
+                      </td>
+                      <td className={cn("px-3 py-2.5 text-right text-sm font-mono font-medium", isSysRow && "opacity-30")}>
+                        {isAccRow ? fmt(pair.accountingItem?.baseAmount) : ""}
+                      </td>
+                      <td className={cn("px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400", isSysRow && "opacity-30")}>
+                        {isAccRow ? fmt(pair.accountingItem?.vatAmount) : ""}
+                      </td>
+
+                      {/* Selection indicator */}
+                      <td className="px-2 py-2.5 text-center">
+                        {isSelected && (
+                          <div
+                            className={cn(
+                              "h-5 w-5 rounded-full border-2 flex items-center justify-center mx-auto",
+                              isSysSelected
+                                ? "border-primary bg-primary/10"
+                                : "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                isSysSelected ? "bg-primary" : "bg-amber-500"
+                              )}
+                            />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </>
+            )}
+
+            {/* ===== SECTION: Matched ===== */}
+            {matchedPairs.length > 0 && (
+              <>
+                <tr className="bg-emerald-50/40 dark:bg-emerald-950/10">
+                  <td colSpan={12} className="px-3 py-1.5 border-y border-emerald-200/60 dark:border-emerald-800/40">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      จับคู่แล้ว ({matchedPairs.length} รายการ)
+                    </div>
+                  </td>
+                </tr>
+                {matchedPairs.map((pair) => {
+                  const amtDiff =
+                    pair.systemItem && pair.accountingItem
+                      ? Math.abs(pair.systemItem.baseAmount - pair.accountingItem.baseAmount)
+                      : 0;
+                  return (
+                    <tr
+                      key={pair.id}
+                      className="hover:bg-muted/20 transition-colors"
+                    >
+                      {/* System side */}
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {fmtDate(pair.systemItem?.date)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-sm font-medium truncate max-w-[180px]">
+                          {pair.systemItem?.vendorName || "—"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[110px]">
+                        {pair.systemItem?.invoiceNumber || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-sm font-mono font-medium">
+                        {fmt(pair.systemItem?.baseAmount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400">
+                        {fmt(pair.systemItem?.vatAmount)}
+                      </td>
+
+                      {/* Status center */}
+                      <td className="px-2 py-2.5 border-x border-muted text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <StatusBadge pair={pair} />
+                          {amtDiff > 0.01 && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1 h-4 text-orange-600 border-orange-300"
+                            >
+                              ต่าง {fmt(amtDiff)}
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Accounting side */}
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {fmtDate(pair.accountingItem?.date)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-sm font-medium truncate max-w-[180px]">
+                          {pair.accountingItem?.vendorName || "—"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[110px]">
+                        {pair.accountingItem?.invoiceNumber || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-sm font-mono font-medium">
+                        {fmt(pair.accountingItem?.baseAmount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400">
+                        {fmt(pair.accountingItem?.vatAmount)}
+                      </td>
+
+                      {/* Unlink */}
+                      <td className="px-2 py-2.5 text-center">
+                        <button
+                          onClick={() => onUnlink(pair.id)}
+                          className="text-muted-foreground/40 hover:text-destructive transition-colors"
+                          title="ยกเลิกการจับคู่"
+                        >
+                          <Unlink2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </>
+            )}
+
+          </tbody>
+
+          {/* ---- TFOOT: Totals ---- */}
+          {pairs.length > 0 && (
+            <tfoot>
+              <tr className="bg-muted/50 border-t-2 border-border font-semibold">
+                <td className="px-3 py-2.5 text-xs text-muted-foreground" colSpan={3}>
+                  รวม ({pairs.filter(p => p.systemItem).length} รายการ)
+                </td>
+                <td className="px-3 py-2.5 text-right text-sm font-mono">
+                  {fmt(
+                    pairs.reduce((s, p) => s + (p.systemItem?.baseAmount ?? 0), 0)
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400">
+                  {fmt(
+                    pairs.reduce((s, p) => s + (p.systemItem?.vatAmount ?? 0), 0)
+                  )}
+                </td>
+                <td className="border-x border-muted" />
+                <td className="px-3 py-2.5 text-xs text-muted-foreground" colSpan={3}>
+                  รวม ({pairs.filter(p => p.accountingItem).length} รายการ)
+                </td>
+                <td className="px-3 py-2.5 text-right text-sm font-mono">
+                  {fmt(
+                    pairs.reduce((s, p) => s + (p.accountingItem?.baseAmount ?? 0), 0)
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-right text-xs font-mono text-blue-600 dark:text-blue-400">
+                  {fmt(
+                    pairs.reduce((s, p) => s + (p.accountingItem?.vatAmount ?? 0), 0)
+                  )}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      {/* ===== Floating link bar (shows when both sides selected) ===== */}
+      {canLink && selectedSysItem && selectedAccItem && (
+        <div className="sticky bottom-0 border-t bg-card shadow-lg px-4 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+            <span className="text-sm font-medium truncate">{selectedSysItem.vendorName}</span>
+            <span className="text-sm text-muted-foreground font-mono flex-shrink-0">
+              {fmt(selectedSysItem.baseAmount)}
+            </span>
+          </div>
+          <Link2 className="h-4 w-4 text-primary flex-shrink-0" />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0" />
+            <span className="text-sm font-medium truncate">{selectedAccItem.vendorName}</span>
+            <span className="text-sm text-muted-foreground font-mono flex-shrink-0">
+              {fmt(selectedAccItem.baseAmount)}
+            </span>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-muted-foreground"
+              onClick={() => {
+                onSelectSystem(null);
+                onSelectAccounting(null);
+              }}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() =>
+                onManualLink(selectedSystemId!, selectedAccountingIndex!)
+              }
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              จับคู่รายการนี้
+            </Button>
           </div>
         </div>
       )}
 
-      {/* ===== MATCHED SECTION ===== */}
-      {matched.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 px-1">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <span className="text-sm font-semibold text-foreground">จับคู่แล้ว</span>
-            <Badge variant="secondary" className="text-xs">{matched.length} รายการ</Badge>
-          </div>
-          <div className="space-y-2">
-            {matched.map((pair) => (
-              <MatchedRow
-                key={pair.id}
-                pair={pair}
-                onUnlink={onUnlink}
-                onConfirmAI={onConfirmAI}
-                onRejectAI={onRejectAI}
-              />
-            ))}
-          </div>
+      {/* Hint when only one side selected */}
+      {!canLink && (selectedSystemId || selectedAccountingIndex !== null) && (
+        <div className="border-t px-4 py-2 bg-muted/30 text-xs text-muted-foreground">
+          {selectedSystemId && selectedAccountingIndex === null
+            ? "เลือกแถวจากรายงานบัญชี (ฝั่งขวา) อีก 1 แถวเพื่อจับคู่"
+            : "เลือกแถวจากระบบ (ฝั่งซ้าย) อีก 1 แถวเพื่อจับคู่"}
         </div>
       )}
     </div>
