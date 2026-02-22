@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,8 @@ import {
   MinusCircle,
   Loader2,
   RotateCcw,
+  Search,
+  Receipt,
 } from "lucide-react";
 import { ImportPanel, type AccountingRow } from "./ImportPanel";
 import { ReconcileTable, type MatchedPair, type SystemItem, type MatchStatus } from "./ReconcileTable";
@@ -297,8 +300,29 @@ export function ReconcileView({
   const [isAILoading, setIsAILoading] = useState(false);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [selectedAccountingIndex, setSelectedAccountingIndex] = useState<number | null>(null);
+  const [vatOnly, setVatOnly] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const systemItems = type === "expense" ? systemExpenses : systemIncomes;
+  const allSystemItems = type === "expense" ? systemExpenses : systemIncomes;
+
+  // Filter system items by VAT toggle and search query
+  const systemItems = useMemo(() => {
+    let items = allSystemItems;
+    if (vatOnly) items = items.filter((i) => i.vatAmount > 0);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter(
+        (i) =>
+          i.vendorName.toLowerCase().includes(q) ||
+          i.description.toLowerCase().includes(q)
+      );
+    }
+    return items;
+  }, [allSystemItems, vatOnly, searchQuery]);
+
+  const hiddenByVatFilter = vatOnly
+    ? allSystemItems.filter((i) => i.vatAmount === 0).length
+    : 0;
 
   const handleDateChange = (field: "month" | "year" | "type", value: string) => {
     const params = new URLSearchParams();
@@ -552,6 +576,42 @@ export function ReconcileView({
             <SelectItem value="income">ภาษีขาย (รายรับ)</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Divider */}
+        <div className="h-6 w-px bg-border mx-1" />
+
+        {/* VAT-only toggle */}
+        <Button
+          variant={vatOnly ? "default" : "outline"}
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={() => {
+            setVatOnly((v) => !v);
+            // Reset pairs so stale matches from old filter set don't persist
+            setPairs([]);
+            setAccountingItems([]);
+          }}
+          title="กรองเฉพาะรายการที่มี VAT (สำหรับเทียบรายงานภาษี)"
+        >
+          <Receipt className="h-3.5 w-3.5" />
+          เฉพาะ VAT
+          {vatOnly && hiddenByVatFilter > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 h-4 ml-0.5">
+              ซ่อน {hiddenByVatFilter}
+            </Badge>
+          )}
+        </Button>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="ค้นหาชื่อ..."
+            className="h-9 pl-8 w-40 text-sm"
+          />
+        </div>
 
         <div className="flex-1" />
 
