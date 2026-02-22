@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowUpCircle, Building2, Eye } from "lucide-react";
+import { ArrowUpCircle, Building2, FileText } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   TransactionListClient, 
@@ -35,6 +35,7 @@ interface ExpensesClientProps {
   canApprove?: boolean;
   isOwner?: boolean;
   tabCounts?: TabCounts;
+  crossCompanyCount?: number;
 }
 
 // Expense-specific configuration
@@ -85,11 +86,12 @@ export function ExpensesClient({
   companyCode,
   initialExpenses,
   initialTotal,
-  viewMode = "official",
+  viewMode = "internal",
   currentUserId,
   canApprove = false,
   isOwner = false,
   tabCounts,
+  crossCompanyCount = 0,
 }: ExpensesClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -139,8 +141,8 @@ export function ExpensesClient({
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Eye className="h-4 w-4 mr-1.5" />
-            ตามที่บันทึก
+            <FileText className="h-4 w-4 mr-1.5" />
+            ตามบัญชี
           </Button>
           <Button
             variant="ghost"
@@ -154,16 +156,36 @@ export function ExpensesClient({
             )}
           >
             <Building2 className="h-4 w-4 mr-1.5" />
-            ตามบริษัทจริง
+            ตามจริง
           </Button>
         </div>
         {viewMode === "internal" && (
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            แสดงรายจ่ายที่บริษัทนี้เป็นเจ้าของจริง (ถูกบันทึกไว้ในบริษัทอื่น)
+          <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 px-2 py-1 rounded">
+            แสดงรายจ่ายที่บริษัทนี้เป็นเจ้าของจริง รวมถึงที่บริษัทอื่นจ่ายแทน
           </span>
         )}
       </div>
-      
+
+      {/* Warning banner: in official mode, warn about cross-company items */}
+      {viewMode === "official" && crossCompanyCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/20 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+            <Building2 className="h-4 w-4 flex-shrink-0" />
+            <span>
+              มี <strong>{crossCompanyCount}</strong> รายการที่บริษัทอื่นจ่ายแทน ไม่แสดงในมุมมองนี้
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleViewModeChange("internal")}
+            className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 flex-shrink-0"
+          >
+            ดูทั้งหมด →
+          </Button>
+        </div>
+      )}
+
       <TransactionListClient
         companyCode={companyCode}
         data={initialExpenses}

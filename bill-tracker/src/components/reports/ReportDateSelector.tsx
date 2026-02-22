@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -22,18 +22,19 @@ export function ReportDateSelector({
 }: ReportDateSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const thisYear = new Date().getFullYear();
 
   const handleMonthChange = (month: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", month);
-    router.push(`/${companyCode}/reports?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   const handleYearChange = (year: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("year", year);
-    router.push(`/${companyCode}/reports?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   return (

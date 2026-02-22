@@ -51,13 +51,16 @@ export function ViewModeToggle({ companyCode, currentMode = "official" }: ViewMo
                 )}
               >
                 <FileText className="h-4 w-4 mr-1.5" />
-                บัญชีของเรา
+                ตามบัญชี
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-[250px]">
-              <p className="font-medium">บัญชีของเรา (ตามที่ลงบัญชี)</p>
+            <TooltipContent side="bottom" className="max-w-[280px]">
+              <p className="font-medium">ตามบัญชี (ตามที่ลงบัญชีไว้)</p>
               <p className="text-xs text-muted-foreground mt-1">
-                แสดงรายการทั้งหมดที่ลงบัญชีในบริษัทนี้ รวมถึงที่จ่ายแทนบริษัทอื่น
+                แสดงรายการทั้งหมดที่บันทึกในบริษัทนี้ รวมถึงที่จ่ายแทนบริษัทอื่น
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 border-t pt-1">
+                เช่น Meelike จ่าย Facebook Ads ให้ Anajak → แสดงใน Meelike
               </p>
             </TooltipContent>
           </Tooltip>
@@ -75,13 +78,16 @@ export function ViewModeToggle({ companyCode, currentMode = "official" }: ViewMo
                 )}
               >
                 <Building2 className="h-4 w-4 mr-1.5" />
-                ค่าใช้จ่ายจริง
+                ตามจริง
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-[250px]">
-              <p className="font-medium">ค่าใช้จ่ายจริงของเรา</p>
+            <TooltipContent side="bottom" className="max-w-[280px]">
+              <p className="font-medium">ตามจริง (รายการที่เป็นของบริษัทนี้จริงๆ)</p>
               <p className="text-xs text-muted-foreground mt-1">
-                แสดงเฉพาะค่าใช้จ่ายที่เป็นของบริษัทนี้จริงๆ รวมถึงที่บริษัทอื่นจ่ายแทน
+                แสดงค่าใช้จ่ายที่บริษัทนี้เป็นเจ้าของ ไม่ว่าใครจะเป็นผู้จ่าย
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 border-t pt-1">
+                เช่น Meelike จ่าย Facebook Ads ให้ Anajak → แสดงใน Anajak
               </p>
             </TooltipContent>
           </Tooltip>
@@ -91,7 +97,7 @@ export function ViewModeToggle({ companyCode, currentMode = "official" }: ViewMo
             <TooltipTrigger asChild>
               <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 px-2 py-1 rounded flex items-center gap-1 cursor-help">
                 <Info className="h-3 w-3" />
-                มุมมองค่าใช้จ่ายจริง
+                มุมมองตามจริง
               </span>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-[280px]">

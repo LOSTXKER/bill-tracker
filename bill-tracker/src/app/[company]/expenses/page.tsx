@@ -46,7 +46,7 @@ export default async function ExpensesPage({ params, searchParams }: ExpensesPag
           companyCode={companyCode} 
           dateFrom={urlParams.dateFrom as string | undefined}
           dateTo={urlParams.dateTo as string | undefined}
-          viewMode={(urlParams.viewMode as string) || "official"}
+          viewMode={(urlParams.viewMode as string) || "internal"}
         />
       </Suspense>
 
@@ -167,8 +167,8 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const creator = searchParams.creator as string | undefined;
   const dateFrom = searchParams.dateFrom as string | undefined;
   const dateTo = searchParams.dateTo as string | undefined;
-  // View mode: "official" (default - by companyId), "internal" (by internalCompanyId)
-  const viewMode = (searchParams.viewMode as string) || "official";
+  // View mode: "internal" (default - show actual ownership), "official" (by companyId)
+  const viewMode = (searchParams.viewMode as string) || "internal";
 
   // Build where clause
   // Filter: Only show regular expenses OR reimbursements that have been PAID
@@ -312,6 +312,11 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
         ],
       };
 
+  // Count cross-company expenses (paid by others for this company) — for warning banner in official mode
+  const crossCompanyCount = await prisma.expense.count({
+    where: { internalCompanyId: companyId, companyId: { not: companyId }, deletedAt: null },
+  });
+
   const [expensesRaw, total, tabCounts] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
@@ -385,6 +390,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       canApprove={canApprove}
       isOwner={isOwner}
       tabCounts={tabCounts}
+      crossCompanyCount={crossCompanyCount}
     />
   );
 }

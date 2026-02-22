@@ -16,6 +16,7 @@ export const GET = withCompanyAccess(
     const type = searchParams.get("type"); // 'expenses', 'incomes', 'monthly', 'vat', 'wht'
     const month = searchParams.get("month");
     const year = searchParams.get("year");
+    const viewMode = searchParams.get("viewMode") || "official"; // 'official' | 'internal'
 
     if (!type || !month || !year) {
       return apiResponse.badRequest("Missing required parameters");
@@ -25,11 +26,22 @@ export const GET = withCompanyAccess(
     const endDate = new Date(parseInt(year), parseInt(month), 0);
     const period = `${month}/${year}`;
 
+    const expenseCompanyFilter =
+      viewMode === "internal"
+        ? {
+            OR: [
+              { internalCompanyId: company.id },
+              { companyId: company.id, internalCompanyId: null },
+            ],
+          }
+        : { companyId: company.id };
+
     const [expensesRaw, incomesRaw] = await Promise.all([
       prisma.expense.findMany({
         where: {
-          companyId: company.id,
+          ...expenseCompanyFilter,
           billDate: { gte: startDate, lte: endDate },
+          deletedAt: null,
         },
         include: {
           Contact: true,
@@ -40,6 +52,7 @@ export const GET = withCompanyAccess(
         where: {
           companyId: company.id,
           receiveDate: { gte: startDate, lte: endDate },
+          deletedAt: null,
         },
         include: {
           Contact: true,

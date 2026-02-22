@@ -52,6 +52,9 @@ export interface TransactionData {
   contact?: { name: string } | null;
   contactName?: string | null; // One-time contact name (not saved as Contact)
   account?: { id: string; code: string; name: string } | null;
+  // Company that recorded this expense (payer)
+  company?: { id: string; name: string; code: string } | null;
+  companyId?: string | null;
   // Internal company tracking (for expenses that belong to a different company)
   internalCompany?: { id: string; name: string; code: string } | null;
   internalCompanyId?: string | null;
@@ -324,19 +327,41 @@ export function TransactionTableRow({
         )}
       </TableCell>
 
-      {/* Internal Company (for expenses recorded under a different company) */}
+      {/* Internal Company (cross-company expense indicator) */}
       {config.showInternalCompany && (
         <TableCell>
           {transaction.internalCompany ? (
-            <div className="flex flex-col gap-0.5">
-              <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 gap-1">
-                <ArrowRightLeft className="h-3 w-3" />
-                จ่ายแทน
-              </Badge>
-              <span className="text-xs text-muted-foreground pl-0.5">
-                {transaction.internalCompany.code}
-              </span>
-            </div>
+            (() => {
+              // If internalCompany is the current company → we are the beneficiary, show the payer
+              const isCurrentCompanyBeneficiary =
+                transaction.internalCompany.code.toLowerCase() === companyCode.toLowerCase();
+              if (isCurrentCompanyBeneficiary && transaction.company) {
+                // Internal view: "MEELIKE จ่ายแทน" (another company paid for us)
+                return (
+                  <div className="flex flex-col gap-0.5">
+                    <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 gap-1">
+                      <ArrowRightLeft className="h-3 w-3" />
+                      จ่ายแทน
+                    </Badge>
+                    <span className="text-xs text-muted-foreground pl-0.5">
+                      {transaction.company.code}
+                    </span>
+                  </div>
+                );
+              }
+              // Official view: "จ่ายแทน ANAJAK" (we paid for another company)
+              return (
+                <div className="flex flex-col gap-0.5">
+                  <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 gap-1">
+                    <ArrowRightLeft className="h-3 w-3" />
+                    จ่ายแทน
+                  </Badge>
+                  <span className="text-xs text-muted-foreground pl-0.5">
+                    {transaction.internalCompany.code}
+                  </span>
+                </div>
+              );
+            })()
           ) : (
             <span className="text-muted-foreground/50">-</span>
           )}
