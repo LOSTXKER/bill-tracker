@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Inbox, User, X, Filter } from "lucide-react";
+import { RefreshCw, Inbox, User, X, Filter, AlertCircle } from "lucide-react";
 
 interface SettlementDashboardProps {
   companyCode: string;
@@ -269,6 +269,28 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
           data={summaryData?.data}
           isLoading={summaryLoading}
         />
+      )}
+
+      {/* Pending Approval Banner */}
+      {summaryData?.data?.pending?.pendingApprovalCount > 0 && tab === "pending" && (
+        <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-amber-700 dark:text-amber-300">
+              มี <strong>{summaryData.data.pending.pendingApprovalCount} รายการ</strong>รออนุมัติก่อนโอนคืน
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="h-7 gap-1 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/50"
+            >
+              <Link href={`/${companyCode}/approvals`}>
+                ไปอนุมัติ
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Main Content */}

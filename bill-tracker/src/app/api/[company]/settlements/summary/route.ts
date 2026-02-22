@@ -16,13 +16,14 @@ export const GET = withCompanyAccessFromParams(
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    // Get all pending payments
+    // Get all pending payments (only approved/not-required expenses)
     const pendingPayments = await prisma.expensePayment.findMany({
       where: {
         settlementStatus: "PENDING",
         Expense: {
           companyId: company.id,
           deletedAt: null,
+          approvalStatus: { in: ["APPROVED", "NOT_REQUIRED"] },
         },
       },
       select: {
@@ -33,6 +34,19 @@ export const GET = withCompanyAccessFromParams(
         paidByName: true,
         PaidByUser: {
           select: { id: true, name: true },
+        },
+      },
+    });
+
+    // Count payments blocked by pending approval
+    const pendingApprovalCount = await prisma.expensePayment.count({
+      where: {
+        settlementStatus: "PENDING",
+        paidByType: "USER",
+        Expense: {
+          companyId: company.id,
+          deletedAt: null,
+          approvalStatus: "PENDING",
         },
       },
     });
@@ -107,6 +121,7 @@ export const GET = withCompanyAccessFromParams(
             amount: totalPendingAmount,
           },
           topUsers: topPendingUsers,
+          pendingApprovalCount,
         },
         settledThisMonth: {
           count: settledThisMonth._count,

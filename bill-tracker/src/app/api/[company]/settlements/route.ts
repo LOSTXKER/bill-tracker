@@ -34,6 +34,7 @@ export const GET = withCompanyAccessFromParams(
     // Only filter deletedAt for PENDING status (not for history)
     if (status === "PENDING") {
       expenseWhere.deletedAt = null;
+      expenseWhere.approvalStatus = { in: ["APPROVED", "NOT_REQUIRED"] };
     }
 
     // For PENDING with month/year filter, filter by billDate on Expense
