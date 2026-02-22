@@ -620,6 +620,11 @@ export function ReconcileView({
         selectedAccountingIndex={selectedAccountingIndex}
         onSelectSystem={setSelectedSystemId}
         onSelectAccounting={setSelectedAccountingIndex}
+        month={month}
+        year={year}
+        type={type}
+        onShowImport={() => setShowImport(true)}
+        hasAccountingData={accountingItems.length > 0}
       />
 
       {/* Import dialog */}
@@ -628,6 +633,9 @@ export function ReconcileView({
         onClose={() => setShowImport(false)}
         onImport={handleImport}
         companyCode={companyCode}
+        month={month}
+        year={year}
+        type={type}
       />
     </div>
   );

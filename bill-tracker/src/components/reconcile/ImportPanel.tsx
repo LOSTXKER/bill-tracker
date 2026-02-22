@@ -79,14 +79,22 @@ const THAI_COLUMN_HINTS: Record<string, keyof ColumnMapping> = {
   "vat": "vatAmount",
 };
 
+const MONTHS_TH = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
 interface ImportPanelProps {
   open: boolean;
   onClose: () => void;
   onImport: (rows: AccountingRow[]) => void;
   companyCode?: string;
+  month?: number;
+  year?: number;
+  type?: "expense" | "income";
 }
 
-export function ImportPanel({ open, onClose, onImport, companyCode }: ImportPanelProps) {
+export function ImportPanel({ open, onClose, onImport, companyCode, month, year, type }: ImportPanelProps) {
   const [step, setStep] = useState<"choose" | "mapping" | "preview" | "manual" | "pdf-loading">("choose");
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [rawData, setRawData] = useState<string[][]>([]);
@@ -327,10 +335,15 @@ export function ImportPanel({ open, onClose, onImport, companyCode }: ImportPane
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
-            นำเข้ารายงานบัญชี
+            นำเข้ารายงาน{type === "expense" ? "ภาษีซื้อ" : type === "income" ? "ภาษีขาย" : "บัญชี"}
+            {month !== undefined && (
+              <span className="text-sm font-normal text-muted-foreground">
+                — เดือน{MONTHS_TH[month - 1]}{year !== undefined ? ` ${year + 543}` : ""}
+              </span>
+            )}
           </DialogTitle>
           <DialogDescription>
-            อัปโหลดไฟล์ Excel/CSV จากโปรแกรมบัญชี หรือกรอกข้อมูลด้วยตนเอง
+            อัปโหลดไฟล์ Excel/CSV จากโปรแกรมบัญชี หรือ PDF หรือกรอกข้อมูลด้วยตนเอง
           </DialogDescription>
         </DialogHeader>
 
