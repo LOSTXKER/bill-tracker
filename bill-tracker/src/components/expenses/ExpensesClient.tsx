@@ -116,11 +116,7 @@ export function ExpensesClient({
   
   const handleViewModeChange = (mode: "official" | "internal") => {
     const params = new URLSearchParams(searchParams.toString());
-    if (mode === "official") {
-      params.delete("viewMode"); // official is default
-    } else {
-      params.set("viewMode", mode);
-    }
+    params.set("viewMode", mode);
     router.push(`/${companyCode}/expenses?${params.toString()}`);
   };
   

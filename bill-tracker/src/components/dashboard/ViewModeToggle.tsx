@@ -23,13 +23,8 @@ export function ViewModeToggle({ companyCode, currentMode = "official" }: ViewMo
   
   const handleViewModeChange = (mode: "official" | "internal") => {
     const params = new URLSearchParams(searchParams.toString());
-    if (mode === "official") {
-      params.delete("viewMode"); // official is default
-    } else {
-      params.set("viewMode", mode);
-    }
-    const queryString = params.toString();
-    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    params.set("viewMode", mode);
+    router.push(`${pathname}?${params.toString()}`);
   };
   
   return (
