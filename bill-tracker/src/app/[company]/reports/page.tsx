@@ -684,7 +684,6 @@ async function MonthlySummary({
       },
       include: { Contact: true, Account: true },
       orderBy: { billDate: "desc" },
-      take: 50, // Limit to 50 most recent
     }),
     // Get all incomes for transaction list
     prisma.income.findMany({
@@ -695,7 +694,6 @@ async function MonthlySummary({
       },
       include: { Contact: true },
       orderBy: { receiveDate: "desc" },
-      take: 50, // Limit to 50 most recent
     }),
   ]);
   
