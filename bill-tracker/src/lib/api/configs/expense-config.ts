@@ -17,6 +17,26 @@ export type { WhtChangeValidation } from "@/lib/validations/wht-validator";
 // Internal alias for use within this file
 const validateWhtChange = validateExpenseWhtChange;
 
+function deduplicatePayers<T extends { paidByType: string; paidByUserId?: string | null; paidByPettyCashFundId?: string | null; amount: number }>(payers: T[]): T[] {
+  const seen = new Map<string, T>();
+  for (const payer of payers) {
+    let key: string;
+    if (payer.paidByType === "USER" && payer.paidByUserId) {
+      key = `USER:${payer.paidByUserId}`;
+    } else if (payer.paidByType === "PETTY_CASH" && payer.paidByPettyCashFundId) {
+      key = `PETTY_CASH:${payer.paidByPettyCashFundId}`;
+    } else if (payer.paidByType === "COMPANY") {
+      key = `COMPANY:${payer.amount}`;
+    } else {
+      key = `${payer.paidByType}:${payer.paidByUserId || ""}:${payer.amount}`;
+    }
+    if (!seen.has(key)) {
+      seen.set(key, payer);
+    }
+  }
+  return Array.from(seen.values());
+}
+
 export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "prismaModel"> & {
   prismaModel: typeof prisma.expense;
 } = {
@@ -267,7 +287,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
 
     // Handle payers if provided
     if (body.payers && Array.isArray(body.payers) && body.payers.length > 0) {
-      for (const payer of body.payers as Array<{
+      const uniquePayers = deduplicatePayers(body.payers as Array<{
         paidByType: PaidByType;
         paidByUserId?: string | null;
         paidByPettyCashFundId?: string | null;
@@ -278,7 +298,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
         settlementStatus?: SettlementStatus;
         settledAt?: string;
         settlementRef?: string;
-      }>) {
+      }>);
+      for (const payer of uniquePayers) {
         // Determine settlement status based on payer type
         // Only USER type requires settlement (COMPANY and PETTY_CASH don't)
         let settlementStatus: SettlementStatus = payer.settlementStatus || "NOT_REQUIRED";
@@ -387,7 +408,7 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
 
       // Create new payments — skip if an identical settled payment already exists
       if (body.payers.length > 0) {
-        for (const payer of body.payers as Array<{
+        const uniquePayers = deduplicatePayers(body.payers as Array<{
           paidByType: PaidByType;
           paidByUserId?: string | null;
           paidByPettyCashFundId?: string | null;
@@ -395,7 +416,8 @@ export const expenseRouteConfig: Omit<TransactionRouteConfig<any, any, any>, "pr
           paidByBankName?: string | null;
           paidByBankAccount?: string | null;
           amount: number;
-        }>) {
+        }>);
+        for (const payer of uniquePayers) {
           // Skip if this payer already has a SETTLED payment (avoid duplicates)
           if (payer.paidByType === "USER" && payer.paidByUserId && settledUserIds.has(payer.paidByUserId)) {
             continue;

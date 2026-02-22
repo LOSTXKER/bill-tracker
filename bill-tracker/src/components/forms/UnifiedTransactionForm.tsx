@@ -726,16 +726,27 @@ export function UnifiedTransactionForm({
           const result = await res.json();
           const payments = result.data?.payments || [];
           if (payments.length > 0) {
-            setPayers(
-              payments.map((p: Record<string, unknown>) => ({
-                paidByType: p.paidByType as PayerInfo["paidByType"],
-                paidByUserId: p.paidByUserId as string | null,
-                paidByName: p.paidByName as string | null,
-                paidByBankName: p.paidByBankName as string | null,
-                paidByBankAccount: p.paidByBankAccount as string | null,
-                amount: Number(p.amount),
-              }))
-            );
+            const mapped = payments.map((p: Record<string, unknown>) => ({
+              paidByType: p.paidByType as PayerInfo["paidByType"],
+              paidByUserId: p.paidByUserId as string | null,
+              paidByName: p.paidByName as string | null,
+              paidByBankName: p.paidByBankName as string | null,
+              paidByBankAccount: p.paidByBankAccount as string | null,
+              amount: Number(p.amount),
+            }));
+            // Deduplicate: keep only unique payers by type+userId
+            const seen = new Set<string>();
+            const unique = mapped.filter((p: PayerInfo) => {
+              const key = p.paidByType === "USER"
+                ? `USER:${p.paidByUserId}`
+                : p.paidByType === "PETTY_CASH"
+                ? `PETTY_CASH:${p.paidByPettyCashFundId || ""}`
+                : `${p.paidByType}:${p.amount}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            setPayers(unique);
           }
         }
       } catch (err) {
