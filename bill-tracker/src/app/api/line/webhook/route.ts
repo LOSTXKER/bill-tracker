@@ -17,6 +17,48 @@ import {
 
 const log = createApiLogger("line/webhook");
 
+type CompanyWithLine = {
+  id: string;
+  name: string;
+  lineChannelSecret: string | null;
+  lineChannelAccessToken: string | null;
+  lineGroupId: string | null;
+};
+
+/**
+ * Find the correct company for a LINE event.
+ * 1. Filter to companies whose Channel Secret matches the signature
+ * 2. If event has a groupId, match by lineGroupId (supports shared bot across companies)
+ * 3. If no groupId match, pick the first company without a groupId assigned (new company setup)
+ * 4. Fallback to first signature-matched company
+ */
+function findMatchingCompany(
+  companies: CompanyWithLine[],
+  bodyText: string,
+  signature: string,
+  eventGroupId?: string
+): CompanyWithLine | null {
+  const validCompanies = companies.filter(
+    (c) => c.lineChannelSecret && c.lineChannelAccessToken &&
+      verifySignature(bodyText, signature, c.lineChannelSecret)
+  );
+
+  if (validCompanies.length === 0) return null;
+  if (validCompanies.length === 1) return validCompanies[0];
+
+  // Multiple companies share the same bot — use groupId to distinguish
+  if (eventGroupId) {
+    const byGroupId = validCompanies.find((c) => c.lineGroupId === eventGroupId);
+    if (byGroupId) return byGroupId;
+  }
+
+  // No groupId match — pick first company that hasn't been assigned a group yet
+  const unassigned = validCompanies.find((c) => !c.lineGroupId);
+  if (unassigned) return unassigned;
+
+  return validCompanies[0];
+}
+
 /**
  * POST /api/line/webhook
  * Receive events from LINE Messaging API
@@ -36,104 +78,78 @@ export async function POST(request: NextRequest) {
     const bodyText = await request.text();
     const body: LineWebhookBody = JSON.parse(bodyText);
 
+    // Find all companies with LINE configuration
+    const companies = await prisma.company.findMany({
+      where: {
+        lineChannelSecret: { not: null },
+        lineChannelAccessToken: { not: null },
+      },
+    });
+
     // Process each event
     for (const event of body.events) {
       log.debug("LINE Event received", { type: event.type, sourceType: event.source?.type });
 
-      // Find company with matching LINE configuration
-      const companies = await prisma.company.findMany({
-        where: {
-          lineChannelSecret: { not: null },
-          lineChannelAccessToken: { not: null },
-        },
-      });
+      const eventGroupId = event.source?.groupId;
 
-      for (const company of companies) {
-        if (!company.lineChannelSecret || !company.lineChannelAccessToken) {
+      // Find the matching company for this event
+      const company = findMatchingCompany(companies, bodyText, signature, eventGroupId);
+
+      if (!company) {
+        log.warn("No matching company found for event", { eventGroupId });
+        continue;
+      }
+
+      const companyConfig: LineCompanyConfig = {
+        id: company.id,
+        name: company.name,
+        lineChannelSecret: company.lineChannelSecret!,
+        lineChannelAccessToken: company.lineChannelAccessToken!,
+        lineGroupId: company.lineGroupId,
+      };
+
+      // Auto-save Group ID if not yet saved
+      if (eventGroupId && !company.lineGroupId) {
+        log.info("Auto-saving Group ID", { groupId: eventGroupId, company: company.name });
+        await prisma.company.update({
+          where: { id: company.id },
+          data: { lineGroupId: eventGroupId },
+        });
+        companyConfig.lineGroupId = eventGroupId;
+        company.lineGroupId = eventGroupId;
+
+        if (event.type !== "join" && event.replyToken) {
+          const { replyToLine } = await import("@/lib/line/api");
+          await replyToLine(
+            event.replyToken,
+            [
+              {
+                type: "text",
+                text: `✅ เชื่อมต่อ ${company.name} สำเร็จ!\n\nบอทพร้อมส่งแจ้งเตือนรายรับ-รายจ่ายแล้ว\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้`,
+              },
+            ],
+            company.lineChannelAccessToken!
+          );
           continue;
         }
+      }
 
-        // Verify signature matches this company's secret
-        const isValid = verifySignature(
-          bodyText,
-          signature,
-          company.lineChannelSecret
-        );
-
-        if (!isValid) {
-          continue; // Try next company
-        }
-
-        // Create typed company config
-        const companyConfig: LineCompanyConfig = {
-          id: company.id,
-          name: company.name,
-          lineChannelSecret: company.lineChannelSecret,
-          lineChannelAccessToken: company.lineChannelAccessToken,
-          lineGroupId: company.lineGroupId,
-        };
-
-        // Auto-save Group ID from any event (in case join event wasn't received)
-        const eventGroupId = event.source?.groupId;
-        if (eventGroupId && !company.lineGroupId) {
-          log.info("Auto-saving Group ID", { groupId: eventGroupId, company: company.name });
-          await prisma.company.update({
-            where: { id: company.id },
-            data: { lineGroupId: eventGroupId },
-          });
-          // Update local config
-          companyConfig.lineGroupId = eventGroupId;
-          
-          // Send welcome message for newly detected group (only if not a join event, to avoid duplicate)
-          if (event.type !== "join" && event.replyToken) {
-            const { replyToLine } = await import("@/lib/line/api");
-            await replyToLine(
-              event.replyToken,
-              [
-                {
-                  type: "text",
-                  text: `✅ เชื่อมต่อ ${company.name} สำเร็จ!\n\nบอทพร้อมส่งแจ้งเตือนรายรับ-รายจ่ายแล้ว\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้`,
-                },
-              ],
-              company.lineChannelAccessToken
-            );
-            // Skip further processing for this event since we've already replied
-            break;
+      // Process event based on type
+      switch (event.type) {
+        case "message":
+          if (event.message?.type === "text") {
+            await handleTextMessage(event, companyConfig, company.lineChannelAccessToken!);
+          } else if (event.message?.type === "image") {
+            await handleImageMessage(event, companyConfig, company.lineChannelAccessToken!);
           }
-        }
+          break;
 
-        // Process event based on type
-        switch (event.type) {
-          case "message":
-            if (event.message?.type === "text") {
-              await handleTextMessage(
-                event,
-                companyConfig,
-                company.lineChannelAccessToken
-              );
-            } else if (event.message?.type === "image") {
-              await handleImageMessage(
-                event,
-                companyConfig,
-                company.lineChannelAccessToken
-              );
-            }
-            break;
+        case "join":
+          await handleJoinEvent(event, companyConfig, company.lineChannelAccessToken!);
+          break;
 
-          case "join":
-            await handleJoinEvent(
-              event,
-              companyConfig,
-              company.lineChannelAccessToken
-            );
-            break;
-
-          default:
-            log.debug("Unhandled event type", { type: event.type });
-        }
-
-        // Event processed, no need to check other companies
-        break;
+        default:
+          log.debug("Unhandled event type", { type: event.type });
       }
     }
 
