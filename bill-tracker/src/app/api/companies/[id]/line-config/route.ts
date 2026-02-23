@@ -70,25 +70,36 @@ export const POST = withCompanyAccessFromParams(
       );
     }
 
-    // Validate required fields for full config update
-    if (!channelSecret || !channelAccessToken) {
+    // Check if this is a new setup or an update
+    const existing = await prisma.company.findUnique({
+      where: { id: company.id },
+      select: { lineChannelSecret: true, lineChannelAccessToken: true },
+    });
+    const isNewSetup = !existing?.lineChannelSecret || !existing?.lineChannelAccessToken;
+
+    // New setup requires both fields
+    if (isNewSetup && (!channelSecret || !channelAccessToken)) {
       return apiResponse.badRequest("Channel Secret and Access Token are required");
     }
 
-    // Basic validation
-    if (channelSecret.length < 10 || channelAccessToken.length < 10) {
-      return apiResponse.badRequest("Invalid credentials format");
+    // Validate provided fields
+    if (channelSecret && channelSecret.length < 10) {
+      return apiResponse.badRequest("Invalid Channel Secret format");
+    }
+    if (channelAccessToken && channelAccessToken.length < 10) {
+      return apiResponse.badRequest("Invalid Access Token format");
     }
 
-    // Update company LINE config
+    // Build update data — only update fields that are provided
+    const updateData: Record<string, unknown> = {};
+    if (channelSecret) updateData.lineChannelSecret = channelSecret;
+    if (channelAccessToken) updateData.lineChannelAccessToken = channelAccessToken;
+    if (groupId !== undefined) updateData.lineGroupId = groupId || null;
+    if (notifyEnabled !== undefined) updateData.lineNotifyEnabled = notifyEnabled;
+
     await prisma.company.update({
       where: { id: company.id },
-      data: {
-        lineChannelSecret: channelSecret,
-        lineChannelAccessToken: channelAccessToken,
-        lineGroupId: groupId || null,
-        lineNotifyEnabled: notifyEnabled !== false, // Default to true
-      },
+      data: updateData,
     });
 
     return apiResponse.success(

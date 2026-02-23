@@ -3,7 +3,6 @@
  * Handles events when bot is added to a group
  */
 
-import { prisma } from "@/lib/db";
 import type { LineWebhookEvent, LineCompanyConfig } from "../types";
 import { replyToLine } from "../api";
 
@@ -18,23 +17,12 @@ export async function handleJoinEvent(
   const replyToken = event.replyToken;
   if (!replyToken) return;
 
-  const groupId = event.source.groupId;
-
-  // Auto-save group ID if available
-  if (groupId && company) {
-    await prisma.company.update({
-      where: { id: company.id },
-      data: { lineGroupId: groupId },
-    });
-  }
-
-  // Send welcome message
   await replyToLine(
     replyToken,
     [
       {
         type: "text",
-        text: `👋 สวัสดีครับ!\n\nผมคือบอทจัดการบัญชีสำหรับ ${company?.name || "บริษัทของคุณ"}\n\n✅ Group ID ถูกบันทึกอัตโนมัติแล้ว\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้`,
+        text: `👋 สวัสดีครับ!\n\nผมคือบอทจัดการบัญชีสำหรับ ${company?.name || "บริษัทของคุณ"}\n\nพิมพ์ "group id" เพื่อดู Group ID สำหรับตั้งค่าบนเว็บ\nพิมพ์ "help" เพื่อดูคำสั่งที่ใช้ได้`,
       },
     ],
     channelAccessToken

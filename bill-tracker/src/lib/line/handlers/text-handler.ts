@@ -66,18 +66,12 @@ async function handleGroupIdCommand(
     return;
   }
 
-  // Update company with group ID
-  await prisma.company.update({
-    where: { id: company.id },
-    data: { lineGroupId: groupId },
-  });
-
   await replyToLine(
     replyToken,
     [
       {
         type: "text",
-        text: `✅ บันทึก Group ID สำเร็จ!\n\n📱 Group ID:\n${groupId}\n\nคุณสามารถคัดลอก ID นี้ไปใช้ในการตั้งค่าบนเว็บได้แล้ว`,
+        text: `📱 Group ID:\n${groupId}\n\nคัดลอก ID นี้ไปวางในหน้าตั้งค่า LINE Bot บนเว็บ`,
       },
     ],
     channelAccessToken

@@ -87,7 +87,8 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
   }, [companyId]);
 
   const handleSave = async () => {
-    if (!formData.channelSecret || !formData.channelAccessToken) {
+    const isNewSetup = !config?.isConfigured;
+    if (isNewSetup && (!formData.channelSecret || !formData.channelAccessToken)) {
       toast.error("กรุณากรอก Channel Secret และ Access Token");
       return;
     }
@@ -390,41 +391,51 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="channelSecret">
-                    Channel Secret <span className="text-destructive">*</span>
+                    Channel Secret {!config?.isConfigured && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="channelSecret"
                     type="password"
-                    placeholder="กรอก Channel Secret"
+                    placeholder={config?.isConfigured ? "เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน" : "กรอก Channel Secret"}
                     value={formData.channelSecret}
                     onChange={(e) =>
                       setFormData({ ...formData, channelSecret: e.target.value })
                     }
                   />
+                  {config?.isConfigured && config.channelSecret && (
+                    <p className="text-xs text-muted-foreground">
+                      ค่าปัจจุบัน: {config.channelSecret}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="channelAccessToken">
-                    Channel Access Token <span className="text-destructive">*</span>
+                    Channel Access Token {!config?.isConfigured && <span className="text-destructive">*</span>}
                   </Label>
                   <Input
                     id="channelAccessToken"
                     type="password"
-                    placeholder="กรอก Channel Access Token"
+                    placeholder={config?.isConfigured ? "เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน" : "กรอก Channel Access Token"}
                     value={formData.channelAccessToken}
                     onChange={(e) =>
                       setFormData({ ...formData, channelAccessToken: e.target.value })
                     }
                   />
+                  {config?.isConfigured && config.channelAccessToken && (
+                    <p className="text-xs text-muted-foreground">
+                      ค่าปัจจุบัน: {config.channelAccessToken}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="groupId">
-                    Group ID <span className="text-muted-foreground">(ไม่บังคับ)</span>
+                    Group ID <span className="text-muted-foreground">(พิมพ์ &quot;group id&quot; ในกลุ่ม LINE เพื่อดู)</span>
                   </Label>
                   <Input
                     id="groupId"
-                    placeholder="บอทจะบันทึกอัตโนมัติเมื่อเข้ากลุ่ม"
+                    placeholder="วาง Group ID ที่ได้จากคำสั่งในกลุ่ม LINE"
                     value={formData.groupId}
                     onChange={(e) =>
                       setFormData({ ...formData, groupId: e.target.value })
@@ -452,7 +463,7 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
                 )}
                 <Button
                   onClick={handleSave}
-                  disabled={saving || !formData.channelSecret || !formData.channelAccessToken}
+                  disabled={saving || (!config?.isConfigured && (!formData.channelSecret || !formData.channelAccessToken))}
                   className="flex-1"
                 >
                   {saving ? (
