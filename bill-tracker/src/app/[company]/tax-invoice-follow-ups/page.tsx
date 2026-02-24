@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr-config";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,11 +118,6 @@ export default function TaxInvoiceFollowUpsPage() {
   const router = useRouter();
   const companyCode = params.company as string;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [groups, setGroups] = useState<ContactGroup[]>([]);
-  const [totalPending, setTotalPending] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [oldestDays, setOldestDays] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set());
 
@@ -131,30 +128,25 @@ export default function TaxInvoiceFollowUpsPage() {
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/${companyCode}/tax-invoice-follow-ups?groupBy=contact`);
-      const data = await res.json();
-      if (data.success) {
-        setGroups(data.data.groups || []);
-        setTotalPending(data.data.totalPending || 0);
-        setTotalAmount(data.data.totalAmount || 0);
-        setOldestDays(data.data.oldestDays || 0);
-        // Auto-expand all groups
-        setExpandedGroups(new Set((data.data.groups || []).map((g: ContactGroup) => g.contactId)));
-      }
-    } catch (error) {
-      console.error("Error fetching tax invoice follow-ups:", error);
-      toast.error("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: swrData, isLoading, mutate: refreshData } = useSWR<{
+    data?: { groups?: ContactGroup[]; totalPending?: number; totalAmount?: number; oldestDays?: number };
+  }>(
+    companyCode ? `/api/${companyCode}/tax-invoice-follow-ups?groupBy=contact` : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
 
+  const groups: ContactGroup[] = swrData?.data?.groups || [];
+  const totalPending: number = swrData?.data?.totalPending || 0;
+  const totalAmount: number = swrData?.data?.totalAmount || 0;
+  const oldestDays: number = swrData?.data?.oldestDays || 0;
+
+  // Auto-expand all groups when data first loads
   useEffect(() => {
-    fetchData();
-  }, [companyCode]);
+    if (groups.length > 0 && expandedGroups.size === 0) {
+      setExpandedGroups(new Set(groups.map((g) => g.contactId)));
+    }
+  }, [groups.length]);
 
   const toggleGroup = (contactId: string) => {
     const newExpanded = new Set(expandedGroups);
@@ -214,7 +206,7 @@ export default function TaxInvoiceFollowUpsPage() {
         setSelectedExpenses(new Set());
         setSelectedRequestMethod("");
         setNotes("");
-        fetchData();
+        refreshData();
       } else {
         throw new Error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -249,7 +241,7 @@ export default function TaxInvoiceFollowUpsPage() {
         setShowReceivedDialog(false);
         setSelectedExpenses(new Set());
         setNotes("");
-        fetchData();
+        refreshData();
       } else {
         throw new Error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -268,7 +260,7 @@ export default function TaxInvoiceFollowUpsPage() {
           description="รายการค่าใช้จ่ายที่รอใบกำกับภาษีจาก Vendor จัดกลุ่มตามร้าน/ผู้ติดต่อ"
           actions={
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={fetchData}>
+              <Button variant="outline" size="sm" onClick={() => refreshData()}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 รีเฟรช
               </Button>

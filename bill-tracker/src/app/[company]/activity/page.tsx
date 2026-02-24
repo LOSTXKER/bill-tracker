@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, use } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr-config";
 import { 
   Bell, 
   Check, 
@@ -126,35 +128,26 @@ export default function ActivityPage({ params }: PageProps) {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
-  // Fetch notifications
-  const fetchNotifications = useCallback(async (showRefresh = false) => {
-    try {
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
+  const { data: notifData, isLoading: loading, mutate } = useSWR<{
+    data: { notifications: Notification[]; unreadCount: number };
+  }>(
+    companyCode ? `/api/${companyCode}/notifications?limit=100` : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
 
-      const res = await fetch(`/api/${companyCode}/notifications?limit=100`);
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.data.notifications || []);
-        setUnreadCount(data.data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [companyCode]);
-
+  // Sync SWR data to local state (local state enables optimistic updates)
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    if (notifData?.data) {
+      setNotifications(notifData.data.notifications || []);
+      setUnreadCount(notifData.data.unreadCount || 0);
+    }
+  }, [notifData]);
 
   // Mark as read
   const handleMarkAsRead = async (notificationId: string) => {
@@ -307,7 +300,7 @@ export default function ActivityPage({ params }: PageProps) {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => fetchNotifications(true)}
+            onClick={async () => { setRefreshing(true); await mutate(); setRefreshing(false); }}
             disabled={refreshing}
           >
             <RefreshCw className={cn("h-4 w-4 mr-1", refreshing && "animate-spin")} />

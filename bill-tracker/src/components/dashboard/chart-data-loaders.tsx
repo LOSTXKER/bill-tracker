@@ -5,94 +5,33 @@ import { CashFlowChart } from "@/components/charts/cash-flow-chart";
 import { ExpenseCategoryChart } from "@/components/charts/expense-category-chart";
 import { MonthlyTrendChart } from "@/components/charts/monthly-trend-chart";
 import { getCompanyId } from "@/lib/cache/company";
+import { getMonthlyChartData } from "@/lib/cache/chart-data";
 
 export async function CashFlowChartData({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  const now = new Date();
-  const months = [];
+  const data = await getMonthlyChartData(companyId, 6);
 
-  for (let i = 5; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-    const [incomeSum, expenseSum] = await Promise.all([
-      prisma.income.aggregate({
-        where: {
-          companyId: companyId,
-          receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        _sum: { netReceived: true },
-      }),
-      prisma.expense.aggregate({
-        where: {
-          companyId: companyId,
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        _sum: { netPaid: true },
-      }),
-    ]);
-
-    const income = Number(incomeSum._sum.netReceived) || 0;
-    const expense = Number(expenseSum._sum.netPaid) || 0;
-
-    months.push({
-      month: monthDate.toLocaleDateString("th-TH", {
-        month: "short",
-        year: "2-digit",
-      }),
-      income,
-      expense,
-      netFlow: income - expense,
-    });
-  }
-
-  return <CashFlowChart data={months} />;
+  return <CashFlowChart data={data} />;
 }
 
 export async function MonthlyTrendChartData({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  const now = new Date();
-  const months = [];
+  const rawData = await getMonthlyChartData(companyId, 6);
+  const data = rawData.map(({ monthKey, income, expense }) => {
+    const [year, month] = monthKey.split("-").map(Number);
+    const date = new Date(year, month - 1, 1);
+    return {
+      month: date.toLocaleDateString("th-TH", { month: "short" }),
+      income,
+      expense,
+    };
+  });
 
-  for (let i = 5; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-    const [incomeSum, expenseSum] = await Promise.all([
-      prisma.income.aggregate({
-        where: {
-          companyId: companyId,
-          receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        _sum: { netReceived: true },
-      }),
-      prisma.expense.aggregate({
-        where: {
-          companyId: companyId,
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        _sum: { netPaid: true },
-      }),
-    ]);
-
-    months.push({
-      month: monthDate.toLocaleDateString("th-TH", { month: "short" }),
-      income: Number(incomeSum._sum.netReceived) || 0,
-      expense: Number(expenseSum._sum.netPaid) || 0,
-    });
-  }
-
-  return <MonthlyTrendChart data={months} />;
+  return <MonthlyTrendChart data={data} />;
 }
 
 export async function ExpenseCategoryChartData({ companyCode }: { companyCode: string }) {

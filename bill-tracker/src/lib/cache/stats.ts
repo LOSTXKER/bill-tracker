@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 
 export type ViewMode = "official" | "internal";
@@ -9,15 +10,37 @@ export interface DateRangeFilter {
   dateTo?: string;
 }
 
+const _getExpenseStats = unstable_cache(
+  async (
+    companyId: string,
+    viewMode: ViewMode,
+    dateFrom: string | undefined,
+    dateTo: string | undefined
+  ) => {
+    const dateFilter: DateRangeFilter | undefined =
+      dateFrom || dateTo ? { dateFrom, dateTo } : undefined;
+    return _expenseStatsImpl(companyId, viewMode, dateFilter);
+  },
+  ["expense-stats"],
+  { revalidate: 60, tags: ["expense-stats"] }
+);
+
 /**
- * Get expense stats - real-time without caching
- * Stats should always be up-to-date
- * 
+ * Get expense stats - cached for 60 seconds per (companyId, viewMode, dateRange) combination.
+ *
  * @param companyId - The company ID
  * @param viewMode - "official" (by companyId) or "internal" (by internalCompanyId)
  * @param dateFilter - Optional date range filter
  */
 export async function getExpenseStats(
+  companyId: string,
+  viewMode: ViewMode = "official",
+  dateFilter?: DateRangeFilter
+) {
+  return _getExpenseStats(companyId, viewMode, dateFilter?.dateFrom, dateFilter?.dateTo);
+}
+
+async function _expenseStatsImpl(
   companyId: string, 
   viewMode: ViewMode = "official",
   dateFilter?: DateRangeFilter
@@ -124,14 +147,31 @@ export async function getExpenseStats(
   };
 }
 
+const _getIncomeStats = unstable_cache(
+  async (
+    companyId: string,
+    dateFrom: string | undefined,
+    dateTo: string | undefined
+  ) => {
+    const dateFilter: DateRangeFilter | undefined =
+      dateFrom || dateTo ? { dateFrom, dateTo } : undefined;
+    return _incomeStatsImpl(companyId, dateFilter);
+  },
+  ["income-stats"],
+  { revalidate: 60, tags: ["income-stats"] }
+);
+
 /**
- * Get income stats - real-time without caching
- * Stats should always be up-to-date
- * 
+ * Get income stats - cached for 60 seconds per (companyId, dateRange) combination.
+ *
  * @param companyId - The company ID
  * @param dateFilter - Optional date range filter
  */
 export async function getIncomeStats(companyId: string, dateFilter?: DateRangeFilter) {
+  return _getIncomeStats(companyId, dateFilter?.dateFrom, dateFilter?.dateTo);
+}
+
+async function _incomeStatsImpl(companyId: string, dateFilter?: DateRangeFilter) {
   const now = new Date();
   
   // If date filter provided, use it; otherwise use current month

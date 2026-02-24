@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Building2, FileText } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
@@ -35,6 +34,7 @@ interface ExpensesClientProps {
   isOwner?: boolean;
   tabCounts?: TabCounts;
   crossCompanyCount?: number;
+  companies?: CompanyOption[];
 }
 
 const expenseListConfig = createTransactionListConfig(
@@ -65,27 +65,10 @@ export function ExpensesClient({
   isOwner = false,
   tabCounts,
   crossCompanyCount = 0,
+  companies = [],
 }: ExpensesClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [companies, setCompanies] = useState<CompanyOption[]>([]);
-  
-  // Fetch companies for bulk internal company change
-  useEffect(() => {
-    fetch("/api/companies")
-      .then((res) => res.json())
-      .then((result) => {
-        const companiesList = result.data?.companies || [];
-        setCompanies(companiesList.map((c: { id: string; name: string; code: string }) => ({
-          id: c.id,
-          name: c.name,
-          code: c.code,
-        })));
-      })
-      .catch(() => {
-        // Ignore errors
-      });
-  }, []);
   
   const handleViewModeChange = (mode: "official" | "internal") => {
     const params = new URLSearchParams(searchParams.toString());

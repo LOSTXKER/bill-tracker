@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr-config";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,50 +51,24 @@ export default function EmployeesPage() {
   const companyCode = (params.company as string).toUpperCase();
   const isOwner = useIsOwner();
 
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
 
-  // Fetch company ID
-  useEffect(() => {
-    const fetchCompany = async () => {
-      try {
-        const response = await fetch(`/api/companies?code=${companyCode}`);
-        const result = await response.json();
-        const companies = result.data?.companies || result.companies;
-        if (companies?.[0]) {
-          setCompanyId(companies[0].id);
-        }
-      } catch (error) {
-        console.error("Error fetching company:", error);
-      }
-    };
-    fetchCompany();
-  }, [companyCode]);
+  const { data: companyData } = useSWR<{ data?: { companies?: { id: string }[] }; companies?: { id: string }[] }>(
+    companyCode ? `/api/companies?code=${companyCode}` : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
+  const companyId: string | null =
+    companyData?.data?.companies?.[0]?.id || companyData?.companies?.[0]?.id || null;
 
-  // Fetch members
-  const fetchMembers = async () => {
-    if (!companyId) return;
-
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/companies/${companyId}/members`);
-      const result = await response.json();
-      const members = result.data?.members || result.members || [];
-      setMembers(members);
-    } catch (error) {
-      console.error("Error fetching members:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMembers();
-  }, [companyId]);
+  const { data: membersData, isLoading, mutate: fetchMembers } = useSWR<{ data?: { members?: TeamMember[] }; members?: TeamMember[] }>(
+    companyId ? `/api/companies/${companyId}/members` : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
+  const members: TeamMember[] = membersData?.data?.members || membersData?.members || [];
 
   const handleRowClick = (member: TeamMember) => {
     // Use companyAccess.id (member.id) not userId for API routes

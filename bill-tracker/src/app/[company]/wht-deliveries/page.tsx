@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr-config";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,40 +85,32 @@ export default function WhtDeliveriesPage() {
   const router = useRouter();
   const companyCode = params.company as string;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [groups, setGroups] = useState<ContactGroup[]>([]);
-  const [totalPending, setTotalPending] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set());
-  
+
   // Mark sent dialog
   const [showMarkSentDialog, setShowMarkSentDialog] = useState(false);
   const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/${companyCode}/wht-deliveries?groupBy=contact`);
-      const data = await res.json();
-      if (data.success) {
-        setGroups(data.data.groups || []);
-        setTotalPending(data.data.totalPending || 0);
-        // Auto-expand all groups
-        setExpandedGroups(new Set((data.data.groups || []).map((g: ContactGroup) => g.contactId)));
-      }
-    } catch (error) {
-      console.error("Error fetching WHT deliveries:", error);
-      toast.error("ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: swrData, isLoading, mutate: refreshData } = useSWR<{
+    data?: { groups?: ContactGroup[]; totalPending?: number };
+  }>(
+    companyCode ? `/api/${companyCode}/wht-deliveries?groupBy=contact` : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
 
+  const groups: ContactGroup[] = swrData?.data?.groups || [];
+  const totalPending: number = swrData?.data?.totalPending || 0;
+
+  // Auto-expand all groups when data first loads
   useEffect(() => {
-    fetchData();
-  }, [companyCode]);
+    if (groups.length > 0 && expandedGroups.size === 0) {
+      setExpandedGroups(new Set(groups.map((g) => g.contactId)));
+    }
+  }, [groups.length]);
 
   const toggleGroup = (contactId: string) => {
     const newExpanded = new Set(expandedGroups);
@@ -179,7 +173,7 @@ export default function WhtDeliveriesPage() {
         setSelectedExpenses(new Set());
         setSelectedDeliveryMethod("");
         setNotes("");
-        fetchData();
+        refreshData();
       } else {
         throw new Error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -200,7 +194,7 @@ export default function WhtDeliveriesPage() {
           description="รายการใบหัก ณ ที่จ่ายที่ออกแล้วแต่ยังไม่ได้ส่งให้ vendor"
           actions={
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={fetchData}>
+              <Button variant="outline" size="sm" onClick={() => refreshData()}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 รีเฟรช
               </Button>

@@ -143,16 +143,24 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const session = await getSession();
   const currentUserId = session?.user?.id;
   
-  // Get user permissions including isOwner
-  const userPermissions = currentUserId
-    ? await getUserPermissions(currentUserId, companyId)
-    : { isOwner: false, permissions: [] };
-  
-  const canApprove = currentUserId 
-    ? await hasPermission(currentUserId, companyId, "expenses:approve")
-    : false;
+  // Fetch permissions and user's accessible companies in parallel
+  const [userPermissions, canApprove, companiesRaw] = await Promise.all([
+    currentUserId
+      ? getUserPermissions(currentUserId, companyId)
+      : Promise.resolve({ isOwner: false, permissions: [] }),
+    currentUserId
+      ? hasPermission(currentUserId, companyId, "expenses:approve")
+      : Promise.resolve(false),
+    currentUserId
+      ? prisma.companyAccess.findMany({
+          where: { userId: currentUserId },
+          select: { Company: { select: { id: true, name: true, code: true } } },
+        })
+      : Promise.resolve([]),
+  ]);
   
   const isOwner = userPermissions.isOwner;
+  const companies = companiesRaw.map((ca) => ca.Company);
 
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
@@ -312,12 +320,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
         ],
       };
 
-  // Count cross-company expenses (paid by others for this company) — for warning banner in official mode
-  const crossCompanyCount = await prisma.expense.count({
-    where: { internalCompanyId: companyId, companyId: { not: companyId }, deletedAt: null },
-  });
-
-  const [expensesRaw, total, tabCounts] = await Promise.all([
+  const [expensesRaw, total, tabCounts, crossCompanyCount] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
       orderBy,
@@ -362,6 +365,10 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       sent,
       recent: null, // Recent doesn't need a count
     })),
+    // Count cross-company expenses (paid by others for this company) — for warning banner in official mode
+    prisma.expense.count({
+      where: { internalCompanyId: companyId, companyId: { not: companyId }, deletedAt: null },
+    }),
   ]);
 
   // Map Prisma relation names to what the client expects
@@ -391,6 +398,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       isOwner={isOwner}
       tabCounts={tabCounts}
       crossCompanyCount={crossCompanyCount}
+      companies={companies}
     />
   );
 }
