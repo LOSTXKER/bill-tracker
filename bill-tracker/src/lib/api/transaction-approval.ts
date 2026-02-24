@@ -3,6 +3,7 @@
  * Eliminates duplication between expense and income approve/reject routes.
  */
 
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { withAuth } from "./with-auth";
 import { apiResponse } from "./response";
@@ -174,6 +175,10 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
         approverName: session.user.name || undefined,
       }, getBaseUrl());
 
+      // Bust stats cache so dashboard reflects the approval immediately
+      if (config.type === "expense") revalidateTag("expense-stats", {});
+      if (config.type === "income") revalidateTag("income-stats", {});
+
       return apiResponse.success(
         { [config.responseKey]: updated },
         `อนุมัติ${config.displayName}แล้ว`
@@ -305,6 +310,10 @@ export function createTransactionRejectHandler(type: "expense" | "income") {
         approverName: session.user.name || undefined,
         rejectedReason: reason.trim(),
       }, getBaseUrl());
+
+      // Bust stats cache so dashboard reflects the rejection immediately
+      if (config.type === "expense") revalidateTag("expense-stats", {});
+      if (config.type === "income") revalidateTag("income-stats", {});
 
       return apiResponse.success(
         { [config.responseKey]: updated },

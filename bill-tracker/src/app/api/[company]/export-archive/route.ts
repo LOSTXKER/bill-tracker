@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/api/with-auth";
+import { NextResponse } from "next/server";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
 import archiver from "archiver";
@@ -63,49 +63,20 @@ interface IncomeWithFiles {
   otherDocUrls: any;
 }
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ company: string }> }
-) {
-  return withAuth(async (req, { session }) => {
-    try {
-      const { company: companyCode } = await context.params;
+export const GET = withCompanyAccessFromParams(async (req, { company }) => {
+  try {
       const { searchParams } = new URL(req.url);
-      
+
       // Get month and year from query params
       const month = parseInt(searchParams.get("month") || String(new Date().getMonth()));
       const year = parseInt(searchParams.get("year") || String(new Date().getFullYear() + 543));
-      
+
       // Convert Buddhist year to Gregorian
       const gregorianYear = year - 543;
-      
+
       // Calculate date range
       const startDate = new Date(gregorianYear, month, 1);
       const endDate = new Date(gregorianYear, month + 1, 0, 23, 59, 59);
-
-      // Find company
-      const company = await prisma.company.findUnique({
-        where: { code: companyCode.toUpperCase() },
-        select: { id: true, name: true, code: true },
-      });
-
-      if (!company) {
-        return apiResponse.notFound("ไม่พบบริษัท");
-      }
-
-      // Check user access
-      const hasAccess = await prisma.companyAccess.findUnique({
-        where: {
-          userId_companyId: {
-            userId: session.user.id,
-            companyId: company.id,
-          },
-        },
-      });
-
-      if (!hasAccess) {
-        return apiResponse.forbidden("คุณไม่มีสิทธิ์เข้าถึงข้อมูลบริษัทนี้");
-      }
 
       // Fetch expenses with files
       const expensesRaw = await prisma.expense.findMany({
@@ -535,9 +506,8 @@ export async function GET(
 
       // Return streaming response
       return new NextResponse(readable, { headers });
-    } catch (error) {
-      console.error("Export archive error:", error);
-      return apiResponse.error("เกิดข้อผิดพลาดในการส่งออกข้อมูล");
-    }
-  })(request);
-}
+  } catch (error) {
+    console.error("Export archive error:", error);
+    return apiResponse.error("เกิดข้อผิดพลาดในการส่งออกข้อมูล");
+  }
+});

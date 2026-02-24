@@ -20,13 +20,16 @@ export default async function ApprovalsPage({ params, searchParams }: ApprovalsP
   const { company: companyCode } = await params;
   const urlParams = await searchParams;
 
-  // Check if user has permission to approve
-  const session = await getSession();
+  // Fetch session and companyId in parallel (both are independent)
+  const [session, companyId] = await Promise.all([
+    getSession(),
+    getCompanyId(companyCode),
+  ]);
+
   if (!session?.user?.id) {
     redirect("/login");
   }
 
-  const companyId = await getCompanyId(companyCode);
   if (!companyId) {
     redirect("/");
   }
