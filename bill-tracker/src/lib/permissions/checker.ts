@@ -61,7 +61,7 @@ export async function hasPermission(
 }
 
 /**
- * Check multiple permissions at once
+ * Check multiple permissions at once (single DB query)
  * 
  * @param userId - The user ID to check
  * @param companyId - The company ID to check against
@@ -82,17 +82,40 @@ export async function hasPermissions(
   companyId: string,
   permissions: string[]
 ): Promise<Record<string, boolean>> {
-  const results: Record<string, boolean> = {};
-  
-  for (const permission of permissions) {
-    results[permission] = await hasPermission(userId, companyId, permission);
+  const access = await prisma.companyAccess.findUnique({
+    where: {
+      userId_companyId: {
+        userId,
+        companyId,
+      },
+    },
+  });
+
+  if (!access) {
+    return Object.fromEntries(permissions.map(p => [p, false]));
   }
-  
+
+  if (access.isOwner) {
+    return Object.fromEntries(permissions.map(p => [p, true]));
+  }
+
+  const userPerms = (access.permissions as string[]) || [];
+  const results: Record<string, boolean> = {};
+
+  for (const permission of permissions) {
+    if (userPerms.includes(permission)) {
+      results[permission] = true;
+    } else {
+      const [module] = permission.split(":");
+      results[permission] = userPerms.includes(`${module}:*`);
+    }
+  }
+
   return results;
 }
 
 /**
- * Check if user has ANY of the provided permissions
+ * Check if user has ANY of the provided permissions (single DB query)
  * 
  * @param userId - The user ID to check
  * @param companyId - The company ID to check against
@@ -104,16 +127,12 @@ export async function hasAnyPermission(
   companyId: string,
   permissions: string[]
 ): Promise<boolean> {
-  for (const permission of permissions) {
-    if (await hasPermission(userId, companyId, permission)) {
-      return true;
-    }
-  }
-  return false;
+  const results = await hasPermissions(userId, companyId, permissions);
+  return Object.values(results).some(Boolean);
 }
 
 /**
- * Check if user has ALL of the provided permissions
+ * Check if user has ALL of the provided permissions (single DB query)
  * 
  * @param userId - The user ID to check
  * @param companyId - The company ID to check against
@@ -125,12 +144,8 @@ export async function hasAllPermissions(
   companyId: string,
   permissions: string[]
 ): Promise<boolean> {
-  for (const permission of permissions) {
-    if (!(await hasPermission(userId, companyId, permission))) {
-      return false;
-    }
-  }
-  return true;
+  const results = await hasPermissions(userId, companyId, permissions);
+  return Object.values(results).every(Boolean);
 }
 
 /**

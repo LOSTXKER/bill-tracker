@@ -7,6 +7,7 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_RATE_LIMIT_ENTRIES = 10_000;
 
 interface RateLimitOptions {
   windowMs?: number; // Time window in milliseconds
@@ -31,6 +32,17 @@ export function checkRateLimit(
   const { windowMs, maxRequests } = { ...DEFAULT_OPTIONS, ...options };
   const now = Date.now();
   const key = identifier;
+
+  // Evict expired/oldest entries if map is too large
+  if (rateLimitStore.size >= MAX_RATE_LIMIT_ENTRIES) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (now > v.resetTime) rateLimitStore.delete(k);
+    }
+    if (rateLimitStore.size >= MAX_RATE_LIMIT_ENTRIES) {
+      const sorted = [...rateLimitStore.entries()].sort((a, b) => a[1].resetTime - b[1].resetTime);
+      sorted.slice(0, Math.floor(MAX_RATE_LIMIT_ENTRIES / 2)).forEach(([k]) => rateLimitStore.delete(k));
+    }
+  }
 
   // Get or create entry
   let entry = rateLimitStore.get(key);

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { generateText } from "@/lib/ai/gemini";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
 
 export interface ReconcileItem {
   id?: string;
@@ -19,26 +19,16 @@ export interface AISuggestion {
   reason: string;
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ company: string }> }
-) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  await params;
-
-  try {
-    const body = await req.json();
+export const POST = withCompanyAccessFromParams(
+  async (request, { company }) => {
+    const body = await request.json();
     const { systemItems, accountingItems } = body as {
       systemItems: ReconcileItem[];
       accountingItems: ReconcileItem[];
     };
 
     if (!systemItems?.length || !accountingItems?.length) {
-      return NextResponse.json({ suggestions: [] });
+      return apiResponse.success({ suggestions: [] });
     }
 
     const prompt = buildMatchingPrompt(systemItems, accountingItems);
@@ -55,12 +45,13 @@ export async function POST(
       suggestions = [];
     }
 
-    return NextResponse.json({ suggestions });
-  } catch (error) {
-    console.error("Reconcile AI match error:", error);
-    return NextResponse.json({ error: "AI matching failed" }, { status: 500 });
+    return apiResponse.success({ suggestions });
+  },
+  {
+    permission: "reports:read",
+    rateLimit: { maxRequests: 10, windowMs: 60_000 },
   }
-}
+);
 
 function buildMatchingPrompt(
   systemItems: ReconcileItem[],

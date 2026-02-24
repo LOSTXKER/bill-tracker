@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import useSWR from "swr";
 
 // =============================================================================
 // Types
@@ -22,6 +22,15 @@ interface UseSidebarBadgesOptions {
   enablePolling?: boolean;
 }
 
+const DEFAULT_BADGES: SidebarBadges = {
+  pendingApprovals: 0,
+  pendingReimbursements: 0,
+  pendingSettlements: 0,
+  pendingTaxInvoices: 0,
+  pendingWhtDeliveries: 0,
+  unreadNotifications: 0,
+};
+
 // =============================================================================
 // Hook
 // =============================================================================
@@ -32,66 +41,27 @@ export function useSidebarBadges(
 ) {
   const { pollInterval = 30000, enablePolling = true } = options;
 
-  const [badges, setBadges] = useState<SidebarBadges>({
-    pendingApprovals: 0,
-    pendingReimbursements: 0,
-    pendingSettlements: 0,
-    pendingTaxInvoices: 0,
-    pendingWhtDeliveries: 0,
-    unreadNotifications: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch badges from API
-  const fetchBadges = useCallback(async () => {
-    if (!companyCode) return;
-
-    try {
-      const res = await fetch(`/api/${companyCode}/sidebar-badges`);
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.data) {
-          setBadges(data.data);
-          setError(null);
-        }
-      } else {
-        // Don't set error for normal failures, just keep previous state
-        console.warn("Failed to fetch sidebar badges:", res.statusText);
-      }
-    } catch (err) {
-      console.error("Failed to fetch sidebar badges:", err);
-      // Don't set error state to avoid UI disruption
-    } finally {
-      setLoading(false);
+  const { data, error, isLoading, mutate } = useSWR<{ success: boolean; data: SidebarBadges }>(
+    companyCode ? `/api/${companyCode}/sidebar-badges` : null,
+    {
+      refreshInterval: enablePolling ? pollInterval : 0,
+      revalidateOnFocus: false,
+      dedupingInterval: 10_000,
     }
-  }, [companyCode]);
+  );
 
-  // Initial fetch and polling
-  useEffect(() => {
-    fetchBadges();
+  const badges: SidebarBadges = data?.data || DEFAULT_BADGES;
 
-    if (enablePolling && pollInterval > 0) {
-      const interval = setInterval(fetchBadges, pollInterval);
-      return () => clearInterval(interval);
-    }
-  }, [fetchBadges, pollInterval, enablePolling]);
-
-  // Manual refresh function
-  const refresh = useCallback(() => {
-    setLoading(true);
-    return fetchBadges();
-  }, [fetchBadges]);
-
-  // Calculate total badge count (excluding notifications which are shown separately)
-  const totalCount = badges.pendingApprovals + badges.pendingReimbursements + badges.pendingSettlements;
+  const totalCount =
+    badges.pendingApprovals +
+    badges.pendingReimbursements +
+    badges.pendingSettlements;
 
   return {
     badges,
-    loading,
-    error,
-    refresh,
+    loading: isLoading,
+    error: error?.message || null,
+    refresh: mutate,
     totalCount,
   };
 }

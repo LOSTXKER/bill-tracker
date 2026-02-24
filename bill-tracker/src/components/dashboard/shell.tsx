@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
 import { PermissionProvider } from "@/components/providers/permission-provider";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { BottomNav } from "@/components/dashboard/bottom-nav";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { useSidebarBadges, type SidebarBadges } from "@/hooks/use-sidebar-badges";
@@ -433,7 +434,9 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
 
         {/* Main content */}
         <main className="pt-16 pb-20 lg:pb-0 lg:pl-60">
-          <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">{children}</div>
+          <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </div>
         </main>
 
         {/* Bottom Navigation - Mobile Only */}

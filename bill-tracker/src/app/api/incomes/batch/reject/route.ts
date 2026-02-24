@@ -25,6 +25,11 @@ export const POST = (request: Request) => {
         return apiResponse.badRequest("กรุณาเลือกรายการที่ต้องการปฏิเสธ");
       }
 
+      const MAX_BATCH_SIZE = 50;
+      if (ids.length > MAX_BATCH_SIZE) {
+        return apiResponse.badRequest(`ไม่สามารถดำเนินการเกิน ${MAX_BATCH_SIZE} รายการต่อครั้ง`);
+      }
+
       if (!reason || !reason.trim()) {
         return apiResponse.badRequest("กรุณาระบุเหตุผลในการปฏิเสธ");
       }

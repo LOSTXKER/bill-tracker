@@ -423,8 +423,8 @@ export function ReconcileView({
       });
 
       if (!res.ok) throw new Error("AI request failed");
-      const data = await res.json();
-      const suggestions = data.suggestions ?? [];
+      const json = await res.json();
+      const suggestions = json.data?.suggestions ?? [];
 
       if (suggestions.length === 0) return;
 

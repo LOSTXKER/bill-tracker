@@ -23,9 +23,6 @@ import {
   Loader2,
   LucideIcon,
   ArrowLeft,
-  Edit,
-  Save,
-  X,
   Trash2,
   Receipt,
   FileText,
@@ -33,12 +30,10 @@ import {
   Calendar,
   User,
   AlertCircle,
-  Phone,
-  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
-import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
+
 
 // Hooks
 import { useContacts } from "@/hooks/use-contacts";
@@ -61,15 +56,16 @@ import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { CalculationSummary } from "./shared/CalculationSummary";
 import { PayerSection, PayerInfo } from "./shared/PayerSection";
 import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
+import { TransactionViewToolbar } from "./shared/TransactionViewToolbar";
 
 // Transaction components
-import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, WorkflowActions, TimelineStepper, DraftActions, ApprovalBadge, ApprovalActions, TransactionViewHeader } from "@/components/transactions";
+import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, TransactionViewHeader } from "@/components/transactions";
 import { CommentSection } from "@/components/comments/CommentSection";
 
 // Types & Constants
 import type { ContactSummary } from "@/types";
 import type { ApprovalStatus } from "@prisma/client";
-import { StatusInfo, EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO, APPROVAL_STATUS_INFO, getExpenseWorkflowLabel, WHT_LOCKED_STATUSES, WHT_CONFIRM_STATUSES_ALL } from "@/lib/constants/transaction";
+import { StatusInfo, WHT_LOCKED_STATUSES, WHT_CONFIRM_STATUSES_ALL } from "@/lib/constants/transaction";
 
 // Permissions
 import { usePermissions } from "@/components/providers/permission-provider";
@@ -1065,13 +1061,6 @@ export function UnifiedTransactionForm({
     );
   }
 
-  // Use workflowStatus for badge if available, fallback to legacy status
-  const workflowInfo = config.type === "expense" ? EXPENSE_WORKFLOW_INFO : INCOME_WORKFLOW_INFO;
-  const statusInfo = transaction
-    ? (transaction.workflowStatus 
-        ? workflowInfo[transaction.workflowStatus] 
-        : config.statusInfo[transaction.status]) || config.statusInfo[config.defaultStatus]
-    : null;
   const isDeleted = transaction?.deletedAt ? true : false;
 
   // Build fields config for TransactionFieldsSection
@@ -1091,244 +1080,28 @@ export function UnifiedTransactionForm({
     <>
       {/* View/Edit Mode Header */}
       {mode !== "create" && transaction && (
-        <div className="max-w-6xl mx-auto px-4 mb-4">
-          {/* Deleted Warning Banner */}
-          {isDeleted && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-3 flex items-center gap-3">
-              <Trash2 className="h-5 w-5 text-destructive shrink-0" />
-              <div>
-                <p className="font-medium text-destructive text-sm">รายการนี้ถูกลบแล้ว</p>
-                <p className="text-xs text-muted-foreground">
-                  ลบเมื่อ {new Date(transaction.deletedAt as string).toLocaleString("th-TH")}
-                  {transaction.deletedByUser && ` โดย ${transaction.deletedByUser.name}`}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Compact Header */}
-          <div className="flex items-center justify-between gap-4 py-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn("shrink-0 rounded-full h-9 w-9", config.iconColor)}
-                  onClick={navigateToList}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
-                  {/* Show single badge: ApprovalBadge for PENDING/REJECTED, otherwise StatusBadge */}
-                  {transaction.workflowStatus === "DRAFT" && transaction.approvalStatus === "PENDING" ? (
-                    <ApprovalBadge status="PENDING" size="sm" />
-                  ) : transaction.workflowStatus === "DRAFT" && transaction.approvalStatus === "REJECTED" ? (
-                    <ApprovalBadge status="REJECTED" size="sm" />
-                  ) : statusInfo && (
-                    <Badge className={cn("text-xs", statusInfo.bgColor, statusInfo.color)}>
-                      {config.type === "expense" && transaction.workflowStatus
-                        ? getExpenseWorkflowLabel(transaction.workflowStatus, (transaction.documentType as string) || "TAX_INVOICE")
-                        : statusInfo.label}
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {new Date(transaction[config.fields.dateField.name] as string).toLocaleDateString(
-                    "th-TH",
-                    { day: "numeric", month: "long", year: "numeric" }
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {isDeleted ? (
-                <Badge variant="destructive" className="gap-1 text-xs">
-                  <Trash2 className="h-3 w-3" />
-                  ถูกลบแล้ว
-                </Badge>
-              ) : mode === "edit" ? (
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={saving}>
-                    <X className="h-4 w-4 mr-1" />
-                    ยกเลิก
-                  </Button>
-                  <Button size="sm" onClick={handleSave} disabled={saving} className="bg-primary">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-                    บันทึก
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {/* Show actions based on role for DRAFT status */}
-                  {transaction?.workflowStatus === "DRAFT" && transaction.approvalStatus && (
-                    <>
-                      {/* PENDING: Show actions based on user role */}
-                      {transaction.approvalStatus === "PENDING" && (
-                        <>
-                          {/* Requester: Show only withdraw button */}
-                          {transaction.submittedBy === currentUserId && (
-                            <DraftActions
-                              companyCode={companyCode}
-                              transactionId={transaction.id}
-                              transactionType={config.type}
-                              workflowStatus={transaction.workflowStatus}
-                              approvalStatus={transaction.approvalStatus as ApprovalStatus}
-                              rejectedReason={transaction.rejectedReason as string | null}
-                              submittedAt={transaction.submittedAt as string | null}
-                              submittedByName={(transaction.submittedByUser as { name?: string } | null)?.name}
-                              canCreateDirect={canCreateDirect}
-                              canMarkPaid={canMarkPaid}
-                              onSuccess={() => {
-                                refreshAll();
-                              }}
-                            />
-                          )}
-                          
-                          {/* Approver (not requester): Show only approve/reject buttons */}
-                          {transaction.submittedBy !== currentUserId && currentUserId && hasPermission(`${config.type}s:approve`) && (
-                            <ApprovalActions
-                              transactionId={transaction.id}
-                              transactionType={config.type}
-                              approvalStatus={transaction.approvalStatus as ApprovalStatus}
-                              submittedBy={transaction.submittedBy as string | null}
-                              currentUserId={currentUserId}
-                              canApprove={true}
-                              onSuccess={refreshAll}
-                            />
-                          )}
-                          
-                          {/* Others (not requester, not approver): Show status only */}
-                          {transaction.submittedBy !== currentUserId && !hasPermission(`${config.type}s:approve`) && (
-                            <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md">
-                              รอการอนุมัติ
-                            </div>
-                          )}
-                        </>
-                      )}
-                      
-                      {/* NOT_REQUIRED or REJECTED: Show DraftActions for owner */}
-                      {transaction.approvalStatus !== "PENDING" && (
-                        <DraftActions
-                          companyCode={companyCode}
-                          transactionId={transaction.id}
-                          transactionType={config.type}
-                          workflowStatus={transaction.workflowStatus}
-                          approvalStatus={transaction.approvalStatus as ApprovalStatus}
-                          rejectedReason={transaction.rejectedReason as string | null}
-                          submittedAt={transaction.submittedAt as string | null}
-                          submittedByName={(transaction.submittedByUser as { name?: string } | null)?.name}
-                          canCreateDirect={canCreateDirect}
-                          canMarkPaid={canMarkPaid}
-                          onSuccess={() => {
-                            refreshAll();
-                          }}
-                        />
-                      )}
-                    </>
-                  )}
-                  {/* Show WorkflowActions for non-DRAFT status */}
-                  {transaction?.workflowStatus && transaction.workflowStatus !== "DRAFT" && (
-                    <WorkflowActions
-                      companyCode={companyCode}
-                      type={config.type}
-                      transactionId={transaction.id}
-                      currentStatus={transaction.workflowStatus}
-                      isWht={config.type === "expense" ? transaction.isWht : undefined}
-                      isWhtDeducted={config.type === "income" ? transaction.isWhtDeducted : undefined}
-                      documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") : undefined}
-                      taxInvoiceRequestedAt={config.type === "expense" ? (transaction.taxInvoiceRequestedAt as string | null | undefined) : undefined}
-                      onActionComplete={() => {
-                        refreshAll();
-                      }}
-                      variant="compact"
-                      isOwner={isOwner}
-                    />
-                  )}
-                  <Button variant="outline" size="sm" onClick={handleEditClick}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    แก้ไข
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    ลบ
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Timeline Stepper - Compact */}
-          {transaction?.workflowStatus && (
-            <div className="pb-2">
-              <TimelineStepper
-                type={config.type}
-                currentStatus={transaction.workflowStatus}
-                isWht={config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted}
-                approvalStatus={transaction.approvalStatus as ApprovalStatus | undefined}
-                documentType={config.type === "expense" ? (transaction.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT" | undefined) : undefined}
-                taxInvoiceRequestedAt={config.type === "expense" ? (transaction.taxInvoiceRequestedAt as string | null | undefined) : undefined}
-              />
-            </div>
-          )}
-
-          {/* Tax Invoice Request Info Banner - shown when WAITING_TAX_INVOICE */}
-          {config.type === "expense" && transaction?.workflowStatus === "WAITING_TAX_INVOICE" && (() => {
-            const method = taxInvoiceRequestMethod || selectedContact?.taxInvoiceRequestMethod;
-            const email = taxInvoiceRequestMethod === "email"
-              ? (taxInvoiceRequestEmail || selectedContact?.taxInvoiceRequestEmail || selectedContact?.email)
-              : (selectedContact?.taxInvoiceRequestEmail || selectedContact?.email);
-            const notes = taxInvoiceRequestNotes || selectedContact?.taxInvoiceRequestNotes;
-            const phone = selectedContact?.phone;
-            const methodInfo = getDeliveryMethod(method);
-
-            return (
-              <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-300 dark:border-orange-700 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                  <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
-                    รอใบกำกับภาษี — ช่องทางติดต่อ
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm">
-                  {methodInfo ? (() => {
-                    const Icon = methodInfo.Icon;
-                    return (
-                      <span className="flex items-center gap-1.5 font-medium text-orange-800 dark:text-orange-200">
-                        <Icon className="h-4 w-4" />
-                        {methodInfo.label}
-                        {method === "email" && email && (
-                          <span className="font-normal text-orange-700 dark:text-orange-300">({email})</span>
-                        )}
-                      </span>
-                    );
-                  })() : (
-                    <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="h-4 w-4" />
-                      ยังไม่ระบุช่องทาง
-                    </span>
-                  )}
-                  {phone && (
-                    <span className="flex items-center gap-1 text-orange-700 dark:text-orange-300">
-                      <Phone className="h-3.5 w-3.5" />
-                      {phone}
-                    </span>
-                  )}
-                  {notes && (
-                    <span className="text-orange-700 dark:text-orange-300">• {notes}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+        <TransactionViewToolbar
+          config={config}
+          transaction={transaction}
+          mode={mode}
+          saving={saving}
+          companyCode={companyCode}
+          currentUserId={currentUserId}
+          isOwner={isOwner}
+          hasPermission={hasPermission}
+          canCreateDirect={canCreateDirect}
+          canMarkPaid={canMarkPaid}
+          selectedContact={selectedContact}
+          taxInvoiceRequestMethod={taxInvoiceRequestMethod}
+          taxInvoiceRequestEmail={taxInvoiceRequestEmail}
+          taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+          onNavigateToList={navigateToList}
+          onEditClick={handleEditClick}
+          onCancelEdit={handleCancelEdit}
+          onSave={handleSave}
+          onDeleteClick={() => setShowDeleteConfirm(true)}
+          onRefreshAll={refreshAll}
+        />
       )}
 
       {/* Form Content */}

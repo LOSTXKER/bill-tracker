@@ -7,6 +7,12 @@
  */
 
 import type { Prisma } from "@prisma/client";
+import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
+import {
+  getNextStatus as getNextWorkflowStatus,
+  getEffectiveWorkflowOrder,
+  type TransactionWorkflowContext,
+} from "@/lib/workflow/status-rules";
 
 // =============================================================================
 // Types
@@ -148,7 +154,7 @@ export interface ITransactionStrategy {
   /**
    * Check if status transition is allowed
    */
-  canTransitionTo(fromStatus: string, toStatus: string): boolean;
+  canTransitionTo(fromStatus: string, toStatus: string, data?: Record<string, unknown>): boolean;
 
   /**
    * Get display name for a contact
@@ -242,41 +248,35 @@ export abstract class BaseTransactionStrategy implements ITransactionStrategy {
     totalWithVat: number;
     netAmount: number;
   } {
-    const base = Number(amount) || 0;
-    const vat = Number(vatRate) || 0;
-    const wht = Number(whtRate) || 0;
-
-    const vatAmount = Math.round((base * vat) / 100 * 100) / 100;
-    const whtAmount = Math.round((base * wht) / 100 * 100) / 100;
-    const totalWithVat = base + vatAmount;
-    const netAmount = totalWithVat - whtAmount;
-
-    return {
-      baseAmount: base,
-      vatAmount,
-      whtAmount,
-      totalWithVat,
-      netAmount,
-    };
+    return calculateTransactionTotals(amount, vatRate, whtRate);
   }
 
   abstract determineWorkflowStatus(data: Record<string, unknown>): string;
 
-  getNextStatus(currentStatus: string, data: Record<string, unknown>): string | null {
-    const currentIndex = this.workflowStatuses.findIndex((s) => s.value === currentStatus);
-    if (currentIndex === -1 || currentIndex === this.workflowStatuses.length - 1) {
-      return null;
-    }
-    return this.workflowStatuses[currentIndex + 1].value;
+  protected buildWorkflowContext(data: Record<string, unknown>): TransactionWorkflowContext {
+    return {
+      isWht: Boolean(data.isWht),
+      isWhtDeducted: Boolean(data.isWhtDeducted),
+      documentType: (data.documentType as TransactionWorkflowContext["documentType"]) ?? null,
+    };
   }
 
-  canTransitionTo(fromStatus: string, toStatus: string): boolean {
-    const fromIndex = this.workflowStatuses.findIndex((s) => s.value === fromStatus);
-    const toIndex = this.workflowStatuses.findIndex((s) => s.value === toStatus);
+  getNextStatus(currentStatus: string, data: Record<string, unknown>): string | null {
+    const txType = this.type === "expense" ? "expense" : "income";
+    const context = this.buildWorkflowContext(data);
+    const next = getNextWorkflowStatus(currentStatus, txType, context);
+    return next?.value ?? null;
+  }
+
+  canTransitionTo(fromStatus: string, toStatus: string, data?: Record<string, unknown>): boolean {
+    const txType = this.type === "expense" ? "expense" : "income";
+    const context = data ? this.buildWorkflowContext(data) : undefined;
+    const order = getEffectiveWorkflowOrder(txType, context);
+
+    const fromIndex = order.indexOf(fromStatus);
+    const toIndex = order.indexOf(toStatus);
 
     if (fromIndex === -1 || toIndex === -1) return false;
-
-    // Allow forward transitions
     return toIndex > fromIndex;
   }
 

@@ -16,8 +16,8 @@ export async function GET(
     async (req, { company }) => {
       const { id } = await props.params;
       const url = new URL(req.url);
-      const limit = parseInt(url.searchParams.get("limit") || "50");
-      const offset = parseInt(url.searchParams.get("offset") || "0");
+      const limit = Math.min(Math.max(1, parseInt(url.searchParams.get("limit") || "50") || 50), 100);
+      const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0") || 0);
       const type = url.searchParams.get("type"); // EXPENSE, REPLENISH, ADJUSTMENT
 
       const fund = await prisma.pettyCashFund.findFirst({

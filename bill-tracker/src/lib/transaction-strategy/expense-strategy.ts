@@ -79,6 +79,12 @@ export class ExpenseStrategy extends BaseTransactionStrategy {
       color: "purple",
     },
     {
+      value: "WHT_SENT_TO_VENDOR",
+      label: "ส่ง 50 ทวิแล้ว",
+      description: "ส่งใบหัก ณ ที่จ่ายให้ vendor แล้ว",
+      color: "teal",
+    },
+    {
       value: "READY_FOR_ACCOUNTING",
       label: "รอส่งบัญชี",
       description: "เอกสารครบ รอส่งบัญชี",

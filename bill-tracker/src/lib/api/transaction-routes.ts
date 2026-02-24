@@ -280,8 +280,8 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const includeDeleted = searchParams.get("includeDeleted") === "true";
       const includeReimbursements = searchParams.get("includeReimbursements") === "true";
       const onlyMine = searchParams.get("onlyMine") === "true"; // Only show items created by current user
-      const page = parseInt(searchParams.get("page") || "1");
-      const limit = parseInt(searchParams.get("limit") || "20");
+      const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+      const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "20") || 20), 100);
       const sortBy = searchParams.get("sortBy") || "createdAt";
       const sortOrder = (searchParams.get("sortOrder") || "desc") as "asc" | "desc";
 
@@ -322,31 +322,35 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       }
       // Default (tab === "all" or no tab): show all items based on other filters
 
-      // Date range filter
+      // Date range filter (with validation)
       if (dateFrom || dateTo) {
         where[config.fields.dateField] = {};
         if (dateFrom) {
-          where[config.fields.dateField].gte = new Date(dateFrom);
+          const d = new Date(dateFrom);
+          if (!isNaN(d.getTime())) where[config.fields.dateField].gte = d;
         }
         if (dateTo) {
-          where[config.fields.dateField].lte = new Date(dateTo);
+          const d = new Date(dateTo);
+          if (!isNaN(d.getTime())) where[config.fields.dateField].lte = d;
+        }
+        if (Object.keys(where[config.fields.dateField]).length === 0) {
+          delete where[config.fields.dateField];
         }
       }
 
-      // Search filter (description)
-      if (search) {
-        // If we already have an OR filter from tab, we need to handle this differently
+      // Search filter (description) - truncate to prevent abuse
+      const sanitizedSearch = search?.trim().substring(0, 100);
+      if (sanitizedSearch) {
         if (where.OR) {
-          // Wrap existing OR with AND, then add search OR
           const existingOr = where.OR;
           delete where.OR;
           where.AND = [
             { OR: existingOr },
-            { OR: [{ description: { contains: search, mode: "insensitive" } }] },
+            { OR: [{ description: { contains: sanitizedSearch, mode: "insensitive" } }] },
           ];
         } else {
           where.OR = [
-            { description: { contains: search, mode: "insensitive" } },
+            { description: { contains: sanitizedSearch, mode: "insensitive" } },
           ];
         }
       }

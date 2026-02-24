@@ -335,6 +335,8 @@ model Expense {
 
   @@index([accountId])
   @@index([companyId, billDate])
+  @@index([companyId, workflowStatus, billDate])
+  @@index([companyId, approvalStatus, createdAt])
   @@index([contactId])
   @@index([createdAt])
   @@index([deletedAt])
@@ -409,6 +411,8 @@ model Income {
 
   @@index([accountId])
   @@index([companyId, receiveDate])
+  @@index([companyId, workflowStatus, receiveDate])
+  @@index([companyId, approvalStatus, createdAt])
   @@index([contactId])
   @@index([createdAt])
   @@index([deletedAt])
@@ -553,6 +557,7 @@ model ExpensePayment {
   @@index([paidByUserId])
   @@index([paidByPettyCashFundId])
   @@index([settlementStatus])
+  @@index([settlementStatus, createdAt])
   @@index([paidByType, settlementStatus])
 }
 

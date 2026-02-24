@@ -25,6 +25,11 @@ export const POST = (request: Request) => {
         return apiResponse.badRequest("กรุณาเลือกรายการที่ต้องการอนุมัติ");
       }
 
+      const MAX_BATCH_SIZE = 50;
+      if (ids.length > MAX_BATCH_SIZE) {
+        return apiResponse.badRequest(`ไม่สามารถดำเนินการเกิน ${MAX_BATCH_SIZE} รายการต่อครั้ง`);
+      }
+
       // Find all expenses (without company filter first, we'll check access per item)
       const expenses = await prisma.expense.findMany({
         where: {

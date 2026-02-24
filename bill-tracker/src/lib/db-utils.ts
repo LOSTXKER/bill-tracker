@@ -22,13 +22,16 @@ export interface RetryOptions {
  */
 export function isTimeoutError(error: Error): boolean {
   const message = error.message?.toLowerCase() || "";
+  const code = (error as any).code;
   return (
     message.includes("timed out") ||
     message.includes("timeout") ||
     message.includes("operation has timed out") ||
     message.includes("connection pool timeout") ||
-    // Prisma error codes
-    (error as any).code === "P2024" // Timed out fetching connection from pool
+    code === "P2024" || // Connection pool timeout
+    code === "P2034" || // Transaction conflict / deadlock
+    code === "P1001" || // Cannot reach database server
+    code === "P1002"    // Database server timed out
   );
 }
 

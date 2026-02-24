@@ -170,15 +170,15 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
         body: formData,
       });
 
-      const data = await res.json();
+      const json = await res.json();
 
-      if (!res.ok || data.error) {
+      if (!res.ok || !json.success) {
         setStep("choose");
-        setFileError(data.error ?? "AI ไม่สามารถอ่าน PDF ได้");
+        setFileError(json.error ?? "AI ไม่สามารถอ่าน PDF ได้");
         return;
       }
 
-      setPreview(data.rows as AccountingRow[]);
+      setPreview(json.data.rows as AccountingRow[]);
       setStep("preview");
     } catch {
       setStep("choose");

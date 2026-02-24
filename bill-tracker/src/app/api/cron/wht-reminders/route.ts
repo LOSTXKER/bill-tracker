@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
   // Check authorization
   const authHeader = request.headers.get("authorization");
   
-  // Allow if CRON_SECRET is set and matches, or if no secret is configured (dev mode)
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return apiResponse.forbidden("Unauthorized");
   }
 

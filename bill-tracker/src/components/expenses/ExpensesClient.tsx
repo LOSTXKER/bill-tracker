@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowUpCircle, Building2, FileText } from "lucide-react";
+import { Building2, FileText } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   TransactionListClient, 
-  type TransactionListConfig,
   type CompanyOption,
   TransactionTableRow,
   expenseRowConfig,
 } from "@/components/transactions";
-import { EXPENSE_WORKFLOW_INFO } from "@/lib/constants/transaction";
+import { createTransactionListConfig } from "@/lib/config/transaction-list-config";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -38,35 +37,9 @@ interface ExpensesClientProps {
   crossCompanyCount?: number;
 }
 
-// Expense-specific configuration
-const expenseListConfig: TransactionListConfig = {
-  type: "expense",
-  title: "รายการรายจ่าย",
-  emptyStateTitle: "ยังไม่มีรายจ่าย",
-  emptyIcon: ArrowUpCircle,
-  apiEndpoint: "/api/expenses",
-  captureUrl: "capture",
-  dateField: "billDate",
-  statusInfo: EXPENSE_WORKFLOW_INFO,
-  
-  tableHeaders: [
-    { key: "createdAt", label: "สร้างเมื่อ", sortable: true },
-    { key: "billDate", label: "วันที่บิล", sortable: true },
-    { key: "status", label: "สถานะ", align: "center" },
-    { key: "contact", label: "ผู้ติดต่อ", sortable: true },
-    { key: "category", label: "บัญชี" },
-    { key: "description", label: "รายละเอียด" },
-    { key: "internalCompany", label: "บริษัทจริง" },
-    { key: "creator", label: "ผู้สร้าง", sortable: true },
-    { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" },
-    { key: "updatedAt", label: "แก้ไขล่าสุด", sortable: true },
-    { key: "wht", label: "หัก ณ ที่จ่าย", align: "center" },
-    { key: "line", label: "LINE", align: "center" },
-  ],
-  
-  showCategory: true,
-  
-  renderRow: (expense, companyCode, selected, onToggle, options) => (
+const expenseListConfig = createTransactionListConfig(
+  "expense",
+  (expense, companyCode, selected, onToggle, options) => (
     <TransactionTableRow
       key={expense.id}
       transaction={expense}
@@ -80,7 +53,7 @@ const expenseListConfig: TransactionListConfig = {
       onPreview={options?.onPreview}
     />
   ),
-};
+);
 
 export function ExpensesClient({
   companyCode,

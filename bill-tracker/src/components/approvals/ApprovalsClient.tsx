@@ -118,11 +118,11 @@ export function ApprovalsClient({
     const toastId = toast.loading(`กำลังอนุมัติ ${selectedIds.length} รายการ...`);
 
     try {
-      // Separate by type
-      const expenseIds = items.filter(i => i._type === "expense" && selectedIds.includes(i.id)).map(i => i.id);
-      const incomeIds = items.filter(i => i._type === "income" && selectedIds.includes(i.id)).map(i => i.id);
+      const selected = new Set(selectedIds);
+      const expenseIds = items.filter(i => i._type === "expense" && selected.has(i.id)).map(i => i.id);
+      const incomeIds = items.filter(i => i._type === "income" && selected.has(i.id)).map(i => i.id);
 
-      const promises = [];
+      const promises: Promise<Response>[] = [];
       if (expenseIds.length > 0) {
         promises.push(
           fetch("/api/expenses/batch/approve", {
@@ -142,8 +142,18 @@ export function ApprovalsClient({
         );
       }
 
-      await Promise.all(promises);
-      toast.success(`อนุมัติ ${selectedIds.length} รายการสำเร็จ`, { id: toastId });
+      const results = await Promise.allSettled(promises);
+      const failed = results.filter(
+        r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)
+      );
+
+      if (failed.length > 0 && failed.length < results.length) {
+        toast.warning(`${results.length - failed.length} สำเร็จ, ${failed.length} ล้มเหลว`, { id: toastId });
+      } else if (failed.length > 0) {
+        toast.error("เกิดข้อผิดพลาดในการอนุมัติ", { id: toastId });
+      } else {
+        toast.success(`อนุมัติ ${selectedIds.length} รายการสำเร็จ`, { id: toastId });
+      }
       setSelectedIds([]);
       setShowApproveConfirm(false);
       router.refresh();
@@ -164,11 +174,11 @@ export function ApprovalsClient({
     const toastId = toast.loading(`กำลังปฏิเสธ ${selectedIds.length} รายการ...`);
 
     try {
-      // Separate by type
-      const expenseIds = items.filter(i => i._type === "expense" && selectedIds.includes(i.id)).map(i => i.id);
-      const incomeIds = items.filter(i => i._type === "income" && selectedIds.includes(i.id)).map(i => i.id);
+      const selected = new Set(selectedIds);
+      const expenseIds = items.filter(i => i._type === "expense" && selected.has(i.id)).map(i => i.id);
+      const incomeIds = items.filter(i => i._type === "income" && selected.has(i.id)).map(i => i.id);
 
-      const promises = [];
+      const promises: Promise<Response>[] = [];
       if (expenseIds.length > 0) {
         promises.push(
           fetch("/api/expenses/batch/reject", {
@@ -188,8 +198,18 @@ export function ApprovalsClient({
         );
       }
 
-      await Promise.all(promises);
-      toast.success(`ปฏิเสธ ${selectedIds.length} รายการสำเร็จ`, { id: toastId });
+      const results = await Promise.allSettled(promises);
+      const failed = results.filter(
+        r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)
+      );
+
+      if (failed.length > 0 && failed.length < results.length) {
+        toast.warning(`${results.length - failed.length} สำเร็จ, ${failed.length} ล้มเหลว`, { id: toastId });
+      } else if (failed.length > 0) {
+        toast.error("เกิดข้อผิดพลาดในการปฏิเสธ", { id: toastId });
+      } else {
+        toast.success(`ปฏิเสธ ${selectedIds.length} รายการสำเร็จ`, { id: toastId });
+      }
       setSelectedIds([]);
       setShowRejectConfirm(false);
       setRejectReason("");

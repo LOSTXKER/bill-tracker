@@ -10,10 +10,10 @@ import { EXPENSE_STATUS_LABELS, INCOME_STATUS_LABELS } from "@/lib/constants/tra
 // =============================================================================
 
 /**
- * ลำดับสถานะของ Expense (ไม่รวม WHT_SENT_TO_VENDOR เพราะเป็น optional)
+ * ลำดับสถานะของ Expense (รวม WHT_SENT_TO_VENDOR ซึ่งเป็น optional WHT status)
  * Flow: DRAFT → PAID → WAITING_TAX_INVOICE → TAX_INVOICE_RECEIVED 
- *       → WHT_PENDING_ISSUE → WHT_ISSUED → READY_FOR_ACCOUNTING 
- *       → SENT_TO_ACCOUNTANT → COMPLETED
+ *       → WHT_PENDING_ISSUE → WHT_ISSUED → WHT_SENT_TO_VENDOR
+ *       → READY_FOR_ACCOUNTING → SENT_TO_ACCOUNTANT → COMPLETED
  */
 export const EXPENSE_WORKFLOW_ORDER: string[] = [
   "DRAFT",
@@ -22,13 +22,14 @@ export const EXPENSE_WORKFLOW_ORDER: string[] = [
   "TAX_INVOICE_RECEIVED",
   "WHT_PENDING_ISSUE",
   "WHT_ISSUED",
+  "WHT_SENT_TO_VENDOR",
   "READY_FOR_ACCOUNTING",
   "SENT_TO_ACCOUNTANT",
   "COMPLETED",
 ];
 
 // WHT-related statuses for expenses
-const EXPENSE_WHT_STATUSES = ["WHT_PENDING_ISSUE", "WHT_ISSUED"];
+const EXPENSE_WHT_STATUSES = ["WHT_PENDING_ISSUE", "WHT_ISSUED", "WHT_SENT_TO_VENDOR"];
 
 // Tax invoice related statuses for expenses (skip if documentType is NO_DOCUMENT or CASH_RECEIPT)
 const EXPENSE_TAX_INVOICE_STATUSES = ["WAITING_TAX_INVOICE", "TAX_INVOICE_RECEIVED"];
@@ -81,7 +82,7 @@ export interface TransactionWorkflowContext {
  * Get the effective workflow order based on transaction context
  * Skips statuses that don't apply (e.g., WHT statuses for non-WHT items)
  */
-function getEffectiveWorkflowOrder(
+export function getEffectiveWorkflowOrder(
   type: "expense" | "income",
   context?: TransactionWorkflowContext
 ): string[] {

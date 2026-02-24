@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { analyzeImage } from "@/lib/ai/gemini";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
+import { apiResponse } from "@/lib/api/response";
+import { ApiError, ApiErrors } from "@/lib/api/errors";
 
 export interface ExtractedRow {
   date: string;
@@ -14,30 +15,17 @@ export interface ExtractedRow {
 
 const MAX_PDF_SIZE_MB = 10;
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ company: string }> }
-) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  await params;
-
-  try {
-    const formData = await req.formData();
+export const POST = withCompanyAccessFromParams(
+  async (request, { company }) => {
+    const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "ไม่พบไฟล์ PDF" }, { status: 400 });
+      throw ApiErrors.badRequest("ไม่พบไฟล์ PDF");
     }
 
     if (file.size > MAX_PDF_SIZE_MB * 1024 * 1024) {
-      return NextResponse.json(
-        { error: `ไฟล์ใหญ่เกินไป (สูงสุด ${MAX_PDF_SIZE_MB} MB)` },
-        { status: 400 }
-      );
+      throw ApiErrors.badRequest(`ไฟล์ใหญ่เกินไป (สูงสุด ${MAX_PDF_SIZE_MB} MB)`);
     }
 
     const buffer = await file.arrayBuffer();
@@ -52,30 +40,30 @@ export async function POST(
     });
 
     if (response.error || !response.data) {
-      return NextResponse.json(
-        { error: "AI ไม่สามารถอ่าน PDF ได้: " + (response.error ?? "ไม่มีข้อมูล") },
-        { status: 422 }
+      throw new ApiError(
+        422,
+        "AI ไม่สามารถอ่าน PDF ได้: " + (response.error ?? "ไม่มีข้อมูล"),
+        "AI_EXTRACTION_FAILED"
       );
     }
 
     const rows = parseAIResponse(response.data);
 
     if (rows.length === 0) {
-      return NextResponse.json(
-        { error: "ไม่พบตารางข้อมูลภาษีใน PDF นี้ กรุณาตรวจสอบไฟล์" },
-        { status: 422 }
+      throw new ApiError(
+        422,
+        "ไม่พบตารางข้อมูลภาษีใน PDF นี้ กรุณาตรวจสอบไฟล์",
+        "NO_DATA_FOUND"
       );
     }
 
-    return NextResponse.json({ rows });
-  } catch (error) {
-    console.error("PDF extraction error:", error);
-    return NextResponse.json(
-      { error: "เกิดข้อผิดพลาดในการประมวลผล PDF" },
-      { status: 500 }
-    );
+    return apiResponse.success({ rows });
+  },
+  {
+    permission: "reports:read",
+    rateLimit: { maxRequests: 10, windowMs: 60_000 },
   }
-}
+);
 
 function buildExtractionPrompt(): string {
   return `คุณเป็นผู้เชี่ยวชาญอ่านรายงานภาษีไทย กรุณาอ่านตารางใน PDF นี้และ extract ข้อมูลทุกแถว

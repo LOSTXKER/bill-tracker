@@ -194,6 +194,7 @@ const EXPENSE_STATUS_LABELS: Record<string, string> = {
   TAX_INVOICE_RECEIVED: "ได้ใบกำกับแล้ว",
   WHT_PENDING_ISSUE: "รอออก 50 ทวิ",
   WHT_ISSUED: "ออก 50 ทวิแล้ว",
+  WHT_SENT_TO_VENDOR: "ส่ง 50 ทวิให้ vendor แล้ว",
   READY_FOR_ACCOUNTING: "รอส่งบัญชี",
   SENT_TO_ACCOUNTANT: "ส่งบัญชีแล้ว",
   COMPLETED: "เสร็จสิ้น",

@@ -91,13 +91,18 @@ export function sanitizeFilename(filename: string): string {
   // Remove path components
   const basename = filename.split(/[/\\]/).pop() || filename;
   
-  // Remove special characters except dots, dashes, and underscores
   const sanitized = basename
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .replace(/_{2,}/g, "_")
+    .replace(/\0/g, "")               // remove null bytes
+    .replace(/\.\./g, "")             // remove path traversal sequences
+    .replace(/[^a-zA-Z0-9._-]/g, "_") // keep only safe characters
+    .replace(/_{2,}/g, "_")           // collapse consecutive underscores
+    .replace(/^\.+/, "")              // remove leading dots (hidden files)
     .substring(0, 255);
 
-  // Ensure file has an extension
+  if (!sanitized || sanitized === ".file") {
+    return `file_${Date.now()}.file`;
+  }
+
   if (!sanitized.includes(".")) {
     return `${sanitized}.file`;
   }

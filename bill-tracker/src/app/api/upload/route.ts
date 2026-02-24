@@ -1,9 +1,17 @@
 import { withAuth } from "@/lib/api/with-auth";
 import { apiResponse } from "@/lib/api/response";
+import { ApiErrors } from "@/lib/api/errors";
 import { uploadToSupabase } from "@/lib/storage/supabase";
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   return withAuth(async (req) => {
+    const ip = getClientIP(req);
+    const { success: rateLimitOk, headers: rateLimitHeaders } = rateLimit(ip, { maxRequests: 30, windowMs: 60_000 });
+    if (!rateLimitOk) {
+      return apiResponse.error(ApiErrors.tooManyRequests(), rateLimitHeaders);
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const folder = (formData.get("folder") as string) || "receipts";

@@ -52,16 +52,30 @@ export interface GeminiResponse<T = string> {
 }
 
 /**
- * Retry configuration
+ * Retry and timeout configuration
  */
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
+const GEMINI_TIMEOUT_MS = 60_000; // 60 seconds per API call
 
 /**
  * Sleep utility for retry delays
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Wrap a promise with a timeout. Rejects with a clear error if the
+ * underlying operation takes longer than `ms` milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`AI request timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
 }
 
 /**
@@ -87,15 +101,17 @@ export async function generateText(
         maxOutputTokens: options?.maxTokens ?? 2048,
       };
 
-      const result: GenerateContentResult = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig,
-      });
+      const result: GenerateContentResult = await withTimeout(
+        model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig,
+        }),
+        GEMINI_TIMEOUT_MS
+      );
 
       const response = result.response;
       const text = response.text();
 
-      // Extract token usage if available
       const usage = response.usageMetadata
         ? {
             promptTokens: response.usageMetadata.promptTokenCount || 0,
@@ -144,7 +160,7 @@ export async function generateText(
  * Fetch image from URL and convert to base64
  */
 async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   
   if (!response.ok) {
     throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
@@ -252,20 +268,22 @@ export async function analyzeImage(
         },
       };
 
-      const result: GenerateContentResult = await model.generateContent({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }, imagePart],
-          },
-        ],
-        generationConfig,
-      });
+      const result: GenerateContentResult = await withTimeout(
+        model.generateContent({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }, imagePart],
+            },
+          ],
+          generationConfig,
+        }),
+        GEMINI_TIMEOUT_MS
+      );
 
       const response = result.response;
       const text = response.text();
 
-      // Extract token usage if available
       const usage = response.usageMetadata
         ? {
             promptTokens: response.usageMetadata.promptTokenCount || 0,
@@ -383,10 +401,13 @@ export async function chat(
       parts: [{ text: msg.content }],
     }));
 
-    const result: GenerateContentResult = await model.generateContent({
-      contents,
-      generationConfig,
-    });
+    const result: GenerateContentResult = await withTimeout(
+      model.generateContent({
+        contents,
+        generationConfig,
+      }),
+      GEMINI_TIMEOUT_MS
+    );
 
     const response = result.response;
     const text = response.text();

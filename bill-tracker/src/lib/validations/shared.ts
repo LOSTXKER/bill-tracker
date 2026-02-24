@@ -78,28 +78,8 @@ export const baseTransactionSchema = z.object({
   paymentMethod: paymentMethodSchema.default("BANK_TRANSFER"),
 });
 
-/**
- * WHT type labels in Thai
- */
-export const WHT_TYPE_LABELS: Record<string, string> = {
-  SERVICE_3: "ค่าบริการ 3%",
-  PROFESSIONAL_5: "ค่าบริการวิชาชีพ 5%",
-  TRANSPORT_1: "ค่าขนส่ง 1%",
-  RENT_5: "ค่าเช่า 5%",
-  ADVERTISING_2: "ค่าโฆษณา 2%",
-  OTHER: "อื่นๆ",
-};
-
-/**
- * Payment method labels in Thai
- */
-export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "เงินสด",
-  BANK_TRANSFER: "โอนเงิน",
-  CREDIT_CARD: "บัตรเครดิต",
-  PROMPTPAY: "พร้อมเพย์",
-  CHEQUE: "เช็ค",
-};
+// WHT_TYPE_LABELS and PAYMENT_METHOD_LABELS are in @/lib/constants/transaction
+// (single source of truth - do not duplicate here)
 
 /**
  * Helper type for WHT configuration
