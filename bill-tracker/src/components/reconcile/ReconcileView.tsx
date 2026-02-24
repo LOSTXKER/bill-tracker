@@ -23,10 +23,23 @@ import {
   RotateCcw,
   Search,
   Receipt,
+  Building2,
+  ChevronsUpDown,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ImportPanel, type AccountingRow } from "./ImportPanel";
 import { ReconcileTable, type MatchedPair, type SystemItem, type MatchStatus } from "./ReconcileTable";
 import { cn } from "@/lib/utils";
+
+export interface SiblingCompany {
+  code: string;
+  name: string;
+}
 
 interface ReconcileViewProps {
   companyCode: string;
@@ -35,6 +48,8 @@ interface ReconcileViewProps {
   type: "expense" | "income";
   systemExpenses: SystemItem[];
   systemIncomes: SystemItem[];
+  siblingCompanies?: SiblingCompany[];
+  selectedCompanyCodes?: string[];
 }
 
 const MONTHS = [
@@ -290,6 +305,8 @@ export function ReconcileView({
   type,
   systemExpenses,
   systemIncomes,
+  siblingCompanies,
+  selectedCompanyCodes,
 }: ReconcileViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -302,6 +319,8 @@ export function ReconcileView({
   const [selectedAccountingIndex, setSelectedAccountingIndex] = useState<number | null>(null);
   const [vatOnly, setVatOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const hasSiblings = !!siblingCompanies && siblingCompanies.length > 1;
 
   const allSystemItems = type === "expense" ? systemExpenses : systemIncomes;
 
@@ -324,11 +343,34 @@ export function ReconcileView({
     ? allSystemItems.filter((i) => i.vatAmount === 0).length
     : 0;
 
-  const handleDateChange = (field: "month" | "year" | "type", value: string) => {
+  const buildParams = (overrides: Record<string, string | undefined> = {}) => {
     const params = new URLSearchParams();
-    params.set("month", field === "month" ? value : String(month));
-    params.set("year", field === "year" ? value : String(year));
-    params.set("type", field === "type" ? value : type);
+    params.set("month", overrides.month ?? String(month));
+    params.set("year", overrides.year ?? String(year));
+    params.set("type", overrides.type ?? type);
+    const companiesVal = overrides.companies !== undefined ? overrides.companies : (selectedCompanyCodes ? selectedCompanyCodes.join(",") : undefined);
+    if (companiesVal) params.set("companies", companiesVal);
+    return params;
+  };
+
+  const handleDateChange = (field: "month" | "year" | "type", value: string) => {
+    const params = buildParams({ [field]: value });
+    startTransition(() => {
+      router.push(`/${companyCode}/reconcile?${params.toString()}`);
+    });
+  };
+
+  const handleCompanyToggle = (code: string) => {
+    if (!siblingCompanies) return;
+    const current = selectedCompanyCodes ?? siblingCompanies.map((c) => c.code);
+    let next: string[];
+    if (current.includes(code)) {
+      next = current.filter((c) => c !== code);
+      if (next.length === 0) return;
+    } else {
+      next = [...current, code];
+    }
+    const params = buildParams({ companies: next.join(",") });
     startTransition(() => {
       router.push(`/${companyCode}/reconcile?${params.toString()}`);
     });
@@ -577,6 +619,55 @@ export function ReconcileView({
           </SelectContent>
         </Select>
 
+        {/* Company selector (only shown when sibling companies exist) */}
+        {hasSiblings && siblingCompanies && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5"
+                disabled={isPending}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                {selectedCompanyCodes && selectedCompanyCodes.length < siblingCompanies.length
+                  ? `${selectedCompanyCodes.length} บริษัท`
+                  : "ทุกบริษัท"}
+                <ChevronsUpDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <p className="text-xs font-medium text-muted-foreground px-2 pb-2">
+                นิติบุคคลเดียวกัน (Tax ID)
+              </p>
+              <div className="space-y-1">
+                {siblingCompanies.map((sc) => {
+                  const isChecked = selectedCompanyCodes
+                    ? selectedCompanyCodes.includes(sc.code)
+                    : true;
+                  return (
+                    <label
+                      key={sc.code}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() => handleCompanyToggle(sc.code)}
+                      />
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Badge variant="secondary" className="text-[10px] px-1.5 h-4 font-mono flex-shrink-0">
+                          {sc.code}
+                        </Badge>
+                        <span className="text-sm truncate">{sc.name}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
         {/* Divider */}
         <div className="h-6 w-px bg-border mx-1" />
 
@@ -685,6 +776,7 @@ export function ReconcileView({
         type={type}
         onShowImport={() => setShowImport(true)}
         hasAccountingData={accountingItems.length > 0}
+        showCompanyBadge={hasSiblings}
       />
 
       {/* Import dialog */}

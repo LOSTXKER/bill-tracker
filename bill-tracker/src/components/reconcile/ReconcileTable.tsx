@@ -26,6 +26,7 @@ export interface SystemItem {
   totalAmount: number;
   description: string;
   status: string;
+  companyCode?: string;
 }
 
 export type MatchStatus =
@@ -57,12 +58,12 @@ interface ReconcileTableProps {
   selectedAccountingIndex: number | null;
   onSelectSystem: (id: string | null) => void;
   onSelectAccounting: (index: number | null) => void;
-  // New props for context
   month: number;
   year: number;
   type: "expense" | "income";
   onShowImport: () => void;
   hasAccountingData: boolean;
+  showCompanyBadge?: boolean;
 }
 
 const MONTHS = [
@@ -131,11 +132,13 @@ function SystemCell({
   isSelected,
   isSelectable,
   onSelect,
+  showCompanyBadge,
 }: {
   pair: MatchedPair;
   isSelected: boolean;
   isSelectable: boolean;
   onSelect: () => void;
+  showCompanyBadge?: boolean;
 }) {
   const item = pair.systemItem;
   const isEmpty = !item;
@@ -160,6 +163,11 @@ function SystemCell({
       <div className="flex items-center gap-2 min-w-0">
         {isSelected && (
           <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+        )}
+        {showCompanyBadge && item.companyCode && (
+          <Badge variant="secondary" className="text-[10px] px-1 h-4 font-mono flex-shrink-0">
+            {item.companyCode}
+          </Badge>
         )}
         <p className="text-sm font-medium truncate">
           {item.vendorName || item.description || "—"}
@@ -359,6 +367,7 @@ export function ReconcileTable({
   type,
   onShowImport,
   hasAccountingData,
+  showCompanyBadge,
 }: ReconcileTableProps) {
   const canLink = selectedSystemId !== null && selectedAccountingIndex !== null;
   const hasOneSelected =
@@ -511,6 +520,11 @@ export function ReconcileTable({
               pairs.map((pair) => (
                 <div key={pair.id} className="px-3 py-2.5">
                   <div className="flex items-center gap-2 min-w-0">
+                    {showCompanyBadge && pair.systemItem?.companyCode && (
+                      <Badge variant="secondary" className="text-[10px] px-1 h-4 font-mono flex-shrink-0">
+                        {pair.systemItem.companyCode}
+                      </Badge>
+                    )}
                     <p className="text-sm font-medium truncate">
                       {pair.systemItem?.vendorName || pair.systemItem?.description || "—"}
                     </p>
@@ -584,6 +598,7 @@ export function ReconcileTable({
                       isSelected={false}
                       isSelectable={false}
                       onSelect={() => {}}
+                      showCompanyBadge={showCompanyBadge}
                     />
                   </div>
                   <div className="border-r border-border">
@@ -651,6 +666,7 @@ export function ReconcileTable({
                               : pair.systemItem.id
                           );
                         }}
+                        showCompanyBadge={showCompanyBadge}
                       />
                     </div>
                     <div className="border-r border-border">
@@ -709,6 +725,7 @@ export function ReconcileTable({
                       isSelected={false}
                       isSelectable={false}
                       onSelect={() => {}}
+                      showCompanyBadge={showCompanyBadge}
                     />
                   </div>
                   <div className="border-r border-border">

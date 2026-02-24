@@ -8,7 +8,7 @@ import { GitCompare } from "lucide-react";
 
 interface ReconcilePageProps {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ month?: string; year?: string; type?: string }>;
+  searchParams: Promise<{ month?: string; year?: string; type?: string; companies?: string }>;
 }
 
 export default async function ReconcilePage({
@@ -19,7 +19,7 @@ export default async function ReconcilePage({
   if (!session?.user) redirect("/login");
 
   const { company: companyCode } = await params;
-  const { month, year, type = "expense" } = await searchParams;
+  const { month, year, type = "expense", companies } = await searchParams;
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -46,6 +46,7 @@ export default async function ReconcilePage({
           year={selectedYear}
           month={selectedMonth}
           type={type as "expense" | "income"}
+          companiesParam={companies}
         />
       </Suspense>
     </div>
@@ -57,24 +58,54 @@ async function ReconcileDataLoader({
   year,
   month,
   type,
+  companiesParam,
 }: {
   companyCode: string;
   year: number;
   month: number;
   type: "expense" | "income";
+  companiesParam?: string;
 }) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
   });
   if (!company) return null;
 
+  const siblingCompanies = company.taxId
+    ? await prisma.company.findMany({
+        where: { taxId: company.taxId },
+        select: { id: true, code: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    : [{ id: company.id, code: company.code, name: company.name }];
+
+  const hasSiblings = siblingCompanies.length > 1;
+
+  const selectedCodes = companiesParam
+    ? companiesParam.split(",").map((c) => c.trim().toUpperCase())
+    : siblingCompanies.map((c) => c.code);
+
+  const selectedCompanyIds = siblingCompanies
+    .filter((c) => selectedCodes.includes(c.code))
+    .map((c) => c.id);
+
+  if (selectedCompanyIds.length === 0) {
+    selectedCompanyIds.push(company.id);
+  }
+
+  const companyIdFilter = selectedCompanyIds.length === 1
+    ? { companyId: selectedCompanyIds[0] }
+    : { companyId: { in: selectedCompanyIds } };
+
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59);
+
+  const companyIdToCode = new Map(siblingCompanies.map((c) => [c.id, c.code]));
 
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        companyId: company.id,
+        ...companyIdFilter,
         billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },
@@ -83,7 +114,7 @@ async function ReconcileDataLoader({
     }),
     prisma.income.findMany({
       where: {
-        companyId: company.id,
+        ...companyIdFilter,
         receiveDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },
@@ -103,6 +134,7 @@ async function ReconcileDataLoader({
     totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
     description: e.description ?? "",
     status: e.workflowStatus,
+    companyCode: companyIdToCode.get(e.companyId) ?? "",
   }));
 
   const systemIncomes = incomes.map((i) => ({
@@ -116,6 +148,7 @@ async function ReconcileDataLoader({
     totalAmount: Number(i.amount) + Number(i.vatAmount ?? 0),
     description: i.source ?? "",
     status: i.workflowStatus,
+    companyCode: companyIdToCode.get(i.companyId) ?? "",
   }));
 
   return (
@@ -126,6 +159,8 @@ async function ReconcileDataLoader({
       type={type}
       systemExpenses={systemExpenses}
       systemIncomes={systemIncomes}
+      siblingCompanies={hasSiblings ? siblingCompanies.map((c) => ({ code: c.code, name: c.name })) : undefined}
+      selectedCompanyCodes={hasSiblings ? selectedCodes.filter((c) => siblingCompanies.some((s) => s.code === c)) : undefined}
     />
   );
 }
