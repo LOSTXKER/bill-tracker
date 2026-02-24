@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import useSWR from "swr";
+import { fetcher } from "@/lib/swr-config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -179,68 +181,41 @@ export default function EmployeeDetailPage() {
   const memberId = params.id as string; // This is companyAccess.id
   const isOwner = useIsOwner();
 
-  const [employee, setEmployee] = useState<EmployeeData | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [editPermissionsOpen, setEditPermissionsOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch company ID
-  useEffect(() => {
-    const fetchCompany = async () => {
-      try {
-        const response = await fetch(`/api/companies?code=${companyCode}`);
-        const result = await response.json();
-        if (result.data?.companies?.[0]) {
-          setCompanyId(result.data.companies[0].id);
-        }
-      } catch (error) {
-        console.error("Error fetching company:", error);
-      }
-    };
-    fetchCompany();
-  }, [companyCode]);
+  const swrOpts = { revalidateOnFocus: false, dedupingInterval: 30_000 };
 
-  // Fetch employee data - using Promise.all for parallel requests
-  const fetchEmployeeData = async () => {
-    if (!companyId) return;
+  const { data: companyData } = useSWR<{ data?: { companies?: { id: string }[] } }>(
+    companyCode ? `/api/companies?code=${companyCode}` : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
+  const companyId: string | null = companyData?.data?.companies?.[0]?.id || null;
 
-    setIsLoading(true);
-    try {
-      // Fetch all data in parallel for faster loading
-      const [membersRes, logsRes] = await Promise.all([
-        fetch(`/api/companies/${companyId}/members`),
-        fetch(`/api/companies/${companyId}/members/${memberId}/audit-logs?limit=20`),
-      ]);
+  const { data: membersData, mutate: fetchEmployeeData } = useSWR<{
+    data?: { members?: EmployeeData[] }; members?: EmployeeData[];
+  }>(
+    companyId ? `/api/companies/${companyId}/members` : null,
+    fetcher,
+    swrOpts
+  );
+  const { data: logsData } = useSWR<{ data?: { logs?: AuditLog[] }; logs?: AuditLog[] }>(
+    companyId && memberId
+      ? `/api/companies/${companyId}/members/${memberId}/audit-logs?limit=20`
+      : null,
+    fetcher,
+    swrOpts
+  );
 
-      // Parse all responses in parallel
-      const [membersData, logsData] = await Promise.all([
-        membersRes.json(),
-        logsRes.json(),
-      ]);
-
-      // Process employee data - find by companyAccess.id (memberId)
-      const members = membersData.data?.members || membersData.members || [];
-      const employeeData = members.find(
-        (m: EmployeeData) => m.id === memberId
-      );
-      setEmployee(employeeData);
-
-      // Set audit logs
-      setAuditLogs(logsData.data?.logs || logsData.logs || []);
-    } catch (error) {
-      console.error("Error fetching employee data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchEmployeeData();
-  }, [companyId, memberId]);
+  const allMembers: EmployeeData[] =
+    membersData?.data?.members || membersData?.members || [];
+  const employee: EmployeeData | null =
+    allMembers.find((m) => m.id === memberId) || null;
+  const auditLogs: AuditLog[] = logsData?.data?.logs || logsData?.logs || [];
+  const isLoading = !companyId || (!membersData && !logsData);
 
   if (isLoading) {
     return (

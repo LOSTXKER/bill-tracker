@@ -12,7 +12,6 @@ import { IncomesClient } from "@/components/incomes/IncomesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getIncomeStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
-import { hasPermission, getUserPermissions } from "@/lib/permissions/checker";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
@@ -141,16 +140,19 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const session = await getSession();
   const currentUserId = session?.user?.id;
   
-  // Get user permissions including isOwner
-  const userPermissions = currentUserId
-    ? await getUserPermissions(currentUserId, companyId)
-    : { isOwner: false, permissions: [] };
-  
-  const canApprove = currentUserId 
-    ? await hasPermission(currentUserId, companyId, "incomes:approve")
-    : false;
-  
-  const isOwner = userPermissions.isOwner;
+  // Single CompanyAccess query — derive all permissions from it
+  const userAccess = currentUserId
+    ? await prisma.companyAccess.findUnique({
+        where: { userId_companyId: { userId: currentUserId, companyId } },
+      })
+    : null;
+
+  const isOwner = userAccess?.isOwner || false;
+  const userPermissions = (userAccess?.permissions as string[]) || [];
+  const canApprove =
+    isOwner ||
+    userPermissions.includes("incomes:approve") ||
+    userPermissions.includes("incomes:*");
 
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";

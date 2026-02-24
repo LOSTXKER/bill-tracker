@@ -18,29 +18,30 @@ export async function CrossCompanySummary({ companyCode }: CrossCompanySummaryPr
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  // Get expenses we paid for other companies (our companyId, different internalCompanyId)
-  const paidForOthers = await prisma.expense.aggregate({
-    where: {
-      companyId: companyId,
-      internalCompanyId: { not: companyId },
-      billDate: { gte: startOfMonth, lte: endOfMonth },
-      deletedAt: null,
-    },
-    _sum: { netPaid: true },
-    _count: true,
-  });
-
-  // Get expenses other companies paid for us (different companyId, our internalCompanyId)
-  const paidByOthers = await prisma.expense.aggregate({
-    where: {
-      companyId: { not: companyId },
-      internalCompanyId: companyId,
-      billDate: { gte: startOfMonth, lte: endOfMonth },
-      deletedAt: null,
-    },
-    _sum: { netPaid: true },
-    _count: true,
-  });
+  const [paidForOthers, paidByOthers] = await Promise.all([
+    // Expenses we paid for other companies (our companyId, different internalCompanyId)
+    prisma.expense.aggregate({
+      where: {
+        companyId: companyId,
+        internalCompanyId: { not: companyId },
+        billDate: { gte: startOfMonth, lte: endOfMonth },
+        deletedAt: null,
+      },
+      _sum: { netPaid: true },
+      _count: true,
+    }),
+    // Expenses other companies paid for us (different companyId, our internalCompanyId)
+    prisma.expense.aggregate({
+      where: {
+        companyId: { not: companyId },
+        internalCompanyId: companyId,
+        billDate: { gte: startOfMonth, lte: endOfMonth },
+        deletedAt: null,
+      },
+      _sum: { netPaid: true },
+      _count: true,
+    }),
+  ]);
 
   const paidForOthersAmount = Number(paidForOthers._sum.netPaid) || 0;
   const paidByOthersAmount = Number(paidByOthers._sum.netPaid) || 0;

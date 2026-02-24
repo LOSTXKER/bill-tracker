@@ -12,7 +12,6 @@ import { ExpensesClient } from "@/components/expenses/ExpensesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getExpenseStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
-import { hasPermission, getUserPermissions } from "@/lib/permissions/checker";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
@@ -143,14 +142,13 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const session = await getSession();
   const currentUserId = session?.user?.id;
   
-  // Fetch permissions and user's accessible companies in parallel
-  const [userPermissions, canApprove, companiesRaw] = await Promise.all([
+  // Single CompanyAccess query per user — derive all permissions from it
+  const [userAccess, companiesRaw] = await Promise.all([
     currentUserId
-      ? getUserPermissions(currentUserId, companyId)
-      : Promise.resolve({ isOwner: false, permissions: [] }),
-    currentUserId
-      ? hasPermission(currentUserId, companyId, "expenses:approve")
-      : Promise.resolve(false),
+      ? prisma.companyAccess.findUnique({
+          where: { userId_companyId: { userId: currentUserId, companyId } },
+        })
+      : Promise.resolve(null),
     currentUserId
       ? prisma.companyAccess.findMany({
           where: { userId: currentUserId },
@@ -158,8 +156,13 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
         })
       : Promise.resolve([]),
   ]);
-  
-  const isOwner = userPermissions.isOwner;
+
+  const isOwner = userAccess?.isOwner || false;
+  const userPermissions = (userAccess?.permissions as string[]) || [];
+  const canApprove =
+    isOwner ||
+    userPermissions.includes("expenses:approve") ||
+    userPermissions.includes("expenses:*");
   const companies = companiesRaw.map((ca) => ca.Company);
 
   // Parse URL params

@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "./with-company-access";
 import { withAuth } from "./with-auth";
@@ -486,6 +487,10 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
         });
       }
 
+      // Bust stats cache so dashboard reflects the new item immediately
+      if (config.modelName === "expense") revalidateTag("expense-stats", {});
+      if (config.modelName === "income") revalidateTag("income-stats", {});
+
       return apiResponse.created({ [config.modelName]: item });
     },
     {
@@ -800,6 +805,10 @@ export function createUpdateHandler<TModel>(config: TransactionRouteConfig<TMode
       log.error("Failed to create in-app notification", error);
     });
 
+    // Bust stats cache so dashboard reflects the updated item immediately
+    if (config.modelName === "expense") revalidateTag("expense-stats", {});
+    if (config.modelName === "income") revalidateTag("income-stats", {});
+
     return apiResponse.success({ [config.modelName]: item });
   });
 }
@@ -913,6 +922,10 @@ export function createDeleteHandler<TModel>(config: TransactionRouteConfig<TMode
     }).catch((error) => {
       log.error("Failed to create in-app notification", error);
     });
+
+    // Bust stats cache so dashboard reflects the deletion immediately
+    if (config.modelName === "expense") revalidateTag("expense-stats", {});
+    if (config.modelName === "income") revalidateTag("income-stats", {});
 
     return apiResponse.success({ 
       message: "ลบรายการสำเร็จ",
