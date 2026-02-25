@@ -27,10 +27,8 @@ type CompanyWithLine = {
 
 /**
  * Find the correct company for a LINE event.
- * 1. Filter to companies whose Channel Secret matches the signature
- * 2. If event has a groupId, match by lineGroupId (supports shared bot across companies)
- * 3. If no groupId match, pick the first company without a groupId assigned (new company setup)
- * 4. Fallback to first signature-matched company
+ * Strictly matches by groupId — will NOT process events from unconfigured groups.
+ * This allows the bot to be shared across multiple systems without interference.
  */
 function findMatchingCompany(
   companies: CompanyWithLine[],
@@ -44,18 +42,13 @@ function findMatchingCompany(
   );
 
   if (validCompanies.length === 0) return null;
-  if (validCompanies.length === 1) return validCompanies[0];
 
-  // Multiple companies share the same bot — use groupId to distinguish
+  // Group event — strictly match by groupId only
   if (eventGroupId) {
-    const byGroupId = validCompanies.find((c) => c.lineGroupId === eventGroupId);
-    if (byGroupId) return byGroupId;
+    return validCompanies.find((c) => c.lineGroupId === eventGroupId) || null;
   }
 
-  // No groupId match — pick first company that hasn't been assigned a group yet
-  const unassigned = validCompanies.find((c) => !c.lineGroupId);
-  if (unassigned) return unassigned;
-
+  // 1-on-1 chat (no groupId) — use first matching company
   return validCompanies[0];
 }
 
@@ -92,11 +85,37 @@ export async function POST(request: NextRequest) {
 
       const eventGroupId = event.source?.groupId;
 
-      // Find the matching company for this event
+      // Handle "group id" command from ANY group (so users can get the ID to configure)
+      if (
+        event.type === "message" &&
+        event.message?.type === "text" &&
+        event.replyToken &&
+        eventGroupId
+      ) {
+        const text = event.message.text?.toLowerCase().trim() || "";
+        if (text === "group id" || text === "groupid" || text === "group") {
+          // Find any company with a valid signature to get the access token
+          const anyValidCompany = companies.find(
+            (c) => c.lineChannelSecret && c.lineChannelAccessToken &&
+              verifySignature(bodyText, signature, c.lineChannelSecret)
+          );
+          if (anyValidCompany) {
+            const { replyToLine } = await import("@/lib/line/api");
+            await replyToLine(
+              event.replyToken,
+              [{ type: "text", text: `📱 Group ID:\n${eventGroupId}\n\nคัดลอก ID นี้ไปวางในหน้าตั้งค่า LINE Bot บนเว็บ` }],
+              anyValidCompany.lineChannelAccessToken!
+            );
+            continue;
+          }
+        }
+      }
+
+      // Find the matching company for this event (strict groupId match)
       const company = findMatchingCompany(companies, bodyText, signature, eventGroupId);
 
       if (!company) {
-        log.warn("No matching company found for event", { eventGroupId });
+        log.debug("Ignoring event from unconfigured group", { eventGroupId });
         continue;
       }
 
