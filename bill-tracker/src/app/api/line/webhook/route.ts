@@ -85,32 +85,6 @@ export async function POST(request: NextRequest) {
 
       const eventGroupId = event.source?.groupId;
 
-      // Handle "group id" command from ANY group (so users can get the ID to configure)
-      if (
-        event.type === "message" &&
-        event.message?.type === "text" &&
-        event.replyToken &&
-        eventGroupId
-      ) {
-        const text = event.message.text?.toLowerCase().trim() || "";
-        if (text === "group id" || text === "groupid" || text === "group") {
-          // Find any company with a valid signature to get the access token
-          const anyValidCompany = companies.find(
-            (c) => c.lineChannelSecret && c.lineChannelAccessToken &&
-              verifySignature(bodyText, signature, c.lineChannelSecret)
-          );
-          if (anyValidCompany) {
-            const { replyToLine } = await import("@/lib/line/api");
-            await replyToLine(
-              event.replyToken,
-              [{ type: "text", text: `📱 Group ID:\n${eventGroupId}\n\nคัดลอก ID นี้ไปวางในหน้าตั้งค่า LINE Bot บนเว็บ` }],
-              anyValidCompany.lineChannelAccessToken!
-            );
-            continue;
-          }
-        }
-      }
-
       // Find the matching company for this event (strict groupId match)
       const company = findMatchingCompany(companies, bodyText, signature, eventGroupId);
 
