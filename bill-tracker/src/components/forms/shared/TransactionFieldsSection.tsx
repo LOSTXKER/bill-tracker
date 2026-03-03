@@ -50,7 +50,7 @@ type FormRegister = (name: string) => Record<string, unknown>;
 type FormWatch = (name?: string) => unknown;
 type FormSetValue = (name: string, value: unknown) => void;
 
-export type AmountInputMode = "beforeVat" | "includingVat";
+export type AmountInputMode = "beforeVat" | "includingVat" | "afterWht";
 
 // Internal company option for dropdown
 export interface InternalCompanyOption {
@@ -204,6 +204,9 @@ export function TransactionFieldsSection({
   
   // Track whether the amount change came from user input (to avoid feedback loop)
   const isUserInputRef = useRef(false);
+
+  // Get WHT rate from form for reverse-calculation
+  const whtRate = (watch("whtRate") as number) || 0;
   
   // AI suggest account state
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
@@ -222,11 +225,16 @@ export function TransactionFieldsSection({
       if (amountInputMode === "includingVat" && vatRate > 0) {
         const includingVat = Math.trunc(formAmount * (1 + vatRate / 100) * 100) / 100;
         setDisplayAmount(String(includingVat));
+      } else if (amountInputMode === "afterWht" && isWht) {
+        // netAmount = baseAmount × (1 + vatRate/100 - whtRate/100)
+        const factor = 1 + vatRate / 100 - whtRate / 100;
+        const netAmount = Math.trunc(formAmount * factor * 100) / 100;
+        setDisplayAmount(String(netAmount));
       } else {
         setDisplayAmount(String(formAmount));
       }
     }
-  }, [formAmount, amountInputMode, vatRate]);
+  }, [formAmount, amountInputMode, vatRate, isWht, whtRate]);
   
   // Handle amount input change
   // Limit to 2 decimal places without rounding
@@ -249,6 +257,12 @@ export function TransactionFieldsSection({
       // Convert from including VAT to before VAT
       const beforeVat = Math.round((numValue / (1 + vatRate / 100)) * 100) / 100;
       setValue("amount", beforeVat);
+    } else if (amountInputMode === "afterWht" && isWht) {
+      // netAmount = baseAmount × (1 + vatRate/100 - whtRate/100)
+      // baseAmount = netAmount / (1 + vatRate/100 - whtRate/100)
+      const factor = 1 + vatRate / 100 - whtRate / 100;
+      const beforeVat = factor > 0 ? Math.round((numValue / factor) * 100) / 100 : numValue;
+      setValue("amount", beforeVat);
     } else {
       setValue("amount", numValue);
     }
@@ -267,6 +281,11 @@ export function TransactionFieldsSection({
       // The displayed value is now treated as including VAT → store base amount
       const beforeVat = Math.round((currentValue / (1 + vatRate / 100)) * 100) / 100;
       setValue("amount", beforeVat);
+    } else if (newMode === "afterWht" && isWht) {
+      // The displayed value is now treated as net after WHT → reverse to base amount
+      const factor = 1 + vatRate / 100 - whtRate / 100;
+      const beforeVat = factor > 0 ? Math.round((currentValue / factor) * 100) / 100 : currentValue;
+      setValue("amount", beforeVat);
     } else {
       // The displayed value is now treated as before VAT → store as-is
       setValue("amount", currentValue);
@@ -274,6 +293,17 @@ export function TransactionFieldsSection({
 
     setAmountInputMode(newMode);
   };
+
+  // Reset to "beforeVat" mode when WHT is disabled while in "afterWht" mode
+  useEffect(() => {
+    if (!isWht && amountInputMode === "afterWht") {
+      setAmountInputMode("beforeVat");
+      if (formAmount !== undefined && formAmount !== null) {
+        setDisplayAmount(String(formAmount));
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWht]);
   
   // Reference URL input state
   const [newReferenceUrl, setNewReferenceUrl] = useState("");
@@ -600,8 +630,8 @@ export function TransactionFieldsSection({
             <Label htmlFor="amount" className="text-foreground font-medium">
               จำนวนเงิน
             </Label>
-            {/* Amount input mode toggle - only show when VAT > 0 */}
-            {vatRate > 0 && (
+            {/* Amount input mode toggle - show when VAT > 0 or WHT enabled */}
+            {(vatRate > 0 || isWht) && (
               <div className="flex items-center gap-1 text-xs">
                 <button
                   type="button"
@@ -614,17 +644,32 @@ export function TransactionFieldsSection({
                 >
                   ก่อน VAT
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleInputModeToggle("includingVat")}
-                  className={`px-2 py-1 rounded transition-all ${
-                    amountInputMode === "includingVat"
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  รวม VAT
-                </button>
+                {vatRate > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleInputModeToggle("includingVat")}
+                    className={`px-2 py-1 rounded transition-all ${
+                      amountInputMode === "includingVat"
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    รวม VAT
+                  </button>
+                )}
+                {isWht && (
+                  <button
+                    type="button"
+                    onClick={() => handleInputModeToggle("afterWht")}
+                    className={`px-2 py-1 rounded transition-all ${
+                      amountInputMode === "afterWht"
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    หลังหักที่จ่าย
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -649,6 +694,17 @@ export function TransactionFieldsSection({
               ยอดก่อน VAT: ฿{((parseFloat(displayAmount) || 0) / (1 + vatRate / 100)).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           )}
+          {/* Show hint when in "after WHT" mode */}
+          {amountInputMode === "afterWht" && isWht && (() => {
+            const factor = 1 + vatRate / 100 - whtRate / 100;
+            const baseAmount = factor > 0 ? (parseFloat(displayAmount) || 0) / factor : 0;
+            return (
+              <p className="text-xs text-muted-foreground">
+                ยอดก่อน VAT: ฿{baseAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {vatRate > 0 && ` · รวม VAT: ฿${(baseAmount * (1 + vatRate / 100)).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </p>
+            );
+          })()}
         </div>
       </div>
 
