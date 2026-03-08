@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { TableCell } from "@/components/ui/table";
+import { useRouter } from "next/navigation";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -184,6 +184,7 @@ export function TransactionTableRow({
   onApprovalChange,
   onPreview,
 }: TransactionTableRowProps) {
+  const router = useRouter();
   const { handleRowClick, handleSendNotification, sending } = useTransactionRow({
     companyCode,
     transactionType: config.type,
@@ -194,13 +195,18 @@ export function TransactionTableRow({
   const detailPath = config.type === "expense" ? "expenses" : "incomes";
   const detailUrl = `/${companyCode}/${detailPath}/${transaction.id}`;
 
-  // Handle link click — open preview instead of navigating when preview handler is set
-  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleRowNavigate = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    // Don't navigate if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, [role=checkbox]")) return;
+
     if (onPreview) {
-      e.preventDefault();
       onPreview(transaction.id);
+    } else if (e.metaKey || e.ctrlKey) {
+      window.open(detailUrl, "_blank");
+    } else {
+      router.push(detailUrl);
     }
-    // Otherwise let Next.js Link handle navigation normally
   };
 
   // Get date based on config
@@ -235,13 +241,10 @@ export function TransactionTableRow({
     ? transaction[config.whtRateField]
     : null;
 
-  // Render the row as a <Link> with display:table-row so all content is inside <a>,
-  // giving browsers native right-click "Open link in new tab" anywhere on the row.
   return (
-    <Link
-      href={detailUrl}
-      onClick={handleLinkClick}
-      className="table-row cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/50"
+    <TableRow
+      onClick={handleRowNavigate}
+      className="cursor-pointer border-b border-border/50 transition-colors hover:bg-muted/50"
     >
       {/* Selection checkbox */}
       {onToggleSelect && (
@@ -449,6 +452,6 @@ export function TransactionTableRow({
           </Button>
         </TableCell>
       )}
-    </Link>
+    </TableRow>
   );
 }

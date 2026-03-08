@@ -85,6 +85,8 @@ export function serializeExpense<T extends Expense>(expense: T): SerializedExpen
     'whtRate',
     'whtAmount',
     'netPaid',
+    'originalAmount',
+    'exchangeRate',
   ] as (keyof T)[]) as SerializedExpense<T>;
   
   // Also serialize nested contact if present
@@ -109,6 +111,8 @@ export function serializeIncome<T extends Income>(income: T): SerializedIncome<T
     'whtRate',
     'whtAmount',
     'netReceived',
+    'originalAmount',
+    'exchangeRate',
   ] as (keyof T)[]) as SerializedIncome<T>;
   
   // Also serialize nested contact if present

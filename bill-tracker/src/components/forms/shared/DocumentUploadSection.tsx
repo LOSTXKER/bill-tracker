@@ -43,9 +43,10 @@ export interface CategorizedFiles {
 }
 
 // Helper to convert legacy string[] to TypedOtherDoc[]
-export function normalizeOtherDocs(docs: (string | TypedOtherDoc)[] | undefined): TypedOtherDoc[] {
+export function normalizeOtherDocs(docs: (string | TypedOtherDoc)[] | undefined | null): TypedOtherDoc[] {
   if (!docs) return [];
-  return docs.map(doc => {
+  const arr = Array.isArray(docs) ? docs : [];
+  return arr.map(doc => {
     if (typeof doc === "string") {
       return { url: doc, type: "OTHER" as OtherDocType };
     }
