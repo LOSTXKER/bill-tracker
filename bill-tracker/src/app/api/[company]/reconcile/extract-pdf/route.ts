@@ -1,5 +1,5 @@
 import { extractText } from "unpdf";
-import { analyzeImage } from "@/lib/ai/gemini";
+import { generateText, analyzeImage } from "@/lib/ai/gemini";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { ApiError, ApiErrors } from "@/lib/api/errors";
@@ -16,6 +16,19 @@ export interface ExtractedRow {
 
 const MAX_PDF_SIZE_MB = 10;
 
+const PARSE_PROMPT = `จาก text ที่ extract มาจาก PDF ด้านล่าง ให้ดึงข้อมูลทุกแถวของตาราง
+
+ส่งคืนเป็น JSON array เท่านั้น ไม่ต้องอธิบาย ไม่ต้องใส่ markdown:
+[{"date":"YYYY-MM-DD","invoiceNumber":"","vendorName":"","taxId":"","baseAmount":0,"vatAmount":0,"totalAmount":0}]
+
+กฎ:
+- วันที่แปลงเป็น YYYY-MM-DD (ถ้าเป็น พ.ศ. ให้ลบ 543)
+- ตัวเลขเงินไม่ต้องมีจุลภาค
+- ข้ามแถวหัวตาราง แถวรวม แถวว่าง
+
+ข้อมูล text จาก PDF:
+`;
+
 export const POST = withCompanyAccessFromParams(
   async (request) => {
     const formData = await request.formData();
@@ -31,19 +44,31 @@ export const POST = withCompanyAccessFromParams(
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Strategy 1: Extract text from PDF and parse with regex (fast, free)
-    const textRows = await extractFromText(buffer);
-    if (textRows.length > 0) {
-      console.log(`[extract-pdf] Text parse succeeded: ${textRows.length} rows`);
-      return apiResponse.success({ rows: textRows });
+    // Step 1: Extract text from PDF (instant, free)
+    let pdfText = "";
+    try {
+      const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+      pdfText = typeof text === "string" ? text : "";
+      console.log(`[extract-pdf] Text extracted: ${pdfText.length} chars`);
+    } catch (e) {
+      console.error("[extract-pdf] Text extraction failed:", e);
     }
 
-    // Strategy 2: Fallback to AI for scanned/image PDFs
-    console.log("[extract-pdf] Text parse found 0 rows, falling back to AI...");
-    const aiRows = await extractWithAI(buffer);
-    if (aiRows.length > 0) {
-      console.log(`[extract-pdf] AI fallback succeeded: ${aiRows.length} rows`);
-      return apiResponse.success({ rows: aiRows });
+    // Step 2: If we got text, send it to AI as text (fast, no vision processing)
+    if (pdfText.length > 50) {
+      const rows = await extractWithTextAI(pdfText);
+      if (rows.length > 0) {
+        console.log(`[extract-pdf] Text+AI succeeded: ${rows.length} rows`);
+        return apiResponse.success({ rows });
+      }
+    }
+
+    // Step 3: Fallback — send PDF binary to vision AI (for scanned PDFs)
+    console.log("[extract-pdf] Text approach failed, falling back to vision AI...");
+    const rows = await extractWithVisionAI(buffer);
+    if (rows.length > 0) {
+      console.log(`[extract-pdf] Vision AI succeeded: ${rows.length} rows`);
+      return apiResponse.success({ rows });
     }
 
     throw new ApiError(
@@ -59,210 +84,39 @@ export const POST = withCompanyAccessFromParams(
 );
 
 // ---------------------------------------------------------------------------
-// Strategy 1: Text-based extraction (pdf-parse + regex)
+// Strategy 1: Extract text → AI parses the text (fast, 2-5 seconds)
 // ---------------------------------------------------------------------------
 
-async function extractFromText(buffer: Buffer): Promise<ExtractedRow[]> {
+async function extractWithTextAI(pdfText: string): Promise<ExtractedRow[]> {
   try {
-    const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+    const prompt = PARSE_PROMPT + pdfText;
 
-    if (!text || text.trim().length < 50) return [];
+    const response = await generateText(prompt, {
+      temperature: 0,
+      maxTokens: 32_768,
+      retries: 2,
+    });
 
-    console.log(`[extract-pdf] PDF text length: ${text.length}`);
-
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    const rows: ExtractedRow[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const row = tryParseLine(line, lines, i);
-      if (row) rows.push(row);
+    if (response.error || !response.data) {
+      console.error("[extract-pdf] Text AI error:", response.error);
+      return [];
     }
 
-    return rows;
+    return parseAIResponse(response.data);
   } catch (e) {
-    console.error("[extract-pdf] pdf-parse error:", e);
+    console.error("[extract-pdf] Text AI failed:", e);
     return [];
   }
 }
 
-// Match Thai date: dd/mm/yyyy or dd/mm/yy (พ.ศ. or ค.ศ.)
-const DATE_RE = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
-
-// Match 13-digit tax ID
-const TAX_ID_RE = /(\d{13})/;
-
-// Match money amounts like 1,234.56 or 1234.56
-const MONEY_RE = /[\d,]+\.\d{2}/g;
-
-function tryParseLine(
-  line: string,
-  _lines: string[],
-  _idx: number,
-): ExtractedRow | null {
-  // Must contain a date to be a data row
-  const dateMatch = line.match(DATE_RE);
-  if (!dateMatch) return null;
-
-  // Must contain at least one money amount
-  const moneyMatches = line.match(MONEY_RE);
-  if (!moneyMatches || moneyMatches.length === 0) return null;
-
-  // Skip header/total/summary rows
-  const lower = line.toLowerCase();
-  if (
-    lower.includes("รวม") ||
-    lower.includes("total") ||
-    lower.includes("ยกมา") ||
-    lower.includes("ยกไป") ||
-    lower.includes("หน้า") ||
-    lower.includes("page")
-  ) {
-    return null;
-  }
-
-  // Parse date
-  const date = parseThaiDate(dateMatch[1], dateMatch[2], dateMatch[3]);
-
-  // Parse tax ID
-  const taxIdMatch = line.match(TAX_ID_RE);
-  const taxId = taxIdMatch ? taxIdMatch[1] : "";
-
-  // Parse money amounts (take last 2-3 values as baseAmount, vatAmount, totalAmount)
-  const amounts = moneyMatches.map(parseMoney);
-
-  let baseAmount = 0;
-  let vatAmount = 0;
-  let totalAmount = 0;
-
-  if (amounts.length >= 3) {
-    // Last 3 amounts are typically: base, vat, total
-    baseAmount = amounts[amounts.length - 3];
-    vatAmount = amounts[amounts.length - 2];
-    totalAmount = amounts[amounts.length - 1];
-  } else if (amounts.length === 2) {
-    baseAmount = amounts[0];
-    vatAmount = amounts[1];
-    totalAmount = baseAmount + vatAmount;
-  } else if (amounts.length === 1) {
-    totalAmount = amounts[0];
-  }
-
-  // Extract vendor name: text between date/invoice area and tax ID / amounts
-  const vendorName = extractVendorName(line, dateMatch, taxIdMatch, moneyMatches);
-
-  if (!vendorName && baseAmount === 0) return null;
-
-  // Extract invoice number (pattern like RT-xxx, IV-xxx, INV-xxx, or alphanumeric codes)
-  const invoiceNumber = extractInvoiceNumber(line, dateMatch);
-
-  return {
-    date,
-    invoiceNumber,
-    vendorName,
-    taxId,
-    baseAmount,
-    vatAmount,
-    totalAmount,
-  };
-}
-
-function parseThaiDate(d: string, m: string, y: string): string {
-  let year = parseInt(y);
-  const month = parseInt(m);
-  const day = parseInt(d);
-
-  // 2-digit year
-  if (year < 100) {
-    year += year > 50 ? 1900 + 543 : 2000 + 543;
-  }
-
-  // Buddhist Era → Gregorian
-  if (year > 2400) {
-    year -= 543;
-  }
-
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function parseMoney(s: string): number {
-  return parseFloat(s.replace(/,/g, "")) || 0;
-}
-
-function extractVendorName(
-  line: string,
-  dateMatch: RegExpMatchArray,
-  taxIdMatch: RegExpMatchArray | null,
-  moneyMatches: RegExpMatchArray,
-): string {
-  // Find the region between structured data (dates, IDs, amounts) and extract Thai text
-  const dateEnd = (dateMatch.index ?? 0) + dateMatch[0].length;
-
-  // Find where the amounts start
-  const firstMoneyIdx = line.indexOf(moneyMatches[0]);
-  const endBound = taxIdMatch
-    ? Math.min(taxIdMatch.index ?? firstMoneyIdx, firstMoneyIdx)
-    : firstMoneyIdx;
-
-  // The vendor name region is roughly between the date area and the amounts/taxID
-  let region = line.substring(dateEnd, endBound).trim();
-
-  // Clean up: remove invoice-like codes and common prefixes
-  region = region
-    .replace(/[A-Z]{1,5}[-\s]?\d{5,}/g, "")   // invoice numbers
-    .replace(/\d{13}/g, "")                      // tax IDs
-    .replace(/HQ|สำนักงานใหญ่/g, "")            // branch labels
-    .replace(/\(\d+\)/g, "")                     // (00000)
-    .replace(/\s{2,}/g, " ")
-    .trim();
-
-  // If too short or just numbers, skip
-  if (region.length < 3) return "";
-
-  // Try to find the Thai company name within the region
-  const thaiNameMatch = region.match(/((?:บริษัท|ห้างหุ้นส่วน|ร้าน|นาย|นาง|น\.ส\.)[\s\S]*?(?:จำกัด(?:\s*\(มหาชน\))?|$))/);
-  if (thaiNameMatch) return thaiNameMatch[1].trim();
-
-  return region;
-}
-
-function extractInvoiceNumber(line: string, dateMatch: RegExpMatchArray): string {
-  const afterDate = line.substring((dateMatch.index ?? 0) + dateMatch[0].length);
-
-  // Common invoice patterns
-  const patterns = [
-    /([A-Z]{1,5}[-]?\d{6,})/,           // RT-20260128000056, INV2602000001
-    /([A-Z]{2,}\d{2,}[-\/]\d+)/,         // IV-2026/001
-    /(\d{4,}[-\/]\d{4,})/,               // 2606-BR1550-000035
-    /(ET-IV-\d+)/,                        // ET-IV-2026021481
-    /([A-Z]+\d+CM\d+[-\/]\d+[-\/]\d+)/,  // DRCPV03CM159/2602/0497
-    /(B\d+[-]P\d+[-]\d+)/,               // B0231-P02-2602020010
-  ];
-
-  for (const pattern of patterns) {
-    const match = afterDate.match(pattern);
-    if (match) return match[1];
-  }
-
-  return "";
-}
-
 // ---------------------------------------------------------------------------
-// Strategy 2: AI fallback (for scanned PDFs)
+// Strategy 2: Vision AI on PDF binary (for scanned PDFs, slower)
 // ---------------------------------------------------------------------------
 
-const AI_PROMPT = `อ่านตารางใน PDF นี้ แล้ว extract ข้อมูลทุกแถว (ข้ามแถวหัวตาราง แถวรวม และแถวว่าง)
-
-ส่งคืนเป็น JSON array เท่านั้น ไม่ต้องอธิบาย ไม่ต้องใส่ markdown:
-[{"date":"YYYY-MM-DD","invoiceNumber":"","vendorName":"","taxId":"","baseAmount":0,"vatAmount":0,"totalAmount":0}]
-
-- วันที่แปลงเป็น YYYY-MM-DD (ถ้าเป็น พ.ศ. ให้ลบ 543)
-- ตัวเลขเงินไม่ต้องมีจุลภาค`;
-
-async function extractWithAI(buffer: Buffer): Promise<ExtractedRow[]> {
+async function extractWithVisionAI(buffer: Buffer): Promise<ExtractedRow[]> {
   try {
     const base64 = buffer.toString("base64");
-    const response = await analyzeImage(base64, AI_PROMPT, {
+    const response = await analyzeImage(base64, PARSE_PROMPT + "(ดูจาก PDF โดยตรง)", {
       mimeType: "application/pdf",
       temperature: 0,
       maxTokens: 32_768,
@@ -271,16 +125,20 @@ async function extractWithAI(buffer: Buffer): Promise<ExtractedRow[]> {
     });
 
     if (response.error || !response.data) {
-      console.error("[extract-pdf] AI error:", response.error);
+      console.error("[extract-pdf] Vision AI error:", response.error);
       return [];
     }
 
     return parseAIResponse(response.data);
   } catch (e) {
-    console.error("[extract-pdf] AI extraction failed:", e);
+    console.error("[extract-pdf] Vision AI failed:", e);
     return [];
   }
 }
+
+// ---------------------------------------------------------------------------
+// Parse AI JSON response (handles truncated responses)
+// ---------------------------------------------------------------------------
 
 function parseAIResponse(text: string): ExtractedRow[] {
   try {
@@ -294,6 +152,7 @@ function parseAIResponse(text: string): ExtractedRow[] {
     try {
       raw = JSON.parse(cleaned);
     } catch {
+      // Truncated JSON — repair
       const lastObj = cleaned.lastIndexOf("}");
       if (lastObj === -1) return [];
       try {
