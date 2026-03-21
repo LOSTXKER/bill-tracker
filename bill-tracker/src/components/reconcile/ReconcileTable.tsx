@@ -427,6 +427,14 @@ export function ReconcileTable({
   const unmatchedPairs = pairs.filter(
     (p) => p.status === "system-only" || p.status === "accounting-only"
   );
+  const unmatchedSystem = unmatchedPairs
+    .filter((p) => p.status === "system-only")
+    .sort((a, b) => (a.systemItem?.date ?? "").localeCompare(b.systemItem?.date ?? ""));
+  const unmatchedAccounting = unmatchedPairs
+    .filter((p) => p.status === "accounting-only")
+    .sort((a, b) => (a.accountingItem?.date ?? "").localeCompare(b.accountingItem?.date ?? ""));
+  const maxUnmatched = Math.max(unmatchedSystem.length, unmatchedAccounting.length);
+
   const matchedPairs = pairs.filter(
     (p) =>
       p.status === "exact" ||
@@ -663,82 +671,99 @@ export function ReconcileTable({
             </>
           )}
 
-          {/* Unmatched section */}
-          {unmatchedPairs.length > 0 && (
+          {/* Unmatched section — side-by-side, sorted by date */}
+          {maxUnmatched > 0 && (
             <>
               <div className="grid grid-cols-[1fr_88px_1fr] bg-muted/30">
                 <div className="col-span-3 px-3 py-1.5 border-y border-muted">
                   <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                     <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                    ยังไม่ตรงกัน ({unmatchedPairs.length} รายการ)
+                    ยังไม่ตรงกัน (ระบบ {unmatchedSystem.length} | รายงาน {unmatchedAccounting.length})
                     <span className="font-normal">
                       — คลิกเลือก 1 แถวจากระบบ และ 1 แถวจากรายงานเพื่อจับคู่
                     </span>
                   </div>
                 </div>
               </div>
-              {unmatchedPairs.map((pair) => {
-                const isSysRow = pair.status === "system-only";
-                const isAccRow = pair.status === "accounting-only";
-                const isSysSelected =
-                  isSysRow && pair.systemItem?.id === selectedSystemId;
-                const isAccSelected =
-                  isAccRow && pair.accountingIndex === selectedAccountingIndex;
+              {Array.from({ length: maxUnmatched }, (_, i) => {
+                const sysPair = unmatchedSystem[i] ?? null;
+                const accPair = unmatchedAccounting[i] ?? null;
+                const isSysSelected = sysPair?.systemItem?.id === selectedSystemId && !!selectedSystemId;
+                const isAccSelected = accPair?.accountingIndex === selectedAccountingIndex && selectedAccountingIndex !== null;
 
                 return (
                   <div
-                    key={pair.id}
+                    key={`unmatched-${i}`}
                     className="grid grid-cols-[1fr_88px_1fr] hover:bg-muted/20 transition-colors"
                   >
+                    {/* Left: system item */}
                     <div
                       className={cn(
                         "border-r border-border",
                         isSysSelected && "bg-primary/5"
                       )}
                     >
-                      <SystemCell
-                        pair={pair}
-                        isSelected={isSysSelected}
-                        isSelectable={isSysRow}
-                        onSelect={() => {
-                          if (!isSysRow || !pair.systemItem) return;
-                          onSelectSystem(
-                            pair.systemItem.id === selectedSystemId
-                              ? null
-                              : pair.systemItem.id
-                          );
-                        }}
-                        showCompanyBadge={showCompanyBadge}
-                        onPreview={pair.systemItem ? () => handlePreview(pair.systemItem!.id) : undefined}
-                      />
+                      {sysPair ? (
+                        <SystemCell
+                          pair={sysPair}
+                          isSelected={isSysSelected}
+                          isSelectable
+                          onSelect={() => {
+                            if (!sysPair.systemItem) return;
+                            onSelectSystem(
+                              sysPair.systemItem.id === selectedSystemId
+                                ? null
+                                : sysPair.systemItem.id
+                            );
+                          }}
+                          showCompanyBadge={showCompanyBadge}
+                          onPreview={sysPair.systemItem ? () => handlePreview(sysPair.systemItem!.id) : undefined}
+                        />
+                      ) : (
+                        <div className="px-3 py-2.5 flex items-center opacity-25">
+                          <span className="text-xs text-muted-foreground italic">—</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Center: link indicator */}
                     <div className="border-r border-border">
-                      <CenterCell
-                        pair={pair}
-                        canLink={
-                          isSysRow
-                            ? isSysSelected && selectedAccountingIndex !== null
-                            : isAccSelected && selectedSystemId !== null
-                        }
-                        onConfirmAI={onConfirmAI}
-                        onRejectAI={onRejectAI}
-                        onUnlink={onUnlink}
-                      />
+                      <div className="flex items-center justify-center px-1 py-2">
+                        {isSysSelected && isAccSelected ? (
+                          <span className="text-[10px] text-primary font-medium text-center leading-tight">
+                            จับคู่
+                          </span>
+                        ) : isSysSelected || isAccSelected ? (
+                          <span className="text-[10px] text-primary font-medium text-center leading-tight">
+                            เลือก<br />อีกฝั่ง
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/30 text-lg">—</span>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Right: accounting item */}
                     <div className={cn(isAccSelected && "bg-amber-50/60 dark:bg-amber-950/20")}>
-                      <AccountingCell
-                        pair={pair}
-                        isSelected={isAccSelected}
-                        isSelectable={isAccRow}
-                        onSelect={() => {
-                          if (!isAccRow || pair.accountingIndex === undefined) return;
-                          onSelectAccounting(
-                            pair.accountingIndex === selectedAccountingIndex
-                              ? null
-                              : pair.accountingIndex
-                          );
-                        }}
-                      />
+                      {accPair ? (
+                        <AccountingCell
+                          pair={accPair}
+                          isSelected={isAccSelected}
+                          isSelectable
+                          onSelect={() => {
+                            if (accPair.accountingIndex === undefined) return;
+                            onSelectAccounting(
+                              accPair.accountingIndex === selectedAccountingIndex
+                                ? null
+                                : accPair.accountingIndex
+                            );
+                          }}
+                        />
+                      ) : (
+                        <div className="px-3 py-2.5 flex items-center opacity-25">
+                          <span className="text-xs text-muted-foreground italic">—</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
