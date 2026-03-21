@@ -83,58 +83,68 @@ export const POST = withCompanyAccessFromParams(
 // ---------------------------------------------------------------------------
 
 const AMOUNTS_AT_END_RE = /([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
-const ROW_NUM_START_RE = /^\d{1,4}\s+/;
-const DATE_GLOBAL_RE = /\d{1,2}\/\d{1,2}\/\d{4}/g;
+const ROW_START_RE = /\b(\d{1,3})\s+(\d{1,2}\/\d{1,2}\/\d{4})/;
 const INTERNAL_REF_RE = /^((?:EXP|PA|INV|REC|REV|JV)[-]?\w+)\s*/;
 const BRANCH_TAIL_RE = /\s+(?:HQ\s*\(\d+\)\s*)?\d{5}\s*$/;
 const TAX_ID_TAIL_RE = /\s+([\d][\d\-]*\d)\s*$/;
 
+function normalizeText(text: string): string {
+  if (text.split("\n").length >= 10) return text;
+
+  // unpdf often returns a single line — split after each set of 3 amounts
+  return text.replace(
+    /([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+/g,
+    "$1 $2 $3\n"
+  );
+}
+
 function parseTextDirect(text: string): ExtractedRow[] {
-  const lines = text.split("\n");
+  const normalized = normalizeText(text);
+  const lines = normalized.split("\n");
   const rows: ExtractedRow[] = [];
 
   for (const rawLine of lines) {
     const line = rawLine.replace(/\t/g, " ").trim();
     if (!line) continue;
-    if (!ROW_NUM_START_RE.test(line)) continue;
-    if (/รวม|total|ยกมา|ยกไป/i.test(line)) continue;
+    if (/(?:^|\s)รวม\s|\btotal\b|ยกมา|ยกไป/i.test(line)) continue;
 
     const amountsMatch = line.match(AMOUNTS_AT_END_RE);
     if (!amountsMatch) continue;
 
+    const rowMatch = line.match(ROW_START_RE);
+    if (!rowMatch) continue;
+
     const baseAmount = parseMoney(amountsMatch[1]);
     const vatAmount = parseMoney(amountsMatch[2]);
     const totalAmount = parseMoney(amountsMatch[3]);
+    const date = convertDate(rowMatch[2]);
 
+    // Core = between row start and amounts
     const core = line
-      .replace(ROW_NUM_START_RE, "")
+      .substring(rowMatch.index! + rowMatch[0].length)
       .replace(AMOUNTS_AT_END_RE, "")
       .trim();
 
-    const dateMatches = [...core.matchAll(DATE_GLOBAL_RE)];
-    if (dateMatches.length < 2) continue;
+    // Find invoice date (dd/mm/yyyy) in core
+    const coreDates = [...core.matchAll(/\d{1,2}\/\d{1,2}\/\d{4}/g)];
+    if (coreDates.length < 1) continue;
 
-    const date = convertDate(dateMatches[0][0]);
+    const lastCoreDate = coreDates[coreDates.length - 1];
+    const lastCoreDateEnd = lastCoreDate.index! + lastCoreDate[0].length;
 
-    // Section between 1st and 2nd date: internalRef + invoiceNumber
-    const lastDateMatch = dateMatches[dateMatches.length - 1];
-    const date1End = dateMatches[0].index! + dateMatches[0][0].length;
-    const refSection = core.substring(date1End, lastDateMatch.index!).trim();
+    // Ref section: before the last date
+    const refSection = core.substring(0, lastCoreDate.index!).trim();
     const refMatch = refSection.match(INTERNAL_REF_RE);
     const invoiceNumber = refMatch
       ? refSection.substring(refMatch[0].length).trim()
       : refSection.trim();
 
-    // Section after 2nd date: vendorName + taxId + branchInfo
-    const lastDateEnd = lastDateMatch.index! + lastDateMatch[0].length;
-    let vendorSection = core.substring(lastDateEnd).trim();
+    // Vendor section: after the last date
+    let vendorSection = core.substring(lastCoreDateEnd).trim();
 
-    // Strip branch info from the tail
     vendorSection = vendorSection.replace(BRANCH_TAIL_RE, "").trim();
-    // Safety: strip bare "HQ (xxxxx)" if no trailing branch code
     vendorSection = vendorSection.replace(/\s+HQ\s*\(\d+\)\s*$/, "").trim();
 
-    // Tax ID is the last digit-starting token
     let vendorName = vendorSection;
     let taxId = "";
     const taxIdMatch = vendorSection.match(TAX_ID_TAIL_RE);
