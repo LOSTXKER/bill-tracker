@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import { extractText } from "unpdf";
 import { analyzeImage } from "@/lib/ai/gemini";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
@@ -64,10 +64,7 @@ export const POST = withCompanyAccessFromParams(
 
 async function extractFromText(buffer: Buffer): Promise<ExtractedRow[]> {
   try {
-    const parser = new PDFParse({ data: new Uint8Array(buffer) });
-    const result = await parser.getText();
-    const text = result.text;
-    await parser.destroy();
+    const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
 
     if (!text || text.trim().length < 50) return [];
 
