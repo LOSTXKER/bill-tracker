@@ -14,6 +14,11 @@ import {
   Upload,
   Building2,
   Eye,
+  Ban,
+  Undo2,
+  ChevronDown,
+  ChevronRight,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
@@ -352,11 +357,15 @@ function AccountingRow_({
   isSelected,
   isSelectable,
   onSelect,
+  onSkip,
+  isSkipped,
 }: {
   item?: AccountingRow;
   isSelected: boolean;
   isSelectable: boolean;
   onSelect: () => void;
+  onSkip?: () => void;
+  isSkipped?: boolean;
 }) {
   if (!item) {
     return (
@@ -370,16 +379,35 @@ function AccountingRow_({
     <div
       className={cn(
         ACC_GRID,
-        "items-center px-2 py-1.5 text-[11px] min-w-0",
+        "items-center px-2 py-1.5 text-[11px] min-w-0 group/acc",
         isSelectable && "cursor-pointer select-none hover:bg-muted/30",
-        isSelected && "bg-amber-50 dark:bg-amber-950/20 ring-1 ring-inset ring-amber-400/40"
+        isSelected && "bg-amber-50 dark:bg-amber-950/20 ring-1 ring-inset ring-amber-400/40",
+        isSkipped && "opacity-40"
       )}
-      onClick={isSelectable ? onSelect : undefined}
+      onClick={isSelectable && !isSkipped ? onSelect : undefined}
     >
       <div className="text-muted-foreground truncate">{fmtDate(item.date)}</div>
       <div className="flex items-center gap-1 min-w-0 pr-1">
         {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />}
         <span className="truncate font-medium text-foreground">{item.vendorName || "—"}</span>
+        {onSkip && !isSkipped && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSkip(); }}
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/30 hover:text-orange-500 opacity-0 group-hover/acc:opacity-100 transition-opacity"
+            title="ข้ามรายการนี้"
+          >
+            <Ban className="h-3 w-3" />
+          </button>
+        )}
+        {isSkipped && onSkip && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSkip(); }}
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-primary transition-colors"
+            title="ยกเลิกข้าม"
+          >
+            <Undo2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
       <div className="text-right font-mono font-semibold tabular-nums">{fmt(item.baseAmount)}</div>
       <div className="text-right font-mono tabular-nums text-blue-600 dark:text-blue-400">
@@ -410,6 +438,17 @@ export function ReconcileTable({
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [monthRange, setMonthRange] = useState<MonthRange>(0);
+  const [skippedAccounting, setSkippedAccounting] = useState<Set<number>>(new Set());
+  const [showSkipped, setShowSkipped] = useState(false);
+
+  const toggleSkip = (index: number) => {
+    setSkippedAccounting((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
 
   const handlePreview = (itemId: string) => {
     setPreviewId(itemId);
@@ -436,9 +475,15 @@ export function ReconcileTable({
   const allUnmatchedSystem = unmatchedPairs
     .filter((p) => p.status === "system-only")
     .sort((a, b) => (a.systemItem?.date ?? "").localeCompare(b.systemItem?.date ?? ""));
-  const unmatchedAccounting = unmatchedPairs
+  const allUnmatchedAccounting = unmatchedPairs
     .filter((p) => p.status === "accounting-only")
     .sort((a, b) => (a.accountingItem?.date ?? "").localeCompare(b.accountingItem?.date ?? ""));
+  const unmatchedAccounting = allUnmatchedAccounting.filter(
+    (p) => p.accountingIndex === undefined || !skippedAccounting.has(p.accountingIndex)
+  );
+  const skippedAccountingPairs = allUnmatchedAccounting.filter(
+    (p) => p.accountingIndex !== undefined && skippedAccounting.has(p.accountingIndex)
+  );
 
   const currentMonthSystem = allUnmatchedSystem.filter((p) => !p.systemItem?.fromMonth);
   const spilloverSystem = allUnmatchedSystem.filter((p) => !!p.systemItem?.fromMonth);
@@ -799,11 +844,52 @@ export function ReconcileTable({
                               : accPair.accountingIndex
                           );
                         }}
+                        onSkip={accPair?.accountingIndex !== undefined ? () => toggleSkip(accPair.accountingIndex!) : undefined}
                       />
                     </div>
                   </div>
                 );
               })}
+            </>
+          )}
+
+          {/* Skipped accounting section */}
+          {skippedAccountingPairs.length > 0 && (
+            <>
+              <div className="bg-muted/20">
+                <div className="px-3 py-1.5 border-y border-muted/60">
+                  <button
+                    type="button"
+                    onClick={() => setShowSkipped(!showSkipped)}
+                    className="flex items-center gap-2 text-xs font-semibold text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                  >
+                    {showSkipped ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    <EyeOff className="h-3.5 w-3.5" />
+                    ข้ามแล้ว ({skippedAccountingPairs.length} รายการ)
+                  </button>
+                </div>
+              </div>
+              {showSkipped && skippedAccountingPairs.map((pair) => (
+                <div
+                  key={pair.id}
+                  className="grid grid-cols-[1fr_88px_1fr] opacity-40 hover:opacity-60 transition-opacity"
+                >
+                  <div className="border-r border-border">
+                    <div className={cn(SYS_GRID, "items-center px-2 py-1.5 h-8")}>
+                      <div /><div /><div /><div /><div />
+                    </div>
+                  </div>
+                  <div className="border-r border-border" />
+                  <AccountingRow_
+                    item={pair.accountingItem}
+                    isSelected={false}
+                    isSelectable={false}
+                    onSelect={() => {}}
+                    onSkip={pair.accountingIndex !== undefined ? () => toggleSkip(pair.accountingIndex!) : undefined}
+                    isSkipped
+                  />
+                </div>
+              ))}
             </>
           )}
 
