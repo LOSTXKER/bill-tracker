@@ -446,16 +446,16 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
                     )}
                   </Label>
                   <Select
-                    value={columnMapping[field]}
+                    value={columnMapping[field] || "__none__"}
                     onValueChange={(val) =>
-                      setColumnMapping((prev) => ({ ...prev, [field]: val }))
+                      setColumnMapping((prev) => ({ ...prev, [field]: val === "__none__" ? "" : val }))
                     }
                   >
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="เลือกคอลัมน์..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">-- ไม่เลือก --</SelectItem>
+                      <SelectItem value="__none__">-- ไม่เลือก --</SelectItem>
                       {rawHeaders.map((h) => (
                         <SelectItem key={h} value={h}>
                           {h}
