@@ -174,7 +174,7 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
 
       if (!res.ok || !json.success) {
         setStep("choose");
-        setFileError(json.error ?? "AI ไม่สามารถอ่าน PDF ได้");
+        setFileError(json.error ?? "ไม่สามารถอ่าน PDF ได้");
         return;
       }
 
@@ -370,7 +370,7 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
                   <FileSpreadsheet className="h-3 w-3" /> .xlsx / .xls / .csv
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5">
-                  <FileText className="h-3 w-3" /> .pdf (AI อ่าน)
+                  <FileText className="h-3 w-3" /> .pdf
                 </span>
               </div>
               <input
@@ -421,9 +421,9 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
               </div>
             </div>
             <div className="text-center space-y-1">
-              <p className="font-semibold text-foreground">AI กำลังอ่าน PDF...</p>
+              <p className="font-semibold text-foreground">กำลังอ่าน PDF...</p>
               <p className="text-sm text-muted-foreground">{pdfFileName}</p>
-              <p className="text-xs text-muted-foreground">AI กำลัง extract ตารางภาษี อาจใช้เวลา 30-90 วินาที</p>
+              <p className="text-xs text-muted-foreground">กำลัง extract ตารางภาษี รอสักครู่</p>
             </div>
           </div>
         )}
@@ -519,7 +519,7 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
               <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
               <span>
                 {pdfFileName ? (
-                  <>AI อ่าน PDF สำเร็จ — พบ <strong>{preview.length}</strong> รายการ</>
+                  <>อ่าน PDF สำเร็จ — พบ <strong>{preview.length}</strong> รายการ</>
                 ) : (
                   <>พร้อมนำเข้า <strong>{preview.length}</strong> รายการ</>
                 )}
