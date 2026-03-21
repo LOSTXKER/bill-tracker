@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +13,10 @@ import {
   AlertTriangle,
   Upload,
   Building2,
+  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
 import type { AccountingRow } from "./ImportPanel";
 
 export interface SystemItem {
@@ -68,6 +71,7 @@ interface ReconcileTableProps {
   onShowImport: () => void;
   hasAccountingData: boolean;
   showCompanyBadge?: boolean;
+  companyCode: string;
 }
 
 const MONTHS = [
@@ -137,12 +141,14 @@ function SystemCell({
   isSelectable,
   onSelect,
   showCompanyBadge,
+  onPreview,
 }: {
   pair: MatchedPair;
   isSelected: boolean;
   isSelectable: boolean;
   onSelect: () => void;
   showCompanyBadge?: boolean;
+  onPreview?: () => void;
 }) {
   const item = pair.systemItem;
   const isEmpty = !item;
@@ -158,7 +164,7 @@ function SystemCell({
   return (
     <div
       className={cn(
-        "px-3 py-2.5 flex flex-col gap-0.5 min-w-0",
+        "px-3 py-2.5 flex flex-col gap-0.5 min-w-0 group/sys",
         isSelectable && "cursor-pointer select-none",
         isSelected && "bg-primary/5 ring-1 ring-inset ring-primary/30"
       )}
@@ -176,6 +182,15 @@ function SystemCell({
         <p className="text-sm font-medium truncate">
           {item.vendorName || item.description || "—"}
         </p>
+        {onPreview && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPreview(); }}
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-primary opacity-0 group-hover/sys:opacity-100 transition-opacity"
+            title="ดูรายละเอียด"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+        )}
         <span className="text-sm font-mono font-semibold ml-auto flex-shrink-0">
           {fmt(item.baseAmount)}
         </span>
@@ -380,7 +395,16 @@ export function ReconcileTable({
   onShowImport,
   hasAccountingData,
   showCompanyBadge,
+  companyCode,
 }: ReconcileTableProps) {
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const handlePreview = (itemId: string) => {
+    setPreviewId(itemId);
+    setPreviewOpen(true);
+  };
+
   const canLink = selectedSystemId !== null && selectedAccountingIndex !== null;
   const hasOneSelected =
     (selectedSystemId !== null) !== (selectedAccountingIndex !== null);
@@ -611,6 +635,7 @@ export function ReconcileTable({
                       isSelectable={false}
                       onSelect={() => {}}
                       showCompanyBadge={showCompanyBadge}
+                      onPreview={pair.systemItem ? () => handlePreview(pair.systemItem!.id) : undefined}
                     />
                   </div>
                   <div className="border-r border-border">
@@ -679,6 +704,7 @@ export function ReconcileTable({
                           );
                         }}
                         showCompanyBadge={showCompanyBadge}
+                        onPreview={pair.systemItem ? () => handlePreview(pair.systemItem!.id) : undefined}
                       />
                     </div>
                     <div className="border-r border-border">
@@ -738,6 +764,7 @@ export function ReconcileTable({
                       isSelectable={false}
                       onSelect={() => {}}
                       showCompanyBadge={showCompanyBadge}
+                      onPreview={pair.systemItem ? () => handlePreview(pair.systemItem!.id) : undefined}
                     />
                   </div>
                   <div className="border-r border-border">
@@ -784,6 +811,14 @@ export function ReconcileTable({
           )}
         </div>
       )}
+
+      <TransactionPreviewSheet
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        transactionId={previewId}
+        transactionType={type}
+        companyCode={companyCode}
+      />
     </div>
   );
 }

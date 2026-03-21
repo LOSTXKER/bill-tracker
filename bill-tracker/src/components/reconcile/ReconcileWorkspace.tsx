@@ -789,8 +789,11 @@ export function ReconcileWorkspace({
               vendorName: s.vendorName,
               amount: s.baseAmount,
               vatAmount: s.vatAmount,
+              totalAmount: s.totalAmount,
               date: s.date,
               taxId: s.taxId,
+              invoiceNumber: s.invoiceNumber,
+              description: s.description,
               type,
             })),
             accountingItems: unmatchedAccounting.map((a) => ({
@@ -798,8 +801,10 @@ export function ReconcileWorkspace({
               vendorName: a.vendorName,
               amount: a.baseAmount,
               vatAmount: a.vatAmount,
+              totalAmount: a.totalAmount,
               date: a.date,
               taxId: a.taxId,
+              invoiceNumber: a.invoiceNumber,
             })),
           }),
         }
@@ -954,6 +959,9 @@ export function ReconcileWorkspace({
           docsRead: data.docsRead,
           matchesFound: data.matchesFound,
         });
+        break;
+      case "debug":
+        console.log("[DocAI debug] raw AI response:", data.rawResponse);
         break;
       case "error":
         setDocAIPhase("error");
@@ -1498,6 +1506,7 @@ export function ReconcileWorkspace({
             onShowImport={() => setShowImport(true)}
             hasAccountingData={hasAccountingData}
             showCompanyBadge={hasSiblings}
+            companyCode={companyCode}
           />
         </>
       )}

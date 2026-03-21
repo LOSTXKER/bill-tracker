@@ -9,8 +9,11 @@ interface DocMatchRequest {
     vendorName: string;
     amount: number;
     vatAmount: number;
+    totalAmount?: number;
     date: string;
     taxId?: string;
+    invoiceNumber?: string;
+    description?: string;
     type: "expense" | "income";
   }>;
   accountingItems: Array<{
@@ -18,8 +21,10 @@ interface DocMatchRequest {
     vendorName: string;
     amount: number;
     vatAmount: number;
+    totalAmount?: number;
     date: string;
     taxId?: string;
+    invoiceNumber?: string;
   }>;
 }
 
@@ -31,6 +36,7 @@ type SSEEvent =
   | { event: "matching"; data: { message: string; itemsWithDocs: number } }
   | { event: "result"; data: { suggestions: Array<{ systemId: string; accountingIndex: number; confidence: number; reason: string }> } }
   | { event: "done"; data: { totalAnalyzed: number; docsRead: number; matchesFound: number } }
+  | { event: "debug"; data: { rawResponse: string } }
   | { event: "error"; data: { message: string } };
 
 function formatSSE(event: SSEEvent): string {
@@ -126,10 +132,26 @@ export async function POST(
           for (let d = 0; d < urlsToAnalyze.length; d++) {
             const url = urlsToAnalyze[d];
             try {
+              const visionPrompt = `อ่านเอกสารนี้อย่างละเอียด ดึงข้อมูลทั้งหมดต่อไปนี้:
+- ชื่อผู้ขาย/ผู้ให้บริการ (ทุกชื่อที่ปรากฏ ทั้งชื่อบริษัท ชื่อร้าน ชื่อบุคคล)
+- เลขประจำตัวผู้เสียภาษี (Tax ID)
+- เลขที่ใบกำกับภาษี / เลขที่เอกสาร
+- ยอดก่อน VAT, ยอด VAT, ยอดรวมทั้งสิ้น
+- วันที่ในเอกสาร
+- รายละเอียดสินค้า/บริการ
+
+ตอบเป็นรูปแบบนี้เท่านั้น:
+ชื่อ: ...
+taxId: ...
+เลขที่: ...
+ยอด: ... VAT: ... รวม: ...
+วันที่: ...
+รายละเอียด: ...`;
+
               const result = await analyzeImage(
                 url,
-                "อ่านข้อมูลจากเอกสารนี้ ระบุ: ยอดเงิน, ยอด VAT, ชื่อผู้ขาย/ลูกค้า, เลขที่ใบกำกับภาษี, เลขประจำตัวผู้เสียภาษี, วันที่ (ถ้ามี) ตอบเป็น text สั้นๆ",
-                { timeoutMs: 30_000, maxTokens: 500, retries: 1 }
+                visionPrompt,
+                { timeoutMs: 30_000, maxTokens: 800, retries: 1 }
               );
 
               if (result.data) {
@@ -159,40 +181,71 @@ export async function POST(
 
         const docContext = docResults
           .map((d) => {
-            const sysItem = systemItems.find((s) => s.id === d.systemId);
-            return `รายการ id="${d.systemId}" (${sysItem?.vendorName}, ยอด ${sysItem?.amount}):\n  เอกสารแนบระบุ: ${d.extractedInfo}`;
+            const s = systemItems.find((si) => si.id === d.systemId);
+            const parts = [`รายการ id="${d.systemId}"`];
+            if (s) {
+              parts.push(`ชื่อผู้ขาย="${s.vendorName}"`);
+              parts.push(`ยอดก่อนVAT=${s.amount} VAT=${s.vatAmount} รวม=${s.totalAmount ?? ""}`);
+              if (s.invoiceNumber) parts.push(`เลขที่เอกสาร="${s.invoiceNumber}"`);
+              if (s.description) parts.push(`รายละเอียด="${s.description}"`);
+              if (s.taxId) parts.push(`taxId="${s.taxId}"`);
+              parts.push(`วันที่=${s.date}`);
+            }
+            return parts.join(" | ") + `\n  ข้อมูลจากเอกสารแนบ:\n  ${d.extractedInfo}`;
           })
           .join("\n\n");
 
         const acctList = accountingItems
-          .map(
-            (a) =>
-              `[${a.index}] ชื่อ="${a.vendorName}" ยอด=${a.amount} VAT=${a.vatAmount} วันที่=${a.date} taxId="${a.taxId ?? ""}"`
-          )
+          .map((a) => {
+            const parts = [`[${a.index}]`];
+            parts.push(`ชื่อ="${a.vendorName}"`);
+            parts.push(`ยอด=${a.amount} VAT=${a.vatAmount} รวม=${a.totalAmount ?? ""}`);
+            if (a.invoiceNumber) parts.push(`เลขที่="${a.invoiceNumber}"`);
+            parts.push(`วันที่=${a.date}`);
+            if (a.taxId) parts.push(`taxId="${a.taxId}"`);
+            return parts.join(" | ");
+          })
           .join("\n");
 
-        const prompt = `คุณเป็นผู้เชี่ยวชาญด้านบัญชีไทย ช่วยจับคู่รายการโดยใช้ข้อมูลจากเอกสารแนบ (ใบกำกับภาษี, สลิป, หนังสือรับรอง ฯลฯ)
+        const prompt = `คุณเป็นผู้เชี่ยวชาญด้านบัญชีภาษีไทย ช่วยจับคู่รายการระบบกับรายงานบัญชี โดยใช้ข้อมูลจากเอกสารแนบ (ใบกำกับภาษี, สลิป, หนังสือรับรอง ฯลฯ)
 
-**ข้อมูลจากเอกสารแนบของรายการในระบบ:**
+## กฎการจับคู่ (สำคัญมาก)
+
+**สัญญาณหลัก (Primary) — ตรงอันใดอันหนึ่ง = confidence สูง:**
+1. เลขประจำตัวผู้เสียภาษี (Tax ID) ตรงกัน
+2. เลขที่ใบกำกับภาษี / เลขที่เอกสาร ตรงกัน
+
+**สัญญาณรอง (Secondary) — ใช้ประกอบ:**
+3. ยอดเงินใกล้เคียง (ต่างได้ไม่เกิน 5% — อาจต่างเพราะหัก ณ ที่จ่าย 1-3%, ปัดเศษ, หรือคนบันทึกใส่ยอดรวมแทนยอดก่อน VAT)
+4. ชื่อผู้ขาย/ผู้ติดต่อคล้ายกัน (อาจย่อ อาจสะกดต่าง อาจเป็นชื่อบริษัทกับชื่อบุคคล)
+5. วันที่ใกล้เคียง (ต่างได้ไม่เกิน 30 วัน)
+6. รายละเอียดสินค้า/บริการที่เกี่ยวข้องกัน
+
+**หลักการ:**
+- ผู้ขายเดียวกันอาจมีหลายรายการ → ต้องดูเลขที่เอกสารหรือยอดเงินประกอบ
+- ถ้ามีความเป็นไปได้แม้ต่ำ ให้ส่งมา พร้อมระบุ confidence ต่ำ (ดีกว่าไม่ส่งเลย)
+- confidence: 0.9+ = tax ID + เลขที่ตรง, 0.7-0.9 = ยอดใกล้เคียง + ชื่อคล้าย, 0.4-0.7 = มีสัญญาณบางอย่างตรง, <0.4 = เดาจากข้อมูลน้อย
+
+## ข้อมูลรายการระบบ (พร้อมเอกสารแนบที่ AI อ่านแล้ว):
 ${docContext}
 
-**รายการจากรายงานบัญชี (ที่ยังไม่จับคู่):**
+## รายการจากรายงานบัญชี (ที่ยังไม่จับคู่):
 ${acctList}
 
-จับคู่โดยใช้ข้อมูลจากเอกสาร — ยอดเงิน ชื่อผู้ขาย เลขที่ใบกำกับ เลข tax ID
-ส่งคืน JSON array:
+## คำตอบ
+ส่งคืน JSON array เท่านั้น (ไม่ต้องมี markdown code block):
 [
   {
     "systemId": "id ของรายการระบบ",
-    "accountingIndex": index ของรายการบัญชี,
-    "confidence": 0-1,
-    "reason": "เหตุผลสั้นๆ ภาษาไทย อ้างอิงข้อมูลจากเอกสาร"
+    "accountingIndex": index ของรายการบัญชี (ตัวเลข),
+    "confidence": 0.0-1.0,
+    "reason": "เหตุผลสั้นๆ ภาษาไทย ระบุว่าตรงจากอะไร เช่น tax ID ตรง / เลขที่ใบกำกับตรง / ยอดใกล้เคียง"
   }
-]
+]`;
 
-ตอบด้วย JSON เท่านั้น`;
+        const response = await generateText(prompt, { maxTokens: 4096 });
 
-        const response = await generateText(prompt, { maxTokens: 2048 });
+        send({ event: "debug", data: { rawResponse: response.data?.slice(0, 2000) ?? "(empty)" } });
 
         let suggestions: Array<{
           systemId: string;
@@ -202,7 +255,9 @@ ${acctList}
         }> = [];
 
         try {
-          const jsonMatch = response.data.match(/\[[\s\S]*\]/);
+          const raw = response.data ?? "";
+          const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+          const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
             suggestions = JSON.parse(jsonMatch[0]);
           }

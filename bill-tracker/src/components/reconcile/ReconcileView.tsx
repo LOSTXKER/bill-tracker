@@ -1198,6 +1198,7 @@ export function ReconcileView({
         onShowImport={() => setShowImport(true)}
         hasAccountingData={accountingItems.length > 0}
         showCompanyBadge={hasSiblings}
+        companyCode={companyCode}
       />
 
       {/* Import dialog */}
