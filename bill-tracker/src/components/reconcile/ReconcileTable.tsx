@@ -11,6 +11,7 @@ import {
   X,
   AlertTriangle,
   Upload,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AccountingRow } from "./ImportPanel";
@@ -27,6 +28,9 @@ export interface SystemItem {
   description: string;
   status: string;
   companyCode?: string;
+  isPayOnBehalf?: boolean;
+  payOnBehalfFrom?: string;
+  paidByUser?: boolean;
 }
 
 export type MatchStatus =
@@ -187,6 +191,14 @@ function SystemCell({
           </span>
         )}
       </div>
+      {item.isPayOnBehalf && (
+        <div className="mt-0.5">
+          <Badge variant="outline" className="text-[10px] px-1 h-4 text-purple-600 border-purple-300 dark:text-purple-400 dark:border-purple-700">
+            <Building2 className="h-2.5 w-2.5 mr-0.5" />
+            จ่ายแทน{item.payOnBehalfFrom ? ` (${item.payOnBehalfFrom})` : ""}
+          </Badge>
+        </div>
+      )}
     </div>
   );
 }

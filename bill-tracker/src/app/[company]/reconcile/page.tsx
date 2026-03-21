@@ -102,14 +102,26 @@ async function ReconcileDataLoader({
 
   const companyIdToCode = new Map(siblingCompanies.map((c) => [c.id, c.code]));
 
-  const [expenses, incomes] = await Promise.all([
+  // Load expenses from selected companies + cross-company "จ่ายแทน"
+  const [expenses, payOnBehalfExpenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
         ...companyIdFilter,
         billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },
-      include: { Contact: true },
+      include: { Contact: true, ExpensePayments: true },
+      orderBy: { billDate: "asc" },
+    }),
+    // Cross-company: expenses from OTHER companies where internalCompanyId = current company
+    prisma.expense.findMany({
+      where: {
+        internalCompanyId: { in: selectedCompanyIds },
+        companyId: { notIn: selectedCompanyIds },
+        billDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
+      },
+      include: { Contact: true, Company: { select: { code: true } } },
       orderBy: { billDate: "asc" },
     }),
     prisma.income.findMany({
@@ -123,19 +135,45 @@ async function ReconcileDataLoader({
     }),
   ]);
 
-  const systemExpenses = expenses.map((e) => ({
-    id: e.id,
-    date: e.billDate.toISOString(),
-    invoiceNumber: e.invoiceNumber ?? "",
-    vendorName: e.Contact?.name ?? e.description ?? "",
-    taxId: e.Contact?.taxId ?? "",
-    baseAmount: Number(e.amount),
-    vatAmount: Number(e.vatAmount ?? 0),
-    totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
-    description: e.description ?? "",
-    status: e.workflowStatus,
-    companyCode: companyIdToCode.get(e.companyId) ?? "",
-  }));
+  const systemExpenses = [
+    ...expenses.map((e) => {
+      const paidByUser = e.ExpensePayments?.some((p: any) => p.paidByType === "USER");
+      return {
+        id: e.id,
+        date: e.billDate.toISOString(),
+        invoiceNumber: e.invoiceNumber ?? "",
+        vendorName: e.Contact?.name ?? e.description ?? "",
+        taxId: e.Contact?.taxId ?? "",
+        baseAmount: Number(e.amount),
+        vatAmount: Number(e.vatAmount ?? 0),
+        totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
+        description: e.description ?? "",
+        status: e.workflowStatus,
+        companyCode: companyIdToCode.get(e.companyId) ?? "",
+        isPayOnBehalf: !!e.internalCompanyId && e.internalCompanyId !== e.companyId,
+        payOnBehalfFrom: e.internalCompanyId && e.internalCompanyId !== e.companyId
+          ? companyIdToCode.get(e.companyId) ?? undefined
+          : undefined,
+        paidByUser,
+      };
+    }),
+    ...payOnBehalfExpenses.map((e) => ({
+      id: e.id,
+      date: e.billDate.toISOString(),
+      invoiceNumber: e.invoiceNumber ?? "",
+      vendorName: e.Contact?.name ?? e.description ?? "",
+      taxId: e.Contact?.taxId ?? "",
+      baseAmount: Number(e.amount),
+      vatAmount: Number(e.vatAmount ?? 0),
+      totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
+      description: e.description ?? "",
+      status: e.workflowStatus,
+      companyCode: (e as any).Company?.code ?? "",
+      isPayOnBehalf: true,
+      payOnBehalfFrom: (e as any).Company?.code ?? undefined,
+      paidByUser: false,
+    })),
+  ];
 
   const systemIncomes = incomes.map((i) => ({
     id: i.id,

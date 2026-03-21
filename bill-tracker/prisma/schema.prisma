@@ -123,6 +123,7 @@ model Company {
   ReimbursementRequest       ReimbursementRequest[]
   VendorMapping              VendorMapping[]
   PettyCashFund              PettyCashFund[]
+  ReconcileSessions          ReconcileSession[]
 
   @@index([code])
 }
@@ -332,6 +333,7 @@ model Expense {
   ReimbursementRequest                       ReimbursementRequest?
   ExpensePayments                            ExpensePayment[]
   PettyCashTransactions                      PettyCashTransaction[]
+  ReconcileMatches                           ReconcileMatch[]
 
   @@index([accountId])
   @@index([companyId, billDate])
@@ -408,6 +410,7 @@ model Income {
   User                          User                 @relation("Income_createdByToUser", fields: [createdBy], references: [id])
   User_Income_submittedByToUser User?                @relation("Income_submittedByToUser", fields: [submittedBy], references: [id])
   User_Income_approvedByToUser  User?                @relation("Income_approvedByToUser", fields: [approvedBy], references: [id])
+  ReconcileMatches              ReconcileMatch[]
 
   @@index([accountId])
   @@index([companyId, receiveDate])
@@ -874,4 +877,90 @@ enum PettyCashTransactionType {
   EXPENSE // จ่ายออก (ตัดจากรายจ่าย)
   REPLENISH // เติมเงิน
   ADJUSTMENT // ปรับยอด (เช่น นับเงินสดได้ไม่ตรง)
+}
+
+// =============================================================================
+// Reconciliation (เทียบรายงานบัญชี)
+// =============================================================================
+
+model ReconcileSession {
+  id                    String                 @id @default(cuid())
+  companyId             String
+  month                 Int
+  year                  Int
+  type                  String // "expense" | "income"
+  status                ReconcileSessionStatus @default(IN_PROGRESS)
+  matchedCount          Int                    @default(0)
+  unmatchedSystemCount  Int                    @default(0)
+  unmatchedAccountCount Int                    @default(0)
+  totalSystemAmount     Decimal                @db.Decimal(14, 2)
+  totalAccountAmount    Decimal                @db.Decimal(14, 2)
+  sourceFileName        String?
+  notes                 String?
+  createdBy             String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  completedAt           DateTime?
+  completedBy           String?
+
+  Company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Matches ReconcileMatch[]
+
+  @@unique([companyId, month, year, type])
+  @@index([companyId, year, month])
+}
+
+enum ReconcileSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+model ReconcileMatch {
+  id        String @id @default(cuid())
+  sessionId String
+
+  // ฝั่งระบบ (อ้างอิง Expense/Income)
+  expenseId    String?
+  incomeId     String?
+  systemAmount Decimal @db.Decimal(12, 2)
+  systemVat    Decimal @db.Decimal(12, 2)
+  systemVendor String
+
+  // ฝั่งรายงานบัญชี (จาก PDF/Excel)
+  acctDate    String
+  acctInvoice String?
+  acctVendor  String
+  acctTaxId   String?
+  acctBase    Decimal @db.Decimal(12, 2)
+  acctVat     Decimal @db.Decimal(12, 2)
+  acctTotal   Decimal @db.Decimal(12, 2)
+
+  // ข้อมูลการจับคู่
+  matchType  String // "exact" | "strong" | "fuzzy" | "ai" | "manual"
+  confidence Decimal? @db.Decimal(3, 2)
+  aiReason   String?
+  amountDiff Decimal? @db.Decimal(12, 2)
+  notes      String?
+
+  // จ่ายแทน
+  isPayOnBehalf   Boolean @default(false)
+  payOnBehalfFrom String?
+
+  // สถานะ
+  status         String    @default("pending") // "pending" | "confirmed" | "rejected"
+  confirmedBy    String?
+  confirmedAt    DateTime?
+  rejectedReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Session ReconcileSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Expense Expense?         @relation(fields: [expenseId], references: [id])
+  Income  Income?          @relation(fields: [incomeId], references: [id])
+
+  @@index([sessionId])
+  @@index([expenseId])
+  @@index([incomeId])
 }

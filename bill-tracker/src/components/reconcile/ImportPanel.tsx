@@ -87,7 +87,7 @@ const MONTHS_TH = [
 interface ImportPanelProps {
   open: boolean;
   onClose: () => void;
-  onImport: (rows: AccountingRow[]) => void;
+  onImport: (rows: AccountingRow[], fileName?: string) => void;
   companyCode?: string;
   month?: number;
   year?: number;
@@ -320,12 +320,12 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
 
   const handleImportManual = () => {
     const valid = manualRows.filter((r) => r.vendorName || r.baseAmount > 0);
-    onImport(valid);
+    onImport(valid, "manual");
     handleClose();
   };
 
   const handleImportPreview = () => {
-    onImport(preview);
+    onImport(preview, pdfFileName || undefined);
     handleClose();
   };
 

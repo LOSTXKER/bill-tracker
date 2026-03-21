@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useTransition } from "react";
+import { useState, useCallback, useMemo, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,10 @@ import {
   Receipt,
   Building2,
   ChevronsUpDown,
+  Save,
+  History,
+  Clock,
+  FileText,
 } from "lucide-react";
 import {
   Popover,
@@ -298,6 +302,24 @@ function SummaryBar({ pairs, systemItems, accountingItems }: SummaryBarProps) {
 // Main ReconcileView
 // ---------------------------------------------------------------------------
 
+interface ReconcileSessionSummary {
+  id: string;
+  month: number;
+  year: number;
+  type: string;
+  status: string;
+  matchedCount: number;
+  unmatchedSystemCount: number;
+  unmatchedAccountCount: number;
+  totalSystemAmount: string;
+  totalAccountAmount: string;
+  sourceFileName: string | null;
+  createdBy: string;
+  createdAt: string;
+  completedAt: string | null;
+  _count?: { Matches: number };
+}
+
 export function ReconcileView({
   companyCode,
   year,
@@ -319,6 +341,12 @@ export function ReconcileView({
   const [selectedAccountingIndex, setSelectedAccountingIndex] = useState<number | null>(null);
   const [vatOnly, setVatOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [activeTab, setActiveTab] = useState<"match" | "history">("match");
+  const [isSaving, setIsSaving] = useState(false);
+  const [sessions, setSessions] = useState<ReconcileSessionSummary[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sourceFileName, setSourceFileName] = useState<string | null>(null);
 
   const hasSiblings = !!siblingCompanies && siblingCompanies.length > 1;
 
@@ -377,8 +405,9 @@ export function ReconcileView({
   };
 
   const handleImport = useCallback(
-    (rows: AccountingRow[]) => {
+    (rows: AccountingRow[], fileName?: string) => {
       setAccountingItems(rows);
+      setSourceFileName(fileName ?? null);
       const matched = runAutoMatch(systemItems, rows);
       setPairs(matched);
       setSelectedSystemId(null);
@@ -411,6 +440,9 @@ export function ReconcileView({
             vatAmount: s.vatAmount,
             date: s.date,
             taxId: s.taxId,
+            description: s.description,
+            isPayOnBehalf: s.isPayOnBehalf,
+            paidByCompany: s.payOnBehalfFrom,
           })),
           accountingItems: unmatchedAccounting.map((a) => ({
             vendorName: a.vendorName,
@@ -566,8 +598,136 @@ export function ReconcileView({
   const unmatchedAccountingCount = pairs.filter((p) => p.status === "accounting-only").length;
   const canAIMatch = unmatchedSystemCount > 0 && unmatchedAccountingCount > 0;
 
+  const matchedPairsForSave = useMemo(
+    () =>
+      pairs.filter(
+        (p) =>
+          (p.status === "exact" ||
+            p.status === "strong" ||
+            p.status === "fuzzy" ||
+            (p.status === "ai" && p.userConfirmed)) &&
+          p.systemItem &&
+          p.accountingItem
+      ),
+    [pairs]
+  );
+  const canSave = matchedPairsForSave.length > 0;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setIsSaving(true);
+    try {
+      const systemTotal = systemItems.reduce((s, i) => s + i.baseAmount, 0);
+      const accountingTotal = accountingItems.reduce((s, i) => s + i.baseAmount, 0);
+
+      const matches = matchedPairsForSave.map((p) => ({
+        expenseId: type === "expense" ? p.systemItem!.id : undefined,
+        incomeId: type === "income" ? p.systemItem!.id : undefined,
+        systemAmount: p.systemItem!.baseAmount,
+        systemVat: p.systemItem!.vatAmount,
+        systemVendor: p.systemItem!.vendorName || p.systemItem!.description || "",
+        acctDate: p.accountingItem!.date,
+        acctInvoice: p.accountingItem!.invoiceNumber || undefined,
+        acctVendor: p.accountingItem!.vendorName,
+        acctTaxId: p.accountingItem!.taxId || undefined,
+        acctBase: p.accountingItem!.baseAmount,
+        acctVat: p.accountingItem!.vatAmount,
+        acctTotal: p.accountingItem!.totalAmount,
+        matchType: p.status === "ai" ? "ai" : p.status,
+        confidence: p.confidence,
+        aiReason: p.aiReason,
+        amountDiff:
+          p.systemItem && p.accountingItem
+            ? Math.abs(p.systemItem.baseAmount - p.accountingItem.baseAmount)
+            : undefined,
+        status: "confirmed",
+      }));
+
+      const res = await fetch(`/api/${companyCode}/reconcile/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          month,
+          year,
+          type,
+          sourceFileName,
+          matches,
+          totalSystemAmount: systemTotal,
+          totalAccountAmount: accountingTotal,
+          unmatchedSystemCount,
+          unmatchedAccountCount: unmatchedAccountingCount,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+      loadSessions();
+    } catch (err) {
+      console.error("Save error:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/${companyCode}/reconcile/sessions?year=${year}&type=${type}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        setSessions(json.data ?? []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [companyCode, year, type]);
+
+  useEffect(() => {
+    if (activeTab === "history") {
+      loadSessions();
+    }
+  }, [activeTab, loadSessions]);
+
   return (
     <div className="space-y-4">
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 border-b">
+        <button
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+            activeTab === "match"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+          onClick={() => setActiveTab("match")}
+        >
+          จับคู่รายการ
+        </button>
+        <button
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5",
+            activeTab === "history"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+          onClick={() => setActiveTab("history")}
+        >
+          <History className="h-3.5 w-3.5" />
+          ประวัติการจับคู่
+        </button>
+      </div>
+
+      {activeTab === "history" ? (
+        <HistoryTab
+          sessions={sessions}
+          loading={sessionsLoading}
+          companyCode={companyCode}
+        />
+      ) : (
+      <>
       {/* Controls bar */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Month/Year selectors */}
@@ -729,6 +889,27 @@ export function ReconcileView({
               )}
             </Button>
 
+            {/* Save button */}
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-2 h-9"
+              onClick={handleSave}
+              disabled={!canSave || isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              บันทึกผลจับคู่
+              {canSave && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
+                  {matchedPairsForSave.length}
+                </Badge>
+              )}
+            </Button>
+
             {/* Reset */}
             <Button
               variant="ghost"
@@ -789,6 +970,123 @@ export function ReconcileView({
         year={year}
         type={type}
       />
+      </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// History Tab Component
+// ---------------------------------------------------------------------------
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  IN_PROGRESS: { label: "กำลังดำเนินการ", color: "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800" },
+  COMPLETED: { label: "เสร็จสิ้น", color: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" },
+  ARCHIVED: { label: "เก็บถาวร", color: "text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-950/20 dark:border-slate-700" },
+};
+
+const MONTH_NAMES_SHORT = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+];
+
+function HistoryTab({
+  sessions,
+  loading,
+  companyCode,
+}: {
+  sessions: ReconcileSessionSummary[];
+  loading: boolean;
+  companyCode: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <div className="h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center mx-auto mb-4">
+          <History className="h-6 w-6 text-muted-foreground/60" />
+        </div>
+        <p className="text-sm font-semibold text-foreground">ยังไม่มีประวัติ</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          บันทึกผลการจับคู่เพื่อดูประวัติที่นี่
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="divide-y">
+        {sessions.map((s) => {
+          const statusInfo = STATUS_LABELS[s.status] ?? STATUS_LABELS.IN_PROGRESS;
+          const totalMatches = s._count?.Matches ?? s.matchedCount;
+          return (
+            <a
+              key={s.id}
+              href={`/${companyCode}/reconcile/history/${s.id}`}
+              className="flex items-center gap-4 px-4 py-3 hover:bg-muted/40 transition-colors"
+            >
+              <div className="flex-shrink-0">
+                <div className="h-10 w-10 rounded-lg bg-muted/60 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">
+                    {s.type === "expense" ? "ภาษีซื้อ" : "ภาษีขาย"}{" "}
+                    {MONTH_NAMES_SHORT[s.month - 1]} {s.year + 543}
+                  </span>
+                  <Badge variant="outline" className={cn("text-[10px]", statusInfo.color)}>
+                    {statusInfo.label}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                    {s.matchedCount} จับคู่
+                  </span>
+                  {s.unmatchedSystemCount > 0 && (
+                    <span>{s.unmatchedSystemCount} ยังไม่จับคู่(ระบบ)</span>
+                  )}
+                  {s.unmatchedAccountCount > 0 && (
+                    <span>{s.unmatchedAccountCount} ยังไม่จับคู่(รายงาน)</span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {new Date(s.createdAt).toLocaleDateString("th-TH", {
+                      day: "numeric",
+                      month: "short",
+                      year: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {s.sourceFileName && (
+                    <span className="truncate max-w-[150px]" title={s.sourceFileName}>
+                      {s.sourceFileName}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <p className="text-sm font-mono font-semibold">
+                  {formatAmt(Number(s.totalSystemAmount))}
+                </p>
+                <p className="text-xs text-muted-foreground">ระบบ</p>
+              </div>
+            </a>
+          );
+        })}
+      </div>
     </div>
   );
 }
