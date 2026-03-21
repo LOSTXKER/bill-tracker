@@ -36,7 +36,7 @@ export const POST = withCompanyAccessFromParams(
     const response = await analyzeImage(base64, prompt, {
       mimeType: "application/pdf",
       temperature: 0.1,
-      maxTokens: 4096,
+      maxTokens: 8192,
     });
 
     if (response.error || !response.data) {
@@ -47,12 +47,18 @@ export const POST = withCompanyAccessFromParams(
       );
     }
 
+    console.log("[extract-pdf] AI raw response length:", response.data.length);
+    console.log("[extract-pdf] AI raw response (first 500 chars):", response.data.substring(0, 500));
+
     const rows = parseAIResponse(response.data);
 
     if (rows.length === 0) {
+      const hint = extractAIExplanation(response.data);
       throw new ApiError(
         422,
-        "ไม่พบตารางข้อมูลภาษีใน PDF นี้ กรุณาตรวจสอบไฟล์",
+        hint
+          ? `AI ไม่พบตารางภาษีใน PDF: ${hint}`
+          : "ไม่พบตารางข้อมูลภาษีใน PDF นี้ กรุณาตรวจสอบว่าไฟล์มีตาราง (ไม่ใช่ scan/รูปภาพ) แล้วลองอีกครั้ง",
         "NO_DATA_FOUND"
       );
     }
@@ -66,57 +72,103 @@ export const POST = withCompanyAccessFromParams(
 );
 
 function buildExtractionPrompt(): string {
-  return `คุณเป็นผู้เชี่ยวชาญอ่านรายงานภาษีไทย กรุณาอ่านตารางใน PDF นี้และ extract ข้อมูลทุกแถว
+  return `You are an expert at reading Thai tax reports (รายงานภาษีซื้อ/ภาษีขาย). Extract ALL data rows from every table in this PDF.
 
-รายงานนี้คือรายงานภาษีซื้อหรือภาษีขาย (VAT report) มีคอลัมน์เช่น:
-- วัน/เดือน/ปี (วันที่)
-- เลขที่ใบกำกับภาษี
-- ชื่อผู้ขาย / ชื่อผู้ให้บริการ / ชื่อลูกค้า / ที่
-- เลขประจำตัวผู้เสียภาษีอากร
-- มูลค่าสินค้าหรือบริการ (ยอดก่อน VAT)
-- จำนวนเงินภาษีมูลค่าเพิ่ม (VAT)
-- รวมเงิน / รวมราย
+This PDF may contain a Thai VAT input/output tax report (ภ.พ.30, รายงานภาษีซื้อ, รายงานภาษีขาย) or a purchase/sales report from accounting software. The table columns may be labeled differently depending on the software, but typically include:
 
-กฎสำคัญ:
-- วันที่: แปลงเป็น YYYY-MM-DD เสมอ, ถ้าปีเป็นพุทธศักราช (เช่น 2569) ให้ลบ 543 ก่อน
-- ยอดเงิน: เอาเฉพาะตัวเลข ไม่ต้องมีจุลภาค
-- ถ้าไม่มีคอลัมน์ใด ให้ใส่ค่าว่างหรือ 0
-- ไม่ต้องใส่แถวหัวตาราง แถวรวม (รวม/Total) หรือแถวว่าง
+- ลำดับที่ / No. (row number — skip this)
+- วัน เดือน ปี / วันที่ (date)
+- เลขที่ใบกำกับภาษี / Invoice No.
+- ชื่อผู้ขายสินค้า/ผู้ให้บริการ / ชื่อลูกค้า / รายการ / ที่
+- เลขประจำตัวผู้เสียภาษีอากร / Tax ID
+- สถานประกอบการ (branch — skip)
+- มูลค่าสินค้าหรือบริการ / ยอดก่อน VAT / Amount
+- จำนวนเงินภาษี / VAT
+- รวม / Total / หมายเหตุ
 
-ส่งคืนเฉพาะ JSON array ดังนี้ ไม่ต้องอธิบาย:
+IMPORTANT RULES:
+1. Date format: Convert to YYYY-MM-DD. If the year is Buddhist Era (> 2500, e.g., 2569), subtract 543.
+2. Amounts: Numbers only, no commas. Use 0 if not available.
+3. SKIP header rows, subtotal rows, total rows (รวม, Total, ยกมา, ยกไป), and empty rows.
+4. If the same vendor appears on multiple lines (wrapped text), merge them into one row.
+5. If the PDF has multiple pages, extract from ALL pages.
+6. If a column is missing entirely, use empty string or 0.
+7. Even if the table layout is unusual, do your best to extract the data.
+
+Return ONLY a JSON array (no explanation, no markdown):
 [
   {
     "date": "YYYY-MM-DD",
-    "invoiceNumber": "เลขที่ใบกำกับ",
-    "vendorName": "ชื่อบริษัทหรือบุคคล",
-    "taxId": "เลขประจำตัวผู้เสียภาษี 13 หลัก หรือว่าง",
+    "invoiceNumber": "invoice number or empty string",
+    "vendorName": "company or person name",
+    "taxId": "13-digit tax ID or empty string",
     "baseAmount": 0.00,
     "vatAmount": 0.00,
     "totalAmount": 0.00
   }
-]`;
+]
+
+If you truly cannot find ANY table data in this PDF, respond with exactly: []`;
+}
+
+function cleanJsonText(text: string): string {
+  let cleaned = text.trim();
+
+  // Strip markdown code fences: ```json ... ``` or ``` ... ```
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
+
+  return cleaned.trim();
 }
 
 function parseAIResponse(text: string): ExtractedRow[] {
   try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+    const cleaned = cleanJsonText(text);
 
-    const raw = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(raw)) return [];
+    // Try parsing the cleaned text directly first (handles both [...] and {...} wrapped)
+    let raw: unknown;
+    try {
+      raw = JSON.parse(cleaned);
+    } catch {
+      // Fallback: extract the first JSON array from the text
+      const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        raw = JSON.parse(arrayMatch[0]);
+      } else {
+        // Last resort: try to find a single JSON object
+        const objMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          raw = [JSON.parse(objMatch[0])];
+        } else {
+          return [];
+        }
+      }
+    }
 
-    return raw
+    const items = Array.isArray(raw) ? raw : [raw];
+    if (items.length === 0) return [];
+
+    return items
       .map((item: Record<string, unknown>) => ({
         date: String(item.date ?? "").trim(),
-        invoiceNumber: String(item.invoiceNumber ?? "").trim(),
-        vendorName: String(item.vendorName ?? "").trim(),
-        taxId: String(item.taxId ?? "").replace(/\D/g, ""),
-        baseAmount: parseFloat(String(item.baseAmount ?? "0")) || 0,
-        vatAmount: parseFloat(String(item.vatAmount ?? "0")) || 0,
-        totalAmount: parseFloat(String(item.totalAmount ?? "0")) || 0,
+        invoiceNumber: String(item.invoiceNumber ?? item.invoice_number ?? "").trim(),
+        vendorName: String(item.vendorName ?? item.vendor_name ?? item.name ?? "").trim(),
+        taxId: String(item.taxId ?? item.tax_id ?? "").replace(/\D/g, ""),
+        baseAmount: parseFloat(String(item.baseAmount ?? item.base_amount ?? item.amount ?? "0")) || 0,
+        vatAmount: parseFloat(String(item.vatAmount ?? item.vat_amount ?? item.vat ?? "0")) || 0,
+        totalAmount: parseFloat(String(item.totalAmount ?? item.total_amount ?? item.total ?? "0")) || 0,
       }))
-      .filter((r) => r.vendorName || r.baseAmount > 0);
-  } catch {
+      .filter((r: ExtractedRow) => r.vendorName || r.baseAmount > 0);
+  } catch (e) {
+    console.error("[extract-pdf] Failed to parse AI response:", e);
     return [];
   }
+}
+
+function extractAIExplanation(text: string): string | null {
+  const cleaned = text.trim();
+  // If the response is short text without JSON, it's likely an explanation
+  if (cleaned.length < 500 && !cleaned.includes("[") && !cleaned.includes("{")) {
+    return cleaned.substring(0, 200);
+  }
+  return null;
 }
