@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Upload,
@@ -39,6 +38,8 @@ import {
   ReconcileTable,
   type MatchedPair,
   type SystemItem,
+  type MonthRange,
+  RANGE_PRESETS,
 } from "./ReconcileTable";
 import { cn } from "@/lib/utils";
 
@@ -319,18 +320,19 @@ function SummaryBar({
   pairs,
   systemItems,
   accountingItems,
+  spilloverInfo,
+  monthRange,
+  onMonthRangeChange,
 }: {
   pairs: MatchedPair[];
   systemItems: SystemItem[];
   accountingItems: AccountingRow[];
+  spilloverInfo: { hasSpillover: boolean; presetCounts: Map<MonthRange, number> };
+  monthRange: MonthRange;
+  onMonthRangeChange: (range: MonthRange) => void;
 }) {
   const systemTotal = systemItems.reduce((s, i) => s + i.baseAmount, 0);
-  const systemVat = systemItems.reduce((s, i) => s + i.vatAmount, 0);
-  const accountingTotal = accountingItems.reduce(
-    (s, i) => s + i.baseAmount,
-    0
-  );
-  const accountingVat = accountingItems.reduce((s, i) => s + i.vatAmount, 0);
+  const accountingTotal = accountingItems.reduce((s, i) => s + i.baseAmount, 0);
 
   const matched = pairs.filter(
     (p) =>
@@ -339,24 +341,19 @@ function SummaryBar({
       p.status === "fuzzy" ||
       (p.status === "ai" && p.userConfirmed)
   ).length;
-  const systemOnly = pairs.filter((p) => p.status === "system-only").length;
-  const accountingOnly = pairs.filter(
-    (p) => p.status === "accounting-only"
-  ).length;
   const aiPending = pairs.filter(
     (p) => p.status === "ai" && p.userConfirmed === undefined
   ).length;
 
   const totalDiff = Math.abs(systemTotal - accountingTotal);
-  const vatDiff = Math.abs(systemVat - accountingVat);
-  const isBalanced = totalDiff < 0.01 && vatDiff < 0.01;
+  const isBalanced = totalDiff < 0.01;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-2.5 text-sm">
+    <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground">ระบบ:</span>
-        <span className="font-semibold">{formatAmt(systemTotal)}</span>
-        <span className="text-xs text-muted-foreground">({systemItems.length})</span>
+        <span className="font-semibold text-sm">{formatAmt(systemTotal)}</span>
+        <span className="text-muted-foreground">({systemItems.length})</span>
       </div>
 
       <div className="h-4 w-px bg-border" />
@@ -378,23 +375,50 @@ function SummaryBar({
 
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">รายงาน:</span>
-            <span className="font-semibold">{formatAmt(accountingTotal)}</span>
-            <span className="text-xs text-muted-foreground">({accountingItems.length})</span>
+            <span className="font-semibold text-sm">{formatAmt(accountingTotal)}</span>
+            <span className="text-muted-foreground">({accountingItems.length})</span>
           </div>
 
           <div className="h-4 w-px bg-border" />
 
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {matched}
             {aiPending > 0 && (
-              <>
-                <Zap className="h-3 w-3 text-amber-500 ml-1" /> {aiPending}
-              </>
+              <><Zap className="h-3 w-3 text-amber-500 ml-1" /> {aiPending}</>
             )}
           </div>
         </>
       ) : (
-        <span className="text-xs text-muted-foreground">ยังไม่มีข้อมูลรายงาน</span>
+        <span className="text-muted-foreground">ยังไม่มีข้อมูลรายงาน</span>
+      )}
+
+      {spilloverInfo.hasSpillover && (
+        <>
+          <div className="flex-1" />
+          <div className="flex items-center gap-1">
+            {RANGE_PRESETS.map((preset) => {
+              const count = spilloverInfo.presetCounts.get(preset.value) ?? 0;
+              if (preset.value > 0 && count === 0) return null;
+              const isActive = monthRange === preset.value;
+              return (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => onMonthRangeChange(preset.value)}
+                  className={cn(
+                    "text-[11px] px-2 py-0.5 rounded-full border transition-colors",
+                    isActive
+                      ? "bg-sky-100 dark:bg-sky-900/40 border-sky-400 dark:border-sky-600 text-sky-700 dark:text-sky-300 font-medium"
+                      : "border-transparent text-muted-foreground hover:border-sky-300 hover:text-sky-600 dark:hover:text-sky-400"
+                  )}
+                >
+                  {preset.label}
+                  {preset.value > 0 && <span className="ml-0.5 opacity-60">({count})</span>}
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -435,6 +459,8 @@ export function ReconcileWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [monthRange, setMonthRange] = useState<MonthRange>(0);
+  const [spilloverInfo, setSpilloverInfo] = useState<{ hasSpillover: boolean; presetCounts: Map<MonthRange, number> }>({ hasSpillover: false, presetCounts: new Map() });
   const [sourceFileName, setSourceFileName] = useState<string | null>(
     savedSession?.sourceFileName ?? null
   );
@@ -608,6 +634,10 @@ export function ReconcileWorkspace({
       setIsAILoading(false);
     }
   };
+
+  const handleSpilloverInfo = useCallback((info: { hasSpillover: boolean; presetCounts: Map<MonthRange, number> }) => {
+    setSpilloverInfo(info);
+  }, []);
 
   const handleConfirmAI = useCallback((id: string) => {
     setPairs((prev) =>
@@ -812,125 +842,73 @@ export function ReconcileWorkspace({
   const monthName = MONTHS[month - 1];
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+    <div className="space-y-3">
+      {/* Toolbar: back + title + file + filters + actions — all one row */}
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           variant="ghost"
-          size="sm"
-          className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
           onClick={handleBack}
         >
           <ArrowLeft className="h-4 w-4" />
-          กลับ
         </Button>
 
-        <div className="h-5 w-px bg-border" />
-
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">
-            {type === "expense" ? "ภาษีซื้อ" : type === "income" ? "ภาษีขาย" : "ภพ.36"} {monthName}{" "}
-            {year + 543}
-          </h2>
-          {savedSession && (
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-[10px]",
-                savedSession.status === "COMPLETED"
-                  ? "text-emerald-600 border-emerald-200"
-                  : "text-amber-600 border-amber-200"
-              )}
-            >
-              {savedSession.status === "COMPLETED"
-                ? "เสร็จสิ้น"
-                : "กำลังทำ"}
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        {lastSaved && (
-          <span className="text-xs text-muted-foreground">
-            บันทึกล่าสุด{" "}
-            {lastSaved.toLocaleTimeString("th-TH", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-        )}
-      </div>
-
-      {/* Compact import bar */}
-      {hasAccountingData ? (
-        <div className="flex items-center gap-2 text-sm">
-          <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-          <span className="text-muted-foreground">
-            ไฟล์: <span className="font-medium text-foreground">{sourceFileName || "ไม่ระบุ"}</span>
-            {" "}({accountingItems.length} รายการ)
-          </span>
-          <button
-            className="text-xs text-primary hover:underline"
-            onClick={() => setShowImport(true)}
+        <h2 className="text-base font-semibold flex-shrink-0">
+          {type === "expense" ? "ภาษีซื้อ" : type === "income" ? "ภาษีขาย" : "ภพ.36"} {monthName}{" "}
+          {year + 543}
+        </h2>
+        {savedSession && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px]",
+              savedSession.status === "COMPLETED"
+                ? "text-emerald-600 border-emerald-200"
+                : "text-amber-600 border-amber-200"
+            )}
           >
-            เปลี่ยน
-          </button>
-        </div>
-      ) : (
-        <Card className="border-dashed">
-          <CardContent className="py-8 flex flex-col items-center gap-3">
-            <Upload className="h-6 w-6 text-muted-foreground/60" />
-            <div className="text-center">
-              <p className="text-sm font-semibold">นำเข้ารายงานบัญชี</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                อัปโหลดไฟล์ PDF หรือ Excel จากรายงานภาษีของสำนักงานบัญชี
-              </p>
-            </div>
-            <Button size="sm" onClick={() => setShowImport(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              เลือกไฟล์
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+            {savedSession.status === "COMPLETED" ? "เสร็จสิ้น" : "กำลังทำ"}
+          </Badge>
+        )}
 
-      {/* Controls bar */}
-      <div className="flex flex-wrap items-center gap-2">
+        {hasAccountingData ? (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+            <FileText className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="font-medium text-foreground max-w-[120px] truncate">{sourceFileName || "ไฟล์"}</span>
+            <span>({accountingItems.length})</span>
+            <button className="text-primary hover:underline ml-0.5" onClick={() => setShowImport(true)}>เปลี่ยน</button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs flex-shrink-0" onClick={() => setShowImport(true)}>
+            <Upload className="h-3.5 w-3.5" />
+            นำเข้ารายงาน
+          </Button>
+        )}
+
+        <div className="h-5 w-px bg-border mx-0.5 flex-shrink-0" />
+
         {hasSiblings && siblingCompanies && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs flex-shrink-0">
                 <Building2 className="h-3.5 w-3.5" />
-                {selectedCompanyCodes &&
-                selectedCompanyCodes.length < siblingCompanies.length
+                {selectedCompanyCodes && selectedCompanyCodes.length < siblingCompanies.length
                   ? `${selectedCompanyCodes.length} บริษัท`
                   : "ทุกบริษัท"}
                 <ChevronsUpDown className="h-3 w-3 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2" align="start">
-              <p className="text-xs font-medium text-muted-foreground px-2 pb-2">
-                นิติบุคคลเดียวกัน (Tax ID)
-              </p>
+              <p className="text-xs font-medium text-muted-foreground px-2 pb-2">นิติบุคคลเดียวกัน (Tax ID)</p>
               <div className="space-y-1">
                 {siblingCompanies.map((sc) => {
-                  const isChecked = selectedCompanyCodes
-                    ? selectedCompanyCodes.includes(sc.code)
-                    : true;
+                  const isChecked = selectedCompanyCodes ? selectedCompanyCodes.includes(sc.code) : true;
                   return (
-                    <label
-                      key={sc.code}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer"
-                    >
+                    <label key={sc.code} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer">
                       <Checkbox checked={isChecked} />
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <Badge
-                          variant="secondary"
-                          className="text-[10px] px-1.5 h-4 font-mono flex-shrink-0"
-                        >
-                          {sc.code}
-                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 h-4 font-mono flex-shrink-0">{sc.code}</Badge>
                         <span className="text-sm truncate">{sc.name}</span>
                       </div>
                     </label>
@@ -944,89 +922,52 @@ export function ReconcileWorkspace({
         <Button
           variant={vatOnly ? "default" : "outline"}
           size="sm"
-          className="h-9 gap-1.5"
-          onClick={() => {
-            setVatOnly((v) => !v);
-            setPairs([]);
-            setAccountingItems([]);
-          }}
+          className="h-8 gap-1 text-xs flex-shrink-0"
+          onClick={() => { setVatOnly((v) => !v); setPairs([]); setAccountingItems([]); }}
           title="กรองเฉพาะรายการที่มี VAT"
         >
           <Receipt className="h-3.5 w-3.5" />
-          เฉพาะ VAT
+          VAT
           {vatOnly && hiddenByVatFilter > 0 && (
-            <Badge
-              variant="secondary"
-              className="text-[10px] px-1.5 h-4 ml-0.5"
-            >
-              ซ่อน {hiddenByVatFilter}
-            </Badge>
+            <Badge variant="secondary" className="text-[10px] px-1 h-4">{hiddenByVatFilter}</Badge>
           )}
         </Button>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <div className="relative flex-shrink-0">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ค้นหาชื่อ..."
-            className="h-9 pl-8 w-40 text-sm"
+            placeholder="ค้นหา..."
+            className="h-8 pl-7 w-32 text-xs"
           />
         </div>
 
-        <div className="flex-1" />
+        <div className="flex-1 min-w-0" />
+
+        {lastSaved && (
+          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+            {lastSaved.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
 
         {hasAccountingData && (
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 h-9"
-              onClick={handleAIMatch}
-              disabled={!canAIMatch || isAILoading}
-            >
-              {isAILoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4 text-amber-500" />
-              )}
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs flex-shrink-0" onClick={handleAIMatch} disabled={!canAIMatch || isAILoading}>
+              {isAILoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-amber-500" />}
               AI จับคู่
-              {canAIMatch && (
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] px-1.5 h-4"
-                >
-                  {unmatchedSystemCount + unmatchedAccountingCount}
-                </Badge>
-              )}
+              {canAIMatch && <Badge variant="secondary" className="text-[10px] px-1 h-4">{unmatchedSystemCount + unmatchedAccountingCount}</Badge>}
             </Button>
 
-            <Button
-              variant="default"
-              size="sm"
-              className="gap-2 h-9"
-              onClick={handleSave}
-              disabled={!canSave || isSaving}
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
+            <Button variant="default" size="sm" className="gap-1.5 h-8 text-xs flex-shrink-0" onClick={handleSave} disabled={!canSave || isSaving}>
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               บันทึก
-              {matchedPairsForSave.length > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] px-1.5 h-4"
-                >
-                  {matchedPairsForSave.length}
-                </Badge>
-              )}
+              {matchedPairsForSave.length > 0 && <Badge variant="secondary" className="text-[10px] px-1 h-4">{matchedPairsForSave.length}</Badge>}
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -1045,11 +986,14 @@ export function ReconcileWorkspace({
         )}
       </div>
 
-      {/* Summary bar */}
+      {/* Summary bar + month filter */}
       <SummaryBar
         pairs={pairs}
         systemItems={systemItems}
         accountingItems={accountingItems}
+        spilloverInfo={spilloverInfo}
+        monthRange={monthRange}
+        onMonthRangeChange={setMonthRange}
       />
 
       {/* Table */}
@@ -1070,6 +1014,9 @@ export function ReconcileWorkspace({
         hasAccountingData={hasAccountingData}
         showCompanyBadge={hasSiblings}
         companyCode={companyCode}
+        monthRange={monthRange}
+        onMonthRangeChange={setMonthRange}
+        onSpilloverInfo={handleSpilloverInfo}
       />
 
       {/* Import dialog */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,6 +80,9 @@ interface ReconcileTableProps {
   hasAccountingData: boolean;
   showCompanyBadge?: boolean;
   companyCode: string;
+  monthRange?: MonthRange;
+  onMonthRangeChange?: (range: MonthRange) => void;
+  onSpilloverInfo?: (info: { hasSpillover: boolean; presetCounts: Map<MonthRange, number> }) => void;
 }
 
 const MONTHS = [
@@ -91,9 +94,9 @@ const SHORT_MONTHS = [
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
 ];
 
-type MonthRange = 0 | 1 | 3 | 6;
+export type MonthRange = 0 | 1 | 3 | 6;
 
-const RANGE_PRESETS: { value: MonthRange; label: string }[] = [
+export const RANGE_PRESETS: { value: MonthRange; label: string }[] = [
   { value: 0, label: "เดือนนี้" },
   { value: 1, label: "+1 เดือน" },
   { value: 3, label: "+3 เดือน" },
@@ -441,10 +444,15 @@ export function ReconcileTable({
   hasAccountingData,
   showCompanyBadge,
   companyCode,
+  monthRange: monthRangeProp,
+  onMonthRangeChange,
+  onSpilloverInfo,
 }: ReconcileTableProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [monthRange, setMonthRange] = useState<MonthRange>(0);
+  const [monthRangeLocal, setMonthRangeLocal] = useState<MonthRange>(0);
+  const monthRange = monthRangeProp ?? monthRangeLocal;
+  const setMonthRange = onMonthRangeChange ?? setMonthRangeLocal;
   const [skippedAccounting, setSkippedAccounting] = useState<Set<number>>(new Set());
   const [showSkipped, setShowSkipped] = useState(false);
 
@@ -518,6 +526,10 @@ export function ReconcileTable({
     }
     return counts;
   }, [currentMonthSystem.length, spilloverSystem, month]);
+
+  useEffect(() => {
+    onSpilloverInfo?.({ hasSpillover: spilloverSystem.length > 0, presetCounts });
+  }, [spilloverSystem.length, presetCounts, onSpilloverInfo]);
 
   const matchedPairs = pairs.filter(
     (p) =>
@@ -618,42 +630,23 @@ export function ReconcileTable({
         </div>
       )}
 
-      {/* Column headers with table sub-headers */}
-      <div className="border-b bg-muted/50">
-        <div className="grid grid-cols-[1fr_88px_1fr]">
-          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-r border-border">
-            ระบบเว็บ ({pairs.filter((p) => p.systemItem).length} รายการ)
-          </div>
-          <div className="px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground border-r border-border">
-            สถานะ
-          </div>
-          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center justify-between">
-            <span>รายงานบัญชี ({pairs.filter((p) => p.accountingItem).length} รายการ)</span>
-            {hasAccountingData && (
-              <button
-                onClick={onShowImport}
-                className="text-[10px] text-primary underline-offset-2 hover:underline"
-              >
-                โหลดใหม่
-              </button>
-            )}
-          </div>
+      {/* Column headers */}
+      <div className="grid grid-cols-[1fr_88px_1fr] border-b bg-muted/50">
+        <div className={cn(SYS_GRID, "px-2 py-1.5 text-[11px] font-medium text-muted-foreground border-r border-border")}>
+          <div />
+          <div>วันที่</div>
+          <div>ชื่อผู้ขาย</div>
+          <div className="text-right">ยอดเงิน</div>
+          <div className="text-right">VAT</div>
         </div>
-        <div className="grid grid-cols-[1fr_88px_1fr] border-t border-border/50">
-          <div className={cn(SYS_GRID, "px-2 py-1 text-[10px] text-muted-foreground/60 border-r border-border")}>
-            <div />
-            <div>วันที่</div>
-            <div>ชื่อผู้ขาย</div>
-            <div className="text-right">ยอดเงิน</div>
-            <div className="text-right">VAT</div>
-          </div>
-          <div className="border-r border-border" />
-          <div className={cn(ACC_GRID, "px-2 py-1 text-[10px] text-muted-foreground/60")}>
-            <div>วันที่</div>
-            <div>ชื่อผู้ขาย</div>
-            <div className="text-right">ยอดเงิน</div>
-            <div className="text-right">VAT</div>
-          </div>
+        <div className="flex items-center justify-center text-[11px] font-medium text-muted-foreground border-r border-border">
+          สถานะ
+        </div>
+        <div className={cn(ACC_GRID, "px-2 py-1.5 text-[11px] font-medium text-muted-foreground")}>
+          <div>วันที่</div>
+          <div>ชื่อผู้ขาย</div>
+          <div className="text-right">ยอดเงิน</div>
+          <div className="text-right">VAT</div>
         </div>
       </div>
 
@@ -752,42 +745,10 @@ export function ReconcileTable({
           {/* Unmatched section */}
           {(allUnmatchedSystem.length > 0 || unmatchedAccounting.length > 0) && (
             <>
-              <div className="bg-muted/30">
-                <div className="px-3 py-1.5 border-y border-muted">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                    <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                    ยังไม่ตรงกัน (ระบบ {unmatchedSystem.length} | รายงาน {unmatchedAccounting.length})
-                    <span className="font-normal">
-                      — คลิกเลือก 1 แถวจากระบบ และ 1 แถวจากรายงานเพื่อจับคู่
-                    </span>
-                  </div>
-                  {spilloverSystem.length > 0 && (
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {RANGE_PRESETS.map((preset) => {
-                        const count = presetCounts.get(preset.value) ?? 0;
-                        if (preset.value > 0 && count === 0) return null;
-                        const isActive = monthRange === preset.value;
-                        return (
-                          <button
-                            key={preset.value}
-                            type="button"
-                            onClick={() => setMonthRange(preset.value)}
-                            className={cn(
-                              "text-[11px] px-2 py-0.5 rounded-full border transition-colors",
-                              isActive
-                                ? "bg-sky-100 dark:bg-sky-900/40 border-sky-400 dark:border-sky-600 text-sky-700 dark:text-sky-300 font-medium"
-                                : "border-border text-muted-foreground hover:border-sky-300 hover:text-sky-600 dark:hover:text-sky-400"
-                            )}
-                          >
-                            {preset.label}
-                            {preset.value > 0 && (
-                              <span className="ml-1 opacity-60">({count})</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+              <div className="px-3 py-1 border-y border-muted bg-muted/30">
+                <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                  <AlertTriangle className="h-3 w-3 text-orange-500" />
+                  ยังไม่ตรงกัน (ระบบ {unmatchedSystem.length} | รายงาน {unmatchedAccounting.length})
                 </div>
               </div>
               {Array.from({ length: maxUnmatched }, (_, i) => {
