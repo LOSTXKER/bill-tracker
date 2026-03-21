@@ -43,6 +43,8 @@ export const POST = withCompanyAccessFromParams(
       mimeType: "application/pdf",
       temperature: 0,
       maxTokens: 32_768,
+      timeoutMs: 180_000,
+      retries: 2,
     });
 
     console.log("[extract-pdf] error:", response.error ?? "none");

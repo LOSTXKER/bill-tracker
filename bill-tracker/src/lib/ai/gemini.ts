@@ -211,6 +211,7 @@ export async function analyzeImage(
     temperature?: number;
     maxTokens?: number;
     retries?: number;
+    timeoutMs?: number;
   }
 ): Promise<GeminiResponse<string>> {
   const maxRetries = options?.retries ?? MAX_RETRIES;
@@ -278,7 +279,7 @@ export async function analyzeImage(
           ],
           generationConfig,
         }),
-        GEMINI_TIMEOUT_MS
+        options?.timeoutMs ?? GEMINI_TIMEOUT_MS
       );
 
       const response = result.response;

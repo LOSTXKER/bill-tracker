@@ -423,7 +423,7 @@ export function ImportPanel({ open, onClose, onImport, companyCode, month, year,
             <div className="text-center space-y-1">
               <p className="font-semibold text-foreground">AI กำลังอ่าน PDF...</p>
               <p className="text-sm text-muted-foreground">{pdfFileName}</p>
-              <p className="text-xs text-muted-foreground">Gemini กำลัง extract ตารางภาษี อาจใช้เวลา 10-30 วินาที</p>
+              <p className="text-xs text-muted-foreground">AI กำลัง extract ตารางภาษี อาจใช้เวลา 30-90 วินาที</p>
             </div>
           </div>
         )}
