@@ -29,6 +29,7 @@ import {
   History,
   Clock,
   FileText,
+  ScanEye,
 } from "lucide-react";
 import {
   Popover,
@@ -347,6 +348,7 @@ export function ReconcileView({
   const [sessions, setSessions] = useState<ReconcileSessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sourceFileName, setSourceFileName] = useState<string | null>(null);
+  const [isDocAILoading, setIsDocAILoading] = useState(false);
 
   const hasSiblings = !!siblingCompanies && siblingCompanies.length > 1;
 
@@ -506,6 +508,93 @@ export function ReconcileView({
       console.error("AI match error:", err);
     } finally {
       setIsAILoading(false);
+    }
+  };
+
+  const handleDocAIMatch = async () => {
+    const unmatchedSystem = pairs
+      .filter((p) => p.status === "system-only")
+      .map((p) => p.systemItem!)
+      .filter(Boolean);
+    const unmatchedAccounting = pairs
+      .filter((p) => p.status === "accounting-only")
+      .map((p) => ({ ...p.accountingItem!, _idx: p.accountingIndex! }));
+
+    if (!unmatchedSystem.length || !unmatchedAccounting.length) return;
+
+    setIsDocAILoading(true);
+    try {
+      const res = await fetch(`/api/${companyCode}/reconcile/match-with-docs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemItems: unmatchedSystem.map((s) => ({
+            id: s.id,
+            vendorName: s.vendorName,
+            amount: s.baseAmount,
+            vatAmount: s.vatAmount,
+            date: s.date,
+            taxId: s.taxId,
+            type,
+          })),
+          accountingItems: unmatchedAccounting.map((a) => ({
+            index: a._idx,
+            vendorName: a.vendorName,
+            amount: a.baseAmount,
+            vatAmount: a.vatAmount,
+            date: a.date,
+            taxId: a.taxId,
+          })),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Doc AI request failed");
+      const json = await res.json();
+      const suggestions = json.data?.suggestions ?? [];
+
+      if (suggestions.length === 0) return;
+
+      setPairs((prev) => {
+        const updated = [...prev];
+        const usedAccountingInAI = new Set<number>();
+
+        suggestions.forEach(
+          (s: { systemId: string; accountingIndex: number; confidence: number; reason: string }) => {
+            const realIdx = s.accountingIndex;
+            if (usedAccountingInAI.has(realIdx)) return;
+
+            const sysIdx = updated.findIndex(
+              (p) => p.status === "system-only" && p.systemItem?.id === s.systemId
+            );
+            const accIdx = updated.findIndex(
+              (p) => p.status === "accounting-only" && p.accountingIndex === realIdx
+            );
+
+            if (sysIdx === -1 || accIdx === -1) return;
+
+            const merged: MatchedPair = {
+              id: `docai-${s.systemId}-${realIdx}`,
+              systemItem: updated[sysIdx].systemItem,
+              accountingItem: updated[accIdx].accountingItem,
+              accountingIndex: realIdx,
+              status: "ai",
+              confidence: s.confidence,
+              aiReason: `[เอกสาร] ${s.reason}`,
+              userConfirmed: undefined,
+            };
+
+            updated.splice(Math.max(sysIdx, accIdx), 1);
+            updated.splice(Math.min(sysIdx, accIdx), 1, merged);
+            usedAccountingInAI.add(realIdx);
+          }
+        );
+
+        return updated;
+      });
+    } catch (err) {
+      console.error("Doc AI match error:", err);
+    } finally {
+      setIsDocAILoading(false);
     }
   };
 
@@ -887,6 +976,23 @@ export function ReconcileView({
                   {unmatchedSystemCount + unmatchedAccountingCount}
                 </Badge>
               )}
+            </Button>
+
+            {/* AI Doc Match button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 h-9"
+              onClick={handleDocAIMatch}
+              disabled={!canAIMatch || isDocAILoading || isAILoading}
+              title="ให้ AI อ่านเอกสารแนบ (ใบกำกับภาษี, สลิป) เพื่อจับคู่"
+            >
+              {isDocAILoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ScanEye className="h-4 w-4 text-violet-500" />
+              )}
+              AI ดูเอกสาร
             </Button>
 
             {/* Save button */}
