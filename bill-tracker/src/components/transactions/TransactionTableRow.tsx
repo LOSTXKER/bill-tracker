@@ -339,29 +339,21 @@ export function TransactionTableRow({
               const isCurrentCompanyBeneficiary =
                 transaction.internalCompany.code.toLowerCase() === companyCode.toLowerCase();
               if (isCurrentCompanyBeneficiary && transaction.company) {
-                // Internal view: "MEELIKE จ่ายแทน" (another company paid for us)
                 return (
                   <div className="flex flex-col gap-0.5">
                     <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 gap-1">
                       <ArrowRightLeft className="h-3 w-3" />
-                      จ่ายแทน
+                      {transaction.company.code} จ่ายให้ {transaction.internalCompany.code}
                     </Badge>
-                    <span className="text-xs text-muted-foreground pl-0.5">
-                      {transaction.company.code}
-                    </span>
                   </div>
                 );
               }
-              // Official view: "จ่ายแทน ANAJAK" (we paid for another company)
               return (
                 <div className="flex flex-col gap-0.5">
                   <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 gap-1">
                     <ArrowRightLeft className="h-3 w-3" />
-                    จ่ายแทน
+                    {companyCode.toUpperCase()} จ่ายให้ {transaction.internalCompany.code}
                   </Badge>
-                  <span className="text-xs text-muted-foreground pl-0.5">
-                    {transaction.internalCompany.code}
-                  </span>
                 </div>
               );
             })()

@@ -162,6 +162,10 @@ async function WorkspaceDataLoader({
           e.internalCompanyId && e.internalCompanyId !== e.companyId
             ? companyIdToCode.get(e.companyId) ?? undefined
             : undefined,
+        payOnBehalfTo:
+          e.internalCompanyId && e.internalCompanyId !== e.companyId
+            ? companyIdToCode.get(e.internalCompanyId) ?? undefined
+            : undefined,
         paidByUser,
       };
     }),
@@ -179,6 +183,7 @@ async function WorkspaceDataLoader({
       companyCode: (e as any).Company?.code ?? "",
       isPayOnBehalf: true,
       payOnBehalfFrom: (e as any).Company?.code ?? undefined,
+      payOnBehalfTo: e.internalCompanyId ? companyIdToCode.get(e.internalCompanyId) ?? undefined : undefined,
       paidByUser: false,
     })),
   ];
@@ -227,6 +232,7 @@ async function WorkspaceDataLoader({
     amountDiff: m.amountDiff ? Number(m.amountDiff) : undefined,
     isPayOnBehalf: m.isPayOnBehalf,
     payOnBehalfFrom: m.payOnBehalfFrom,
+    payOnBehalfTo: m.payOnBehalfTo ?? null,
     status: m.status,
   }));
 

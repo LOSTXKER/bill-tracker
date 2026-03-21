@@ -131,6 +131,7 @@ async function SessionDataLoader({
       notes: m.notes,
       isPayOnBehalf: m.isPayOnBehalf,
       payOnBehalfFrom: m.payOnBehalfFrom,
+      payOnBehalfTo: m.payOnBehalfTo ?? null,
       status: m.status,
       confirmedBy: m.confirmedBy,
       confirmedAt: m.confirmedAt?.toISOString() ?? null,

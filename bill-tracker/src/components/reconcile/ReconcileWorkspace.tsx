@@ -77,6 +77,7 @@ interface SavedMatch {
   amountDiff?: number;
   isPayOnBehalf: boolean;
   payOnBehalfFrom: string | null;
+  payOnBehalfTo: string | null;
   status: string;
 }
 
@@ -909,6 +910,8 @@ export function ReconcileWorkspace({
       case "result": {
         const suggestions = data.suggestions ?? [];
         if (suggestions.length > 0) {
+          const matchedSystemIds = new Map<string, { acctVendor: string; reason: string }>();
+
           setPairs((prev) => {
             const updated = [...prev];
             const usedAI = new Set<number>();
@@ -932,6 +935,10 @@ export function ReconcileWorkspace({
                     p.accountingIndex === realIdx
                 );
                 if (sysIdx === -1 || accIdx === -1) return;
+
+                const acctVendor = updated[accIdx].accountingItem?.vendorName ?? "";
+                matchedSystemIds.set(s.systemId, { acctVendor, reason: s.reason });
+
                 const merged: MatchedPair = {
                   id: `docai-${s.systemId}-${realIdx}`,
                   systemItem: updated[sysIdx].systemItem,
@@ -949,6 +956,16 @@ export function ReconcileWorkspace({
             );
             return updated;
           });
+
+          setDocAIItems((prev) =>
+            prev.map((item) => {
+              const match = matchedSystemIds.get(item.itemId);
+              if (match) {
+                return { ...item, matchedWith: match.acctVendor, matchReason: match.reason };
+              }
+              return item;
+            })
+          );
         }
         break;
       }
@@ -1125,6 +1142,9 @@ export function ReconcileWorkspace({
           p.systemItem && p.accountingItem
             ? Math.abs(p.systemItem.baseAmount - p.accountingItem.baseAmount)
             : undefined,
+        isPayOnBehalf: p.systemItem!.isPayOnBehalf ?? false,
+        payOnBehalfFrom: p.systemItem!.payOnBehalfFrom ?? undefined,
+        payOnBehalfTo: p.systemItem!.payOnBehalfTo ?? undefined,
         status: "confirmed",
       }));
 

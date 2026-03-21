@@ -34,6 +34,7 @@ interface MatchInput {
   notes?: string;
   isPayOnBehalf?: boolean;
   payOnBehalfFrom?: string;
+  payOnBehalfTo?: string;
   status?: string;
 }
 
@@ -205,6 +206,7 @@ function toMatchCreate(m: MatchInput) {
     notes: m.notes || null,
     isPayOnBehalf: m.isPayOnBehalf ?? false,
     payOnBehalfFrom: m.payOnBehalfFrom || null,
+    payOnBehalfTo: m.payOnBehalfTo || null,
     status: m.status ?? "pending",
   };
 }

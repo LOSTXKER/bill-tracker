@@ -33,6 +33,7 @@ export interface SystemItem {
   companyCode?: string;
   isPayOnBehalf?: boolean;
   payOnBehalfFrom?: string;
+  payOnBehalfTo?: string;
   paidByUser?: boolean;
 }
 
@@ -210,7 +211,11 @@ function SystemCell({
         <div className="mt-0.5">
           <Badge variant="outline" className="text-[10px] px-1 h-4 text-purple-600 border-purple-300 dark:text-purple-400 dark:border-purple-700">
             <Building2 className="h-2.5 w-2.5 mr-0.5" />
-            จ่ายแทน{item.payOnBehalfFrom ? ` (${item.payOnBehalfFrom})` : ""}
+            {item.payOnBehalfFrom && item.payOnBehalfTo
+              ? `${item.payOnBehalfFrom} จ่ายให้ ${item.payOnBehalfTo}`
+              : item.payOnBehalfFrom
+                ? `${item.payOnBehalfFrom} จ่ายแทน`
+                : "จ่ายแทน"}
           </Badge>
         </div>
       )}

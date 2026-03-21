@@ -948,6 +948,7 @@ model ReconcileMatch {
   // จ่ายแทน
   isPayOnBehalf   Boolean @default(false)
   payOnBehalfFrom String?
+  payOnBehalfTo   String?
 
   // สถานะ
   status         String    @default("pending") // "pending" | "confirmed" | "rejected"

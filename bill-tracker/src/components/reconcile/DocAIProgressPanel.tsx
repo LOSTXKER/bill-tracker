@@ -29,6 +29,8 @@ export interface DocAIItemProgress {
   docsRead?: number;
   docTotal?: number;
   lastSnippet?: string;
+  matchedWith?: string;
+  matchReason?: string;
 }
 
 export type DocAIPhase = "analyzing" | "matching" | "done" | "error";
@@ -68,6 +70,9 @@ function StatusIcon({ status }: { status: ItemStatus }) {
 }
 
 function statusLabel(item: DocAIItemProgress): string {
+  if (item.matchedWith) {
+    return `จับคู่ได้ → ${item.matchedWith}`;
+  }
   switch (item.status) {
     case "pending":
       return "รอคิว";
@@ -197,11 +202,13 @@ export function DocAIProgressPanel({
               <span
                 className={cn(
                   "text-xs flex-shrink-0",
-                  item.status === "reading" || item.status === "searching"
-                    ? "text-violet-600 dark:text-violet-400"
-                    : item.status === "done"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-muted-foreground"
+                  item.matchedWith
+                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                    : item.status === "reading" || item.status === "searching"
+                      ? "text-violet-600 dark:text-violet-400"
+                      : item.status === "done"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-muted-foreground"
                 )}
               >
                 {statusLabel(item)}
