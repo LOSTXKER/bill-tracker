@@ -85,17 +85,40 @@ function parseAIResponse(text: string): ExtractedRow[] {
     // Strip markdown fences
     cleaned = cleaned.replace(/```(?:json|JSON)?\s*\n?/g, "").trim();
 
-    // Isolate JSON content
+    // Find the start of JSON array
     const start = cleaned.indexOf("[");
-    const end = cleaned.lastIndexOf("]");
-    if (start === -1 || end === -1 || end <= start) {
+    if (start === -1) {
       console.error("[extract-pdf] No JSON array found in response");
       return [];
     }
-    cleaned = cleaned.substring(start, end + 1);
+    cleaned = cleaned.substring(start);
 
-    const raw: unknown[] = JSON.parse(cleaned);
-    if (!Array.isArray(raw)) return [];
+    // Try parsing as-is first
+    let raw: unknown[];
+    try {
+      raw = JSON.parse(cleaned);
+    } catch {
+      // Response likely truncated — repair by finding last complete object
+      const lastCompleteObj = cleaned.lastIndexOf("}");
+      if (lastCompleteObj === -1) return [];
+
+      const repaired = cleaned.substring(0, lastCompleteObj + 1) + "]";
+      console.log("[extract-pdf] JSON truncated, repaired by closing array after last complete object");
+      try {
+        raw = JSON.parse(repaired);
+      } catch {
+        // Still broken — try extracting individual objects
+        console.log("[extract-pdf] Repaired JSON still invalid, extracting individual objects");
+        raw = [];
+        const objRegex = /\{[^{}]+\}/g;
+        let match;
+        while ((match = objRegex.exec(cleaned)) !== null) {
+          try { raw.push(JSON.parse(match[0])); } catch { /* skip */ }
+        }
+      }
+    }
+
+    if (!Array.isArray(raw) || raw.length === 0) return [];
 
     return raw
       .filter((item): item is Record<string, unknown> =>
