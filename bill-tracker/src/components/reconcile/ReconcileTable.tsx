@@ -14,9 +14,6 @@ import {
   Upload,
   Building2,
   Eye,
-  ChevronDown,
-  ChevronRight,
-  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
@@ -88,6 +85,29 @@ const SHORT_MONTHS = [
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
 ];
 
+type MonthRange = 0 | 1 | 3 | 6;
+
+const RANGE_PRESETS: { value: MonthRange; label: string }[] = [
+  { value: 0, label: "เดือนนี้" },
+  { value: 1, label: "+1 เดือน" },
+  { value: 3, label: "+3 เดือน" },
+  { value: 6, label: "+6 เดือน" },
+];
+
+function isWithinMonthRange(fromMonth: number, currentMonth: number, range: MonthRange): boolean {
+  if (range === 0) return false;
+  if (range >= 6) return true;
+  for (let i = 1; i <= range; i++) {
+    let m = currentMonth - i;
+    if (m <= 0) m += 12;
+    if (fromMonth === m) return true;
+  }
+  return false;
+}
+
+const SYS_GRID = "grid grid-cols-[28px_58px_1fr_88px_72px]";
+const ACC_GRID = "grid grid-cols-[58px_1fr_88px_72px]";
+
 function fmt(n?: number) {
   if (n === undefined || n === null) return "—";
   return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -143,153 +163,6 @@ function MatchBadge({ pair }: { pair: MatchedPair }) {
   return null;
 }
 
-// A compact card for a system item row (left side)
-function SystemCell({
-  pair,
-  isSelected,
-  isSelectable,
-  onSelect,
-  showCompanyBadge,
-  onPreview,
-}: {
-  pair: MatchedPair;
-  isSelected: boolean;
-  isSelectable: boolean;
-  onSelect: () => void;
-  showCompanyBadge?: boolean;
-  onPreview?: () => void;
-}) {
-  const item = pair.systemItem;
-  const isEmpty = !item;
-
-  if (isEmpty) {
-    return (
-      <div className="px-3 py-2.5 flex items-center opacity-25">
-        <span className="text-xs text-muted-foreground italic">ไม่พบในระบบ</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "px-3 py-2.5 flex flex-col gap-0.5 min-w-0 group/sys",
-        isSelectable && "cursor-pointer select-none",
-        isSelected && "bg-primary/5 ring-1 ring-inset ring-primary/30"
-      )}
-      onClick={isSelectable ? onSelect : undefined}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        {isSelected && (
-          <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-        )}
-        {showCompanyBadge && item.companyCode && (
-          <Badge variant="secondary" className="text-[10px] px-1 h-4 font-mono flex-shrink-0">
-            {item.companyCode}
-          </Badge>
-        )}
-        {item.fromMonth && (
-          <Badge variant="outline" className="text-[10px] px-1 h-4 flex-shrink-0 text-sky-600 border-sky-300 dark:text-sky-400 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/30">
-            {SHORT_MONTHS[item.fromMonth - 1]}
-          </Badge>
-        )}
-        <p className="text-sm font-medium truncate">
-          {item.vendorName || item.description || "—"}
-        </p>
-        {onPreview && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onPreview(); }}
-            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/40 hover:text-primary opacity-0 group-hover/sys:opacity-100 transition-opacity"
-            title="ดูรายละเอียด"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <span className="text-sm font-mono font-semibold ml-auto flex-shrink-0">
-          {fmt(item.baseAmount)}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{fmtDate(item.date)}</span>
-        {item.description && item.vendorName && item.description !== item.vendorName && (
-          <span className="truncate max-w-[120px]">{item.description}</span>
-        )}
-        {item.vatAmount > 0 && (
-          <span className="ml-auto flex-shrink-0 text-blue-600 dark:text-blue-400">
-            VAT {fmt(item.vatAmount)}
-          </span>
-        )}
-      </div>
-      {item.isPayOnBehalf && (
-        <div className="mt-0.5">
-          <Badge variant="outline" className="text-[10px] px-1 h-4 text-purple-600 border-purple-300 dark:text-purple-400 dark:border-purple-700">
-            <Building2 className="h-2.5 w-2.5 mr-0.5" />
-            {item.payOnBehalfFrom && item.payOnBehalfTo
-              ? `${item.payOnBehalfFrom} จ่ายให้ ${item.payOnBehalfTo}`
-              : item.payOnBehalfFrom
-                ? `${item.payOnBehalfFrom} จ่ายแทน`
-                : "จ่ายแทน"}
-          </Badge>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// A compact card for an accounting item row (right side)
-function AccountingCell({
-  pair,
-  isSelected,
-  isSelectable,
-  onSelect,
-}: {
-  pair: MatchedPair;
-  isSelected: boolean;
-  isSelectable: boolean;
-  onSelect: () => void;
-}) {
-  const item = pair.accountingItem;
-  const isEmpty = !item;
-
-  if (isEmpty) {
-    return (
-      <div className="px-3 py-2.5 flex items-center opacity-25">
-        <span className="text-xs text-muted-foreground italic">ไม่พบในรายงาน</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "px-3 py-2.5 flex flex-col gap-0.5 min-w-0",
-        isSelectable && "cursor-pointer select-none",
-        isSelected && "bg-amber-50 dark:bg-amber-950/20 ring-1 ring-inset ring-amber-400/40"
-      )}
-      onClick={isSelectable ? onSelect : undefined}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        {isSelected && (
-          <div className="h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-        )}
-        <p className="text-sm font-medium truncate">{item.vendorName || "—"}</p>
-        <span className="text-sm font-mono font-semibold ml-auto flex-shrink-0">
-          {fmt(item.baseAmount)}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{fmtDate(item.date)}</span>
-        {item.vatAmount > 0 && (
-          <span className="ml-auto flex-shrink-0 text-blue-600 dark:text-blue-400">
-            VAT {fmt(item.vatAmount)}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Center cell: status + actions
 function CenterCell({
   pair,
   canLink,
@@ -320,7 +193,7 @@ function CenterCell({
 
   if (isAIPending) {
     return (
-      <div className="flex flex-col items-center gap-1.5 px-1 py-2">
+      <div className="flex flex-col items-center gap-1 px-1 py-1.5">
         <MatchBadge pair={pair} />
         {amtDiff > 0.01 && (
           <Badge variant="outline" className="text-[10px] px-1 h-4 text-orange-600 border-orange-300">
@@ -358,7 +231,7 @@ function CenterCell({
 
   if (isMatched) {
     return (
-      <div className="flex flex-col items-center gap-1 px-1 py-2">
+      <div className="flex flex-col items-center gap-1 px-1 py-1.5">
         <MatchBadge pair={pair} />
         {amtDiff > 0.01 && (
           <Badge variant="outline" className="text-[10px] px-1 h-4 text-orange-600 border-orange-300">
@@ -378,7 +251,7 @@ function CenterCell({
 
   if (isUnmatched) {
     return (
-      <div className="flex items-center justify-center px-1 py-2">
+      <div className="flex items-center justify-center px-1 py-1.5">
         {canLink ? (
           <span className="text-[10px] text-primary font-medium text-center leading-tight">
             เลือก<br />อีกฝั่ง
@@ -391,8 +264,127 @@ function CenterCell({
   }
 
   return (
-    <div className="flex items-center justify-center px-1 py-2">
+    <div className="flex items-center justify-center px-1 py-1.5">
       <span className="text-muted-foreground/30 text-lg">—</span>
+    </div>
+  );
+}
+
+function SystemRow({
+  item,
+  isSelected,
+  isSelectable,
+  onSelect,
+  showCompanyBadge,
+  onPreview,
+}: {
+  item?: SystemItem;
+  isSelected: boolean;
+  isSelectable: boolean;
+  onSelect: () => void;
+  showCompanyBadge?: boolean;
+  onPreview?: () => void;
+}) {
+  if (!item) {
+    return (
+      <div className={cn(SYS_GRID, "items-center px-2 py-1.5 h-8 opacity-25")}>
+        <div /><div /><div className="text-[11px] text-muted-foreground italic">—</div><div /><div />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        SYS_GRID,
+        "items-center px-2 py-1.5 text-[11px] group/sys min-w-0",
+        isSelectable && "cursor-pointer select-none hover:bg-muted/30",
+        isSelected && "bg-primary/5 ring-1 ring-inset ring-primary/30"
+      )}
+      onClick={isSelectable ? onSelect : undefined}
+    >
+      <div className="flex justify-center">
+        {item.fromMonth ? (
+          <span className="text-[9px] px-0.5 rounded bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400 border border-sky-300 dark:border-sky-700 leading-tight whitespace-nowrap">
+            {SHORT_MONTHS[item.fromMonth - 1]}
+          </span>
+        ) : showCompanyBadge && item.companyCode ? (
+          <Badge variant="secondary" className="text-[9px] px-0.5 h-4 font-mono">
+            {item.companyCode}
+          </Badge>
+        ) : isSelected ? (
+          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+        ) : null}
+      </div>
+      <div className="text-muted-foreground truncate">{fmtDate(item.date)}</div>
+      <div className="flex items-center gap-1 min-w-0 pr-1">
+        <span className="truncate font-medium text-foreground">
+          {item.vendorName || item.description || "—"}
+        </span>
+        {item.isPayOnBehalf && (
+          <span className="flex-shrink-0 text-[9px] text-purple-600 dark:text-purple-400 whitespace-nowrap">
+            <Building2 className="h-2.5 w-2.5 inline mr-0.5" />
+            {item.payOnBehalfFrom && item.payOnBehalfTo
+              ? `${item.payOnBehalfFrom}→${item.payOnBehalfTo}`
+              : "จ่ายแทน"}
+          </span>
+        )}
+        {onPreview && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPreview(); }}
+            className="flex-shrink-0 p-0.5 rounded text-muted-foreground/30 hover:text-primary opacity-0 group-hover/sys:opacity-100 transition-opacity"
+            title="ดูรายละเอียด"
+          >
+            <Eye className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+      <div className="text-right font-mono font-semibold tabular-nums">{fmt(item.baseAmount)}</div>
+      <div className="text-right font-mono tabular-nums text-blue-600 dark:text-blue-400">
+        {item.vatAmount > 0 ? fmt(item.vatAmount) : ""}
+      </div>
+    </div>
+  );
+}
+
+function AccountingRow_({
+  item,
+  isSelected,
+  isSelectable,
+  onSelect,
+}: {
+  item?: AccountingRow;
+  isSelected: boolean;
+  isSelectable: boolean;
+  onSelect: () => void;
+}) {
+  if (!item) {
+    return (
+      <div className={cn(ACC_GRID, "items-center px-2 py-1.5 h-8 opacity-25")}>
+        <div /><div className="text-[11px] text-muted-foreground italic">—</div><div /><div />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        ACC_GRID,
+        "items-center px-2 py-1.5 text-[11px] min-w-0",
+        isSelectable && "cursor-pointer select-none hover:bg-muted/30",
+        isSelected && "bg-amber-50 dark:bg-amber-950/20 ring-1 ring-inset ring-amber-400/40"
+      )}
+      onClick={isSelectable ? onSelect : undefined}
+    >
+      <div className="text-muted-foreground truncate">{fmtDate(item.date)}</div>
+      <div className="flex items-center gap-1 min-w-0 pr-1">
+        {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />}
+        <span className="truncate font-medium text-foreground">{item.vendorName || "—"}</span>
+      </div>
+      <div className="text-right font-mono font-semibold tabular-nums">{fmt(item.baseAmount)}</div>
+      <div className="text-right font-mono tabular-nums text-blue-600 dark:text-blue-400">
+        {item.vatAmount > 0 ? fmt(item.vatAmount) : ""}
+      </div>
     </div>
   );
 }
@@ -417,8 +409,7 @@ export function ReconcileTable({
 }: ReconcileTableProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [showSpillover, setShowSpillover] = useState(false);
-  const [spilloverMonthFilter, setSpilloverMonthFilter] = useState<number | null>(null);
+  const [monthRange, setMonthRange] = useState<MonthRange>(0);
 
   const handlePreview = (itemId: string) => {
     setPreviewId(itemId);
@@ -451,17 +442,29 @@ export function ReconcileTable({
 
   const currentMonthSystem = allUnmatchedSystem.filter((p) => !p.systemItem?.fromMonth);
   const spilloverSystem = allUnmatchedSystem.filter((p) => !!p.systemItem?.fromMonth);
-  const spilloverMonths = useMemo(() => {
-    const months = new Set(spilloverSystem.map((p) => p.systemItem!.fromMonth!));
-    return Array.from(months).sort((a, b) => a - b);
-  }, [spilloverSystem]);
-  const filteredSpillover = spilloverMonthFilter
-    ? spilloverSystem.filter((p) => p.systemItem?.fromMonth === spilloverMonthFilter)
-    : spilloverSystem;
-  const unmatchedSystem = showSpillover
-    ? [...currentMonthSystem, ...filteredSpillover]
-    : currentMonthSystem;
+
+  const filteredSpillover = spilloverSystem.filter(
+    (p) => isWithinMonthRange(p.systemItem!.fromMonth!, month, monthRange)
+  );
+  const unmatchedSystem = [...currentMonthSystem, ...filteredSpillover];
   const maxUnmatched = Math.max(unmatchedSystem.length, unmatchedAccounting.length);
+
+  const presetCounts = useMemo(() => {
+    const counts = new Map<MonthRange, number>();
+    for (const preset of RANGE_PRESETS) {
+      if (preset.value === 0) {
+        counts.set(0, currentMonthSystem.length);
+      } else {
+        counts.set(
+          preset.value,
+          spilloverSystem.filter(
+            (p) => isWithinMonthRange(p.systemItem!.fromMonth!, month, preset.value)
+          ).length
+        );
+      }
+    }
+    return counts;
+  }, [currentMonthSystem.length, spilloverSystem, month]);
 
   const matchedPairs = pairs.filter(
     (p) =>
@@ -471,7 +474,6 @@ export function ReconcileTable({
       (p.status === "ai" && p.userConfirmed === true)
   );
 
-  // Order: AI suggestions first, then unmatched, then matched
   const orderedPairs = [...aiPairs, ...unmatchedPairs, ...matchedPairs];
 
   const typeLabel = type === "expense" ? "ภาษีซื้อ" : type === "income" ? "ภาษีขาย" : "ภพ.36";
@@ -563,69 +565,67 @@ export function ReconcileTable({
         </div>
       )}
 
-      {/* Column headers */}
-      <div className="grid grid-cols-[1fr_88px_1fr] border-b bg-muted/50">
-        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">
-          ระบบเว็บ ({pairs.filter((p) => p.systemItem).length} รายการ)
+      {/* Column headers with table sub-headers */}
+      <div className="border-b bg-muted/50">
+        <div className="grid grid-cols-[1fr_88px_1fr]">
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-r border-border">
+            ระบบเว็บ ({pairs.filter((p) => p.systemItem).length} รายการ)
+          </div>
+          <div className="px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground border-r border-border">
+            สถานะ
+          </div>
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center justify-between">
+            <span>รายงานบัญชี ({pairs.filter((p) => p.accountingItem).length} รายการ)</span>
+            {hasAccountingData && (
+              <button
+                onClick={onShowImport}
+                className="text-[10px] text-primary underline-offset-2 hover:underline"
+              >
+                โหลดใหม่
+              </button>
+            )}
+          </div>
         </div>
-        <div className="px-2 py-2 text-center text-xs font-semibold text-muted-foreground border-x border-border">
-          สถานะ
-        </div>
-        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground flex items-center justify-between">
-          <span>รายงานบัญชี ({pairs.filter((p) => p.accountingItem).length} รายการ)</span>
-          {hasAccountingData && (
-            <button
-              onClick={onShowImport}
-              className="text-[10px] text-primary underline-offset-2 hover:underline"
-            >
-              โหลดใหม่
-            </button>
-          )}
+        <div className="grid grid-cols-[1fr_88px_1fr] border-t border-border/50">
+          <div className={cn(SYS_GRID, "px-2 py-1 text-[10px] text-muted-foreground/60 border-r border-border")}>
+            <div />
+            <div>วันที่</div>
+            <div>ชื่อผู้ขาย</div>
+            <div className="text-right">ยอดเงิน</div>
+            <div className="text-right">VAT</div>
+          </div>
+          <div className="border-r border-border" />
+          <div className={cn(ACC_GRID, "px-2 py-1 text-[10px] text-muted-foreground/60")}>
+            <div>วันที่</div>
+            <div>ชื่อผู้ขาย</div>
+            <div className="text-right">ยอดเงิน</div>
+            <div className="text-right">VAT</div>
+          </div>
         </div>
       </div>
 
-      {/* No accounting data: empty state in right panel */}
+      {/* No accounting data: empty state */}
       {!hasAccountingData ? (
         <div className="grid grid-cols-[1fr_88px_1fr]">
-          {/* Left: system items list (non-interactive) */}
-          <div className="border-r border-border overflow-y-auto max-h-[calc(100vh-340px)] divide-y divide-border">
+          <div className="border-r border-border overflow-y-auto max-h-[calc(100vh-380px)] divide-y divide-border/50">
             {pairs.length === 0 ? (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
                 ไม่มีรายการในเดือนนี้
               </div>
             ) : (
               pairs.map((pair) => (
-                <div key={pair.id} className="px-3 py-2.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {showCompanyBadge && pair.systemItem?.companyCode && (
-                      <Badge variant="secondary" className="text-[10px] px-1 h-4 font-mono flex-shrink-0">
-                        {pair.systemItem.companyCode}
-                      </Badge>
-                    )}
-                    <p className="text-sm font-medium truncate">
-                      {pair.systemItem?.vendorName || pair.systemItem?.description || "—"}
-                    </p>
-                    <span className="text-sm font-mono font-semibold ml-auto flex-shrink-0">
-                      {fmt(pair.systemItem?.baseAmount)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <span>{fmtDate(pair.systemItem?.date)}</span>
-                    {(pair.systemItem?.vatAmount ?? 0) > 0 && (
-                      <span className="ml-auto text-blue-600 dark:text-blue-400">
-                        VAT {fmt(pair.systemItem?.vatAmount)}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <SystemRow
+                  key={pair.id}
+                  item={pair.systemItem}
+                  isSelected={false}
+                  isSelectable={false}
+                  onSelect={() => {}}
+                  showCompanyBadge={showCompanyBadge}
+                />
               ))
             )}
           </div>
-
-          {/* Center divider */}
           <div className="border-r border-border" />
-
-          {/* Right: upload empty state */}
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center min-h-[300px]">
             <div className="h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center mb-4">
               <Upload className="h-6 w-6 text-muted-foreground/60" />
@@ -646,18 +646,15 @@ export function ReconcileTable({
           </div>
         </div>
       ) : (
-        /* Main split-view table */
         <div
-          className="divide-y divide-border overflow-y-auto"
-          style={{ maxHeight: "calc(100vh - 340px)" }}
+          className="divide-y divide-border/50 overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 380px)" }}
         >
-          {/* AI Suggestions section */}
+          {/* AI Suggestions */}
           {aiPairs.length > 0 && (
             <>
               <div className="grid grid-cols-[1fr_88px_1fr] bg-amber-50/60 dark:bg-amber-950/20">
-                <div
-                  className="col-span-3 px-3 py-1.5 border-y border-amber-200 dark:border-amber-800"
-                >
+                <div className="col-span-3 px-3 py-1.5 border-y border-amber-200 dark:border-amber-800">
                   <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
                     <Zap className="h-3.5 w-3.5" />
                     AI แนะนำ — รอยืนยัน ({aiPairs.length} รายการ)
@@ -670,8 +667,8 @@ export function ReconcileTable({
                   className="grid grid-cols-[1fr_88px_1fr] bg-amber-50/30 dark:bg-amber-950/10 hover:bg-amber-50/60 dark:hover:bg-amber-950/20 transition-colors"
                 >
                   <div className="border-r border-border">
-                    <SystemCell
-                      pair={pair}
+                    <SystemRow
+                      item={pair.systemItem}
                       isSelected={false}
                       isSelectable={false}
                       onSelect={() => {}}
@@ -688,8 +685,8 @@ export function ReconcileTable({
                       onUnlink={onUnlink}
                     />
                   </div>
-                  <AccountingCell
-                    pair={pair}
+                  <AccountingRow_
+                    item={pair.accountingItem}
                     isSelected={false}
                     isSelectable={false}
                     onSelect={() => {}}
@@ -699,60 +696,43 @@ export function ReconcileTable({
             </>
           )}
 
-          {/* Unmatched section — side-by-side, sorted by date */}
+          {/* Unmatched section */}
           {(allUnmatchedSystem.length > 0 || unmatchedAccounting.length > 0) && (
             <>
-              <div className="grid grid-cols-[1fr_88px_1fr] bg-muted/30">
-                <div className="col-span-3 px-3 py-1.5 border-y border-muted">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground flex-wrap">
+              <div className="bg-muted/30">
+                <div className="px-3 py-1.5 border-y border-muted">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                     <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                    ยังไม่ตรงกัน (ระบบ {currentMonthSystem.length}{spilloverSystem.length > 0 ? ` +${spilloverSystem.length} เดือนอื่น` : ""} | รายงาน {unmatchedAccounting.length})
+                    ยังไม่ตรงกัน (ระบบ {unmatchedSystem.length} | รายงาน {unmatchedAccounting.length})
                     <span className="font-normal">
                       — คลิกเลือก 1 แถวจากระบบ และ 1 แถวจากรายงานเพื่อจับคู่
                     </span>
                   </div>
                   {spilloverSystem.length > 0 && (
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => setShowSpillover(!showSpillover)}
-                        className="flex items-center gap-1 text-[11px] text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 font-medium transition-colors"
-                      >
-                        {showSpillover ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                        <CalendarDays className="h-3 w-3" />
-                        รายการเดือนก่อนหน้า ({spilloverSystem.length})
-                      </button>
-                      {showSpillover && spilloverMonths.length > 1 && (
-                        <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {RANGE_PRESETS.map((preset) => {
+                        const count = presetCounts.get(preset.value) ?? 0;
+                        if (preset.value > 0 && count === 0) return null;
+                        const isActive = monthRange === preset.value;
+                        return (
                           <button
+                            key={preset.value}
                             type="button"
-                            onClick={() => setSpilloverMonthFilter(null)}
+                            onClick={() => setMonthRange(preset.value)}
                             className={cn(
-                              "text-[10px] px-1.5 py-0.5 rounded-full border transition-colors",
-                              !spilloverMonthFilter
-                                ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 font-medium"
-                                : "border-muted text-muted-foreground hover:border-sky-300 hover:text-sky-600"
+                              "text-[11px] px-2 py-0.5 rounded-full border transition-colors",
+                              isActive
+                                ? "bg-sky-100 dark:bg-sky-900/40 border-sky-400 dark:border-sky-600 text-sky-700 dark:text-sky-300 font-medium"
+                                : "border-border text-muted-foreground hover:border-sky-300 hover:text-sky-600 dark:hover:text-sky-400"
                             )}
                           >
-                            ทั้งหมด
+                            {preset.label}
+                            {preset.value > 0 && (
+                              <span className="ml-1 opacity-60">({count})</span>
+                            )}
                           </button>
-                          {spilloverMonths.map((m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setSpilloverMonthFilter(m === spilloverMonthFilter ? null : m)}
-                              className={cn(
-                                "text-[10px] px-1.5 py-0.5 rounded-full border transition-colors",
-                                spilloverMonthFilter === m
-                                  ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 font-medium"
-                                  : "border-muted text-muted-foreground hover:border-sky-300 hover:text-sky-600"
-                              )}
-                            >
-                              {SHORT_MONTHS[m - 1]}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -766,41 +746,32 @@ export function ReconcileTable({
                 return (
                   <div
                     key={`unmatched-${i}`}
-                    className="grid grid-cols-[1fr_88px_1fr] hover:bg-muted/20 transition-colors"
+                    className="grid grid-cols-[1fr_88px_1fr] transition-colors"
                   >
-                    {/* Left: system item */}
                     <div
                       className={cn(
                         "border-r border-border",
                         isSysSelected && "bg-primary/5"
                       )}
                     >
-                      {sysPair ? (
-                        <SystemCell
-                          pair={sysPair}
-                          isSelected={isSysSelected}
-                          isSelectable
-                          onSelect={() => {
-                            if (!sysPair.systemItem) return;
-                            onSelectSystem(
-                              sysPair.systemItem.id === selectedSystemId
-                                ? null
-                                : sysPair.systemItem.id
-                            );
-                          }}
-                          showCompanyBadge={showCompanyBadge}
-                          onPreview={sysPair.systemItem ? () => handlePreview(sysPair.systemItem!.id) : undefined}
-                        />
-                      ) : (
-                        <div className="px-3 py-2.5 flex items-center opacity-25">
-                          <span className="text-xs text-muted-foreground italic">—</span>
-                        </div>
-                      )}
+                      <SystemRow
+                        item={sysPair?.systemItem}
+                        isSelected={isSysSelected}
+                        isSelectable={!!sysPair}
+                        onSelect={() => {
+                          if (!sysPair?.systemItem) return;
+                          onSelectSystem(
+                            sysPair.systemItem.id === selectedSystemId
+                              ? null
+                              : sysPair.systemItem.id
+                          );
+                        }}
+                        showCompanyBadge={showCompanyBadge}
+                        onPreview={sysPair?.systemItem ? () => handlePreview(sysPair.systemItem!.id) : undefined}
+                      />
                     </div>
-
-                    {/* Center: link indicator */}
                     <div className="border-r border-border">
-                      <div className="flex items-center justify-center px-1 py-2">
+                      <div className="flex items-center justify-center px-1 py-1.5">
                         {isSysSelected && isAccSelected ? (
                           <span className="text-[10px] text-primary font-medium text-center leading-tight">
                             จับคู่
@@ -814,28 +785,20 @@ export function ReconcileTable({
                         )}
                       </div>
                     </div>
-
-                    {/* Right: accounting item */}
                     <div className={cn(isAccSelected && "bg-amber-50/60 dark:bg-amber-950/20")}>
-                      {accPair ? (
-                        <AccountingCell
-                          pair={accPair}
-                          isSelected={isAccSelected}
-                          isSelectable
-                          onSelect={() => {
-                            if (accPair.accountingIndex === undefined) return;
-                            onSelectAccounting(
-                              accPair.accountingIndex === selectedAccountingIndex
-                                ? null
-                                : accPair.accountingIndex
-                            );
-                          }}
-                        />
-                      ) : (
-                        <div className="px-3 py-2.5 flex items-center opacity-25">
-                          <span className="text-xs text-muted-foreground italic">—</span>
-                        </div>
-                      )}
+                      <AccountingRow_
+                        item={accPair?.accountingItem}
+                        isSelected={isAccSelected}
+                        isSelectable={!!accPair}
+                        onSelect={() => {
+                          if (accPair?.accountingIndex === undefined) return;
+                          onSelectAccounting(
+                            accPair.accountingIndex === selectedAccountingIndex
+                              ? null
+                              : accPair.accountingIndex
+                          );
+                        }}
+                      />
                     </div>
                   </div>
                 );
@@ -846,8 +809,8 @@ export function ReconcileTable({
           {/* Matched section */}
           {matchedPairs.length > 0 && (
             <>
-              <div className="grid grid-cols-[1fr_88px_1fr] bg-emerald-50/30 dark:bg-emerald-950/10">
-                <div className="col-span-3 px-3 py-1.5 border-y border-emerald-200/60 dark:border-emerald-800/40">
+              <div className="bg-emerald-50/30 dark:bg-emerald-950/10">
+                <div className="px-3 py-1.5 border-y border-emerald-200/60 dark:border-emerald-800/40">
                   <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     จับคู่แล้ว ({matchedPairs.length} รายการ)
@@ -860,8 +823,8 @@ export function ReconcileTable({
                   className="grid grid-cols-[1fr_88px_1fr] hover:bg-muted/20 transition-colors"
                 >
                   <div className="border-r border-border">
-                    <SystemCell
-                      pair={pair}
+                    <SystemRow
+                      item={pair.systemItem}
                       isSelected={false}
                       isSelectable={false}
                       onSelect={() => {}}
@@ -878,8 +841,8 @@ export function ReconcileTable({
                       onUnlink={onUnlink}
                     />
                   </div>
-                  <AccountingCell
-                    pair={pair}
+                  <AccountingRow_
+                    item={pair.accountingItem}
                     isSelected={false}
                     isSelectable={false}
                     onSelect={() => {}}
