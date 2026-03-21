@@ -91,53 +91,98 @@ async function WorkspaceDataLoader({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59);
 
+  // Previous month range for spillover (cross-month) items
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const spilloverStart = new Date(prevYear, prevMonth - 1, 1);
+  const spilloverEnd = new Date(prevYear, prevMonth, 0, 23, 59, 59);
+
   const companyIdToCode = new Map(
     siblingCompanies.map((c) => [c.id, c.code])
   );
 
-  const [expenses, payOnBehalfExpenses, incomes, existingSession] =
-    await Promise.all([
-      prisma.expense.findMany({
-        where: {
-          ...companyIdFilter,
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        include: { Contact: true, ExpensePayments: true },
-        orderBy: { billDate: "asc" },
-      }),
-      prisma.expense.findMany({
-        where: {
-          internalCompanyId: { in: selectedCompanyIds },
-          companyId: { notIn: selectedCompanyIds },
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        include: { Contact: true, Company: { select: { code: true } } },
-        orderBy: { billDate: "asc" },
-      }),
-      prisma.income.findMany({
-        where: {
-          ...companyIdFilter,
-          receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
-        include: { Contact: true },
-        orderBy: { receiveDate: "asc" },
-      }),
-      prisma.reconcileSession.findFirst({
-        where: {
-          companyId: company.id,
-          month,
-          year,
-          type,
-        },
-        include: {
-          AccountingRows: { orderBy: { rowIndex: "asc" } },
-          Matches: { orderBy: { createdAt: "asc" } },
-        },
-      }),
-    ]);
+  const [
+    expenses,
+    payOnBehalfExpenses,
+    incomes,
+    existingSession,
+    spilloverExpenses,
+    spilloverPayOnBehalf,
+    spilloverIncomes,
+  ] = await Promise.all([
+    prisma.expense.findMany({
+      where: {
+        ...companyIdFilter,
+        billDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
+      },
+      include: { Contact: true, ExpensePayments: true },
+      orderBy: { billDate: "asc" },
+    }),
+    prisma.expense.findMany({
+      where: {
+        internalCompanyId: { in: selectedCompanyIds },
+        companyId: { notIn: selectedCompanyIds },
+        billDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
+      },
+      include: { Contact: true, Company: { select: { code: true } } },
+      orderBy: { billDate: "asc" },
+    }),
+    prisma.income.findMany({
+      where: {
+        ...companyIdFilter,
+        receiveDate: { gte: startDate, lte: endDate },
+        deletedAt: null,
+      },
+      include: { Contact: true },
+      orderBy: { receiveDate: "asc" },
+    }),
+    prisma.reconcileSession.findFirst({
+      where: {
+        companyId: company.id,
+        month,
+        year,
+        type,
+      },
+      include: {
+        AccountingRows: { orderBy: { rowIndex: "asc" } },
+        Matches: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+    // Spillover: previous month expenses not yet matched in any session
+    prisma.expense.findMany({
+      where: {
+        ...companyIdFilter,
+        billDate: { gte: spilloverStart, lte: spilloverEnd },
+        deletedAt: null,
+        ReconcileMatches: { none: {} },
+      },
+      include: { Contact: true, ExpensePayments: true },
+      orderBy: { billDate: "asc" },
+    }),
+    prisma.expense.findMany({
+      where: {
+        internalCompanyId: { in: selectedCompanyIds },
+        companyId: { notIn: selectedCompanyIds },
+        billDate: { gte: spilloverStart, lte: spilloverEnd },
+        deletedAt: null,
+        ReconcileMatches: { none: {} },
+      },
+      include: { Contact: true, Company: { select: { code: true } } },
+      orderBy: { billDate: "asc" },
+    }),
+    prisma.income.findMany({
+      where: {
+        ...companyIdFilter,
+        receiveDate: { gte: spilloverStart, lte: spilloverEnd },
+        deletedAt: null,
+        ReconcileMatches: { none: {} },
+      },
+      include: { Contact: true },
+      orderBy: { receiveDate: "asc" },
+    }),
+  ]);
 
   const systemExpenses = [
     ...expenses.map((e) => {
@@ -202,6 +247,73 @@ async function WorkspaceDataLoader({
     companyCode: companyIdToCode.get(i.companyId) ?? "",
   }));
 
+  // Spillover items from previous month (not yet matched anywhere)
+  const spilloverSystemExpenses = [
+    ...spilloverExpenses.map((e) => {
+      const paidByUser = e.ExpensePayments?.some(
+        (p: any) => p.paidByType === "USER"
+      );
+      return {
+        id: e.id,
+        date: e.billDate.toISOString(),
+        invoiceNumber: e.invoiceNumber ?? "",
+        vendorName: e.Contact?.name ?? e.description ?? "",
+        taxId: e.Contact?.taxId ?? "",
+        baseAmount: Number(e.amount),
+        vatAmount: Number(e.vatAmount ?? 0),
+        totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
+        description: e.description ?? "",
+        status: e.workflowStatus,
+        companyCode: companyIdToCode.get(e.companyId) ?? "",
+        isPayOnBehalf:
+          !!e.internalCompanyId && e.internalCompanyId !== e.companyId,
+        payOnBehalfFrom:
+          e.internalCompanyId && e.internalCompanyId !== e.companyId
+            ? companyIdToCode.get(e.companyId) ?? undefined
+            : undefined,
+        payOnBehalfTo:
+          e.internalCompanyId && e.internalCompanyId !== e.companyId
+            ? companyIdToCode.get(e.internalCompanyId) ?? undefined
+            : undefined,
+        paidByUser,
+        fromMonth: prevMonth,
+      };
+    }),
+    ...spilloverPayOnBehalf.map((e) => ({
+      id: e.id,
+      date: e.billDate.toISOString(),
+      invoiceNumber: e.invoiceNumber ?? "",
+      vendorName: e.Contact?.name ?? e.description ?? "",
+      taxId: e.Contact?.taxId ?? "",
+      baseAmount: Number(e.amount),
+      vatAmount: Number(e.vatAmount ?? 0),
+      totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
+      description: e.description ?? "",
+      status: e.workflowStatus,
+      companyCode: (e as any).Company?.code ?? "",
+      isPayOnBehalf: true,
+      payOnBehalfFrom: (e as any).Company?.code ?? undefined,
+      payOnBehalfTo: e.internalCompanyId ? companyIdToCode.get(e.internalCompanyId) ?? undefined : undefined,
+      paidByUser: false,
+      fromMonth: prevMonth,
+    })),
+  ];
+
+  const spilloverSystemIncomes = spilloverIncomes.map((i) => ({
+    id: i.id,
+    date: i.receiveDate.toISOString(),
+    invoiceNumber: i.invoiceNumber ?? "",
+    vendorName: i.Contact?.name ?? i.source ?? "",
+    taxId: i.Contact?.taxId ?? "",
+    baseAmount: Number(i.amount),
+    vatAmount: Number(i.vatAmount ?? 0),
+    totalAmount: Number(i.amount) + Number(i.vatAmount ?? 0),
+    description: i.source ?? "",
+    status: i.workflowStatus,
+    companyCode: companyIdToCode.get(i.companyId) ?? "",
+    fromMonth: prevMonth,
+  }));
+
   const savedAccountingRows = existingSession?.AccountingRows?.map((r) => ({
     date: r.date,
     invoiceNumber: r.invoiceNumber ?? "",
@@ -244,6 +356,8 @@ async function WorkspaceDataLoader({
       type={type}
       systemExpenses={systemExpenses}
       systemIncomes={systemIncomes}
+      spilloverExpenses={spilloverSystemExpenses}
+      spilloverIncomes={spilloverSystemIncomes}
       siblingCompanies={
         hasSiblings
           ? siblingCompanies.map((c) => ({ code: c.code, name: c.name }))

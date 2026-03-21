@@ -35,6 +35,7 @@ export interface SystemItem {
   payOnBehalfFrom?: string;
   payOnBehalfTo?: string;
   paidByUser?: boolean;
+  fromMonth?: number;
 }
 
 export type MatchStatus =
@@ -78,6 +79,10 @@ interface ReconcileTableProps {
 const MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+const SHORT_MONTHS = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
 ];
 
 function fmt(n?: number) {
@@ -178,6 +183,11 @@ function SystemCell({
         {showCompanyBadge && item.companyCode && (
           <Badge variant="secondary" className="text-[10px] px-1 h-4 font-mono flex-shrink-0">
             {item.companyCode}
+          </Badge>
+        )}
+        {item.fromMonth && (
+          <Badge variant="outline" className="text-[10px] px-1 h-4 flex-shrink-0 text-sky-600 border-sky-300 dark:text-sky-400 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/30">
+            {SHORT_MONTHS[item.fromMonth - 1]}
           </Badge>
         )}
         <p className="text-sm font-medium truncate">

@@ -88,6 +88,8 @@ interface ReconcileWorkspaceProps {
   type: "expense" | "income";
   systemExpenses: SystemItem[];
   systemIncomes: SystemItem[];
+  spilloverExpenses?: SystemItem[];
+  spilloverIncomes?: SystemItem[];
   siblingCompanies?: SiblingCompany[];
   selectedCompanyCodes?: string[];
   savedSession?: SavedSession;
@@ -548,6 +550,8 @@ export function ReconcileWorkspace({
   type,
   systemExpenses,
   systemIncomes,
+  spilloverExpenses = [],
+  spilloverIncomes = [],
   siblingCompanies,
   selectedCompanyCodes,
   savedSession,
@@ -593,7 +597,9 @@ export function ReconcileWorkspace({
 
   const hasSiblings = !!siblingCompanies && siblingCompanies.length > 1;
 
-  const allSystemItems = type === "expense" ? systemExpenses : systemIncomes;
+  const allSystemItems = type === "expense"
+    ? [...systemExpenses, ...spilloverExpenses]
+    : [...systemIncomes, ...spilloverIncomes];
 
   const systemItems = useMemo(() => {
     let items = allSystemItems;
