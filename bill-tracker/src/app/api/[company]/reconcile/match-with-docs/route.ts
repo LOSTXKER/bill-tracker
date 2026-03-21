@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/db";
 import { analyzeImage, generateText } from "@/lib/ai/gemini";
-import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
-import { apiResponse } from "@/lib/api/response";
-import { ApiErrors } from "@/lib/api/errors";
+import { auth } from "@/auth";
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 
 interface DocMatchRequest {
   systemItems: Array<{
@@ -24,71 +23,155 @@ interface DocMatchRequest {
   }>;
 }
 
-export const POST = withCompanyAccessFromParams(
-  async (request, { company }) => {
-    const body = (await request.json()) as DocMatchRequest;
-    const { systemItems, accountingItems } = body;
+type SSEEvent =
+  | { event: "progress"; data: { step: string; current: number; total: number; itemId?: string; vendorName?: string } }
+  | { event: "doc_found"; data: { itemId: string; vendorName: string; docCount: number } }
+  | { event: "doc_read"; data: { itemId: string; docIndex: number; docTotal: number; extractedSnippet: string } }
+  | { event: "doc_skip"; data: { itemId: string; vendorName: string; reason: string } }
+  | { event: "matching"; data: { message: string; itemsWithDocs: number } }
+  | { event: "result"; data: { suggestions: Array<{ systemId: string; accountingIndex: number; confidence: number; reason: string }> } }
+  | { event: "done"; data: { totalAnalyzed: number; docsRead: number; matchesFound: number } }
+  | { event: "error"; data: { message: string } };
 
-    if (!systemItems?.length || !accountingItems?.length) {
-      return apiResponse.success({ suggestions: [] });
-    }
+function formatSSE(event: SSEEvent): string {
+  return `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`;
+}
 
-    const MAX_ITEMS = 5;
-    const itemsToAnalyze = systemItems.slice(0, MAX_ITEMS);
+export async function POST(
+  request: Request,
+  routeContext: { params: Promise<{ company: string }> }
+) {
+  const session = await auth();
+  if (!session?.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
 
-    const docResults: Array<{
-      systemId: string;
-      extractedInfo: string;
-    }> = [];
+  const params = await routeContext.params;
+  const companyCode = params.company?.toUpperCase();
+  if (!companyCode) {
+    return new Response(JSON.stringify({ error: "Company code required" }), { status: 400 });
+  }
 
-    for (const item of itemsToAnalyze) {
-      const docUrls = await getDocumentUrls(item.id, item.type);
-      if (docUrls.length === 0) continue;
+  const company = await prisma.company.findUnique({ where: { code: companyCode } });
+  if (!company) {
+    return new Response(JSON.stringify({ error: "Company not found" }), { status: 404 });
+  }
 
-      const urlsToAnalyze = docUrls.slice(0, 3);
+  const access = await prisma.companyAccess.findUnique({
+    where: { userId_companyId: { userId: session.user.id, companyId: company.id } },
+  });
+  if (!access) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+
+  const ip = getClientIP(request);
+  const { success: rateLimitOk } = rateLimit(ip, { maxRequests: 5, windowMs: 60_000 });
+  if (!rateLimitOk) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429 });
+  }
+
+  const body = (await request.json()) as DocMatchRequest;
+  const { systemItems, accountingItems } = body;
+
+  if (!systemItems?.length || !accountingItems?.length) {
+    return new Response(JSON.stringify({ data: { suggestions: [] } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const MAX_ITEMS = 5;
+  const itemsToAnalyze = systemItems.slice(0, MAX_ITEMS);
+  const totalItems = itemsToAnalyze.length;
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const send = (evt: SSEEvent) => {
+        try { controller.enqueue(encoder.encode(formatSSE(evt))); } catch { /* stream closed */ }
+      };
 
       try {
-        const extractedTexts: string[] = [];
-        for (const url of urlsToAnalyze) {
-          const result = await analyzeImage(url, 
-            "อ่านข้อมูลจากเอกสารนี้ ระบุ: ยอดเงิน, ยอด VAT, ชื่อผู้ขาย/ลูกค้า, เลขที่ใบกำกับภาษี, เลขประจำตัวผู้เสียภาษี, วันที่ (ถ้ามี) ตอบเป็น text สั้นๆ",
-            { timeoutMs: 30_000, maxTokens: 500, retries: 1 }
-          );
-          if (result.data) {
-            extractedTexts.push(result.data);
+        send({ event: "progress", data: { step: "เริ่มวิเคราะห์เอกสาร", current: 0, total: totalItems } });
+
+        const docResults: Array<{ systemId: string; extractedInfo: string }> = [];
+        let totalDocsRead = 0;
+
+        for (let i = 0; i < itemsToAnalyze.length; i++) {
+          const item = itemsToAnalyze[i];
+
+          send({
+            event: "progress",
+            data: {
+              step: "ค้นหาเอกสารแนบ",
+              current: i + 1,
+              total: totalItems,
+              itemId: item.id,
+              vendorName: item.vendorName,
+            },
+          });
+
+          const docUrls = await getDocumentUrls(item.id, item.type);
+
+          if (docUrls.length === 0) {
+            send({ event: "doc_skip", data: { itemId: item.id, vendorName: item.vendorName, reason: "ไม่พบเอกสารแนบ" } });
+            continue;
+          }
+
+          send({ event: "doc_found", data: { itemId: item.id, vendorName: item.vendorName, docCount: docUrls.length } });
+
+          const urlsToAnalyze = docUrls.slice(0, 3);
+          const extractedTexts: string[] = [];
+
+          for (let d = 0; d < urlsToAnalyze.length; d++) {
+            const url = urlsToAnalyze[d];
+            try {
+              const result = await analyzeImage(
+                url,
+                "อ่านข้อมูลจากเอกสารนี้ ระบุ: ยอดเงิน, ยอด VAT, ชื่อผู้ขาย/ลูกค้า, เลขที่ใบกำกับภาษี, เลขประจำตัวผู้เสียภาษี, วันที่ (ถ้ามี) ตอบเป็น text สั้นๆ",
+                { timeoutMs: 30_000, maxTokens: 500, retries: 1 }
+              );
+
+              if (result.data) {
+                extractedTexts.push(result.data);
+                totalDocsRead++;
+                const snippet = result.data.length > 80 ? result.data.slice(0, 80) + "…" : result.data;
+                send({ event: "doc_read", data: { itemId: item.id, docIndex: d + 1, docTotal: urlsToAnalyze.length, extractedSnippet: snippet } });
+              }
+            } catch (err) {
+              console.error(`Doc analysis failed for ${item.id} doc ${d}:`, err);
+            }
+          }
+
+          if (extractedTexts.length > 0) {
+            docResults.push({ systemId: item.id, extractedInfo: extractedTexts.join("\n---\n") });
           }
         }
 
-        if (extractedTexts.length > 0) {
-          docResults.push({
-            systemId: item.id,
-            extractedInfo: extractedTexts.join("\n---\n"),
-          });
+        if (docResults.length === 0) {
+          send({ event: "result", data: { suggestions: [] } });
+          send({ event: "done", data: { totalAnalyzed: totalItems, docsRead: totalDocsRead, matchesFound: 0 } });
+          controller.close();
+          return;
         }
-      } catch (err) {
-        console.error(`Doc analysis failed for ${item.id}:`, err);
-      }
-    }
 
-    if (docResults.length === 0) {
-      return apiResponse.success({ suggestions: [] });
-    }
+        send({ event: "matching", data: { message: "กำลังจับคู่ด้วย AI", itemsWithDocs: docResults.length } });
 
-    const docContext = docResults
-      .map((d) => {
-        const sysItem = systemItems.find((s) => s.id === d.systemId);
-        return `รายการ id="${d.systemId}" (${sysItem?.vendorName}, ยอด ${sysItem?.amount}):\n  เอกสารแนบระบุ: ${d.extractedInfo}`;
-      })
-      .join("\n\n");
+        const docContext = docResults
+          .map((d) => {
+            const sysItem = systemItems.find((s) => s.id === d.systemId);
+            return `รายการ id="${d.systemId}" (${sysItem?.vendorName}, ยอด ${sysItem?.amount}):\n  เอกสารแนบระบุ: ${d.extractedInfo}`;
+          })
+          .join("\n\n");
 
-    const acctList = accountingItems
-      .map(
-        (a) =>
-          `[${a.index}] ชื่อ="${a.vendorName}" ยอด=${a.amount} VAT=${a.vatAmount} วันที่=${a.date} taxId="${a.taxId ?? ""}"`
-      )
-      .join("\n");
+        const acctList = accountingItems
+          .map(
+            (a) =>
+              `[${a.index}] ชื่อ="${a.vendorName}" ยอด=${a.amount} VAT=${a.vatAmount} วันที่=${a.date} taxId="${a.taxId ?? ""}"`
+          )
+          .join("\n");
 
-    const prompt = `คุณเป็นผู้เชี่ยวชาญด้านบัญชีไทย ช่วยจับคู่รายการโดยใช้ข้อมูลจากเอกสารแนบ (ใบกำกับภาษี, สลิป, หนังสือรับรอง ฯลฯ)
+        const prompt = `คุณเป็นผู้เชี่ยวชาญด้านบัญชีไทย ช่วยจับคู่รายการโดยใช้ข้อมูลจากเอกสารแนบ (ใบกำกับภาษี, สลิป, หนังสือรับรอง ฯลฯ)
 
 **ข้อมูลจากเอกสารแนบของรายการในระบบ:**
 ${docContext}
@@ -109,31 +192,43 @@ ${acctList}
 
 ตอบด้วย JSON เท่านั้น`;
 
-    const response = await generateText(prompt, { maxTokens: 2048 });
+        const response = await generateText(prompt, { maxTokens: 2048 });
 
-    let suggestions: Array<{
-      systemId: string;
-      accountingIndex: number;
-      confidence: number;
-      reason: string;
-    }> = [];
+        let suggestions: Array<{
+          systemId: string;
+          accountingIndex: number;
+          confidence: number;
+          reason: string;
+        }> = [];
 
-    try {
-      const jsonMatch = response.data.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        suggestions = JSON.parse(jsonMatch[0]);
+        try {
+          const jsonMatch = response.data.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            suggestions = JSON.parse(jsonMatch[0]);
+          }
+        } catch {
+          suggestions = [];
+        }
+
+        send({ event: "result", data: { suggestions } });
+        send({ event: "done", data: { totalAnalyzed: totalItems, docsRead: totalDocsRead, matchesFound: suggestions.length } });
+      } catch (err) {
+        send({ event: "error", data: { message: err instanceof Error ? err.message : "Unknown error" } });
+      } finally {
+        controller.close();
       }
-    } catch {
-      suggestions = [];
-    }
+    },
+  });
 
-    return apiResponse.success({ suggestions });
-  },
-  {
-    permission: "reports:read",
-    rateLimit: { maxRequests: 5, windowMs: 60_000 },
-  }
-);
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
 
 async function getDocumentUrls(
   itemId: string,
@@ -159,8 +254,7 @@ async function getDocumentUrls(
       expense.whtCertUrls,
       expense.otherDocUrls,
     ]) {
-      const parsed = parseJsonUrls(field);
-      urls.push(...parsed);
+      urls.push(...parseJsonUrls(field));
     }
   } else {
     const income = await prisma.income.findUnique({
@@ -180,8 +274,7 @@ async function getDocumentUrls(
       income.whtCertUrls,
       income.otherDocUrls,
     ]) {
-      const parsed = parseJsonUrls(field);
-      urls.push(...parsed);
+      urls.push(...parseJsonUrls(field));
     }
   }
 

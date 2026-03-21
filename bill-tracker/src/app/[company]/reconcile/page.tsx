@@ -2,13 +2,13 @@ import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { ReconcileView } from "@/components/reconcile/ReconcileView";
+import { ReconcileDashboard, type SessionSummary } from "@/components/reconcile/ReconcileDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GitCompare } from "lucide-react";
 
 interface ReconcilePageProps {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ month?: string; year?: string; type?: string; companies?: string }>;
+  searchParams: Promise<{ year?: string; type?: string }>;
 }
 
 export default async function ReconcilePage({
@@ -19,12 +19,10 @@ export default async function ReconcilePage({
   if (!session?.user) redirect("/login");
 
   const { company: companyCode } = await params;
-  const { month, year, type = "expense", companies } = await searchParams;
+  const { year, type = "expense" } = await searchParams;
 
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
   const selectedYear = year ? parseInt(year) : currentYear;
-  const selectedMonth = month ? parseInt(month) : currentMonth;
 
   return (
     <div className="space-y-6">
@@ -36,184 +34,86 @@ export default async function ReconcilePage({
           </h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          เปรียบเทียบข้อมูลในระบบกับรายงานภาษีของพนักงานบัญชี — รองรับ Auto-match และ AI ช่วยจับคู่
+          เลือกเดือนที่ต้องการเทียบรายงาน — รองรับ Auto-match และ AI ช่วยจับคู่
         </p>
       </div>
 
-      <Suspense fallback={<ReconcileSkeleton />}>
-        <ReconcileDataLoader
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardLoader
           companyCode={companyCode}
           year={selectedYear}
-          month={selectedMonth}
           type={type as "expense" | "income"}
-          companiesParam={companies}
         />
       </Suspense>
     </div>
   );
 }
 
-async function ReconcileDataLoader({
+async function DashboardLoader({
   companyCode,
   year,
-  month,
   type,
-  companiesParam,
 }: {
   companyCode: string;
   year: number;
-  month: number;
   type: "expense" | "income";
-  companiesParam?: string;
 }) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
   });
   if (!company) return null;
 
-  const siblingCompanies = company.taxId
-    ? await prisma.company.findMany({
-        where: { taxId: company.taxId },
-        select: { id: true, code: true, name: true },
-        orderBy: { name: "asc" },
-      })
-    : [{ id: company.id, code: company.code, name: company.name }];
+  const sessions = await prisma.reconcileSession.findMany({
+    where: {
+      companyId: company.id,
+      year,
+    },
+    include: {
+      _count: { select: { Matches: true, AccountingRows: true } },
+    },
+    orderBy: [{ month: "asc" }, { type: "asc" }],
+  });
 
-  const hasSiblings = siblingCompanies.length > 1;
-
-  const selectedCodes = companiesParam
-    ? companiesParam.split(",").map((c) => c.trim().toUpperCase())
-    : siblingCompanies.map((c) => c.code);
-
-  const selectedCompanyIds = siblingCompanies
-    .filter((c) => selectedCodes.includes(c.code))
-    .map((c) => c.id);
-
-  if (selectedCompanyIds.length === 0) {
-    selectedCompanyIds.push(company.id);
-  }
-
-  const companyIdFilter = selectedCompanyIds.length === 1
-    ? { companyId: selectedCompanyIds[0] }
-    : { companyId: { in: selectedCompanyIds } };
-
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
-
-  const companyIdToCode = new Map(siblingCompanies.map((c) => [c.id, c.code]));
-
-  // Load expenses from selected companies + cross-company "จ่ายแทน"
-  const [expenses, payOnBehalfExpenses, incomes] = await Promise.all([
-    prisma.expense.findMany({
-      where: {
-        ...companyIdFilter,
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-      },
-      include: { Contact: true, ExpensePayments: true },
-      orderBy: { billDate: "asc" },
-    }),
-    // Cross-company: expenses from OTHER companies where internalCompanyId = current company
-    prisma.expense.findMany({
-      where: {
-        internalCompanyId: { in: selectedCompanyIds },
-        companyId: { notIn: selectedCompanyIds },
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-      },
-      include: { Contact: true, Company: { select: { code: true } } },
-      orderBy: { billDate: "asc" },
-    }),
-    prisma.income.findMany({
-      where: {
-        ...companyIdFilter,
-        receiveDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-      },
-      include: { Contact: true },
-      orderBy: { receiveDate: "asc" },
-    }),
-  ]);
-
-  const systemExpenses = [
-    ...expenses.map((e) => {
-      const paidByUser = e.ExpensePayments?.some((p: any) => p.paidByType === "USER");
-      return {
-        id: e.id,
-        date: e.billDate.toISOString(),
-        invoiceNumber: e.invoiceNumber ?? "",
-        vendorName: e.Contact?.name ?? e.description ?? "",
-        taxId: e.Contact?.taxId ?? "",
-        baseAmount: Number(e.amount),
-        vatAmount: Number(e.vatAmount ?? 0),
-        totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
-        description: e.description ?? "",
-        status: e.workflowStatus,
-        companyCode: companyIdToCode.get(e.companyId) ?? "",
-        isPayOnBehalf: !!e.internalCompanyId && e.internalCompanyId !== e.companyId,
-        payOnBehalfFrom: e.internalCompanyId && e.internalCompanyId !== e.companyId
-          ? companyIdToCode.get(e.companyId) ?? undefined
-          : undefined,
-        paidByUser,
-      };
-    }),
-    ...payOnBehalfExpenses.map((e) => ({
-      id: e.id,
-      date: e.billDate.toISOString(),
-      invoiceNumber: e.invoiceNumber ?? "",
-      vendorName: e.Contact?.name ?? e.description ?? "",
-      taxId: e.Contact?.taxId ?? "",
-      baseAmount: Number(e.amount),
-      vatAmount: Number(e.vatAmount ?? 0),
-      totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
-      description: e.description ?? "",
-      status: e.workflowStatus,
-      companyCode: (e as any).Company?.code ?? "",
-      isPayOnBehalf: true,
-      payOnBehalfFrom: (e as any).Company?.code ?? undefined,
-      paidByUser: false,
-    })),
-  ];
-
-  const systemIncomes = incomes.map((i) => ({
-    id: i.id,
-    date: i.receiveDate.toISOString(),
-    invoiceNumber: i.invoiceNumber ?? "",
-    vendorName: i.Contact?.name ?? i.source ?? "",
-    taxId: i.Contact?.taxId ?? "",
-    baseAmount: Number(i.amount),
-    vatAmount: Number(i.vatAmount ?? 0),
-    totalAmount: Number(i.amount) + Number(i.vatAmount ?? 0),
-    description: i.source ?? "",
-    status: i.workflowStatus,
-    companyCode: companyIdToCode.get(i.companyId) ?? "",
+  const sessionData: SessionSummary[] = sessions.map((s) => ({
+    id: s.id,
+    month: s.month,
+    year: s.year,
+    type: s.type,
+    status: s.status,
+    matchedCount: s.matchedCount,
+    unmatchedSystemCount: s.unmatchedSystemCount,
+    unmatchedAccountCount: s.unmatchedAccountCount,
+    totalSystemAmount: String(s.totalSystemAmount),
+    totalAccountAmount: String(s.totalAccountAmount),
+    sourceFileName: s.sourceFileName,
+    sourceFileUrl: s.sourceFileUrl,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+    completedAt: s.completedAt?.toISOString() ?? null,
+    _count: s._count,
   }));
 
   return (
-    <ReconcileView
+    <ReconcileDashboard
       companyCode={companyCode}
       year={year}
-      month={month}
       type={type}
-      systemExpenses={systemExpenses}
-      systemIncomes={systemIncomes}
-      siblingCompanies={hasSiblings ? siblingCompanies.map((c) => ({ code: c.code, name: c.name })) : undefined}
-      selectedCompanyCodes={hasSiblings ? selectedCodes.filter((c) => siblingCompanies.some((s) => s.code === c)) : undefined}
+      sessions={sessionData}
     />
   );
 }
 
-function ReconcileSkeleton() {
+function DashboardSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex gap-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-9 w-32" />
-        ))}
+        <Skeleton className="h-9 w-28" />
+        <Skeleton className="h-9 w-40" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Skeleton className="h-[500px] w-full rounded-xl" />
-        <Skeleton className="h-[500px] w-full rounded-xl" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <Skeleton key={i} className="h-[120px] w-full rounded-xl" />
+        ))}
       </div>
     </div>
   );

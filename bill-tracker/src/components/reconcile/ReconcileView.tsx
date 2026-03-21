@@ -39,6 +39,12 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImportPanel, type AccountingRow } from "./ImportPanel";
 import { ReconcileTable, type MatchedPair, type SystemItem, type MatchStatus } from "./ReconcileTable";
+import {
+  DocAIProgressPanel,
+  type DocAIItemProgress,
+  type DocAIPhase,
+  type DocAISummary,
+} from "./DocAIProgressPanel";
 import { cn } from "@/lib/utils";
 
 export interface SiblingCompany {
@@ -348,7 +354,12 @@ export function ReconcileView({
   const [sessions, setSessions] = useState<ReconcileSessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sourceFileName, setSourceFileName] = useState<string | null>(null);
-  const [isDocAILoading, setIsDocAILoading] = useState(false);
+  const [docAIPhase, setDocAIPhase] = useState<DocAIPhase | null>(null);
+  const [docAIItems, setDocAIItems] = useState<DocAIItemProgress[]>([]);
+  const [docAITotalItems, setDocAITotalItems] = useState(0);
+  const [docAISummary, setDocAISummary] = useState<DocAISummary | undefined>();
+  const [docAIError, setDocAIError] = useState<string | undefined>();
+  const isDocAILoading = docAIPhase === "analyzing" || docAIPhase === "matching";
 
   const hasSiblings = !!siblingCompanies && siblingCompanies.length > 1;
 
@@ -522,7 +533,19 @@ export function ReconcileView({
 
     if (!unmatchedSystem.length || !unmatchedAccounting.length) return;
 
-    setIsDocAILoading(true);
+    const maxItems = Math.min(unmatchedSystem.length, 5);
+    setDocAIPhase("analyzing");
+    setDocAISummary(undefined);
+    setDocAIError(undefined);
+    setDocAITotalItems(maxItems);
+    setDocAIItems(
+      unmatchedSystem.slice(0, maxItems).map((s) => ({
+        itemId: s.id,
+        vendorName: s.vendorName || s.description || "ไม่ระบุ",
+        status: "pending" as const,
+      }))
+    );
+
     try {
       const res = await fetch(`/api/${companyCode}/reconcile/match-with-docs`, {
         method: "POST",
@@ -549,52 +572,151 @@ export function ReconcileView({
       });
 
       if (!res.ok) throw new Error("Doc AI request failed");
-      const json = await res.json();
-      const suggestions = json.data?.suggestions ?? [];
+      if (!res.body) throw new Error("No response body");
 
-      if (suggestions.length === 0) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      setPairs((prev) => {
-        const updated = [...prev];
-        const usedAccountingInAI = new Set<number>();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        suggestions.forEach(
-          (s: { systemId: string; accountingIndex: number; confidence: number; reason: string }) => {
-            const realIdx = s.accountingIndex;
-            if (usedAccountingInAI.has(realIdx)) return;
+        buffer += decoder.decode(value, { stream: true });
 
-            const sysIdx = updated.findIndex(
-              (p) => p.status === "system-only" && p.systemItem?.id === s.systemId
-            );
-            const accIdx = updated.findIndex(
-              (p) => p.status === "accounting-only" && p.accountingIndex === realIdx
-            );
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
-            if (sysIdx === -1 || accIdx === -1) return;
-
-            const merged: MatchedPair = {
-              id: `docai-${s.systemId}-${realIdx}`,
-              systemItem: updated[sysIdx].systemItem,
-              accountingItem: updated[accIdx].accountingItem,
-              accountingIndex: realIdx,
-              status: "ai",
-              confidence: s.confidence,
-              aiReason: `[เอกสาร] ${s.reason}`,
-              userConfirmed: undefined,
-            };
-
-            updated.splice(Math.max(sysIdx, accIdx), 1);
-            updated.splice(Math.min(sysIdx, accIdx), 1, merged);
-            usedAccountingInAI.add(realIdx);
+        let eventType = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && eventType) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              processDocAIEvent(eventType, data);
+            } catch { /* ignore parse errors */ }
+            eventType = "";
           }
-        );
-
-        return updated;
-      });
+        }
+      }
     } catch (err) {
-      console.error("Doc AI match error:", err);
-    } finally {
-      setIsDocAILoading(false);
+      console.error("Doc AI stream error:", err);
+      setDocAIPhase("error");
+      setDocAIError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const processDocAIEvent = (eventType: string, data: any) => {
+    switch (eventType) {
+      case "progress":
+        setDocAIItems((prev) =>
+          prev.map((item) =>
+            item.itemId === data.itemId
+              ? { ...item, status: "searching" as const }
+              : item
+          )
+        );
+        break;
+
+      case "doc_found":
+        setDocAIItems((prev) =>
+          prev.map((item) =>
+            item.itemId === data.itemId
+              ? { ...item, status: "reading" as const, docCount: data.docCount, docsRead: 0, docTotal: Math.min(data.docCount, 3) }
+              : item
+          )
+        );
+        break;
+
+      case "doc_read":
+        setDocAIItems((prev) =>
+          prev.map((item) =>
+            item.itemId === data.itemId
+              ? { ...item, docsRead: data.docIndex, lastSnippet: data.extractedSnippet }
+              : item
+          )
+        );
+        break;
+
+      case "doc_skip":
+        setDocAIItems((prev) =>
+          prev.map((item) =>
+            item.itemId === data.itemId
+              ? { ...item, status: "skipped" as const }
+              : item
+          )
+        );
+        break;
+
+      case "matching":
+        setDocAIItems((prev) =>
+          prev.map((item) =>
+            item.status === "reading"
+              ? { ...item, status: "done" as const }
+              : item
+          )
+        );
+        setDocAIPhase("matching");
+        break;
+
+      case "result": {
+        const suggestions = data.suggestions ?? [];
+        if (suggestions.length > 0) {
+          setPairs((prev) => {
+            const updated = [...prev];
+            const usedAccountingInAI = new Set<number>();
+
+            suggestions.forEach(
+              (s: { systemId: string; accountingIndex: number; confidence: number; reason: string }) => {
+                const realIdx = s.accountingIndex;
+                if (usedAccountingInAI.has(realIdx)) return;
+
+                const sysIdx = updated.findIndex(
+                  (p) => p.status === "system-only" && p.systemItem?.id === s.systemId
+                );
+                const accIdx = updated.findIndex(
+                  (p) => p.status === "accounting-only" && p.accountingIndex === realIdx
+                );
+
+                if (sysIdx === -1 || accIdx === -1) return;
+
+                const merged: MatchedPair = {
+                  id: `docai-${s.systemId}-${realIdx}`,
+                  systemItem: updated[sysIdx].systemItem,
+                  accountingItem: updated[accIdx].accountingItem,
+                  accountingIndex: realIdx,
+                  status: "ai",
+                  confidence: s.confidence,
+                  aiReason: `[เอกสาร] ${s.reason}`,
+                  userConfirmed: undefined,
+                };
+
+                updated.splice(Math.max(sysIdx, accIdx), 1);
+                updated.splice(Math.min(sysIdx, accIdx), 1, merged);
+                usedAccountingInAI.add(realIdx);
+              }
+            );
+
+            return updated;
+          });
+        }
+        break;
+      }
+
+      case "done":
+        setDocAIPhase("done");
+        setDocAISummary({
+          totalAnalyzed: data.totalAnalyzed,
+          docsRead: data.docsRead,
+          matchesFound: data.matchesFound,
+        });
+        break;
+
+      case "error":
+        setDocAIPhase("error");
+        setDocAIError(data.message);
+        break;
     }
   };
 
@@ -1046,6 +1168,18 @@ export function ReconcileView({
         systemItems={systemItems}
         accountingItems={accountingItems}
       />
+
+      {/* Doc AI Progress Panel */}
+      {docAIPhase && (
+        <DocAIProgressPanel
+          phase={docAIPhase}
+          items={docAIItems}
+          totalItems={docAITotalItems}
+          summary={docAISummary}
+          errorMessage={docAIError}
+          onClose={() => setDocAIPhase(null)}
+        />
+      )}
 
       {/* Main table */}
       <ReconcileTable

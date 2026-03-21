@@ -10,6 +10,9 @@ export const GET = withCompanyAccessFromParams(
     const session = await prisma.reconcileSession.findFirst({
       where: { id, companyId: company.id },
       include: {
+        AccountingRows: {
+          orderBy: { rowIndex: "asc" },
+        },
         Matches: {
           orderBy: { createdAt: "asc" },
           include: {

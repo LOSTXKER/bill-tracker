@@ -4,6 +4,16 @@ import { apiResponse } from "@/lib/api/response";
 import { ApiErrors } from "@/lib/api/errors";
 import { createAuditLog } from "@/lib/audit/logger";
 
+interface AccountingRowInput {
+  date: string;
+  invoiceNumber?: string;
+  vendorName: string;
+  taxId?: string;
+  baseAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+}
+
 interface MatchInput {
   expenseId?: string;
   incomeId?: string;
@@ -32,8 +42,10 @@ interface CreateSessionBody {
   year: number;
   type: "expense" | "income";
   sourceFileName?: string;
+  sourceFileUrl?: string;
   notes?: string;
   matches: MatchInput[];
+  accountingRows?: AccountingRowInput[];
   totalSystemAmount: number;
   totalAccountAmount: number;
   unmatchedSystemCount: number;
@@ -44,57 +56,81 @@ export const POST = withCompanyAccessFromParams(
   async (request, { session, company }) => {
     const body = (await request.json()) as CreateSessionBody;
 
-    if (!body.month || !body.year || !body.type || !body.matches) {
-      throw ApiErrors.badRequest("month, year, type, matches are required");
+    if (!body.month || !body.year || !body.type) {
+      throw ApiErrors.badRequest("month, year, type are required");
     }
 
-    const matchedCount = body.matches.filter(
+    const matchedCount = (body.matches ?? []).filter(
       (m) => m.expenseId || m.incomeId
     ).length;
 
-    const result = await prisma.reconcileSession.upsert({
-      where: {
-        companyId_month_year_type: {
+    const result = await prisma.$transaction(async (tx) => {
+      const sess = await tx.reconcileSession.upsert({
+        where: {
+          companyId_month_year_type: {
+            companyId: company.id,
+            month: body.month,
+            year: body.year,
+            type: body.type,
+          },
+        },
+        create: {
           companyId: company.id,
           month: body.month,
           year: body.year,
           type: body.type,
+          sourceFileName: body.sourceFileName,
+          sourceFileUrl: body.sourceFileUrl,
+          notes: body.notes,
+          matchedCount,
+          unmatchedSystemCount: body.unmatchedSystemCount ?? 0,
+          unmatchedAccountCount: body.unmatchedAccountCount ?? 0,
+          totalSystemAmount: body.totalSystemAmount ?? 0,
+          totalAccountAmount: body.totalAccountAmount ?? 0,
+          createdBy: session.user.id,
+          Matches: {
+            create: (body.matches ?? []).map(toMatchCreate),
+          },
         },
-      },
-      create: {
-        companyId: company.id,
-        month: body.month,
-        year: body.year,
-        type: body.type,
-        sourceFileName: body.sourceFileName,
-        notes: body.notes,
-        matchedCount,
-        unmatchedSystemCount: body.unmatchedSystemCount ?? 0,
-        unmatchedAccountCount: body.unmatchedAccountCount ?? 0,
-        totalSystemAmount: body.totalSystemAmount ?? 0,
-        totalAccountAmount: body.totalAccountAmount ?? 0,
-        createdBy: session.user.id,
-        Matches: {
-          create: body.matches.map(toMatchCreate),
+        update: {
+          sourceFileName: body.sourceFileName,
+          sourceFileUrl: body.sourceFileUrl,
+          notes: body.notes,
+          matchedCount,
+          unmatchedSystemCount: body.unmatchedSystemCount ?? 0,
+          unmatchedAccountCount: body.unmatchedAccountCount ?? 0,
+          totalSystemAmount: body.totalSystemAmount ?? 0,
+          totalAccountAmount: body.totalAccountAmount ?? 0,
+          status: "IN_PROGRESS",
+          completedAt: null,
+          completedBy: null,
+          Matches: {
+            deleteMany: {},
+            create: (body.matches ?? []).map(toMatchCreate),
+          },
         },
-      },
-      update: {
-        sourceFileName: body.sourceFileName,
-        notes: body.notes,
-        matchedCount,
-        unmatchedSystemCount: body.unmatchedSystemCount ?? 0,
-        unmatchedAccountCount: body.unmatchedAccountCount ?? 0,
-        totalSystemAmount: body.totalSystemAmount ?? 0,
-        totalAccountAmount: body.totalAccountAmount ?? 0,
-        status: "IN_PROGRESS",
-        completedAt: null,
-        completedBy: null,
-        Matches: {
-          deleteMany: {},
-          create: body.matches.map(toMatchCreate),
-        },
-      },
-      include: { Matches: true },
+      });
+
+      if (body.accountingRows && body.accountingRows.length > 0) {
+        await tx.reconcileAccountingRow.deleteMany({
+          where: { sessionId: sess.id },
+        });
+        await tx.reconcileAccountingRow.createMany({
+          data: body.accountingRows.map((r, i) => ({
+            sessionId: sess.id,
+            rowIndex: i,
+            date: r.date,
+            invoiceNumber: r.invoiceNumber || null,
+            vendorName: r.vendorName,
+            taxId: r.taxId || null,
+            baseAmount: r.baseAmount,
+            vatAmount: r.vatAmount,
+            totalAmount: r.totalAmount,
+          })),
+        });
+      }
+
+      return sess;
     });
 
     await createAuditLog({
@@ -138,7 +174,7 @@ export const GET = withCompanyAccessFromParams(
         ...(status && { status: status as any }),
       },
       include: {
-        _count: { select: { Matches: true } },
+        _count: { select: { Matches: true, AccountingRows: true } },
       },
       orderBy: [{ year: "desc" }, { month: "desc" }, { type: "asc" }],
     });

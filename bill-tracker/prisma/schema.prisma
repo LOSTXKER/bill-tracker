@@ -896,6 +896,7 @@ model ReconcileSession {
   totalSystemAmount     Decimal                @db.Decimal(14, 2)
   totalAccountAmount    Decimal                @db.Decimal(14, 2)
   sourceFileName        String?
+  sourceFileUrl         String?
   notes                 String?
   createdBy             String
   createdAt             DateTime               @default(now())
@@ -903,8 +904,9 @@ model ReconcileSession {
   completedAt           DateTime?
   completedBy           String?
 
-  Company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Matches ReconcileMatch[]
+  Company         Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Matches         ReconcileMatch[]
+  AccountingRows  ReconcileAccountingRow[]
 
   @@unique([companyId, month, year, type])
   @@index([companyId, year, month])
@@ -963,4 +965,21 @@ model ReconcileMatch {
   @@index([sessionId])
   @@index([expenseId])
   @@index([incomeId])
+}
+
+model ReconcileAccountingRow {
+  id            String  @id @default(cuid())
+  sessionId     String
+  rowIndex      Int
+  date          String
+  invoiceNumber String?
+  vendorName    String
+  taxId         String?
+  baseAmount    Decimal @db.Decimal(12, 2)
+  vatAmount     Decimal @db.Decimal(12, 2)
+  totalAmount   Decimal @db.Decimal(12, 2)
+
+  Session ReconcileSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }
