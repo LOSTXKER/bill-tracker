@@ -956,6 +956,11 @@ model ReconcileMatch {
   confirmedAt    DateTime?
   rejectedReason String?
 
+  // Audit: who matched
+  matchedBy     String? // userId
+  matchedByName String? // display name
+  skipped       Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

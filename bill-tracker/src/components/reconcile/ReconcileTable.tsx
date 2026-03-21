@@ -60,6 +60,7 @@ export interface MatchedPair {
   confidence?: number;
   aiReason?: string;
   userConfirmed?: boolean;
+  matchedByName?: string | null;
 }
 
 interface ReconcileTableProps {
@@ -235,6 +236,7 @@ function CenterCell({
   }
 
   if (isMatched) {
+    const methodLabel = pair.status === "ai" ? "AI" : pair.status === "exact" || pair.status === "strong" ? "อัตโนมัติ" : "จับคู่";
     return (
       <div className="flex flex-col items-center gap-1 px-1 py-1.5">
         <MatchBadge pair={pair} />
@@ -242,6 +244,11 @@ function CenterCell({
           <Badge variant="outline" className="text-[10px] px-1 h-4 text-orange-600 border-orange-300">
             ต่าง {fmt(amtDiff)}
           </Badge>
+        )}
+        {pair.matchedByName && (
+          <span className="text-[9px] text-muted-foreground text-center leading-tight truncate max-w-[80px]" title={`${pair.matchedByName} — ${methodLabel}`}>
+            {pair.matchedByName}
+          </span>
         )}
         <button
           onClick={() => onUnlink(pair.id)}

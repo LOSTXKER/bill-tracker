@@ -45,6 +45,9 @@ interface MatchDetail {
   confirmedBy: string | null;
   confirmedAt: string | null;
   rejectedReason: string | null;
+  matchedBy: string | null;
+  matchedByName: string | null;
+  skipped: boolean;
   documentUrls: string[];
   expenseDescription: string | null;
   expenseDate: string | null;
@@ -374,6 +377,11 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                   {m.amountDiff !== null && m.amountDiff > 0.01 && (
                     <span className="text-[10px] text-orange-600">
                       ±{formatAmt(m.amountDiff)}
+                    </span>
+                  )}
+                  {m.matchedByName && (
+                    <span className="text-[9px] text-muted-foreground" title={`จับคู่โดย ${m.matchedByName}`}>
+                      โดย {m.matchedByName}
                     </span>
                   )}
                 </div>

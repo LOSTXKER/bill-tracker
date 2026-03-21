@@ -11,7 +11,6 @@ import {
   Zap,
   CheckCircle2,
   AlertCircle,
-  MinusCircle,
   Loader2,
   RotateCcw,
   Search,
@@ -19,11 +18,16 @@ import {
   Building2,
   ChevronsUpDown,
   Save,
-  ScanEye,
   ArrowLeft,
   FileText,
-  ChevronRight,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -36,12 +40,6 @@ import {
   type MatchedPair,
   type SystemItem,
 } from "./ReconcileTable";
-import {
-  DocAIProgressPanel,
-  type DocAIItemProgress,
-  type DocAIPhase,
-  type DocAISummary,
-} from "./DocAIProgressPanel";
 import { cn } from "@/lib/utils";
 
 export interface SiblingCompany {
@@ -79,6 +77,7 @@ interface SavedMatch {
   payOnBehalfFrom: string | null;
   payOnBehalfTo: string | null;
   status: string;
+  matchedByName: string | null;
 }
 
 interface ReconcileWorkspaceProps {
@@ -118,8 +117,6 @@ function formatAmt(n: number) {
     maximumFractionDigits: 2,
   });
 }
-
-type WorkStep = "import" | "match" | "review";
 
 // ---------------------------------------------------------------------------
 // Match Algorithm (same as ReconcileView)
@@ -283,6 +280,7 @@ function reconstructPairs(
         confidence: m.confidence ?? 1,
         aiReason: m.aiReason ?? undefined,
         userConfirmed: m.status === "confirmed" ? true : undefined,
+        matchedByName: m.matchedByName,
       });
       usedSystem.add(sItem.id);
       usedAccounting.add(aIdx);
@@ -354,187 +352,50 @@ function SummaryBar({
   const isBalanced = totalDiff < 0.01 && vatDiff < 0.01;
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
-        <Card className="border-primary/30">
-          <CardContent className="py-3 px-4">
-            <p className="text-xs text-muted-foreground mb-1">
-              ระบบเว็บ — {systemItems.length} รายการ
-            </p>
-            <p className="text-lg font-bold text-foreground">
-              {formatAmt(systemTotal)}
-            </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400">
-              VAT: {formatAmt(systemVat)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col items-center justify-center gap-1 py-2">
-          {accountingItems.length > 0 ? (
-            <>
-              <div
-                className={cn(
-                  "h-8 w-8 rounded-full flex items-center justify-center",
-                  isBalanced
-                    ? "bg-emerald-100 dark:bg-emerald-900/30"
-                    : "bg-amber-100 dark:bg-amber-900/30"
-                )}
-              >
-                {isBalanced ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                )}
-              </div>
-              {!isBalanced && (
-                <span className="text-[10px] text-amber-600 font-medium text-center leading-tight">
-                  ต่าง
-                  <br />
-                  {formatAmt(totalDiff)}
-                </span>
-              )}
-            </>
-          ) : (
-            <MinusCircle className="h-5 w-5 text-muted-foreground/50" />
-          )}
-        </div>
-
-        <Card
-          className={cn(
-            accountingItems.length === 0 ? "opacity-40" : "",
-            "border-muted"
-          )}
-        >
-          <CardContent className="py-3 px-4">
-            <p className="text-xs text-muted-foreground mb-1">
-              รายงานบัญชี — {accountingItems.length} รายการ
-            </p>
-            <p className="text-lg font-bold text-foreground">
-              {formatAmt(accountingTotal)}
-            </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400">
-              VAT: {formatAmt(accountingVat)}
-            </p>
-          </CardContent>
-        </Card>
+    <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-2.5 text-sm">
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground">ระบบ:</span>
+        <span className="font-semibold">{formatAmt(systemTotal)}</span>
+        <span className="text-xs text-muted-foreground">({systemItems.length})</span>
       </div>
 
-      {accountingItems.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <Badge
-            variant="outline"
-            className="gap-1 text-emerald-600 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20"
-          >
-            <CheckCircle2 className="h-3 w-3" />
-            {matched} รายการตรงกัน
-          </Badge>
-          {aiPending > 0 && (
-            <Badge
-              variant="outline"
-              className="gap-1 text-amber-600 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20"
-            >
-              <Zap className="h-3 w-3" />
-              {aiPending} AI รอยืนยัน
-            </Badge>
-          )}
-          {systemOnly > 0 && (
-            <Badge
-              variant="outline"
-              className="gap-1 text-slate-500 border-slate-200 dark:border-slate-700"
-            >
-              <MinusCircle className="h-3 w-3" />
-              {systemOnly} เฉพาะในระบบ
-            </Badge>
-          )}
-          {accountingOnly > 0 && (
-            <Badge
-              variant="outline"
-              className="gap-1 text-red-600 border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"
-            >
-              <AlertCircle className="h-3 w-3" />
-              {accountingOnly} เฉพาะในรายงาน
-            </Badge>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+      <div className="h-4 w-px bg-border" />
 
-// ---------------------------------------------------------------------------
-// Step Indicator
-// ---------------------------------------------------------------------------
-
-const STEPS: { key: WorkStep; label: string }[] = [
-  { key: "import", label: "นำเข้ารายงาน" },
-  { key: "match", label: "จับคู่รายการ" },
-  { key: "review", label: "ตรวจสอบ & บันทึก" },
-];
-
-function StepIndicator({
-  currentStep,
-  hasAccountingData,
-  hasMatches,
-  onStepClick,
-}: {
-  currentStep: WorkStep;
-  hasAccountingData: boolean;
-  hasMatches: boolean;
-  onStepClick: (step: WorkStep) => void;
-}) {
-  const stepIndex = STEPS.findIndex((s) => s.key === currentStep);
-
-  return (
-    <div className="flex items-center gap-1">
-      {STEPS.map((step, idx) => {
-        const isActive = step.key === currentStep;
-        const isCompleted =
-          (step.key === "import" && hasAccountingData) ||
-          (step.key === "match" && hasMatches && hasAccountingData);
-        const isClickable =
-          step.key === "import" ||
-          (step.key === "match" && hasAccountingData) ||
-          (step.key === "review" && hasAccountingData);
-
-        return (
-          <div key={step.key} className="flex items-center">
-            {idx > 0 && (
-              <ChevronRight className="h-4 w-4 text-muted-foreground/40 mx-1" />
+      {accountingItems.length > 0 ? (
+        <>
+          <div className="flex items-center gap-1.5">
+            {isBalanced ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+            ) : (
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
             )}
-            <button
-              onClick={() => isClickable && onStepClick(step.key)}
-              disabled={!isClickable}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : isCompleted
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : isClickable
-                      ? "bg-muted text-muted-foreground hover:bg-muted/80"
-                      : "bg-muted/50 text-muted-foreground/40 cursor-not-allowed"
-              )}
-            >
-              {isCompleted && !isActive ? (
-                <CheckCircle2 className="h-3 w-3" />
-              ) : (
-                <span
-                  className={cn(
-                    "h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold",
-                    isActive
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "bg-muted-foreground/20 text-muted-foreground"
-                  )}
-                >
-                  {idx + 1}
-                </span>
-              )}
-              {step.label}
-            </button>
+            <span className={cn("font-medium", isBalanced ? "text-emerald-600" : "text-amber-600")}>
+              ต่าง {formatAmt(totalDiff)}
+            </span>
           </div>
-        );
-      })}
+
+          <div className="h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">รายงาน:</span>
+            <span className="font-semibold">{formatAmt(accountingTotal)}</span>
+            <span className="text-xs text-muted-foreground">({accountingItems.length})</span>
+          </div>
+
+          <div className="h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {matched}
+            {aiPending > 0 && (
+              <>
+                <Zap className="h-3 w-3 text-amber-500 ml-1" /> {aiPending}
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        <span className="text-xs text-muted-foreground">ยังไม่มีข้อมูลรายงาน</span>
+      )}
     </div>
   );
 }
@@ -581,16 +442,6 @@ export function ReconcileWorkspace({
     savedSession?.sourceFileUrl ?? null
   );
 
-  const [docAIPhase, setDocAIPhase] = useState<DocAIPhase | null>(null);
-  const [docAIItems, setDocAIItems] = useState<DocAIItemProgress[]>([]);
-  const [docAITotalItems, setDocAITotalItems] = useState(0);
-  const [docAISummary, setDocAISummary] = useState<DocAISummary | undefined>();
-  const [docAIError, setDocAIError] = useState<string | undefined>();
-  const isDocAILoading = docAIPhase === "analyzing" || docAIPhase === "matching";
-
-  const [currentStep, setCurrentStep] = useState<WorkStep>(
-    savedAccountingRows && savedAccountingRows.length > 0 ? "match" : "import"
-  );
   const [lastSaved, setLastSaved] = useState<Date | null>(
     savedSession ? new Date() : null
   );
@@ -656,7 +507,6 @@ export function ReconcileWorkspace({
       setPairs(matched);
       setSelectedSystemId(null);
       setSelectedAccountingIndex(null);
-      setCurrentStep("match");
     },
     [systemItems]
   );
@@ -759,240 +609,6 @@ export function ReconcileWorkspace({
     }
   };
 
-  // --- Doc AI match (SSE) ---
-  const handleDocAIMatch = async () => {
-    const unmatchedSystem = pairs
-      .filter((p) => p.status === "system-only")
-      .map((p) => p.systemItem!)
-      .filter(Boolean);
-    const unmatchedAccounting = pairs
-      .filter((p) => p.status === "accounting-only")
-      .map((p) => ({ ...p.accountingItem!, _idx: p.accountingIndex! }));
-
-    if (!unmatchedSystem.length || !unmatchedAccounting.length) return;
-
-    const maxItems = Math.min(unmatchedSystem.length, 5);
-    setDocAIPhase("analyzing");
-    setDocAISummary(undefined);
-    setDocAIError(undefined);
-    setDocAITotalItems(maxItems);
-    setDocAIItems(
-      unmatchedSystem.slice(0, maxItems).map((s) => ({
-        itemId: s.id,
-        vendorName: s.vendorName || s.description || "ไม่ระบุ",
-        status: "pending" as const,
-      }))
-    );
-
-    try {
-      const res = await fetch(
-        `/api/${companyCode}/reconcile/match-with-docs`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemItems: unmatchedSystem.map((s) => ({
-              id: s.id,
-              vendorName: s.vendorName,
-              amount: s.baseAmount,
-              vatAmount: s.vatAmount,
-              totalAmount: s.totalAmount,
-              date: s.date,
-              taxId: s.taxId,
-              invoiceNumber: s.invoiceNumber,
-              description: s.description,
-              type,
-            })),
-            accountingItems: unmatchedAccounting.map((a) => ({
-              index: a._idx,
-              vendorName: a.vendorName,
-              amount: a.baseAmount,
-              vatAmount: a.vatAmount,
-              totalAmount: a.totalAmount,
-              date: a.date,
-              taxId: a.taxId,
-              invoiceNumber: a.invoiceNumber,
-            })),
-          }),
-        }
-      );
-
-      if (!res.ok) throw new Error("Doc AI request failed");
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        let eventType = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && eventType) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              processDocAIEvent(eventType, data);
-            } catch {
-              /* ignore */
-            }
-            eventType = "";
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Doc AI stream error:", err);
-      setDocAIPhase("error");
-      setDocAIError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    }
-  };
-
-  const processDocAIEvent = (eventType: string, data: any) => {
-    switch (eventType) {
-      case "progress":
-        setDocAIItems((prev) =>
-          prev.map((item) =>
-            item.itemId === data.itemId
-              ? { ...item, status: "searching" as const }
-              : item
-          )
-        );
-        break;
-      case "doc_found":
-        setDocAIItems((prev) =>
-          prev.map((item) =>
-            item.itemId === data.itemId
-              ? {
-                  ...item,
-                  status: "reading" as const,
-                  docCount: data.docCount,
-                  docsRead: 0,
-                  docTotal: Math.min(data.docCount, 3),
-                }
-              : item
-          )
-        );
-        break;
-      case "doc_read":
-        setDocAIItems((prev) =>
-          prev.map((item) =>
-            item.itemId === data.itemId
-              ? {
-                  ...item,
-                  docsRead: data.docIndex,
-                  lastSnippet: data.extractedSnippet,
-                }
-              : item
-          )
-        );
-        break;
-      case "doc_skip":
-        setDocAIItems((prev) =>
-          prev.map((item) =>
-            item.itemId === data.itemId
-              ? { ...item, status: "skipped" as const }
-              : item
-          )
-        );
-        break;
-      case "matching":
-        setDocAIItems((prev) =>
-          prev.map((item) =>
-            item.status === "reading"
-              ? { ...item, status: "done" as const }
-              : item
-          )
-        );
-        setDocAIPhase("matching");
-        break;
-      case "result": {
-        const suggestions = data.suggestions ?? [];
-        if (suggestions.length > 0) {
-          const matchedSystemIds = new Map<string, { acctVendor: string; reason: string }>();
-
-          setPairs((prev) => {
-            const updated = [...prev];
-            const usedAI = new Set<number>();
-            suggestions.forEach(
-              (s: {
-                systemId: string;
-                accountingIndex: number;
-                confidence: number;
-                reason: string;
-              }) => {
-                const realIdx = s.accountingIndex;
-                if (usedAI.has(realIdx)) return;
-                const sysIdx = updated.findIndex(
-                  (p) =>
-                    p.status === "system-only" &&
-                    p.systemItem?.id === s.systemId
-                );
-                const accIdx = updated.findIndex(
-                  (p) =>
-                    p.status === "accounting-only" &&
-                    p.accountingIndex === realIdx
-                );
-                if (sysIdx === -1 || accIdx === -1) return;
-
-                const acctVendor = updated[accIdx].accountingItem?.vendorName ?? "";
-                matchedSystemIds.set(s.systemId, { acctVendor, reason: s.reason });
-
-                const merged: MatchedPair = {
-                  id: `docai-${s.systemId}-${realIdx}`,
-                  systemItem: updated[sysIdx].systemItem,
-                  accountingItem: updated[accIdx].accountingItem,
-                  accountingIndex: realIdx,
-                  status: "ai",
-                  confidence: s.confidence,
-                  aiReason: `[เอกสาร] ${s.reason}`,
-                  userConfirmed: undefined,
-                };
-                updated.splice(Math.max(sysIdx, accIdx), 1);
-                updated.splice(Math.min(sysIdx, accIdx), 1, merged);
-                usedAI.add(realIdx);
-              }
-            );
-            return updated;
-          });
-
-          setDocAIItems((prev) =>
-            prev.map((item) => {
-              const match = matchedSystemIds.get(item.itemId);
-              if (match) {
-                return { ...item, matchedWith: match.acctVendor, matchReason: match.reason };
-              }
-              return item;
-            })
-          );
-        }
-        break;
-      }
-      case "done":
-        setDocAIPhase("done");
-        setDocAISummary({
-          totalAnalyzed: data.totalAnalyzed,
-          docsRead: data.docsRead,
-          matchesFound: data.matchesFound,
-        });
-        break;
-      case "debug":
-        console.log("[DocAI debug] raw AI response:", data.rawResponse);
-        break;
-      case "error":
-        setDocAIPhase("error");
-        setDocAIError(data.message);
-        break;
-    }
-  };
-
   const handleConfirmAI = useCallback((id: string) => {
     setPairs((prev) =>
       prev.map((p) => (p.id === id ? { ...p, userConfirmed: true } : p))
@@ -1088,7 +704,6 @@ export function ReconcileWorkspace({
     setSelectedSystemId(null);
     setSelectedAccountingIndex(null);
     setSourceFileName(null);
-    setCurrentStep("import");
   };
 
   const unmatchedSystemCount = pairs.filter(
@@ -1194,7 +809,6 @@ export function ReconcileWorkspace({
   };
 
   const hasAccountingData = accountingItems.length > 0;
-  const hasMatches = matchedPairsForSave.length > 0;
   const monthName = MONTHS[month - 1];
 
   return (
@@ -1248,294 +862,215 @@ export function ReconcileWorkspace({
         )}
       </div>
 
-      {/* Step indicator */}
-      <StepIndicator
-        currentStep={currentStep}
-        hasAccountingData={hasAccountingData}
-        hasMatches={hasMatches}
-        onStepClick={setCurrentStep}
-      />
-
-      {/* Step content */}
-      {currentStep === "import" && (
-        <div className="space-y-4">
-          {hasAccountingData ? (
-            <Card>
-              <CardContent className="py-4 px-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">
-                        โหลดข้อมูลแล้ว — {accountingItems.length} รายการ
-                      </p>
-                      {sourceFileName && (
-                        <p className="text-xs text-muted-foreground">
-                          {sourceFileName}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowImport(true)}
-                    >
-                      <Upload className="h-3.5 w-3.5 mr-1.5" />
-                      โหลดใหม่
-                    </Button>
-                    <Button size="sm" onClick={() => setCurrentStep("match")}>
-                      ไปจับคู่
-                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="py-12 flex flex-col items-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center">
-                  <Upload className="h-6 w-6 text-muted-foreground/60" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold">นำเข้ารายงานบัญชี</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    อัปโหลดไฟล์ PDF หรือ Excel จากรายงานภาษีของสำนักงานบัญชี
-                  </p>
-                </div>
-                <Button onClick={() => setShowImport(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  เลือกไฟล์
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+      {/* Compact import bar */}
+      {hasAccountingData ? (
+        <div className="flex items-center gap-2 text-sm">
+          <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+          <span className="text-muted-foreground">
+            ไฟล์: <span className="font-medium text-foreground">{sourceFileName || "ไม่ระบุ"}</span>
+            {" "}({accountingItems.length} รายการ)
+          </span>
+          <button
+            className="text-xs text-primary hover:underline"
+            onClick={() => setShowImport(true)}
+          >
+            เปลี่ยน
+          </button>
         </div>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="py-8 flex flex-col items-center gap-3">
+            <Upload className="h-6 w-6 text-muted-foreground/60" />
+            <div className="text-center">
+              <p className="text-sm font-semibold">นำเข้ารายงานบัญชี</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                อัปโหลดไฟล์ PDF หรือ Excel จากรายงานภาษีของสำนักงานบัญชี
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setShowImport(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              เลือกไฟล์
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {(currentStep === "match" || currentStep === "review") && (
-        <>
-          {/* Controls bar */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Company selector */}
-            {hasSiblings && siblingCompanies && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 gap-1.5">
-                    <Building2 className="h-3.5 w-3.5" />
-                    {selectedCompanyCodes &&
-                    selectedCompanyCodes.length < siblingCompanies.length
-                      ? `${selectedCompanyCodes.length} บริษัท`
-                      : "ทุกบริษัท"}
-                    <ChevronsUpDown className="h-3 w-3 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-2" align="start">
-                  <p className="text-xs font-medium text-muted-foreground px-2 pb-2">
-                    นิติบุคคลเดียวกัน (Tax ID)
-                  </p>
-                  <div className="space-y-1">
-                    {siblingCompanies.map((sc) => {
-                      const isChecked = selectedCompanyCodes
-                        ? selectedCompanyCodes.includes(sc.code)
-                        : true;
-                      return (
-                        <label
-                          key={sc.code}
-                          className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer"
+      {/* Controls bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {hasSiblings && siblingCompanies && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                {selectedCompanyCodes &&
+                selectedCompanyCodes.length < siblingCompanies.length
+                  ? `${selectedCompanyCodes.length} บริษัท`
+                  : "ทุกบริษัท"}
+                <ChevronsUpDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <p className="text-xs font-medium text-muted-foreground px-2 pb-2">
+                นิติบุคคลเดียวกัน (Tax ID)
+              </p>
+              <div className="space-y-1">
+                {siblingCompanies.map((sc) => {
+                  const isChecked = selectedCompanyCodes
+                    ? selectedCompanyCodes.includes(sc.code)
+                    : true;
+                  return (
+                    <label
+                      key={sc.code}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer"
+                    >
+                      <Checkbox checked={isChecked} />
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-1.5 h-4 font-mono flex-shrink-0"
                         >
-                          <Checkbox checked={isChecked} />
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] px-1.5 h-4 font-mono flex-shrink-0"
-                            >
-                              {sc.code}
-                            </Badge>
-                            <span className="text-sm truncate">{sc.name}</span>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
+                          {sc.code}
+                        </Badge>
+                        <span className="text-sm truncate">{sc.name}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
-            {/* VAT-only toggle */}
-            <Button
-              variant={vatOnly ? "default" : "outline"}
-              size="sm"
-              className="h-9 gap-1.5"
-              onClick={() => {
-                setVatOnly((v) => !v);
-                setPairs([]);
-                setAccountingItems([]);
-                setCurrentStep("import");
-              }}
-              title="กรองเฉพาะรายการที่มี VAT"
+        <Button
+          variant={vatOnly ? "default" : "outline"}
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={() => {
+            setVatOnly((v) => !v);
+            setPairs([]);
+            setAccountingItems([]);
+          }}
+          title="กรองเฉพาะรายการที่มี VAT"
+        >
+          <Receipt className="h-3.5 w-3.5" />
+          เฉพาะ VAT
+          {vatOnly && hiddenByVatFilter > 0 && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 h-4 ml-0.5"
             >
-              <Receipt className="h-3.5 w-3.5" />
-              เฉพาะ VAT
-              {vatOnly && hiddenByVatFilter > 0 && (
+              ซ่อน {hiddenByVatFilter}
+            </Badge>
+          )}
+        </Button>
+
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="ค้นหาชื่อ..."
+            className="h-9 pl-8 w-40 text-sm"
+          />
+        </div>
+
+        <div className="flex-1" />
+
+        {hasAccountingData && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 h-9"
+              onClick={handleAIMatch}
+              disabled={!canAIMatch || isAILoading}
+            >
+              {isAILoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4 text-amber-500" />
+              )}
+              AI จับคู่
+              {canAIMatch && (
                 <Badge
                   variant="secondary"
-                  className="text-[10px] px-1.5 h-4 ml-0.5"
+                  className="text-[10px] px-1.5 h-4"
                 >
-                  ซ่อน {hiddenByVatFilter}
+                  {unmatchedSystemCount + unmatchedAccountingCount}
                 </Badge>
               )}
             </Button>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาชื่อ..."
-                className="h-9 pl-8 w-40 text-sm"
-              />
-            </div>
-
-            <div className="flex-1" />
-
-            {hasAccountingData && (
-              <>
-                {/* AI Match */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 h-9"
-                  onClick={handleAIMatch}
-                  disabled={!canAIMatch || isAILoading}
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-2 h-9"
+              onClick={handleSave}
+              disabled={!canSave || isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              บันทึก
+              {matchedPairsForSave.length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 h-4"
                 >
-                  {isAILoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Zap className="h-4 w-4 text-amber-500" />
-                  )}
-                  AI จับคู่ชื่อ
-                  {canAIMatch && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] px-1.5 h-4"
-                    >
-                      {unmatchedSystemCount + unmatchedAccountingCount}
-                    </Badge>
-                  )}
+                  {matchedPairsForSave.length}
+                </Badge>
+              )}
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-
-                {/* AI Doc Match */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 h-9"
-                  onClick={handleDocAIMatch}
-                  disabled={!canAIMatch || isDocAILoading || isAILoading}
-                  title="ให้ AI อ่านเอกสารแนบ (ใบกำกับภาษี, สลิป) เพื่อจับคู่"
-                >
-                  {isDocAILoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ScanEye className="h-4 w-4 text-violet-500" />
-                  )}
-                  AI ดูเอกสาร
-                </Button>
-
-                {/* Save */}
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="gap-2 h-9"
-                  onClick={handleSave}
-                  disabled={!canSave || isSaving}
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  บันทึก
-                  {matchedPairsForSave.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] px-1.5 h-4"
-                    >
-                      {matchedPairsForSave.length}
-                    </Badge>
-                  )}
-                </Button>
-
-                {/* Reset */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 text-muted-foreground hover:text-foreground gap-1.5"
-                  onClick={handleReset}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleReset}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-2" />
                   รีเซ็ต
-                </Button>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowImport(true)}>
+                  <Upload className="h-3.5 w-3.5 mr-2" />
+                  โหลดไฟล์ใหม่
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
+      </div>
 
-                {/* Re-import */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-2"
-                  onClick={() => setShowImport(true)}
-                >
-                  <Upload className="h-4 w-4" />
-                  โหลดใหม่
-                </Button>
-              </>
-            )}
-          </div>
+      {/* Summary bar */}
+      <SummaryBar
+        pairs={pairs}
+        systemItems={systemItems}
+        accountingItems={accountingItems}
+      />
 
-          {/* Summary bar */}
-          <SummaryBar
-            pairs={pairs}
-            systemItems={systemItems}
-            accountingItems={accountingItems}
-          />
-
-          {/* Doc AI Progress */}
-          {docAIPhase && (
-            <DocAIProgressPanel
-              phase={docAIPhase}
-              items={docAIItems}
-              totalItems={docAITotalItems}
-              summary={docAISummary}
-              errorMessage={docAIError}
-              onClose={() => setDocAIPhase(null)}
-            />
-          )}
-
-          {/* Table */}
-          <ReconcileTable
-            pairs={pairs}
-            onConfirmAI={handleConfirmAI}
-            onRejectAI={handleRejectAI}
-            onManualLink={handleManualLink}
-            onUnlink={handleUnlink}
-            selectedSystemId={selectedSystemId}
-            selectedAccountingIndex={selectedAccountingIndex}
-            onSelectSystem={setSelectedSystemId}
-            onSelectAccounting={setSelectedAccountingIndex}
-            month={month}
-            year={year}
-            type={type}
-            onShowImport={() => setShowImport(true)}
-            hasAccountingData={hasAccountingData}
-            showCompanyBadge={hasSiblings}
-            companyCode={companyCode}
-          />
-        </>
-      )}
+      {/* Table */}
+      <ReconcileTable
+        pairs={pairs}
+        onConfirmAI={handleConfirmAI}
+        onRejectAI={handleRejectAI}
+        onManualLink={handleManualLink}
+        onUnlink={handleUnlink}
+        selectedSystemId={selectedSystemId}
+        selectedAccountingIndex={selectedAccountingIndex}
+        onSelectSystem={setSelectedSystemId}
+        onSelectAccounting={setSelectedAccountingIndex}
+        month={month}
+        year={year}
+        type={type}
+        onShowImport={() => setShowImport(true)}
+        hasAccountingData={hasAccountingData}
+        showCompanyBadge={hasSiblings}
+        companyCode={companyCode}
+      />
 
       {/* Import dialog */}
       <ImportPanel

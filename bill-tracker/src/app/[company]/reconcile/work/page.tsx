@@ -360,6 +360,7 @@ async function WorkspaceDataLoader({
     payOnBehalfFrom: m.payOnBehalfFrom,
     payOnBehalfTo: m.payOnBehalfTo ?? null,
     status: m.status,
+    matchedByName: m.matchedByName ?? null,
   }));
 
   return (

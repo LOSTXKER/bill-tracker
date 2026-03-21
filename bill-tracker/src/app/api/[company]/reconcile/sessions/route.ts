@@ -36,6 +36,7 @@ interface MatchInput {
   payOnBehalfFrom?: string;
   payOnBehalfTo?: string;
   status?: string;
+  skipped?: boolean;
 }
 
 interface CreateSessionBody {
@@ -90,7 +91,7 @@ export const POST = withCompanyAccessFromParams(
           totalAccountAmount: body.totalAccountAmount ?? 0,
           createdBy: session.user.id,
           Matches: {
-            create: (body.matches ?? []).map(toMatchCreate),
+            create: (body.matches ?? []).map((m) => toMatchCreate(m, session.user.id, session.user.name ?? "ไม่ระบุ")),
           },
         },
         update: {
@@ -107,7 +108,7 @@ export const POST = withCompanyAccessFromParams(
           completedBy: null,
           Matches: {
             deleteMany: {},
-            create: (body.matches ?? []).map(toMatchCreate),
+            create: (body.matches ?? []).map((m) => toMatchCreate(m, session.user.id, session.user.name ?? "ไม่ระบุ")),
           },
         },
       });
@@ -185,7 +186,7 @@ export const GET = withCompanyAccessFromParams(
   { permission: "reports:read" }
 );
 
-function toMatchCreate(m: MatchInput) {
+function toMatchCreate(m: MatchInput, userId: string, userName: string) {
   return {
     expenseId: m.expenseId || null,
     incomeId: m.incomeId || null,
@@ -208,5 +209,8 @@ function toMatchCreate(m: MatchInput) {
     payOnBehalfFrom: m.payOnBehalfFrom || null,
     payOnBehalfTo: m.payOnBehalfTo || null,
     status: m.status ?? "pending",
+    matchedBy: userId,
+    matchedByName: userName,
+    skipped: m.skipped ?? false,
   };
 }
