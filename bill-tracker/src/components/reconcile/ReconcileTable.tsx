@@ -446,7 +446,8 @@ export function ReconcileTable({
   const filteredSpillover = spilloverSystem.filter(
     (p) => isWithinMonthRange(p.systemItem!.fromMonth!, month, monthRange)
   );
-  const unmatchedSystem = [...currentMonthSystem, ...filteredSpillover];
+  const unmatchedSystem = [...currentMonthSystem, ...filteredSpillover]
+    .sort((a, b) => (a.systemItem?.date ?? "").localeCompare(b.systemItem?.date ?? ""));
   const maxUnmatched = Math.max(unmatchedSystem.length, unmatchedAccounting.length);
 
   const presetCounts = useMemo(() => {
