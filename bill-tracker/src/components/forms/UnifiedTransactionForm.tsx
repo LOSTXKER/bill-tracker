@@ -1200,35 +1200,68 @@ export function UnifiedTransactionForm({
                     />
                   )}
 
-                  {/* Currency Conversion Note - show in create mode when currency data exists */}
-                  {currencyConversion && (
-                    <CurrencyConversionNote 
-                      currencyConversion={currencyConversion}
-                      onRateChange={(newRate, newConvertedAmount) => {
-                        // Update the amount field with new converted amount
-                        setValue("amount", newConvertedAmount);
-                        // Update currency conversion state
-                        setCurrencyConversion((prev) => prev ? {
-                          ...prev,
-                          exchangeRate: newRate,
-                          convertedAmount: newConvertedAmount,
-                          conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                        } : null);
-                        // Also update AI result if it exists
-                        if (aiResult?.currencyConversion) {
-                          setAiResult((prev) => prev ? {
-                            ...prev,
-                            currencyConversion: {
-                              ...prev.currencyConversion!,
+                  {/* Currency Conversion Note - manual toggle + AI-detected */}
+                  <CurrencyConversionNote
+                    currencyConversion={currencyConversion ?? undefined}
+                    manualMode={mode === "create"}
+                    onManualToggle={(enabled) => {
+                      if (enabled) {
+                        setCurrencyConversion({
+                          detected: true,
+                          currency: "USD",
+                          originalAmount: 0,
+                          convertedAmount: 0,
+                          exchangeRate: 0,
+                          conversionNote: null,
+                        });
+                      } else {
+                        setCurrencyConversion(null);
+                        setValue("amount", 0);
+                      }
+                    }}
+                    onCurrencyChange={(currency) => {
+                      setCurrencyConversion((prev) =>
+                        prev ? { ...prev, currency } : null
+                      );
+                    }}
+                    onOriginalAmountChange={(originalAmount) => {
+                      setCurrencyConversion((prev) => {
+                        if (!prev) return null;
+                        const rate = prev.exchangeRate || 0;
+                        const converted = rate > 0 ? Math.trunc(originalAmount * rate * 100) / 100 : 0;
+                        if (converted > 0) setValue("amount", converted);
+                        return { ...prev, originalAmount, convertedAmount: converted };
+                      });
+                    }}
+                    onRateChange={(newRate, newConvertedAmount) => {
+                      setValue("amount", newConvertedAmount);
+                      setCurrencyConversion((prev) =>
+                        prev
+                          ? {
+                              ...prev,
                               exchangeRate: newRate,
                               convertedAmount: newConvertedAmount,
-                              conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                            },
-                          } : null);
-                        }
-                      }}
-                    />
-                  )}
+                              conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
+                            }
+                          : null
+                      );
+                      if (aiResult?.currencyConversion) {
+                        setAiResult((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                currencyConversion: {
+                                  ...prev.currencyConversion!,
+                                  exchangeRate: newRate,
+                                  convertedAmount: newConvertedAmount,
+                                  conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
+                                },
+                              }
+                            : null
+                        );
+                      }
+                    }}
+                  />
 
                   {/* Divider */}
                   <div className="border-t border-border" />

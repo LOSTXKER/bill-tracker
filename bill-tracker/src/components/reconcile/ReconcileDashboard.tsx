@@ -71,10 +71,12 @@ export interface SessionSummary {
   _count?: { Matches: number; AccountingRows: number };
 }
 
+export type ReconcileType = "expense" | "income" | "pp36";
+
 interface ReconcileDashboardProps {
   companyCode: string;
   year: number;
-  type: "expense" | "income";
+  type: ReconcileType;
   sessions: SessionSummary[];
 }
 
@@ -164,6 +166,15 @@ export function ReconcileDashboard({
             disabled={isPending}
           >
             ภาษีขาย
+          </Button>
+          <Button
+            variant={type === "pp36" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 px-4 text-xs"
+            onClick={() => handleNavigate({ type: "pp36" })}
+            disabled={isPending}
+          >
+            ภพ.36
           </Button>
         </div>
 

@@ -69,7 +69,7 @@ interface ReconcileTableProps {
   onSelectAccounting: (index: number | null) => void;
   month: number;
   year: number;
-  type: "expense" | "income";
+  type: "expense" | "income" | "pp36";
   onShowImport: () => void;
   hasAccountingData: boolean;
   showCompanyBadge?: boolean;
@@ -456,7 +456,7 @@ export function ReconcileTable({
   // Order: AI suggestions first, then unmatched, then matched
   const orderedPairs = [...aiPairs, ...unmatchedPairs, ...matchedPairs];
 
-  const typeLabel = type === "expense" ? "ภาษีซื้อ" : "ภาษีขาย";
+  const typeLabel = type === "expense" ? "ภาษีซื้อ" : type === "income" ? "ภาษีขาย" : "ภพ.36";
   const monthLabel = MONTHS[month - 1];
   const yearLabel = year + 543;
 
@@ -856,7 +856,7 @@ export function ReconcileTable({
         open={previewOpen}
         onOpenChange={setPreviewOpen}
         transactionId={previewId}
-        transactionType={type}
+        transactionType={type === "pp36" ? "expense" : type}
         companyCode={companyCode}
       />
     </div>

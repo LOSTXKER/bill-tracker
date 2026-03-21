@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { ReconcileDashboard, type SessionSummary } from "@/components/reconcile/ReconcileDashboard";
+import { ReconcileDashboard, type SessionSummary, type ReconcileType } from "@/components/reconcile/ReconcileDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GitCompare } from "lucide-react";
 
@@ -42,7 +42,7 @@ export default async function ReconcilePage({
         <DashboardLoader
           companyCode={companyCode}
           year={selectedYear}
-          type={type as "expense" | "income"}
+          type={type as ReconcileType}
         />
       </Suspense>
     </div>
@@ -56,7 +56,7 @@ async function DashboardLoader({
 }: {
   companyCode: string;
   year: number;
-  type: "expense" | "income";
+  type: ReconcileType;
 }) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },

@@ -36,7 +36,7 @@ export default async function ReconcileWorkPage({
         companyCode={companyCode}
         year={selectedYear}
         month={selectedMonth}
-        type={type as "expense" | "income"}
+        type={type as "expense" | "income" | "pp36"}
         companiesParam={companies}
       />
     </Suspense>
@@ -53,7 +53,7 @@ async function WorkspaceDataLoader({
   companyCode: string;
   year: number;
   month: number;
-  type: "expense" | "income";
+  type: "expense" | "income" | "pp36";
   companiesParam?: string;
 }) {
   const company = await prisma.company.findUnique({
@@ -101,6 +101,8 @@ async function WorkspaceDataLoader({
     siblingCompanies.map((c) => [c.id, c.code])
   );
 
+  const isForeignOnly = type === "pp36";
+
   const [
     expenses,
     payOnBehalfExpenses,
@@ -115,29 +117,36 @@ async function WorkspaceDataLoader({
         ...companyIdFilter,
         billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
+        ...(isForeignOnly
+          ? { originalCurrency: { not: null, notIn: ["THB", ""] } }
+          : {}),
       },
       include: { Contact: true, ExpensePayments: true },
       orderBy: { billDate: "asc" },
     }),
-    prisma.expense.findMany({
-      where: {
-        internalCompanyId: { in: selectedCompanyIds },
-        companyId: { notIn: selectedCompanyIds },
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-      },
-      include: { Contact: true, Company: { select: { code: true } } },
-      orderBy: { billDate: "asc" },
-    }),
-    prisma.income.findMany({
-      where: {
-        ...companyIdFilter,
-        receiveDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-      },
-      include: { Contact: true },
-      orderBy: { receiveDate: "asc" },
-    }),
+    isForeignOnly
+      ? Promise.resolve([])
+      : prisma.expense.findMany({
+          where: {
+            internalCompanyId: { in: selectedCompanyIds },
+            companyId: { notIn: selectedCompanyIds },
+            billDate: { gte: startDate, lte: endDate },
+            deletedAt: null,
+          },
+          include: { Contact: true, Company: { select: { code: true } } },
+          orderBy: { billDate: "asc" },
+        }),
+    isForeignOnly
+      ? Promise.resolve([])
+      : prisma.income.findMany({
+          where: {
+            ...companyIdFilter,
+            receiveDate: { gte: startDate, lte: endDate },
+            deletedAt: null,
+          },
+          include: { Contact: true },
+          orderBy: { receiveDate: "asc" },
+        }),
     prisma.reconcileSession.findFirst({
       where: {
         companyId: company.id,
@@ -157,31 +166,38 @@ async function WorkspaceDataLoader({
         billDate: { gte: spilloverStart, lte: spilloverEnd },
         deletedAt: null,
         ReconcileMatches: { none: {} },
+        ...(isForeignOnly
+          ? { originalCurrency: { not: null, notIn: ["THB", ""] } }
+          : {}),
       },
       include: { Contact: true, ExpensePayments: true },
       orderBy: { billDate: "asc" },
     }),
-    prisma.expense.findMany({
-      where: {
-        internalCompanyId: { in: selectedCompanyIds },
-        companyId: { notIn: selectedCompanyIds },
-        billDate: { gte: spilloverStart, lte: spilloverEnd },
-        deletedAt: null,
-        ReconcileMatches: { none: {} },
-      },
-      include: { Contact: true, Company: { select: { code: true } } },
-      orderBy: { billDate: "asc" },
-    }),
-    prisma.income.findMany({
-      where: {
-        ...companyIdFilter,
-        receiveDate: { gte: spilloverStart, lte: spilloverEnd },
-        deletedAt: null,
-        ReconcileMatches: { none: {} },
-      },
-      include: { Contact: true },
-      orderBy: { receiveDate: "asc" },
-    }),
+    isForeignOnly
+      ? Promise.resolve([])
+      : prisma.expense.findMany({
+          where: {
+            internalCompanyId: { in: selectedCompanyIds },
+            companyId: { notIn: selectedCompanyIds },
+            billDate: { gte: spilloverStart, lte: spilloverEnd },
+            deletedAt: null,
+            ReconcileMatches: { none: {} },
+          },
+          include: { Contact: true, Company: { select: { code: true } } },
+          orderBy: { billDate: "asc" },
+        }),
+    isForeignOnly
+      ? Promise.resolve([])
+      : prisma.income.findMany({
+          where: {
+            ...companyIdFilter,
+            receiveDate: { gte: spilloverStart, lte: spilloverEnd },
+            deletedAt: null,
+            ReconcileMatches: { none: {} },
+          },
+          include: { Contact: true },
+          orderBy: { receiveDate: "asc" },
+        }),
   ]);
 
   const systemExpenses = [

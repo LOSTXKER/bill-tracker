@@ -84,6 +84,8 @@ export interface TransactionData {
   // Approval fields
   approvalStatus?: ApprovalStatus | null;
   submittedBy?: string | null;
+  // Foreign currency
+  originalCurrency?: string | null;
 }
 
 interface TransactionTableRowProps {
@@ -390,7 +392,14 @@ export function TransactionTableRow({
 
       {/* Amount */}
       <TableCell className={`text-right font-medium ${config.amountColorClass}`}>
-        {formatCurrency(amount)}
+        <div className="flex items-center justify-end gap-1.5">
+          {transaction.originalCurrency && transaction.originalCurrency !== "THB" && (
+            <span className="inline-flex items-center rounded bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-[10px] font-medium px-1 py-0.5 leading-none">
+              {transaction.originalCurrency}
+            </span>
+          )}
+          {formatCurrency(amount)}
+        </div>
       </TableCell>
 
       {/* Updated At - show relative time */}

@@ -85,7 +85,7 @@ interface ReconcileWorkspaceProps {
   companyCode: string;
   year: number;
   month: number;
-  type: "expense" | "income";
+  type: "expense" | "income" | "pp36";
   systemExpenses: SystemItem[];
   systemIncomes: SystemItem[];
   spilloverExpenses?: SystemItem[];
@@ -242,14 +242,14 @@ function reconstructPairs(
   systemItems: SystemItem[],
   accountingItems: AccountingRow[],
   savedMatches: SavedMatch[],
-  type: "expense" | "income"
+  type: "expense" | "income" | "pp36"
 ): MatchedPair[] {
   const usedSystem = new Set<string>();
   const usedAccounting = new Set<number>();
   const pairs: MatchedPair[] = [];
 
   for (const m of savedMatches) {
-    const systemId = type === "expense" ? m.expenseId : m.incomeId;
+    const systemId = type === "income" ? m.incomeId : m.expenseId;
     const sItem = systemId
       ? systemItems.find((s) => s.id === systemId)
       : undefined;
@@ -597,9 +597,9 @@ export function ReconcileWorkspace({
 
   const hasSiblings = !!siblingCompanies && siblingCompanies.length > 1;
 
-  const allSystemItems = type === "expense"
-    ? [...systemExpenses, ...spilloverExpenses]
-    : [...systemIncomes, ...spilloverIncomes];
+  const allSystemItems = type === "income"
+    ? [...systemIncomes, ...spilloverIncomes]
+    : [...systemExpenses, ...spilloverExpenses];
 
   const systemItems = useMemo(() => {
     let items = allSystemItems;
@@ -1128,7 +1128,7 @@ export function ReconcileWorkspace({
       );
 
       const matches = matchedPairsForSave.map((p) => ({
-        expenseId: type === "expense" ? p.systemItem!.id : undefined,
+        expenseId: type !== "income" ? p.systemItem!.id : undefined,
         incomeId: type === "income" ? p.systemItem!.id : undefined,
         systemAmount: p.systemItem!.baseAmount,
         systemVat: p.systemItem!.vatAmount,
@@ -1215,7 +1215,7 @@ export function ReconcileWorkspace({
 
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">
-            {type === "expense" ? "ภาษีซื้อ" : "ภาษีขาย"} {monthName}{" "}
+            {type === "expense" ? "ภาษีซื้อ" : type === "income" ? "ภาษีขาย" : "ภพ.36"} {monthName}{" "}
             {year + 543}
           </h2>
           {savedSession && (
@@ -1545,7 +1545,7 @@ export function ReconcileWorkspace({
         companyCode={companyCode}
         month={month}
         year={year}
-        type={type}
+        type={type === "pp36" ? "expense" : type}
       />
     </div>
   );
