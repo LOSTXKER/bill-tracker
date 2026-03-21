@@ -16,19 +16,6 @@ export interface ExtractedRow {
 
 const MAX_PDF_SIZE_MB = 10;
 
-const PARSE_PROMPT = `จาก text ที่ extract มาจาก PDF ด้านล่าง ให้ดึงข้อมูลทุกแถวของตาราง
-
-ส่งคืนเป็น JSON array เท่านั้น ไม่ต้องอธิบาย ไม่ต้องใส่ markdown:
-[{"date":"YYYY-MM-DD","invoiceNumber":"","vendorName":"","taxId":"","baseAmount":0,"vatAmount":0,"totalAmount":0}]
-
-กฎ:
-- วันที่แปลงเป็น YYYY-MM-DD (ถ้าเป็น พ.ศ. ให้ลบ 543)
-- ตัวเลขเงินไม่ต้องมีจุลภาค
-- ข้ามแถวหัวตาราง แถวรวม แถวว่าง
-
-ข้อมูล text จาก PDF:
-`;
-
 export const POST = withCompanyAccessFromParams(
   async (request) => {
     const formData = await request.formData();
@@ -54,21 +41,29 @@ export const POST = withCompanyAccessFromParams(
       console.error("[extract-pdf] Text extraction failed:", e);
     }
 
-    // Step 2: If we got text, send it to AI as text (fast, no vision processing)
     if (pdfText.length > 50) {
-      const rows = await extractWithTextAI(pdfText);
-      if (rows.length > 0) {
-        console.log(`[extract-pdf] Text+AI succeeded: ${rows.length} rows`);
-        return apiResponse.success({ rows });
+      // Step 2a: Try direct text parsing (instant, no AI)
+      const directRows = parseTextDirect(pdfText);
+      if (directRows.length > 0) {
+        console.log(`[extract-pdf] Direct parse succeeded: ${directRows.length} rows`);
+        return apiResponse.success({ rows: directRows });
+      }
+
+      // Step 2b: Send text to AI for parsing (fast, 2-5s)
+      console.log("[extract-pdf] Direct parse got 0, trying text AI...");
+      const aiRows = await parseTextWithAI(pdfText);
+      if (aiRows.length > 0) {
+        console.log(`[extract-pdf] Text AI succeeded: ${aiRows.length} rows`);
+        return apiResponse.success({ rows: aiRows });
       }
     }
 
-    // Step 3: Fallback — send PDF binary to vision AI (for scanned PDFs)
-    console.log("[extract-pdf] Text approach failed, falling back to vision AI...");
-    const rows = await extractWithVisionAI(buffer);
-    if (rows.length > 0) {
-      console.log(`[extract-pdf] Vision AI succeeded: ${rows.length} rows`);
-      return apiResponse.success({ rows });
+    // Step 3: Vision AI fallback (for scanned PDFs)
+    console.log("[extract-pdf] Text approaches failed, trying vision AI...");
+    const visionRows = await parseWithVisionAI(buffer);
+    if (visionRows.length > 0) {
+      console.log(`[extract-pdf] Vision AI succeeded: ${visionRows.length} rows`);
+      return apiResponse.success({ rows: visionRows });
     }
 
     throw new ApiError(
@@ -84,14 +79,108 @@ export const POST = withCompanyAccessFromParams(
 );
 
 // ---------------------------------------------------------------------------
-// Strategy 1: Extract text → AI parses the text (fast, 2-5 seconds)
+// Strategy 1: Direct text parsing (instant, no AI, no cost)
 // ---------------------------------------------------------------------------
 
-async function extractWithTextAI(pdfText: string): Promise<ExtractedRow[]> {
-  try {
-    const prompt = PARSE_PROMPT + pdfText;
+const AMOUNTS_AT_END_RE = /([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+const ROW_NUM_START_RE = /^\d{1,4}\s+/;
+const DATE_GLOBAL_RE = /\d{1,2}\/\d{1,2}\/\d{4}/g;
+const INTERNAL_REF_RE = /^((?:EXP|PA|INV|REC|REV|JV)[-]?\w+)\s*/;
+const BRANCH_TAIL_RE = /\s+(?:HQ\s*\(\d+\)\s*)?\d{5}\s*$/;
+const TAX_ID_TAIL_RE = /\s+([\d][\d\-]*\d)\s*$/;
 
-    const response = await generateText(prompt, {
+function parseTextDirect(text: string): ExtractedRow[] {
+  const lines = text.split("\n");
+  const rows: ExtractedRow[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\t/g, " ").trim();
+    if (!line) continue;
+    if (!ROW_NUM_START_RE.test(line)) continue;
+    if (/รวม|total|ยกมา|ยกไป/i.test(line)) continue;
+
+    const amountsMatch = line.match(AMOUNTS_AT_END_RE);
+    if (!amountsMatch) continue;
+
+    const baseAmount = parseMoney(amountsMatch[1]);
+    const vatAmount = parseMoney(amountsMatch[2]);
+    const totalAmount = parseMoney(amountsMatch[3]);
+
+    const core = line
+      .replace(ROW_NUM_START_RE, "")
+      .replace(AMOUNTS_AT_END_RE, "")
+      .trim();
+
+    const dateMatches = [...core.matchAll(DATE_GLOBAL_RE)];
+    if (dateMatches.length < 2) continue;
+
+    const date = convertDate(dateMatches[0][0]);
+
+    // Section between 1st and 2nd date: internalRef + invoiceNumber
+    const lastDateMatch = dateMatches[dateMatches.length - 1];
+    const date1End = dateMatches[0].index! + dateMatches[0][0].length;
+    const refSection = core.substring(date1End, lastDateMatch.index!).trim();
+    const refMatch = refSection.match(INTERNAL_REF_RE);
+    const invoiceNumber = refMatch
+      ? refSection.substring(refMatch[0].length).trim()
+      : refSection.trim();
+
+    // Section after 2nd date: vendorName + taxId + branchInfo
+    const lastDateEnd = lastDateMatch.index! + lastDateMatch[0].length;
+    let vendorSection = core.substring(lastDateEnd).trim();
+
+    // Strip branch info from the tail
+    vendorSection = vendorSection.replace(BRANCH_TAIL_RE, "").trim();
+    // Safety: strip bare "HQ (xxxxx)" if no trailing branch code
+    vendorSection = vendorSection.replace(/\s+HQ\s*\(\d+\)\s*$/, "").trim();
+
+    // Tax ID is the last digit-starting token
+    let vendorName = vendorSection;
+    let taxId = "";
+    const taxIdMatch = vendorSection.match(TAX_ID_TAIL_RE);
+    if (taxIdMatch) {
+      taxId = taxIdMatch[1].replace(/-/g, "");
+      vendorName = vendorSection.substring(0, taxIdMatch.index!).trim();
+    }
+
+    if (!vendorName && baseAmount === 0) continue;
+
+    rows.push({ date, invoiceNumber, vendorName, taxId, baseAmount, vatAmount, totalAmount });
+  }
+
+  return rows;
+}
+
+function convertDate(dmy: string): string {
+  const [d, m, y] = dmy.split("/").map(Number);
+  const year = y > 2400 ? y - 543 : y;
+  return `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function parseMoney(s: string): number {
+  return parseFloat(s.replace(/,/g, "")) || 0;
+}
+
+// ---------------------------------------------------------------------------
+// Strategy 2: Text + AI (fast text-only, 2-5 seconds)
+// ---------------------------------------------------------------------------
+
+const AI_PROMPT = `จาก text ที่ extract มาจาก PDF ด้านล่าง ให้ดึงข้อมูลทุกแถวของตาราง
+
+ส่งคืนเป็น JSON array เท่านั้น ไม่ต้องอธิบาย ไม่ต้องใส่ markdown:
+[{"date":"YYYY-MM-DD","invoiceNumber":"","vendorName":"","taxId":"","baseAmount":0,"vatAmount":0,"totalAmount":0}]
+
+กฎ:
+- วันที่แปลงเป็น YYYY-MM-DD (ถ้าเป็น พ.ศ. ให้ลบ 543)
+- ตัวเลขเงินไม่ต้องมีจุลภาค
+- ข้ามแถวหัวตาราง แถวรวม แถวว่าง
+
+ข้อมูล:
+`;
+
+async function parseTextWithAI(pdfText: string): Promise<ExtractedRow[]> {
+  try {
+    const response = await generateText(AI_PROMPT + pdfText, {
       temperature: 0,
       maxTokens: 32_768,
       retries: 2,
@@ -102,7 +191,7 @@ async function extractWithTextAI(pdfText: string): Promise<ExtractedRow[]> {
       return [];
     }
 
-    return parseAIResponse(response.data);
+    return parseJSON(response.data);
   } catch (e) {
     console.error("[extract-pdf] Text AI failed:", e);
     return [];
@@ -110,13 +199,12 @@ async function extractWithTextAI(pdfText: string): Promise<ExtractedRow[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Strategy 2: Vision AI on PDF binary (for scanned PDFs, slower)
+// Strategy 3: Vision AI fallback (for scanned PDFs)
 // ---------------------------------------------------------------------------
 
-async function extractWithVisionAI(buffer: Buffer): Promise<ExtractedRow[]> {
+async function parseWithVisionAI(buffer: Buffer): Promise<ExtractedRow[]> {
   try {
-    const base64 = buffer.toString("base64");
-    const response = await analyzeImage(base64, PARSE_PROMPT + "(ดูจาก PDF โดยตรง)", {
+    const response = await analyzeImage(buffer, AI_PROMPT + "(ดูจาก PDF โดยตรง)", {
       mimeType: "application/pdf",
       temperature: 0,
       maxTokens: 32_768,
@@ -129,7 +217,7 @@ async function extractWithVisionAI(buffer: Buffer): Promise<ExtractedRow[]> {
       return [];
     }
 
-    return parseAIResponse(response.data);
+    return parseJSON(response.data);
   } catch (e) {
     console.error("[extract-pdf] Vision AI failed:", e);
     return [];
@@ -137,10 +225,10 @@ async function extractWithVisionAI(buffer: Buffer): Promise<ExtractedRow[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Parse AI JSON response (handles truncated responses)
+// JSON parser (handles truncated AI responses)
 // ---------------------------------------------------------------------------
 
-function parseAIResponse(text: string): ExtractedRow[] {
+function parseJSON(text: string): ExtractedRow[] {
   try {
     let cleaned = text.trim().replace(/```(?:json|JSON)?\s*\n?/g, "").trim();
 
@@ -152,7 +240,6 @@ function parseAIResponse(text: string): ExtractedRow[] {
     try {
       raw = JSON.parse(cleaned);
     } catch {
-      // Truncated JSON — repair
       const lastObj = cleaned.lastIndexOf("}");
       if (lastObj === -1) return [];
       try {
