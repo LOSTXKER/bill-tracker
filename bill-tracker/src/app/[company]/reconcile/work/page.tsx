@@ -91,11 +91,9 @@ async function WorkspaceDataLoader({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59);
 
-  // Previous month range for spillover (cross-month) items
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const spilloverStart = new Date(prevYear, prevMonth - 1, 1);
-  const spilloverEnd = new Date(prevYear, prevMonth, 0, 23, 59, 59);
+  // Spillover range: up to 6 months back for unmatched items (Thai VAT credit period)
+  const spilloverStart = new Date(year, month - 7, 1);
+  const spilloverEnd = new Date(year, month - 1, 0, 23, 59, 59);
 
   const companyIdToCode = new Map(
     siblingCompanies.map((c) => [c.id, c.code])
@@ -292,7 +290,7 @@ async function WorkspaceDataLoader({
             ? companyIdToCode.get(e.internalCompanyId) ?? undefined
             : undefined,
         paidByUser,
-        fromMonth: prevMonth,
+        fromMonth: e.billDate.getMonth() + 1,
       };
     }),
     ...spilloverPayOnBehalf.map((e) => ({
@@ -311,7 +309,7 @@ async function WorkspaceDataLoader({
       payOnBehalfFrom: (e as any).Company?.code ?? undefined,
       payOnBehalfTo: e.internalCompanyId ? companyIdToCode.get(e.internalCompanyId) ?? undefined : undefined,
       paidByUser: false,
-      fromMonth: prevMonth,
+      fromMonth: e.billDate.getMonth() + 1,
     })),
   ];
 
@@ -327,7 +325,7 @@ async function WorkspaceDataLoader({
     description: i.source ?? "",
     status: i.workflowStatus,
     companyCode: companyIdToCode.get(i.companyId) ?? "",
-    fromMonth: prevMonth,
+    fromMonth: i.receiveDate.getMonth() + 1,
   }));
 
   const savedAccountingRows = existingSession?.AccountingRows?.map((r) => ({

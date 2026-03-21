@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,9 @@ import {
   Upload,
   Building2,
   Eye,
+  ChevronDown,
+  ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
@@ -414,6 +417,8 @@ export function ReconcileTable({
 }: ReconcileTableProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [showSpillover, setShowSpillover] = useState(false);
+  const [spilloverMonthFilter, setSpilloverMonthFilter] = useState<number | null>(null);
 
   const handlePreview = (itemId: string) => {
     setPreviewId(itemId);
@@ -437,12 +442,25 @@ export function ReconcileTable({
   const unmatchedPairs = pairs.filter(
     (p) => p.status === "system-only" || p.status === "accounting-only"
   );
-  const unmatchedSystem = unmatchedPairs
+  const allUnmatchedSystem = unmatchedPairs
     .filter((p) => p.status === "system-only")
     .sort((a, b) => (a.systemItem?.date ?? "").localeCompare(b.systemItem?.date ?? ""));
   const unmatchedAccounting = unmatchedPairs
     .filter((p) => p.status === "accounting-only")
     .sort((a, b) => (a.accountingItem?.date ?? "").localeCompare(b.accountingItem?.date ?? ""));
+
+  const currentMonthSystem = allUnmatchedSystem.filter((p) => !p.systemItem?.fromMonth);
+  const spilloverSystem = allUnmatchedSystem.filter((p) => !!p.systemItem?.fromMonth);
+  const spilloverMonths = useMemo(() => {
+    const months = new Set(spilloverSystem.map((p) => p.systemItem!.fromMonth!));
+    return Array.from(months).sort((a, b) => a - b);
+  }, [spilloverSystem]);
+  const filteredSpillover = spilloverMonthFilter
+    ? spilloverSystem.filter((p) => p.systemItem?.fromMonth === spilloverMonthFilter)
+    : spilloverSystem;
+  const unmatchedSystem = showSpillover
+    ? [...currentMonthSystem, ...filteredSpillover]
+    : currentMonthSystem;
   const maxUnmatched = Math.max(unmatchedSystem.length, unmatchedAccounting.length);
 
   const matchedPairs = pairs.filter(
@@ -682,17 +700,61 @@ export function ReconcileTable({
           )}
 
           {/* Unmatched section — side-by-side, sorted by date */}
-          {maxUnmatched > 0 && (
+          {(allUnmatchedSystem.length > 0 || unmatchedAccounting.length > 0) && (
             <>
               <div className="grid grid-cols-[1fr_88px_1fr] bg-muted/30">
                 <div className="col-span-3 px-3 py-1.5 border-y border-muted">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground flex-wrap">
                     <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                    ยังไม่ตรงกัน (ระบบ {unmatchedSystem.length} | รายงาน {unmatchedAccounting.length})
+                    ยังไม่ตรงกัน (ระบบ {currentMonthSystem.length}{spilloverSystem.length > 0 ? ` +${spilloverSystem.length} เดือนอื่น` : ""} | รายงาน {unmatchedAccounting.length})
                     <span className="font-normal">
                       — คลิกเลือก 1 แถวจากระบบ และ 1 แถวจากรายงานเพื่อจับคู่
                     </span>
                   </div>
+                  {spilloverSystem.length > 0 && (
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setShowSpillover(!showSpillover)}
+                        className="flex items-center gap-1 text-[11px] text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 font-medium transition-colors"
+                      >
+                        {showSpillover ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        <CalendarDays className="h-3 w-3" />
+                        รายการเดือนก่อนหน้า ({spilloverSystem.length})
+                      </button>
+                      {showSpillover && spilloverMonths.length > 1 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSpilloverMonthFilter(null)}
+                            className={cn(
+                              "text-[10px] px-1.5 py-0.5 rounded-full border transition-colors",
+                              !spilloverMonthFilter
+                                ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 font-medium"
+                                : "border-muted text-muted-foreground hover:border-sky-300 hover:text-sky-600"
+                            )}
+                          >
+                            ทั้งหมด
+                          </button>
+                          {spilloverMonths.map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setSpilloverMonthFilter(m === spilloverMonthFilter ? null : m)}
+                              className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded-full border transition-colors",
+                                spilloverMonthFilter === m
+                                  ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 font-medium"
+                                  : "border-muted text-muted-foreground hover:border-sky-300 hover:text-sky-600"
+                              )}
+                            >
+                              {SHORT_MONTHS[m - 1]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               {Array.from({ length: maxUnmatched }, (_, i) => {
