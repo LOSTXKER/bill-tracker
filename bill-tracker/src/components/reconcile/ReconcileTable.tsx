@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -527,9 +527,15 @@ export function ReconcileTable({
     return counts;
   }, [currentMonthSystem.length, spilloverSystem, month]);
 
+  const prevSpilloverKey = useRef("");
   useEffect(() => {
-    onSpilloverInfo?.({ hasSpillover: spilloverSystem.length > 0, presetCounts });
-  }, [spilloverSystem.length, presetCounts, onSpilloverInfo]);
+    const hasSpillover = spilloverSystem.length > 0;
+    const key = `${hasSpillover}|${Array.from(presetCounts.entries()).map(([k, v]) => `${k}:${v}`).join(",")}`;
+    if (key !== prevSpilloverKey.current) {
+      prevSpilloverKey.current = key;
+      onSpilloverInfo?.({ hasSpillover, presetCounts });
+    }
+  });
 
   const matchedPairs = pairs.filter(
     (p) =>
