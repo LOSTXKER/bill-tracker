@@ -89,7 +89,8 @@ const BRANCH_TAIL_RE = /\s+(?:HQ\s*\(\d+\)\s*)?\d{5}\s*$/;
 const TAX_ID_TAIL_RE = /\s+([\d][\d\-]*\d)\s*$/;
 
 // PP36 format: ...CURRENCY totalAmt (rate|-) baseAmt vatAmt
-const PP36_AMOUNTS_RE = /\s+(THB|USD|AED|EUR|GBP|JPY|CNY|SGD|HKD|MYR)\s+([\d,]+\.\d{2,4})\s+(?:([\d.]+)|-)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+// No $ anchor — the last row may have trailing summary totals on the same line
+const PP36_AMOUNTS_RE = /\s+(THB|USD|AED|EUR|GBP|JPY|CNY|SGD|HKD|MYR)\s+([\d,]+\.\d{2,4})\s+(?:([\d.]+)|-)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/;
 const PP36_HEADER_RE = /สกุลเงิน|Ex\s*Rate/i;
 
 function normalizeText(text: string): string {
@@ -116,8 +117,20 @@ function parseTextDirect(text: string): ExtractedRow[] {
   return parseStandardText(text);
 }
 
+function normalizePP36Text(text: string): string {
+  if (text.split("\n").length >= 10) return text;
+
+  // Split before each row start (e.g. "1 01/02/2026", "24 28/02/2026")
+  // but not when the digit is part of a larger number (e.g. amounts)
+  return text.replace(
+    /\s+(\d{1,3}\s+\d{1,2}\/\d{1,2}\/\d{4})/g,
+    "\n$1"
+  );
+}
+
 function parsePP36Text(text: string): ExtractedRow[] {
-  const lines = text.split("\n");
+  const normalized = normalizePP36Text(text);
+  const lines = normalized.split("\n");
   const rows: ExtractedRow[] = [];
 
   for (const rawLine of lines) {
