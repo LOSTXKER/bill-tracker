@@ -65,6 +65,7 @@ export interface MatchedPair {
 
 interface ReconcileTableProps {
   pairs: MatchedPair[];
+  systemItems?: SystemItem[];
   onConfirmAI: (id: string) => void;
   onRejectAI: (id: string) => void;
   onManualLink: (systemId: string, accountingIndex: number) => void;
@@ -429,6 +430,7 @@ function AccountingRow_({
 
 export function ReconcileTable({
   pairs,
+  systemItems: systemItemsProp,
   onConfirmAI,
   onRejectAI,
   onManualLink,
@@ -656,23 +658,24 @@ export function ReconcileTable({
         </div>
       </div>
 
-      {/* No accounting data: empty state */}
+      {/* No accounting data: show system items + upload prompt */}
       {!hasAccountingData ? (
         <div className="grid grid-cols-[1fr_88px_1fr]">
           <div className="border-r border-border overflow-y-auto max-h-[calc(100vh-380px)] divide-y divide-border/50">
-            {pairs.length === 0 ? (
+            {(systemItemsProp ?? []).length === 0 ? (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">
                 ไม่มีรายการในเดือนนี้
               </div>
             ) : (
-              pairs.map((pair) => (
+              (systemItemsProp ?? []).map((item) => (
                 <SystemRow
-                  key={pair.id}
-                  item={pair.systemItem}
+                  key={item.id}
+                  item={item}
                   isSelected={false}
                   isSelectable={false}
                   onSelect={() => {}}
                   showCompanyBadge={showCompanyBadge}
+                  onPreview={() => handlePreview(item.id)}
                 />
               ))
             )}

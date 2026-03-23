@@ -999,6 +999,7 @@ export function ReconcileWorkspace({
       {/* Table */}
       <ReconcileTable
         pairs={pairs}
+        systemItems={systemItems}
         onConfirmAI={handleConfirmAI}
         onRejectAI={handleRejectAI}
         onManualLink={handleManualLink}
