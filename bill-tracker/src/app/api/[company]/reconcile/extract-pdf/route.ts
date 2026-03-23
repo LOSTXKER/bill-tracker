@@ -88,6 +88,10 @@ const INTERNAL_REF_RE = /^((?:EXP|PA|INV|REC|REV|JV)[-]?\w+)\s*/;
 const BRANCH_TAIL_RE = /\s+(?:HQ\s*\(\d+\)\s*)?\d{5}\s*$/;
 const TAX_ID_TAIL_RE = /\s+([\d][\d\-]*\d)\s*$/;
 
+// PP36 format: ...CURRENCY totalAmt (rate|-) baseAmt vatAmt
+const PP36_AMOUNTS_RE = /\s+(THB|USD|AED|EUR|GBP|JPY|CNY|SGD|HKD|MYR)\s+([\d,]+\.\d{2,4})\s+(?:([\d.]+)|-)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/;
+const PP36_HEADER_RE = /สกุลเงิน|Ex\s*Rate/i;
+
 function normalizeText(text: string): string {
   if (text.split("\n").length >= 10) return text;
 
@@ -98,7 +102,76 @@ function normalizeText(text: string): string {
   );
 }
 
+function detectPP36(text: string): boolean {
+  const headerArea = text.substring(0, Math.min(text.length, 500));
+  return PP36_HEADER_RE.test(headerArea);
+}
+
 function parseTextDirect(text: string): ExtractedRow[] {
+  const isPP36 = detectPP36(text);
+  if (isPP36) {
+    console.log("[extract-pdf] Detected PP36 format");
+    return parsePP36Text(text);
+  }
+  return parseStandardText(text);
+}
+
+function parsePP36Text(text: string): ExtractedRow[] {
+  const lines = text.split("\n");
+  const rows: ExtractedRow[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\t/g, " ").trim();
+    if (!line) continue;
+    if (/(?:^|\s)รวม\s|\btotal\b|ยกมา|ยกไป/i.test(line)) continue;
+
+    const rowMatch = line.match(ROW_START_RE);
+    if (!rowMatch) continue;
+
+    const amountsMatch = line.match(PP36_AMOUNTS_RE);
+    if (!amountsMatch) continue;
+
+    const date = convertDate(rowMatch[2]);
+    const baseAmount = parseMoney(amountsMatch[4]);
+    const vatAmount = parseMoney(amountsMatch[5]);
+    const totalAmount = baseAmount + vatAmount;
+
+    // Core = between row start and the currency/amounts section
+    const coreEnd = amountsMatch.index!;
+    const coreStart = rowMatch.index! + rowMatch[0].length;
+    let core = line.substring(coreStart, coreEnd).trim();
+
+    // Strip internal ref (EXP-xxx, etc.)
+    const refMatch = core.match(INTERNAL_REF_RE);
+    if (refMatch) {
+      core = core.substring(refMatch[0].length).trim();
+    }
+
+    // The remaining core is: vendorName [taxId]
+    let vendorName = core;
+    let taxId = "";
+
+    // Tax ID is typically at the end, separated by whitespace
+    // Can be numeric (0993000454995), hyphenated (87-4436547), or alphanumeric (IE6364992H)
+    const taxIdMatch = core.match(/\s+([\w][\w\-]*[\w])\s*$/);
+    if (taxIdMatch) {
+      const candidate = taxIdMatch[1];
+      // Only treat as tax ID if it looks like one (mostly digits, or known alphanumeric patterns)
+      if (/\d/.test(candidate) && candidate.length >= 5) {
+        taxId = candidate.replace(/-/g, "");
+        vendorName = core.substring(0, taxIdMatch.index!).trim();
+      }
+    }
+
+    if (!vendorName && baseAmount === 0) continue;
+
+    rows.push({ date, invoiceNumber: "", vendorName, taxId, baseAmount, vatAmount, totalAmount });
+  }
+
+  return rows;
+}
+
+function parseStandardText(text: string): ExtractedRow[] {
   const normalized = normalizeText(text);
   const lines = normalized.split("\n");
   const rows: ExtractedRow[] = [];
