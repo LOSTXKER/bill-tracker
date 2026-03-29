@@ -40,12 +40,13 @@ export function createTransactionRoutes(config: CreateTransactionRoutesOptions) 
       const page = parseInt(searchParams.get("page") || "1");
       const limit = parseInt(searchParams.get("limit") || "20");
 
-      const where = {
+      const where: Record<string, unknown> = {
         companyId: company.id,
-        ...(status && { status: status as any }),
+        ...(status && { status }),
       };
 
-      const prismaModel = prisma[model as PrismaModel] as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prismaModel = (prisma as any)[model as PrismaModel];
 
       const [items, total] = await Promise.all([
         prismaModel.findMany({
@@ -86,7 +87,7 @@ export function createTransactionRoutes(config: CreateTransactionRoutesOptions) 
       const netValue = body[netField];
 
       // Build create data based on model type
-      const createData: any = {
+      const createData: Record<string, unknown> = {
         companyId: company.id,
         contactId: data.contactId || null,
         amount: data.amount,
@@ -119,7 +120,8 @@ export function createTransactionRoutes(config: CreateTransactionRoutesOptions) 
         createData.receiveDate = data.receiveDate ? new Date(data.receiveDate) : new Date();
       }
 
-      const prismaModel = prisma[model as PrismaModel] as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prismaModel = (prisma as any)[model as PrismaModel];
 
       const item = await prismaModel.create({
         data: createData,

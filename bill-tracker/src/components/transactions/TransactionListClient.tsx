@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Loader2, ArrowUpDown, ArrowUp, ArrowDown, LucideIcon } from "lucide-react";
+import { Plus, Loader2, LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
 import { Pagination } from "@/components/shared/Pagination";
@@ -25,10 +25,14 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { StatusInfo } from "@/lib/constants/transaction";
 import { getNextStatus, getStatusLabel, getPreviousStatus, type TransactionWorkflowContext, type NextStatusInfo } from "@/lib/workflow/status-rules";
+import { SortableHeader } from "@/components/transactions/SortableHeader";
+import { StatusTab, EXPENSE_STATUS_TABS, INCOME_STATUS_TABS } from "@/components/transactions/transaction-list-constants";
 
 // ============================================================================
 // Types
 // ============================================================================
+
+export type TransactionListItem = Record<string, unknown> & { id: string };
 
 export interface CompanyOption {
   id: string;
@@ -54,9 +58,9 @@ export interface TransactionListConfig {
   
   // Custom row renderer
   renderRow: (
-    item: any, 
-    companyCode: string, 
-    selected: boolean, 
+    item: TransactionListItem,
+    companyCode: string,
+    selected: boolean,
     onToggle: () => void,
     options?: { 
       currentUserId?: string; 
@@ -89,7 +93,7 @@ interface TabCounts {
 
 interface TransactionListClientProps {
   companyCode: string;
-  data: any[];
+  data: TransactionListItem[];
   total: number;
   config: TransactionListConfig;
   companies?: CompanyOption[];
@@ -102,43 +106,6 @@ interface TransactionListClientProps {
 // ============================================================================
 // Component
 // ============================================================================
-
-// Status tab configuration
-interface StatusTab {
-  key: string;
-  label: string;
-  statuses: string[]; // Statuses to include in this tab
-  icon?: string;
-  isTabFilter?: boolean; // Use tab parameter instead of status
-  isApprovalTab?: boolean; // Show pending approval items
-  isRejectedTab?: boolean; // Show rejected items
-}
-
-// Expense workflow: ร่าง → รออนุมัติ → จ่ายแล้ว → รอใบกำกับ → (ออก 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
-const EXPENSE_STATUS_TABS: StatusTab[] = [
-  { key: "all", label: "ทั้งหมด", statuses: [] },
-  { key: "draft", label: "ร่างของฉัน", statuses: ["DRAFT"], isTabFilter: true },
-  { key: "pending", label: "รออนุมัติ", statuses: [], isApprovalTab: true },
-  { key: "rejected", label: "ถูกปฏิเสธ", statuses: [], isRejectedTab: true },
-  { key: "waiting_doc", label: "รอเอกสาร", statuses: ["PAID", "WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE"] },
-  { key: "doc_received", label: "ได้เอกสารแล้ว", statuses: ["TAX_INVOICE_RECEIVED", "WHT_ISSUED", "WHT_SENT_TO_VENDOR"] },
-  { key: "ready", label: "รอส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
-  { key: "sent", label: "ส่งบัญชีแล้ว", statuses: ["SENT_TO_ACCOUNTANT", "COMPLETED"] },
-  { key: "recent", label: "แก้ไขล่าสุด", statuses: [] },
-];
-
-// Income workflow: ร่าง → รออนุมัติ → รับเงินแล้ว → รอออกบิล → (รอ 50 ทวิ) → รอส่งบัญชี → ส่งแล้ว
-const INCOME_STATUS_TABS: StatusTab[] = [
-  { key: "all", label: "ทั้งหมด", statuses: [] },
-  { key: "draft", label: "ร่างของฉัน", statuses: ["DRAFT"], isTabFilter: true },
-  { key: "pending", label: "รออนุมัติ", statuses: [], isApprovalTab: true },
-  { key: "rejected", label: "ถูกปฏิเสธ", statuses: [], isRejectedTab: true },
-  { key: "waiting_doc", label: "รอออกบิล", statuses: ["RECEIVED", "NO_INVOICE_NEEDED", "WAITING_INVOICE_ISSUE", "WHT_PENDING_CERT"] },
-  { key: "doc_issued", label: "ออกบิลแล้ว", statuses: ["INVOICE_ISSUED", "INVOICE_SENT", "WHT_CERT_RECEIVED"] },
-  { key: "ready", label: "รอส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
-  { key: "sent", label: "ส่งบัญชีแล้ว", statuses: ["SENT_TO_ACCOUNTANT", "COMPLETED"] },
-  { key: "recent", label: "แก้ไขล่าสุด", statuses: [] },
-];
 
 export function TransactionListClient({
   companyCode,
@@ -202,6 +169,8 @@ export function TransactionListClient({
     setPreviewId(id);
     setPreviewOpen(true);
   }, []);
+
+  const handleRefresh = useCallback(() => router.refresh(), [router]);
   
   const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
   
@@ -248,34 +217,6 @@ export function TransactionListClient({
   // Note: handleBulkDelete, handleBulkStatusChange, handleBulkInternalCompanyChange, handleBulkApprove, 
   //       handleBulkReject, isPending are now from useBulkActions hook
 
-  const SortableHeader = ({ field, children, align = "left" }: { field: string; children: React.ReactNode; align?: "left" | "center" | "right" }) => (
-    <TableHead className={cn(
-      "text-muted-foreground font-medium",
-      align === "center" && "text-center",
-      align === "right" && "text-right"
-    )}>
-      <button
-        onClick={() => toggleSort(field)}
-        className={cn(
-          "flex items-center gap-1 hover:text-foreground transition-colors",
-          sortBy === field && "text-foreground",
-          align === "right" && "ml-auto"
-        )}
-      >
-        {children}
-        {sortBy === field ? (
-          sortOrder === "asc" ? (
-            <ArrowUp className="h-3 w-3" />
-          ) : (
-            <ArrowDown className="h-3 w-3" />
-          )
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-50" />
-        )}
-      </button>
-    </TableHead>
-  );
-
   const statusOptions = Object.entries(config.statusInfo).map(([value, info]) => ({
     value,
     label: info.label,
@@ -301,7 +242,7 @@ export function TransactionListClient({
     if (tab.key === "draft") {
       return data.filter(item => 
         (item.workflowStatus === "DRAFT" || item.status === "DRAFT") && 
-        item.creator?.id === currentUserId
+        (item.creator as Record<string, unknown> | undefined)?.id === currentUserId
       ).length;
     }
     
@@ -313,7 +254,7 @@ export function TransactionListClient({
       return data.filter(item => item.approvalStatus === "REJECTED").length;
     }
     
-    return data.filter(item => tab.statuses.includes(item.workflowStatus || item.status)).length;
+    return data.filter(item => tab.statuses.includes(((item.workflowStatus ?? item.status) as string | undefined) ?? "")).length;
   };
 
   return (
@@ -412,10 +353,13 @@ export function TransactionListClient({
                       </TableHead>
                       {config.tableHeaders.map((header) => (
                         header.sortable ? (
-                          <SortableHeader 
-                            key={header.key} 
+                          <SortableHeader
+                            key={header.key}
                             field={header.key}
                             align={header.align}
+                            sortBy={sortBy}
+                            sortOrder={sortOrder}
+                            onSort={toggleSort}
                           >
                             {header.label}
                           </SortableHeader>
@@ -444,7 +388,7 @@ export function TransactionListClient({
                         {
                           currentUserId,
                           canApprove,
-                          onRefresh: () => router.refresh(),
+                          onRefresh: handleRefresh,
                           onPreview: handlePreview,
                         }
                       )

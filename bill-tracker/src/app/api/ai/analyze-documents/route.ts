@@ -1,7 +1,6 @@
-import { withAuth } from "@/lib/api/with-auth";
+import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
-import { prisma } from "@/lib/db";
 import { analyzeReceipt, ReceiptAnalysisResult } from "@/lib/ai/analyze-receipt";
 import { convertCurrency, CurrencyDetectionResult } from "@/lib/ai/currency-converter";
 import { createApiLogger } from "@/lib/utils/logger";
@@ -10,101 +9,84 @@ const log = createApiLogger("ai/analyze-documents");
 
 /**
  * POST /api/ai/analyze-documents
- * 🧠 AI วิเคราะห์เอกสาร - ส่ง context ให้ AI ตัดสินใจเอง
+ * AI document analysis — requires auth + company membership
  */
 export async function POST(request: Request) {
-  return withAuth(async (req, { session }) => {
-    // Check if Gemini API is configured
-    if (!isGeminiConfigured()) {
-      return apiResponse.error(
-        "AI features not configured. Please set GOOGLE_GEMINI_API_KEY."
-      );
-    }
+  return withCompanyAccess(
+    async (req, { session, company }) => {
+      if (!isGeminiConfigured()) {
+        return apiResponse.error(
+          "AI features not configured. Please set GOOGLE_GEMINI_API_KEY."
+        );
+      }
 
-    const body = await req.json();
-    const {
-      imageUrls,
-      companyCode,
-      transactionType = "EXPENSE",
-    } = body;
+      const body = await req.json();
+      const {
+        imageUrls,
+        transactionType = "EXPENSE",
+      } = body;
 
-    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
-      return apiResponse.badRequest("imageUrls array is required");
-    }
+      if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+        return apiResponse.badRequest("imageUrls array is required");
+      }
 
-    if (!companyCode) {
-      return apiResponse.badRequest("companyCode is required");
-    }
+      const exchangeRates = (company.exchangeRates as Record<string, number>) || {};
 
-    // Find company with exchange rates
-    const company = await prisma.company.findUnique({
-      where: { code: companyCode.toUpperCase() },
-      select: { id: true, name: true, exchangeRates: true },
-    });
+      const startTime = Date.now();
 
-    if (!company) {
-      return apiResponse.notFound("Company not found");
-    }
-
-    // Get exchange rates from company settings
-    const exchangeRates = (company.exchangeRates as Record<string, number>) || {};
-
-    const startTime = Date.now();
-
-    // 🧠 AI วิเคราะห์ - AI ฉลาดอยู่แล้ว ให้มันจัดการเอง
-    const aiResult = await analyzeReceipt({
-      imageUrls,
-      companyId: company.id,
-      transactionType: transactionType.toUpperCase() as "EXPENSE" | "INCOME",
-    });
-
-    if ("error" in aiResult) {
-      return apiResponse.error(aiResult.error);
-    }
-
-    const processingTime = Date.now() - startTime;
-
-    // Apply currency conversion if detected foreign currency
-    let currencyConversion: CurrencyDetectionResult | null = null;
-    if (aiResult.currency && aiResult.currency !== "THB" && aiResult.amount) {
-      currencyConversion = convertCurrency(
-        aiResult.amount,
-        aiResult.currency as "USD" | "AED" | "THB",
-        exchangeRates
-      );
-      log.info("Currency conversion applied", {
-        originalCurrency: aiResult.currency,
-        originalAmount: aiResult.amount,
-        convertedAmount: currencyConversion.convertedAmount,
-        exchangeRate: currencyConversion.exchangeRate,
+      const aiResult = await analyzeReceipt({
+        imageUrls,
+        companyId: company.id,
+        transactionType: transactionType.toUpperCase() as "EXPENSE" | "INCOME",
       });
-    }
 
-    log.info("AI analysis completed", {
-      userId: session.user.id,
-      companyId: company.id,
-      processingTime,
-      vendor: aiResult.vendor.name,
-      matchedContact: aiResult.vendor.matchedContactName,
-      account: aiResult.account.name,
-      confidence: aiResult.confidence.overall,
-      isNewVendor: !aiResult.vendor.matchedContactId,
-    });
+      if ("error" in aiResult) {
+        return apiResponse.error(aiResult.error);
+      }
 
-    // Convert to legacy format for frontend
-    const result = convertToLegacyFormat(aiResult, imageUrls, currencyConversion);
+      const processingTime = Date.now() - startTime;
 
-    return apiResponse.success({
-      ...result,
-      meta: {
-        processingTime,
+      let currencyConversion: CurrencyDetectionResult | null = null;
+      if (aiResult.currency && aiResult.currency !== "THB" && aiResult.amount) {
+        currencyConversion = convertCurrency(
+          aiResult.amount,
+          aiResult.currency as "USD" | "AED" | "THB",
+          exchangeRates
+        );
+        log.info("Currency conversion applied", {
+          originalCurrency: aiResult.currency,
+          originalAmount: aiResult.amount,
+          convertedAmount: currencyConversion.convertedAmount,
+          exchangeRate: currencyConversion.exchangeRate,
+        });
+      }
+
+      log.info("AI analysis completed", {
         userId: session.user.id,
         companyId: company.id,
-        fileCount: imageUrls.length,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  })(request);
+        processingTime,
+        vendor: aiResult.vendor.name,
+        matchedContact: aiResult.vendor.matchedContactName,
+        account: aiResult.account.name,
+        confidence: aiResult.confidence.overall,
+        isNewVendor: !aiResult.vendor.matchedContactId,
+      });
+
+      const result = convertToLegacyFormat(aiResult, imageUrls, currencyConversion);
+
+      return apiResponse.success({
+        ...result,
+        meta: {
+          processingTime,
+          userId: session.user.id,
+          companyId: company.id,
+          fileCount: imageUrls.length,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    },
+    { rateLimit: { maxRequests: 15, windowMs: 60_000 } }
+  )(request);
 }
 
 /**

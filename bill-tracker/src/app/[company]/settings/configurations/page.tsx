@@ -22,16 +22,14 @@ export default async function ConfigurationsPage({ params }: PageProps) {
   
   const company = await prisma.company.findUnique({
     where: { code: params.company.toUpperCase() },
-    // Note: CompanyConfig relation will be available after running prisma generate
-    // include: { CompanyConfig: true },
+    include: { CompanyConfig: true },
   });
 
   if (!company) {
     return <div>ไม่พบข้อมูลบริษัท</div>;
   }
 
-  // TODO: Fetch CompanyConfig after Prisma migration
-  const configs: any[] = [];
+  const configs = company.CompanyConfig ?? [];
 
   return (
     <div className="container mx-auto py-6 space-y-6">

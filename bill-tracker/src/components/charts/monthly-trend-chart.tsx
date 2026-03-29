@@ -30,13 +30,19 @@ const COLORS = {
   expense: "#ef4444", // red-500
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string; payload: Record<string, unknown> }>;
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
         <p className="font-medium text-foreground mb-2">{label}</p>
         <div className="space-y-1">
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-sm">
               <div
                 className="w-2.5 h-2.5 rounded-full"
@@ -48,20 +54,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               <span className="font-medium text-foreground">{formatCurrency(entry.value)}</span>
             </div>
           ))}
-          <div className="pt-2 mt-2 border-t border-border">
-            <span className="text-muted-foreground text-sm">
-              สุทธิ:
-            </span>
-            <span
-              className={`ml-2 font-medium ${
-                payload[0].value - payload[1].value >= 0
-                  ? "text-primary"
-                  : "text-destructive"
-              }`}
-            >
-              {formatCurrency(payload[0].value - payload[1].value)}
-            </span>
-          </div>
+          {payload.length >= 2 && (
+            <div className="pt-2 mt-2 border-t border-border">
+              <span className="text-muted-foreground text-sm">
+                สุทธิ:
+              </span>
+              <span
+                className={`ml-2 font-medium ${
+                  payload[0].value - payload[1].value >= 0
+                    ? "text-primary"
+                    : "text-destructive"
+                }`}
+              >
+                {formatCurrency(payload[0].value - payload[1].value)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );

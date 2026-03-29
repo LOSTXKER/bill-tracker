@@ -9,6 +9,7 @@ import {
   Legend,
   Tooltip,
 } from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 import { PieChart as PieChartIcon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 
@@ -37,8 +38,15 @@ const COLORS = [
   "#ec4899", // pink
 ];
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; payload: Record<string, unknown> }>;
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
+    const percentage = payload[0].payload.percentage;
     return (
       <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
         <p className="font-medium text-foreground">{payload[0].name}</p>
@@ -46,7 +54,7 @@ const CustomTooltip = ({ active, payload }: any) => {
           {formatCurrency(payload[0].value)}
         </p>
         <p className="text-xs text-muted-foreground">
-          {payload[0].payload.percentage.toFixed(1)}%
+          {typeof percentage === "number" ? percentage.toFixed(1) : "0.0"}%
         </p>
       </div>
     );
@@ -93,9 +101,11 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={(props: any) =>
-                props.percentage > 5 ? `${props.percentage?.toFixed(0) || 0}%` : ""
-              }
+              label={(props: PieLabelRenderProps) => {
+                const pct =
+                  typeof props.percent === "number" ? props.percent : 0;
+                return pct > 0.05 ? `${(pct * 100).toFixed(0)}%` : "";
+              }}
               outerRadius={90}
               innerRadius={50}
               fill="#8884d8"

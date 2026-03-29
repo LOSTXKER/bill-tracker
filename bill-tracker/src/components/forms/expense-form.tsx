@@ -111,8 +111,6 @@ export function ExpenseForm({
 }: ExpenseFormProps) {
   const baseConfig = getExpenseConfig(companyCode);
   
-  console.log("ExpenseForm received prefillData:", prefillData);
-  
   // Merge prefillData with defaultValues if provided
   const config = prefillData
     ? {
@@ -123,8 +121,6 @@ export function ExpenseForm({
         },
       }
     : baseConfig;
-
-  console.log("ExpenseForm final config.defaultValues:", config.defaultValues);
 
   return (
     <UnifiedTransactionForm

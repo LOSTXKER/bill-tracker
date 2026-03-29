@@ -3,6 +3,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { ApiErrors } from "@/lib/api/errors";
 import { createAuditLog } from "@/lib/audit/logger";
+import { ReconcileMatchStatus } from "@prisma/client";
 
 export const PATCH = withCompanyAccessFromParams(
   async (request, { session: authSession, company, params }) => {
@@ -33,7 +34,7 @@ export const PATCH = withCompanyAccessFromParams(
       throw ApiErrors.notFound("ReconcileMatch");
     }
 
-    const newStatus = action === "confirm" ? "confirmed" : "rejected";
+    const newStatus = action === "confirm" ? ReconcileMatchStatus.CONFIRMED : ReconcileMatchStatus.REJECTED;
 
     const updated = await prisma.reconcileMatch.update({
       where: { id: matchId },
@@ -47,7 +48,7 @@ export const PATCH = withCompanyAccessFromParams(
     });
 
     const confirmedCount = await prisma.reconcileMatch.count({
-      where: { sessionId: id, status: "confirmed" },
+      where: { sessionId: id, status: ReconcileMatchStatus.CONFIRMED },
     });
     await prisma.reconcileSession.update({
       where: { id },

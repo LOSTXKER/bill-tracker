@@ -50,7 +50,7 @@ export function useTransactionActions({
 
   const handleStatusChange = async (
     newStatus: string,
-    transactionData: any
+    transactionData: unknown
   ) => {
     try {
       setSaving(true);
@@ -89,7 +89,7 @@ export function useTransactionActions({
     return statusFlow[currentIndex - 1];
   };
 
-  const handleNextStatus = (currentStatus: string, transactionData: any) => {
+  const handleNextStatus = (currentStatus: string, transactionData: unknown) => {
     const nextStatus = getNextStatus(currentStatus);
     if (nextStatus) {
       handleStatusChange(nextStatus, transactionData);
@@ -98,7 +98,7 @@ export function useTransactionActions({
 
   const handlePreviousStatus = (
     currentStatus: string,
-    transactionData: any
+    transactionData: unknown
   ) => {
     const prevStatus = getPreviousStatus(currentStatus);
     if (prevStatus) {

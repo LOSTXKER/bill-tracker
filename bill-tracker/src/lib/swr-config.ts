@@ -4,21 +4,9 @@
  */
 
 import type { SWRConfiguration } from "swr";
+import { fetcher } from "@/lib/utils/fetcher";
 
-/**
- * Default fetcher for SWR
- * Handles JSON responses and error handling
- */
-export const fetcher = async <T>(url: string): Promise<T> => {
-  const res = await fetch(url);
-  
-  if (!res.ok) {
-    const error = new Error("An error occurred while fetching the data.");
-    throw error;
-  }
-  
-  return res.json();
-};
+export { fetcher };
 
 /**
  * Global SWR configuration

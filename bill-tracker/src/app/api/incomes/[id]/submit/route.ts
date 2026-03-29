@@ -69,11 +69,6 @@ export const POST = (
       const currentWorkflowStatus = income.workflowStatus;
       const currentApprovalStatus = income.approvalStatus;
       
-      // Debug logging (only in development)
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[Submit Income] id=${id}, workflowStatus=${currentWorkflowStatus}, approvalStatus=${currentApprovalStatus}`);
-      }
-
       // Only DRAFT can be submitted (or null for old records before migration)
       if (currentWorkflowStatus !== "DRAFT" && currentWorkflowStatus !== null) {
         return apiResponse.badRequest(

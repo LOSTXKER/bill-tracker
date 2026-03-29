@@ -232,23 +232,11 @@ export function useAiResultProcessor({
       // Normalize AI's whtType to valid enum key (e.g., "ค่าธรรมเนียม" -> "SERVICE_3")
       const whtType = normalizeWhtType(rawWhtType);
       
-      // Debug: Log WHT data from AI
-      console.log("[AI WHT Debug]", {
-        "suggested.whtRate": suggested.whtRate,
-        "extendedCombined.whtRate": extendedCombined.whtRate,
-        "extendedCombined.whtAmount": whtAmount,
-        "whtRate (final)": whtRate,
-        "rawWhtType": rawWhtType,
-        "whtType (normalized)": whtType,
-      });
-      
       // Enable WHT if we have rate OR amount
       const hasWht = (whtRate !== null && whtRate !== undefined && whtRate > 0) || 
                      (whtAmount !== null && whtAmount !== undefined && whtAmount > 0);
       
       if (hasWht) {
-        // Enable WHT toggle
-        console.log("[AI WHT] Enabling WHT - rate:", whtRate, "amount:", whtAmount, "type:", whtType);
         setValue(config.fields.whtField.name, true);
         
         // Set rate (calculate from amount if not provided)
@@ -261,7 +249,6 @@ export function useAiResultProcessor({
             const calculatedRate = Math.round((whtAmount / aiAmount) * 100);
             if ([1, 2, 3, 5].includes(calculatedRate)) {
               setValue("whtRate", calculatedRate);
-              console.log("[AI WHT] Calculated rate from amount:", calculatedRate, "%");
             }
           }
         }

@@ -175,7 +175,7 @@ function formatRelativeTime(date: Date): string {
 // Component
 // =============================================================================
 
-export function TransactionTableRow({
+function TransactionTableRowInner({
   transaction,
   companyCode,
   config,
@@ -456,3 +456,19 @@ export function TransactionTableRow({
     </TableRow>
   );
 }
+
+function areTransactionRowPropsEqual(
+  prev: TransactionTableRowProps,
+  next: TransactionTableRowProps
+) {
+  return (
+    prev.transaction === next.transaction &&
+    prev.companyCode === next.companyCode &&
+    prev.config === next.config &&
+    prev.selected === next.selected &&
+    prev.currentUserId === next.currentUserId &&
+    prev.canApprove === next.canApprove
+  );
+}
+
+export const TransactionTableRow = React.memo(TransactionTableRowInner, areTransactionRowPropsEqual);

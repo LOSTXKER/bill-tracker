@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import {
   generateAccountingArchive,
   getArchiveStats,
 } from "@/lib/export/archive";
 import { apiResponse } from "@/lib/api/response";
-
-// Helper to extract company code from URL path
-const getCompanyFromPath = (req: Request) => {
-  const url = new URL(req.url);
-  const pathParts = url.pathname.split("/");
-  // URL: /api/[company]/archive → pathParts = ["", "api", "company", "archive"]
-  return pathParts[2];
-};
 
 // Helper to parse JSON array from Prisma (can be string or array)
 function parseJsonArray(value: unknown): string[] {
@@ -249,12 +241,10 @@ async function handlePost(
   }
 }
 
-export const GET = withCompanyAccess(handleGetPreview, {
+export const GET = withCompanyAccessFromParams(handleGetPreview, {
   permission: "reports:read",
-  getCompanyCode: getCompanyFromPath,
 });
 
-export const POST = withCompanyAccess(handlePost, {
+export const POST = withCompanyAccessFromParams(handlePost, {
   permission: "reports:read",
-  getCompanyCode: getCompanyFromPath,
 });

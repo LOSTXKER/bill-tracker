@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { exportExpensesToPEAK } from "@/lib/export/peak-export";
 import { apiResponse } from "@/lib/api/response";
-
-// Helper to extract company code from URL path
-const getCompanyFromPath = (req: Request) => {
-  const url = new URL(req.url);
-  const pathParts = url.pathname.split("/");
-  // URL: /api/[company]/export-peak → pathParts = ["", "api", "company", "export-peak"]
-  return pathParts[2];
-};
 
 // POST /api/[company]/export-peak
 // Generate and download PEAK-format Excel file
@@ -192,12 +184,10 @@ async function handleGet(
   });
 }
 
-export const GET = withCompanyAccess(handleGet, {
+export const GET = withCompanyAccessFromParams(handleGet, {
   permission: "reports:read",
-  getCompanyCode: getCompanyFromPath,
 });
 
-export const POST = withCompanyAccess(handlePost, {
+export const POST = withCompanyAccessFromParams(handlePost, {
   permission: "reports:read",
-  getCompanyCode: getCompanyFromPath,
 });

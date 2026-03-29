@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpCircle, ArrowDownCircle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,8 +32,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { QuickApprovalCell } from "@/components/transactions/QuickApprovalCell";
+import type { ApprovalStatus } from "@prisma/client";
 
-interface ApprovalItem {
+export interface ApprovalItem {
   id: string;
   description?: string | null;
   source?: string | null;
@@ -44,7 +44,7 @@ interface ApprovalItem {
   netReceived?: number | bigint;
   submittedAt?: string | Date;
   submittedBy?: string | null;
-  approvalStatus?: string | null;
+  approvalStatus?: ApprovalStatus | null;
   contact?: { name: string } | null;
   creator?: { id: string; name: string; email: string; avatarUrl: string | null } | null;
   submittedByUser?: { id: string; name: string } | null;
@@ -324,11 +324,13 @@ export function ApprovalsClient({
                 const rowHref = `/${companyCode}/${itemBasePath}/${item.id}`;
 
                 return (
-                  <Link
+                  <TableRow
                     key={item.id}
-                    href={rowHref}
-                    onClick={() => handleRowClick(item)}
-                    className="table-row cursor-pointer hover:bg-muted/50 transition-colors border-b"
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      handleRowClick(item);
+                      router.push(rowHref);
+                    }}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
@@ -379,14 +381,14 @@ export function ApprovalsClient({
                       <QuickApprovalCell
                         transactionId={item.id}
                         transactionType={item._type as "expense" | "income"}
-                        approvalStatus={item.approvalStatus as any}
+                        approvalStatus={item.approvalStatus ?? "NOT_REQUIRED"}
                         submittedBy={item.submittedBy}
                         currentUserId={currentUserId}
                         canApprove={true}
                         onSuccess={() => router.refresh()}
                       />
                     </TableCell>
-                  </Link>
+                  </TableRow>
                 );
               })}
             </TableBody>

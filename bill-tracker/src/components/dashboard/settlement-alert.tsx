@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Banknote, ArrowRight, Users, AlertCircle } from "lucide-react";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface SettlementSummary {
   pending: {
@@ -27,8 +28,6 @@ interface SettlementSummary {
     amount: number;
   };
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface SettlementAlertProps {
   companyCode: string;

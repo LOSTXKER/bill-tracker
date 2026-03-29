@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileCheck2 } from "lucide-react";
 import { ReconcileHistoryList } from "@/components/reconcile/ReconcileHistoryList";
+import { ReconcileSessionType } from "@prisma/client";
 
 interface HistoryPageProps {
   params: Promise<{ company: string }>;
@@ -70,12 +71,17 @@ async function HistoryDataLoader({
   });
   if (!company) return null;
 
+  const validTypes = Object.values(ReconcileSessionType) as string[];
+  const sessionType = type && validTypes.includes(type)
+    ? (type as ReconcileSessionType)
+    : undefined;
+
   const sessions = await prisma.reconcileSession.findMany({
     where: {
       companyId: company.id,
       year,
-      ...(type && { type }),
-      ...(status && { status: status as any }),
+      ...(sessionType && { type: sessionType }),
+      ...(status && { status: status as "IN_PROGRESS" | "COMPLETED" }),
     },
     include: {
       _count: { select: { Matches: true } },

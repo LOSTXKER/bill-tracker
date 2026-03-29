@@ -71,7 +71,7 @@ export const GET = withCompanyAccessFromParams(
 
         // Use expense-level request method if set, otherwise fall back to contact's preference
         const requestMethod = expense.taxInvoiceRequestMethod || expense.contact?.taxInvoiceRequestMethod || null;
-        const requestEmail = expense.taxInvoiceRequestMethod === "email"
+        const requestEmail = expense.taxInvoiceRequestMethod === "EMAIL"
           ? (expense.taxInvoiceRequestEmail || expense.contact?.taxInvoiceRequestEmail || expense.contact?.email)
           : (expense.contact?.taxInvoiceRequestEmail || expense.contact?.email);
         const requestNotes = expense.taxInvoiceRequestNotes || expense.contact?.taxInvoiceRequestNotes || null;

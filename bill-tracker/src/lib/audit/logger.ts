@@ -7,8 +7,19 @@
 
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
-import type { AuditAction } from "@prisma/client";
+import type { AuditAction, Prisma } from "@prisma/client";
 import { EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
+
+/** Entity record passed to audit functions for name extraction and logging */
+interface AuditEntity {
+  id: string;
+  name?: string;
+  description?: string | null;
+  vendorName?: string;
+  customerName?: string;
+  invoiceNumber?: string;
+  [key: string]: unknown;
+}
 
 interface CreateAuditLogParams {
   userId: string;
@@ -16,7 +27,7 @@ interface CreateAuditLogParams {
   action: AuditAction;
   entityType: string;
   entityId: string;
-  changes?: any;
+  changes?: Record<string, unknown>;
   description?: string;
 }
 
@@ -41,7 +52,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        changes: params.changes,
+        changes: params.changes as Prisma.InputJsonValue | undefined,
         description: params.description,
         ipAddress,
         userAgent,
@@ -56,7 +67,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
 /**
  * Get a display name for an entity (for descriptions)
  */
-function getEntityName(entity: any): string {
+function getEntityName(entity: AuditEntity | null | undefined): string {
   if (!entity) return "Unknown";
   
   // Try common name fields
@@ -75,7 +86,7 @@ function getEntityName(entity: any): string {
  */
 export async function logCreate(
   entityType: string,
-  entity: any,
+  entity: AuditEntity,
   userId: string,
   companyId?: string
 ): Promise<void> {
@@ -129,12 +140,12 @@ function getFieldLabel(field: string): string {
 export async function logUpdate(
   entityType: string,
   entityId: string,
-  before: any,
-  after: any,
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
   userId: string,
   companyId?: string
 ): Promise<void> {
-  const entityName = getEntityName(after || before);
+  const entityName = getEntityName((after || before) as AuditEntity | null);
   const typeLabel = getEntityTypeLabel(entityType);
   
   // Calculate what fields changed
@@ -169,7 +180,7 @@ export async function logUpdate(
  */
 export async function logDelete(
   entityType: string,
-  entity: any,
+  entity: AuditEntity,
   userId: string,
   companyId?: string
 ): Promise<void> {
@@ -283,7 +294,7 @@ export async function logStatusChange(
  */
 export async function logApprove(
   entityType: string,
-  entity: any,
+  entity: AuditEntity,
   userId: string,
   companyId?: string
 ): Promise<void> {
@@ -306,7 +317,7 @@ export async function logApprove(
 export async function logExport(
   entityType: string,
   exportFormat: string,
-  filters: any,
+  filters: Record<string, unknown>,
   userId: string,
   companyId?: string
 ): Promise<void> {
@@ -399,8 +410,8 @@ export async function logPermissionChange(
  */
 export async function logSettingsChange(
   settingName: string,
-  oldValue: any,
-  newValue: any,
+  oldValue: unknown,
+  newValue: unknown,
   userId: string,
   companyId: string
 ): Promise<void> {
@@ -426,7 +437,7 @@ export async function logBulkAction(
   action: AuditAction,
   entityType: string,
   count: number,
-  filters: any,
+  filters: Record<string, unknown>,
   userId: string,
   companyId?: string
 ): Promise<void> {

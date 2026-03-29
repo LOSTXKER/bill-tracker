@@ -49,6 +49,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface ContactReportPageProps {
   params: Promise<{ company: string }>;
@@ -100,8 +101,6 @@ interface ReportData {
     incomeCount: number;
   }>;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 // Get current year and past 3 years
 const currentYear = new Date().getFullYear();

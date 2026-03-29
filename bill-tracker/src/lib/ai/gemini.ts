@@ -5,6 +5,7 @@
 
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentResult } from "@google/generative-ai";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
+import { parseAIJsonResponse } from "./utils/parse-ai-json";
 
 // Initialize Gemini AI client
 let genAI: GoogleGenerativeAI | null = null;
@@ -156,10 +157,23 @@ export async function generateText(
   };
 }
 
+const ALLOWED_FETCH_HOSTS = [".supabase.co", ".supabase.in"];
+
 /**
- * Fetch image from URL and convert to base64
+ * Fetch image from URL and convert to base64.
+ * Only allows HTTPS URLs from trusted hosts to prevent SSRF.
  */
 async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || !ALLOWED_FETCH_HOSTS.some(h => parsed.hostname.endsWith(h))) {
+      throw new Error(`Blocked fetch to untrusted host: ${parsed.hostname}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Blocked")) throw e;
+    throw new Error(`Invalid image URL: ${url}`);
+  }
+
   const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   
   if (!response.ok) {
@@ -354,15 +368,7 @@ export async function generateJSON<T = any>(
   }
 
   try {
-    // Try to extract JSON from response (in case it's wrapped in markdown)
-    let jsonText = response.data.trim();
-    
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
-    }
-
-    const data = JSON.parse(jsonText);
+    const data = parseAIJsonResponse<T>(response.data);
 
     return {
       data,

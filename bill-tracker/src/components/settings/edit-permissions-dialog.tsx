@@ -86,9 +86,9 @@ export function EditPermissionsDialog({
 
       toast.success(`อัพเดตสิทธิ์ของ ${member.user.name} แล้ว`);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating permissions:", error);
-      toast.error(error.message || "ไม่สามารถอัพเดตสิทธิ์ได้");
+      toast.error(error instanceof Error ? error.message : "ไม่สามารถอัพเดตสิทธิ์ได้");
     } finally {
       setLoading(false);
     }

@@ -4,8 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
 import { SettlementSummaryCards } from "./SettlementSummaryCards";
-import { SettlementRoundsTable } from "./SettlementRoundsTable";
-import { PendingMonthSection } from "./PendingMonthSection";
+import { SettlementRoundsTable, type SettlementRound } from "./SettlementRoundsTable";
+import { PendingMonthSection, type MonthGroup } from "./PendingMonthSection";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -17,13 +17,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RefreshCw, Inbox, User, X, Filter, AlertCircle } from "lucide-react";
+import { fetcher } from "@/lib/utils/fetcher";
+
+/** SWR payload: GET /settlements/summary (matches SettlementSummaryCards + dashboard fields) */
+type SettlementSummarySWR = {
+  data: {
+    pending: {
+      total: { count: number; amount: number };
+      topUsers?: Array<{
+        userId: string | null;
+        name: string;
+        count: number;
+        amount: number;
+      }>;
+      pendingApprovalCount: number;
+    };
+    settledThisMonth: { count: number; amount: number };
+  };
+};
+
+/** SWR payload: GET /settlements (list); monthGroups when groupBy=monthPayer */
+type SettlementListSWR = {
+  data: {
+    monthGroups?: MonthGroup[];
+    rounds?: SettlementRound[];
+  };
+};
 
 interface SettlementDashboardProps {
   companyCode: string;
   filterUserId?: string | null;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 // Generate month/year options
 const currentDate = new Date();
@@ -71,7 +95,7 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
   const {
     data: summaryData,
     isLoading: summaryLoading,
-  } = useSWR(`${settlementBasePath}/summary`, fetcher);
+  } = useSWR<SettlementSummarySWR>(`${settlementBasePath}/summary`, fetcher);
 
   // Build URL with optional userId filter
   const buildUrl = (status: string, groupBy?: string) => {
@@ -113,10 +137,10 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
   const {
     data: pendingData,
     isLoading: pendingLoading,
-  } = useSWR(buildUrl("PENDING", "monthPayer"), fetcher);
+  } = useSWR<SettlementListSWR>(buildUrl("PENDING", "monthPayer"), fetcher);
   
   // Also fetch without filters to get all employees for dropdown
-  const { data: allPendingData } = useSWR(
+  const { data: allPendingData } = useSWR<SettlementListSWR>(
     `${settlementBasePath}?status=PENDING&groupBy=monthPayer`,
     fetcher
   );
@@ -125,13 +149,13 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
   const {
     data: settledData,
     isLoading: settledLoading,
-  } = useSWR(
+  } = useSWR<SettlementListSWR>(
     tab === "settled" ? buildUrl("SETTLED", "round") : null,
     fetcher
   );
 
   // Fetch all settled without filters to get all employees for dropdown
-  const { data: allSettledData } = useSWR(
+  const { data: allSettledData } = useSWR<SettlementListSWR>(
     `${settlementBasePath}?status=SETTLED&groupBy=round`,
     fetcher
   );
@@ -142,10 +166,10 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     
     // From pending month groups
     const monthGroups = allPendingData?.data?.monthGroups || [];
-    monthGroups.forEach((monthGroup: any) => {
-      monthGroup.payerGroups?.forEach((group: any) => {
+    monthGroups.forEach((monthGroup) => {
+      monthGroup.payerGroups?.forEach((group) => {
         if (group.payerId && group.payerType === "USER") {
-          employeeMap.set(group.payerId, group.payerName);
+          employeeMap.set(group.payerId, group.payerName ?? "");
         }
       });
     });
@@ -167,8 +191,8 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
     
     // From settled rounds (all data)
     const settledRounds = allSettledData?.data?.rounds || [];
-    settledRounds.forEach((round: any) => {
-      round.payments?.forEach((payment: any) => {
+    settledRounds.forEach((round) => {
+      round.payments?.forEach((payment) => {
         if (payment.paidByUserId && payment.PaidByUser) {
           employeeMap.set(payment.paidByUserId, payment.PaidByUser.name);
         }
@@ -266,18 +290,18 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
       {/* Summary Cards - hide when filtering by user */}
       {!filterUserId && (
         <SettlementSummaryCards
-          data={summaryData?.data}
+          data={summaryData?.data ?? null}
           isLoading={summaryLoading}
         />
       )}
 
       {/* Pending Approval Banner */}
-      {summaryData?.data?.pending?.pendingApprovalCount > 0 && tab === "pending" && (
+      {(summaryData?.data?.pending?.pendingApprovalCount ?? 0) > 0 && tab === "pending" && (
         <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="flex items-center justify-between">
             <span className="text-amber-700 dark:text-amber-300">
-              มี <strong>{summaryData.data.pending.pendingApprovalCount} รายการ</strong>รออนุมัติก่อนโอนคืน
+              มี <strong>{summaryData?.data?.pending?.pendingApprovalCount} รายการ</strong>รออนุมัติก่อนโอนคืน
             </span>
             <Button
               variant="outline"
@@ -300,9 +324,9 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
             <TabsList>
               <TabsTrigger value="pending" className="gap-1">
                 รอโอนคืน
-                {summaryData?.data?.pending?.total?.count > 0 && (
+                {(summaryData?.data?.pending?.total?.count ?? 0) > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
-                    {summaryData.data.pending.total.count}
+                    {summaryData?.data?.pending?.total?.count}
                   </span>
                 )}
               </TabsTrigger>
@@ -453,7 +477,7 @@ export function SettlementDashboard({ companyCode, filterUserId }: SettlementDas
           </div>
         ) : (
           <div className="space-y-4">
-            {pendingMonthGroups.map((monthGroup: any) => (
+            {pendingMonthGroups.map((monthGroup) => (
               <PendingMonthSection
                 key={monthGroup.monthKey}
                 monthGroup={monthGroup}

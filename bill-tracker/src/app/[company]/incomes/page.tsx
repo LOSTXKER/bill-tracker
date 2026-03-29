@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
+import { Prisma, IncomeWorkflowStatus } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { serializeIncomes } from "@/lib/utils/serializers";
@@ -157,6 +158,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
   const sortOrder = (searchParams.sortOrder as string) || "desc";
+  const sortDir = sortOrder as Prisma.SortOrder;
   const page = parseInt((searchParams.page as string) || "1");
   const limit = parseInt((searchParams.limit as string) || "20");
   const search = searchParams.search as string | undefined;
@@ -169,7 +171,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const dateTo = searchParams.dateTo as string | undefined;
 
   // Build where clause
-  const whereClause: any = {
+  const whereClause: Prisma.IncomeWhereInput = {
     companyId,
     deletedAt: null,
   };
@@ -178,7 +180,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
     whereClause.AND = [
       {
         OR: [
-          { description: { contains: search, mode: "insensitive" } },
+          { source: { contains: search, mode: "insensitive" } },
           { invoiceNumber: { contains: search, mode: "insensitive" } },
           { Contact: { name: { contains: search, mode: "insensitive" } } },
         ],
@@ -188,9 +190,9 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
 
   if (status) {
     if (status.includes(",")) {
-      whereClause.workflowStatus = { in: status.split(",") };
+      whereClause.workflowStatus = { in: status.split(",") as IncomeWorkflowStatus[] };
     } else {
-      whereClause.workflowStatus = status;
+      whereClause.workflowStatus = status as IncomeWorkflowStatus;
     }
   }
 
@@ -207,10 +209,6 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
     if (currentUserId) {
       whereClause.createdBy = currentUserId;
     }
-  }
-
-  if (category) {
-    whereClause.categoryId = category;
   }
 
   if (contact) {
@@ -232,23 +230,23 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   }
 
   // Build orderBy - always include secondary sort for consistency
-  const orderBy: any[] = [];
+  const orderBy: Prisma.IncomeOrderByWithRelationInput[] = [];
   if (sortBy === "receiveDate") {
-    orderBy.push({ receiveDate: sortOrder });
+    orderBy.push({ receiveDate: sortDir });
     orderBy.push({ createdAt: "desc" }); // Secondary sort
   } else if (sortBy === "createdAt") {
-    orderBy.push({ createdAt: sortOrder });
+    orderBy.push({ createdAt: sortDir });
   } else if (sortBy === "amount") {
-    orderBy.push({ netReceived: sortOrder });
+    orderBy.push({ netReceived: sortDir });
     orderBy.push({ createdAt: "desc" });
   } else if (sortBy === "creator") {
-    orderBy.push({ User: { name: sortOrder } });
+    orderBy.push({ User: { name: sortDir } });
     orderBy.push({ createdAt: "desc" });
   } else if (sortBy === "contact") {
-    orderBy.push({ Contact: { name: sortOrder } });
+    orderBy.push({ Contact: { name: sortDir } });
     orderBy.push({ createdAt: "desc" });
   } else if (sortBy === "updatedAt") {
-    orderBy.push({ updatedAt: sortOrder });
+    orderBy.push({ updatedAt: sortDir });
   } else {
     orderBy.push({ receiveDate: "desc" });
     orderBy.push({ createdAt: "desc" });

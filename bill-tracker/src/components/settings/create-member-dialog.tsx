@@ -103,9 +103,9 @@ export function CreateMemberDialog({
             setConfirmPassword("");
             setPermissions([]);
             setIsOwner(false);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error creating member:", error);
-            toast.error(error.message || "ไม่สามารถสร้างสมาชิกได้");
+            toast.error(error instanceof Error ? error.message : "ไม่สามารถสร้างสมาชิกได้");
         } finally {
             setLoading(false);
         }

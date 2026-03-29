@@ -83,17 +83,17 @@ const MONTH_NAMES = [
 ];
 
 const MATCH_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  exact: { label: "ตรงกัน", color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-  strong: { label: "ใกล้เคียง", color: "text-blue-600 bg-blue-50 border-blue-200" },
-  fuzzy: { label: "คล้ายกัน", color: "text-blue-600 bg-blue-50 border-blue-200" },
-  ai: { label: "AI แนะนำ", color: "text-amber-600 bg-amber-50 border-amber-200" },
-  manual: { label: "จับคู่เอง", color: "text-purple-600 bg-purple-50 border-purple-200" },
+  EXACT: { label: "ตรงกัน", color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
+  STRONG: { label: "ใกล้เคียง", color: "text-blue-600 bg-blue-50 border-blue-200" },
+  FUZZY: { label: "คล้ายกัน", color: "text-blue-600 bg-blue-50 border-blue-200" },
+  AI: { label: "AI แนะนำ", color: "text-amber-600 bg-amber-50 border-amber-200" },
+  MANUAL: { label: "จับคู่เอง", color: "text-purple-600 bg-purple-50 border-purple-200" },
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending: { label: "รอยืนยัน", color: "text-amber-600" },
-  confirmed: { label: "ยืนยันแล้ว", color: "text-emerald-600" },
-  rejected: { label: "ปฏิเสธ", color: "text-red-600" },
+  PENDING: { label: "รอยืนยัน", color: "text-amber-600" },
+  CONFIRMED: { label: "ยืนยันแล้ว", color: "text-emerald-600" },
+  REJECTED: { label: "ปฏิเสธ", color: "text-red-600" },
 };
 
 const SESSION_STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -135,9 +135,9 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
   const diff = Math.abs(session.totalSystemAmount - session.totalAccountAmount);
   const isBalanced = diff < 0.01;
 
-  const confirmedCount = localMatches.filter((m) => m.status === "confirmed").length;
-  const rejectedCount = localMatches.filter((m) => m.status === "rejected").length;
-  const pendingCount = localMatches.filter((m) => m.status === "pending").length;
+  const confirmedCount = localMatches.filter((m) => m.status === "CONFIRMED").length;
+  const rejectedCount = localMatches.filter((m) => m.status === "REJECTED").length;
+  const pendingCount = localMatches.filter((m) => m.status === "PENDING").length;
 
   const handleMatchAction = async (
     matchId: string,
@@ -158,7 +158,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
         setLocalMatches((prev) =>
           prev.map((m) =>
             m.id === matchId
-              ? { ...m, status: action === "confirm" ? "confirmed" : "rejected" }
+              ? { ...m, status: action === "confirm" ? "CONFIRMED" : "REJECTED" }
               : m
           )
         );
@@ -204,7 +204,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold">
-              {session.type === "expense" ? "ภาษีซื้อ" : "ภาษีขาย"}{" "}
+              {session.type === "EXPENSE" ? "ภาษีซื้อ" : session.type === "INCOME" ? "ภาษีขาย" : "ภพ.36"}{" "}
               {MONTH_NAMES[session.month - 1]} {session.year + 543}
             </h1>
             <Badge variant="outline" className={cn("text-xs", sessionStatus.color)}>
@@ -300,8 +300,8 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
 
         <div className="divide-y max-h-[calc(100vh-400px)] overflow-y-auto">
           {localMatches.map((m) => {
-            const matchTypeInfo = MATCH_TYPE_LABELS[m.matchType] ?? MATCH_TYPE_LABELS.manual;
-            const statusInfo = STATUS_LABELS[m.status] ?? STATUS_LABELS.pending;
+            const matchTypeInfo = MATCH_TYPE_LABELS[m.matchType] ?? MATCH_TYPE_LABELS.MANUAL;
+            const statusInfo = STATUS_LABELS[m.status] ?? STATUS_LABELS.PENDING;
             const hasDocs = m.documentUrls.length > 0;
 
             return (
@@ -309,7 +309,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                 key={m.id}
                 className={cn(
                   "grid grid-cols-[1fr_100px_1fr_auto] px-4 py-3 hover:bg-muted/20 transition-colors",
-                  m.status === "rejected" && "opacity-50"
+                  m.status === "REJECTED" && "opacity-50"
                 )}
               >
                 {/* System side */}
@@ -421,7 +421,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
 
                 {/* Actions */}
                 <div className="flex items-center justify-center gap-1 w-24">
-                  {m.status === "pending" ? (
+                  {m.status === "PENDING" ? (
                     <>
                       <Button
                         size="icon"

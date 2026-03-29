@@ -71,7 +71,7 @@ export interface SessionSummary {
   _count?: { Matches: number; AccountingRows: number };
 }
 
-export type ReconcileType = "expense" | "income" | "pp36";
+export type ReconcileType = "EXPENSE" | "INCOME" | "PP36";
 
 interface ReconcileDashboardProps {
   companyCode: string;
@@ -150,28 +150,28 @@ export function ReconcileDashboard({
 
         <div className="flex rounded-lg border bg-muted/30 p-0.5">
           <Button
-            variant={type === "expense" ? "default" : "ghost"}
+            variant={type === "EXPENSE" ? "default" : "ghost"}
             size="sm"
             className="h-8 px-4 text-xs"
-            onClick={() => handleNavigate({ type: "expense" })}
+            onClick={() => handleNavigate({ type: "EXPENSE" })}
             disabled={isPending}
           >
             ภาษีซื้อ
           </Button>
           <Button
-            variant={type === "income" ? "default" : "ghost"}
+            variant={type === "INCOME" ? "default" : "ghost"}
             size="sm"
             className="h-8 px-4 text-xs"
-            onClick={() => handleNavigate({ type: "income" })}
+            onClick={() => handleNavigate({ type: "INCOME" })}
             disabled={isPending}
           >
             ภาษีขาย
           </Button>
           <Button
-            variant={type === "pp36" ? "default" : "ghost"}
+            variant={type === "PP36" ? "default" : "ghost"}
             size="sm"
             className="h-8 px-4 text-xs"
-            onClick={() => handleNavigate({ type: "pp36" })}
+            onClick={() => handleNavigate({ type: "PP36" })}
             disabled={isPending}
           >
             ภพ.36

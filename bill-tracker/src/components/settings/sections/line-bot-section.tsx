@@ -30,6 +30,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLineConfig } from "@/hooks/use-line-config";
 
 interface LineBotSectionProps {
   companyId: string;
@@ -37,16 +38,12 @@ interface LineBotSectionProps {
 }
 
 export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) {
-  const [loading, setLoading] = React.useState(false);
+  const {
+    config, setConfig, loading,
+    saveConfig, removeConfig, toggleNotify, sendTest,
+  } = useLineConfig(companyId);
   const [saving, setSaving] = React.useState(false);
   const [testing, setTesting] = React.useState(false);
-  const [config, setConfig] = React.useState<{
-    channelSecret: string | null;
-    channelAccessToken: string | null;
-    groupId: string | null;
-    notifyEnabled: boolean;
-    isConfigured: boolean;
-  } | null>(null);
 
   const [formData, setFormData] = React.useState({
     channelSecret: "",
@@ -61,30 +58,13 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
     setWebhookUrl(`${window.location.origin}/api/line/webhook`);
   }, []);
 
+  const formInitialized = React.useRef(false);
   React.useEffect(() => {
-    async function fetchConfig() {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/companies/${companyId}/line-config`);
-        if (response.ok) {
-          const result = await response.json();
-          // API returns { success: true, data: {...} }
-          const data = result.data || result;
-          setConfig(data);
-          setFormData({
-            channelSecret: "",
-            channelAccessToken: "",
-            groupId: data.groupId || "",
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch LINE config:", error);
-      } finally {
-        setLoading(false);
-      }
+    if (!loading && config && !formInitialized.current) {
+      formInitialized.current = true;
+      setFormData((prev) => ({ ...prev, groupId: config.groupId || "" }));
     }
-    fetchConfig();
-  }, [companyId]);
+  }, [loading, config]);
 
   const handleSave = async () => {
     const isNewSetup = !config?.isConfigured;
@@ -95,29 +75,12 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/companies/${companyId}/line-config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        setConfig({
-          channelSecret: config?.channelSecret ?? null,
-          channelAccessToken: config?.channelAccessToken ?? null,
-          isConfigured: true,
-          groupId: formData.groupId || null,
-          notifyEnabled: config?.notifyEnabled ?? true,
-        });
-        setIsEditing(false);
-        toast.success("บันทึกการตั้งค่า LINE Bot สำเร็จ");
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "เกิดข้อผิดพลาด");
-      }
+      await saveConfig(formData);
+      setIsEditing(false);
+      toast.success("บันทึกการตั้งค่า LINE Bot สำเร็จ");
     } catch (error) {
       console.error("Failed to save LINE config:", error);
-      toast.error("เกิดข้อผิดพลาดในการบันทึก");
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึก");
     } finally {
       setSaving(false);
     }
@@ -128,22 +91,10 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/companies/${companyId}/line-config`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        setConfig({
-          channelSecret: null,
-          channelAccessToken: null,
-          groupId: null,
-          notifyEnabled: true,
-          isConfigured: false,
-        });
-        setFormData({ channelSecret: "", channelAccessToken: "", groupId: "" });
-        setIsEditing(false);
-        toast.success("ลบการตั้งค่า LINE Bot สำเร็จ");
-      }
+      await removeConfig();
+      setFormData({ channelSecret: "", channelAccessToken: "", groupId: "" });
+      setIsEditing(false);
+      toast.success("ลบการตั้งค่า LINE Bot สำเร็จ");
     } catch (error) {
       console.error("Failed to remove LINE config:", error);
       toast.error("เกิดข้อผิดพลาด");
@@ -155,16 +106,8 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
   const handleToggleNotify = async (enabled: boolean) => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/companies/${companyId}/line-config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notifyEnabled: enabled }),
-      });
-
-      if (response.ok) {
-        setConfig((prev) => (prev ? { ...prev, notifyEnabled: enabled } : null));
-        toast.success(enabled ? "เปิดการแจ้งเตือนแล้ว" : "ปิดการแจ้งเตือนแล้ว");
-      }
+      await toggleNotify(enabled);
+      toast.success(enabled ? "เปิดการแจ้งเตือนแล้ว" : "ปิดการแจ้งเตือนแล้ว");
     } catch (error) {
       console.error("Failed to toggle notifications:", error);
       toast.error("เกิดข้อผิดพลาด");
@@ -176,19 +119,11 @@ export function LineBotSection({ companyId, companyCode }: LineBotSectionProps) 
   const handleSendTest = async () => {
     setTesting(true);
     try {
-      const response = await fetch(`/api/companies/${companyId}/line-config`, {
-        method: "PUT",
-      });
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success("ส่งข้อความทดสอบสำเร็จ");
-      } else {
-        toast.error(data.error || "เกิดข้อผิดพลาด");
-      }
+      await sendTest();
+      toast.success("ส่งข้อความทดสอบสำเร็จ");
     } catch (error) {
       console.error("Failed to send test notification:", error);
-      toast.error("เกิดข้อผิดพลาดในการส่งข้อความ");
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการส่งข้อความ");
     } finally {
       setTesting(false);
     }

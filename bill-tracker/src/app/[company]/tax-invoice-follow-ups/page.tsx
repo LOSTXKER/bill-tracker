@@ -390,7 +390,7 @@ export default function TaxInvoiceFollowUpsPage() {
                                 <span className="flex items-center gap-1">
                                   <Icon className="h-4 w-4" />
                                   {requestMethodInfo.label}
-                                  {group.requestMethod === "email" && group.requestEmail && (
+                                  {group.requestMethod === "EMAIL" && group.requestEmail && (
                                     <span className="text-xs">({group.requestEmail})</span>
                                   )}
                                 </span>

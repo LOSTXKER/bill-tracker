@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { ReportSummaryCards } from "@/components/settlements/ReportSummaryCards";
 import { PersonBreakdownTable } from "@/components/settlements/PersonBreakdownTable";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface ReimbursementReportPageProps {
   params: Promise<{ company: string }>;
@@ -63,8 +64,6 @@ interface ReportData {
     pendingCount: number;
   }>;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 // Get current year and past 3 years
 const currentYear = new Date().getFullYear();

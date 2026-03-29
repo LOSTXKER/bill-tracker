@@ -22,7 +22,7 @@ export const POST = withCompanyAccessFromParams(
     }
 
     const pendingMatches = reconcileSession.Matches.filter(
-      (m) => m.status === "pending"
+      (m) => m.status === "PENDING"
     );
     if (pendingMatches.length > 0) {
       throw ApiErrors.badRequest(

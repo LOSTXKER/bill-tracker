@@ -27,6 +27,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface PettyCashDetailPageProps {
   params: Promise<{ company: string; id: string }>;
@@ -53,8 +54,6 @@ interface PettyCashFund {
   Transactions: Transaction[];
   createdAt: string;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function PettyCashDetailPage({
   params,

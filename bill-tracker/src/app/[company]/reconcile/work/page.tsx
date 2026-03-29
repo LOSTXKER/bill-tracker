@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { ReconcileWorkspace } from "@/components/reconcile/ReconcileWorkspace";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReconcileSessionType, type ExpensePayment } from "@prisma/client";
 
 interface WorkPageProps {
   params: Promise<{ company: string }>;
@@ -23,7 +24,7 @@ export default async function ReconcileWorkPage({
   if (!session?.user) redirect("/login");
 
   const { company: companyCode } = await params;
-  const { month, year, type = "expense", companies } = await searchParams;
+  const { month, year, type = "EXPENSE", companies } = await searchParams;
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -36,7 +37,7 @@ export default async function ReconcileWorkPage({
         companyCode={companyCode}
         year={selectedYear}
         month={selectedMonth}
-        type={type as "expense" | "income" | "pp36"}
+        type={type as ReconcileSessionType}
         companiesParam={companies}
       />
     </Suspense>
@@ -53,7 +54,7 @@ async function WorkspaceDataLoader({
   companyCode: string;
   year: number;
   month: number;
-  type: "expense" | "income" | "pp36";
+  type: ReconcileSessionType;
   companiesParam?: string;
 }) {
   const company = await prisma.company.findUnique({
@@ -99,7 +100,7 @@ async function WorkspaceDataLoader({
     siblingCompanies.map((c) => [c.id, c.code])
   );
 
-  const isForeignOnly = type === "pp36";
+  const isForeignOnly = type === "PP36";
 
   const [
     expenses,
@@ -201,7 +202,7 @@ async function WorkspaceDataLoader({
   const systemExpenses = [
     ...expenses.map((e) => {
       const paidByUser = e.ExpensePayments?.some(
-        (p: any) => p.paidByType === "USER"
+        (p: ExpensePayment) => p.paidByType === "USER"
       );
       return {
         id: e.id,
@@ -239,9 +240,9 @@ async function WorkspaceDataLoader({
       totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
       description: e.description ?? "",
       status: e.workflowStatus,
-      companyCode: (e as any).Company?.code ?? "",
+      companyCode: (e as { Company?: { code: string } | null }).Company?.code ?? "",
       isPayOnBehalf: true,
-      payOnBehalfFrom: (e as any).Company?.code ?? undefined,
+      payOnBehalfFrom: (e as { Company?: { code: string } | null }).Company?.code ?? undefined,
       payOnBehalfTo: e.internalCompanyId ? companyIdToCode.get(e.internalCompanyId) ?? undefined : undefined,
       paidByUser: false,
     })),
@@ -265,7 +266,7 @@ async function WorkspaceDataLoader({
   const spilloverSystemExpenses = [
     ...spilloverExpenses.map((e) => {
       const paidByUser = e.ExpensePayments?.some(
-        (p: any) => p.paidByType === "USER"
+        (p: ExpensePayment) => p.paidByType === "USER"
       );
       return {
         id: e.id,
@@ -304,9 +305,9 @@ async function WorkspaceDataLoader({
       totalAmount: Number(e.amount) + Number(e.vatAmount ?? 0),
       description: e.description ?? "",
       status: e.workflowStatus,
-      companyCode: (e as any).Company?.code ?? "",
+      companyCode: (e as { Company?: { code: string } | null }).Company?.code ?? "",
       isPayOnBehalf: true,
-      payOnBehalfFrom: (e as any).Company?.code ?? undefined,
+      payOnBehalfFrom: (e as { Company?: { code: string } | null }).Company?.code ?? undefined,
       payOnBehalfTo: e.internalCompanyId ? companyIdToCode.get(e.internalCompanyId) ?? undefined : undefined,
       paidByUser: false,
       fromMonth: e.billDate.getMonth() + 1,

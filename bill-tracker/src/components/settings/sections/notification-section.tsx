@@ -4,7 +4,7 @@ import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Bell, AlertCircle, MessageSquare, ArrowRight } from "lucide-react";
 import { LineNotificationSettings } from "@/components/line-notification-settings";
-import { LineNotifySettings } from "@/lib/notifications/settings";
+import { useLineConfig } from "@/hooks/use-line-config";
 import { Button } from "@/components/ui/button";
 
 interface NotificationSectionProps {
@@ -12,42 +12,10 @@ interface NotificationSectionProps {
 }
 
 export function NotificationSection({ companyId }: NotificationSectionProps) {
-  const [loading, setLoading] = React.useState(true);
-  const [settings, setSettings] = React.useState<LineNotifySettings | null>(null);
-  const [isConfigured, setIsConfigured] = React.useState(false);
-  const [notifyEnabled, setNotifyEnabled] = React.useState(false);
+  const { config, notifySettings, setNotifySettings, loading } = useLineConfig(companyId, { fetchSettings: true });
 
-  React.useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const [configRes, settingsRes] = await Promise.all([
-          fetch(`/api/companies/${companyId}/line-config`),
-          fetch(`/api/companies/${companyId}/line-config/settings`),
-        ]);
-
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          // API response is wrapped: { success: true, data: {...} }
-          const data = configData.data || configData;
-          setIsConfigured(data.isConfigured && data.groupId);
-          setNotifyEnabled(data.notifyEnabled);
-        }
-
-        if (settingsRes.ok) {
-          const settingsData = await settingsRes.json();
-          // API response is wrapped: { success: true, data: {...} }
-          const data = settingsData.data || settingsData;
-          setSettings(data.settings);
-        }
-      } catch (error) {
-        console.error("Failed to fetch notification settings:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [companyId]);
+  const isConfigured = !!(config?.isConfigured && config?.groupId);
+  const notifyEnabled = config?.notifyEnabled ?? false;
 
   if (loading) {
     return (
@@ -100,8 +68,8 @@ export function NotificationSection({ companyId }: NotificationSectionProps) {
       {/* Main Settings */}
       <LineNotificationSettings
         companyId={companyId}
-        initialSettings={settings || undefined}
-        onSettingsChange={(newSettings) => setSettings(newSettings)}
+        initialSettings={notifySettings || undefined}
+        onSettingsChange={(newSettings) => setNotifySettings(newSettings)}
       />
     </div>
   );

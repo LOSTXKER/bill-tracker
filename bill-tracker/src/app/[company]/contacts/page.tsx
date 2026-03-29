@@ -48,6 +48,7 @@ import { useContacts } from "@/hooks/use-contacts";
 import { mutate } from "swr";
 import { swrKeys } from "@/lib/swr-config";
 import useSWR from "swr";
+import { fetcher } from "@/lib/utils/fetcher";
 import { formatDistanceToNowStrict } from "date-fns";
 import { th } from "date-fns/locale";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
@@ -55,9 +56,6 @@ import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 interface ContactsPageProps {
   params: Promise<{ company: string }>;
 }
-
-// Fetcher for company data
-const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 // Helper to format relative date like "วันนี้", "เมื่อวาน", "3 วันที่แล้ว"
 function formatRelativeDate(date: Date): string {
@@ -74,6 +72,12 @@ function formatRelativeDate(date: Date): string {
 
 type SortField = "peakCode" | "name" | "taxId";
 type SortOrder = "asc" | "desc";
+
+type CompaniesByCodeSWRResponse = {
+  data: {
+    companies: Array<{ lastContactImportAt?: string | null }>;
+  };
+};
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: typeof UserCheck }> = {
   CUSTOMER: { label: "ลูกค้า", icon: UserCheck },
@@ -96,7 +100,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
   const { contacts, isLoading, refetch } = useContacts(companyCode);
 
   // Fetch company data for lastContactImportAt
-  const { data: companyData, mutate: mutateCompany } = useSWR(
+  const { data: companyData, mutate: mutateCompany } = useSWR<CompaniesByCodeSWRResponse>(
     `/api/companies?code=${companyCode.toUpperCase()}`,
     fetcher,
     { revalidateOnFocus: false }
@@ -130,12 +134,12 @@ export default function ContactsPage({ params }: ContactsPageProps) {
       contact.taxId?.toLowerCase().includes(search.toLowerCase()) ||
       contact.phone?.toLowerCase().includes(search.toLowerCase()) ||
       contact.email?.toLowerCase().includes(search.toLowerCase()) ||
-      (contact as any).peakCode?.toLowerCase().includes(search.toLowerCase())
+      contact.peakCode?.toLowerCase().includes(search.toLowerCase())
     );
 
     // Category filter
     const matchesCategory = !selectedCategory || 
-      (contact as any).contactCategory === selectedCategory;
+      contact.contactCategory === selectedCategory;
 
     // Source filter
     const matchesSource = !selectedSource ||
@@ -149,8 +153,8 @@ export default function ContactsPage({ params }: ContactsPageProps) {
     return [...filteredContacts].sort((a, b) => {
       let comparison = 0;
       if (sortField === "peakCode") {
-        const aCode = (a as any).peakCode || "";
-        const bCode = (b as any).peakCode || "";
+        const aCode = a.peakCode || "";
+        const bCode = b.peakCode || "";
         comparison = aCode.localeCompare(bCode);
       } else if (sortField === "name") {
         comparison = (a.name || "").localeCompare(b.name || "", "th");
@@ -233,7 +237,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
       sortable: true,
       render: (contact) => (
         <span className="font-mono text-sm text-muted-foreground">
-          {(contact as any).peakCode || "-"}
+          {contact.peakCode || "-"}
         </span>
       ),
     },
@@ -261,8 +265,8 @@ export default function ContactsPage({ params }: ContactsPageProps) {
       key: "category",
       label: "ประเภท",
       render: (contact) => {
-        const category = (contact as any).contactCategory;
-        const info = CATEGORY_LABELS[category];
+        const category = contact.contactCategory;
+        const info = category ? CATEGORY_LABELS[category] : undefined;
         if (!info) return <span className="text-muted-foreground">-</span>;
         const Icon = info.icon;
         return (

@@ -1,0 +1,239 @@
+import { prisma } from "@/lib/db";
+import type { Expense, Prisma, PaidByType, SettlementStatus } from "@prisma/client";
+import type { TransactionRequestBody, TransactionHookContext, TransactionUpdateHookContext } from "../transaction-types";
+import { deduplicatePayers } from "./expense-transforms";
+
+export async function handleExpenseAfterCreate(item: Expense, body: TransactionRequestBody, context: TransactionHookContext) {
+  if (item.contactId) {
+    try {
+      await prisma.contact.findUnique({
+        where: { id: item.contactId },
+        select: { defaultsLastUpdatedAt: true },
+      });
+
+      const contactUpdate: Record<string, unknown> = {
+        defaultVatRate: item.vatRate,
+        defaultWhtEnabled: item.isWht,
+        defaultWhtRate: item.whtRate,
+        defaultWhtType: item.whtType,
+        descriptionTemplate: item.description,
+        defaultsLastUpdatedAt: new Date(),
+      };
+
+      if (body.updateContactDelivery && item.whtDeliveryMethod) {
+        contactUpdate.preferredDeliveryMethod = item.whtDeliveryMethod;
+        contactUpdate.deliveryEmail = item.whtDeliveryEmail || null;
+        contactUpdate.deliveryNotes = item.whtDeliveryNotes || null;
+      }
+
+      if (body.updateContactTaxInvoiceRequest && item.taxInvoiceRequestMethod) {
+        contactUpdate.taxInvoiceRequestMethod = item.taxInvoiceRequestMethod;
+        contactUpdate.taxInvoiceRequestEmail = item.taxInvoiceRequestEmail || null;
+        contactUpdate.taxInvoiceRequestNotes = item.taxInvoiceRequestNotes || null;
+      }
+
+      await prisma.contact.update({
+        where: { id: item.contactId },
+        data: contactUpdate as Prisma.ContactUncheckedUpdateInput,
+      });
+    } catch (error) {
+      console.error("Failed to update contact defaults:", error);
+    }
+  }
+
+  if (body.payers && Array.isArray(body.payers) && body.payers.length > 0) {
+    const uniquePayers = deduplicatePayers(body.payers as Array<{
+      paidByType: PaidByType;
+      paidByUserId?: string | null;
+      paidByPettyCashFundId?: string | null;
+      paidByName?: string | null;
+      paidByBankName?: string | null;
+      paidByBankAccount?: string | null;
+      amount: number;
+      settlementStatus?: SettlementStatus;
+      settledAt?: string;
+      settlementRef?: string;
+    }>);
+    for (const payer of uniquePayers) {
+      let settlementStatus: SettlementStatus = payer.settlementStatus || "NOT_REQUIRED";
+      if (!payer.settlementStatus && payer.paidByType === "USER") {
+        settlementStatus = "PENDING";
+      }
+
+      await prisma.expensePayment.create({
+        data: {
+          expenseId: item.id,
+          paidByType: payer.paidByType,
+          paidByUserId: payer.paidByUserId || null,
+          paidByPettyCashFundId: payer.paidByPettyCashFundId || null,
+          paidByName: payer.paidByName || null,
+          paidByBankName: payer.paidByBankName || null,
+          paidByBankAccount: payer.paidByBankAccount || null,
+          amount: payer.amount,
+          settlementStatus,
+          settledAt: payer.settledAt ? new Date(payer.settledAt) : null,
+          settledBy: settlementStatus === "SETTLED" ? context.session.user.id : null,
+          settlementRef: payer.settlementRef || null,
+        },
+      });
+
+      if (payer.paidByType === "PETTY_CASH" && payer.paidByPettyCashFundId) {
+        await prisma.pettyCashFund.update({
+          where: { id: payer.paidByPettyCashFundId },
+          data: {
+            currentAmount: {
+              decrement: payer.amount,
+            },
+          },
+        });
+
+        await prisma.pettyCashTransaction.create({
+          data: {
+            fundId: payer.paidByPettyCashFundId,
+            type: "EXPENSE",
+            amount: payer.amount,
+            expenseId: item.id,
+            description: item.description || "รายจ่าย",
+            createdBy: context.session.user.id,
+          },
+        });
+      }
+    }
+  }
+}
+
+export async function handleExpenseAfterUpdate(item: Expense, body: TransactionRequestBody, context: TransactionUpdateHookContext<Expense>) {
+  if (body.payers && Array.isArray(body.payers)) {
+    const existingPayments = await prisma.expensePayment.findMany({
+      where: { expenseId: item.id },
+    });
+
+    for (const payment of existingPayments) {
+      if (payment.paidByType === "PETTY_CASH" && payment.paidByPettyCashFundId) {
+        await prisma.pettyCashFund.update({
+          where: { id: payment.paidByPettyCashFundId },
+          data: {
+            currentAmount: {
+              increment: Number(payment.amount),
+            },
+          },
+        });
+
+        await prisma.pettyCashTransaction.create({
+          data: {
+            fundId: payment.paidByPettyCashFundId,
+            type: "ADJUSTMENT",
+            amount: Number(payment.amount),
+            description: `คืนเงินจากการแก้ไขรายจ่าย: ${item.description || "ไม่ระบุ"}`,
+            createdBy: context.session.user.id,
+          },
+        });
+      }
+    }
+
+    const settledUserPayments = existingPayments.filter(
+      (p) => p.paidByType === "USER" && p.settlementStatus === "SETTLED"
+    );
+    const settledUserIds = new Set(settledUserPayments.map((p) => p.paidByUserId));
+
+    await prisma.expensePayment.deleteMany({
+      where: {
+        expenseId: item.id,
+        NOT: {
+          AND: [
+            { paidByType: "USER" },
+            { settlementStatus: "SETTLED" },
+          ],
+        },
+      },
+    });
+
+    if (body.payers.length > 0) {
+      const uniquePayers = deduplicatePayers(body.payers as Array<{
+        paidByType: PaidByType;
+        paidByUserId?: string | null;
+        paidByPettyCashFundId?: string | null;
+        paidByName?: string | null;
+        paidByBankName?: string | null;
+        paidByBankAccount?: string | null;
+        amount: number;
+      }>);
+      for (const payer of uniquePayers) {
+        if (payer.paidByType === "USER" && payer.paidByUserId && settledUserIds.has(payer.paidByUserId)) {
+          continue;
+        }
+
+        let settlementStatus: SettlementStatus = "NOT_REQUIRED";
+        if (payer.paidByType === "USER") {
+          settlementStatus = "PENDING";
+        }
+
+        await prisma.expensePayment.create({
+          data: {
+            expenseId: item.id,
+            paidByType: payer.paidByType,
+            paidByUserId: payer.paidByUserId || null,
+            paidByPettyCashFundId: payer.paidByPettyCashFundId || null,
+            paidByName: payer.paidByName || null,
+            paidByBankName: payer.paidByBankName || null,
+            paidByBankAccount: payer.paidByBankAccount || null,
+            amount: payer.amount,
+            settlementStatus,
+          },
+        });
+
+        if (payer.paidByType === "PETTY_CASH" && payer.paidByPettyCashFundId) {
+          await prisma.pettyCashFund.update({
+            where: { id: payer.paidByPettyCashFundId },
+            data: {
+              currentAmount: {
+                decrement: payer.amount,
+              },
+            },
+          });
+
+          await prisma.pettyCashTransaction.create({
+            data: {
+              fundId: payer.paidByPettyCashFundId,
+              type: "EXPENSE",
+              amount: payer.amount,
+              expenseId: item.id,
+              description: item.description || "รายจ่าย (แก้ไข)",
+              createdBy: context.session.user.id,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  if (body.updateContactDelivery && item.contactId && item.whtDeliveryMethod) {
+    try {
+      await prisma.contact.update({
+        where: { id: item.contactId },
+        data: {
+          preferredDeliveryMethod: item.whtDeliveryMethod,
+          deliveryEmail: item.whtDeliveryEmail || null,
+          deliveryNotes: item.whtDeliveryNotes || null,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to update contact delivery preferences:", error);
+    }
+  }
+
+  if (body.updateContactTaxInvoiceRequest && item.contactId && item.taxInvoiceRequestMethod) {
+    try {
+      await prisma.contact.update({
+        where: { id: item.contactId },
+        data: {
+          taxInvoiceRequestMethod: item.taxInvoiceRequestMethod,
+          taxInvoiceRequestEmail: item.taxInvoiceRequestEmail || null,
+          taxInvoiceRequestNotes: item.taxInvoiceRequestNotes || null,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to update contact tax invoice request preferences:", error);
+    }
+  }
+}

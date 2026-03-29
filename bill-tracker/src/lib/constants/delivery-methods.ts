@@ -1,6 +1,7 @@
 /**
  * Delivery Methods Constants
  * วิธีการส่งเอกสาร (ใบหัก ณ ที่จ่าย ฯลฯ)
+ * Values match the Prisma DeliveryMethod enum
  */
 
 import {
@@ -14,34 +15,34 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export interface DeliveryMethod {
+export interface DeliveryMethodOption {
   value: string;
   label: string;
   Icon: LucideIcon;
 }
 
-export const DELIVERY_METHODS: DeliveryMethod[] = [
-  { value: "email", label: "อีเมล", Icon: Mail },
-  { value: "physical", label: "ส่งตัวจริง (ไปรษณีย์/messenger)", Icon: Package },
-  { value: "line", label: "LINE", Icon: MessageCircle },
-  { value: "pickup", label: "มารับเอง", Icon: Building2 },
-  { value: "google_drive", label: "Google Drive", Icon: Cloud },
+export const DELIVERY_METHODS: DeliveryMethodOption[] = [
+  { value: "EMAIL", label: "อีเมล", Icon: Mail },
+  { value: "PHYSICAL", label: "ส่งตัวจริง (ไปรษณีย์/messenger)", Icon: Package },
+  { value: "LINE", label: "LINE", Icon: MessageCircle },
+  { value: "PICKUP", label: "มารับเอง", Icon: Building2 },
+  { value: "GOOGLE_DRIVE", label: "Google Drive", Icon: Cloud },
 ];
 
 /**
  * Tax Invoice Request Methods
  * ช่องทางขอใบกำกับภาษี - รวม DELIVERY_METHODS + ช่องทางเพิ่มเติม (Shopee, อื่นๆ)
  */
-export const TAX_INVOICE_REQUEST_METHODS: DeliveryMethod[] = [
+export const TAX_INVOICE_REQUEST_METHODS: DeliveryMethodOption[] = [
   ...DELIVERY_METHODS,
-  { value: "shopee", label: "Shopee", Icon: ShoppingBag },
-  { value: "other", label: "อื่นๆ", Icon: MoreHorizontal },
+  { value: "SHOPEE", label: "Shopee", Icon: ShoppingBag },
+  { value: "OTHER", label: "อื่นๆ", Icon: MoreHorizontal },
 ];
 
 /**
  * Get delivery method by value
  */
-export function getDeliveryMethod(value: string | null | undefined): DeliveryMethod | undefined {
+export function getDeliveryMethod(value: string | null | undefined): DeliveryMethodOption | undefined {
   if (!value) return undefined;
   return DELIVERY_METHODS.find((m) => m.value === value);
 }
@@ -49,7 +50,7 @@ export function getDeliveryMethod(value: string | null | undefined): DeliveryMet
 /**
  * Get tax invoice request method by value
  */
-export function getTaxInvoiceRequestMethod(value: string | null | undefined): DeliveryMethod | undefined {
+export function getTaxInvoiceRequestMethod(value: string | null | undefined): DeliveryMethodOption | undefined {
   if (!value) return undefined;
   return TAX_INVOICE_REQUEST_METHODS.find((m) => m.value === value);
 }

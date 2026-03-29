@@ -35,6 +35,7 @@ import {
   mergeSettings,
 } from "@/lib/notifications/settings";
 import { cn } from "@/lib/utils";
+import { useLineConfig } from "@/hooks/use-line-config";
 
 interface LineNotificationSettingsProps {
   companyId: string;
@@ -215,6 +216,7 @@ export function LineNotificationSettings({
   initialSettings,
   onSettingsChange,
 }: LineNotificationSettingsProps) {
+  const { saveNotifySettings } = useLineConfig(companyId, { skipFetch: true });
   const [settings, setSettings] = React.useState<LineNotifySettings>(() =>
     mergeSettings(initialSettings)
   );
@@ -239,23 +241,13 @@ export function LineNotificationSettings({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/companies/${companyId}/line-config/settings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings }),
-      });
-
-      if (response.ok) {
-        toast.success("บันทึกการตั้งค่าแล้ว");
-        setHasChanges(false);
-        onSettingsChange?.(settings);
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "เกิดข้อผิดพลาด");
-      }
+      await saveNotifySettings(settings);
+      toast.success("บันทึกการตั้งค่าแล้ว");
+      setHasChanges(false);
+      onSettingsChange?.(settings);
     } catch (error) {
       console.error("Failed to save notification settings:", error);
-      toast.error("เกิดข้อผิดพลาดในการบันทึก");
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการบันทึก");
     } finally {
       setSaving(false);
     }

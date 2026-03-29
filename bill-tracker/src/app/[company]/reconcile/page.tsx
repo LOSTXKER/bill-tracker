@@ -19,7 +19,7 @@ export default async function ReconcilePage({
   if (!session?.user) redirect("/login");
 
   const { company: companyCode } = await params;
-  const { year, type = "expense" } = await searchParams;
+  const { year, type = "EXPENSE" } = await searchParams;
 
   const currentYear = new Date().getFullYear();
   const selectedYear = year ? parseInt(year) : currentYear;

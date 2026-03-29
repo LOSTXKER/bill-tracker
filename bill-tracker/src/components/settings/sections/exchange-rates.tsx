@@ -10,7 +10,7 @@ import { Loader2, DollarSign, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface ExchangeRatesProps {
-  companyCode: string;
+  companyId: string;
   initialRates: Record<string, number>;
 }
 
@@ -26,7 +26,7 @@ const CURRENCIES = [
   { code: "MYR", name: "ริงกิต", symbol: "RM", flag: "🇲🇾" },
 ] as const;
 
-export function ExchangeRatesSection({ companyCode, initialRates }: ExchangeRatesProps) {
+export function ExchangeRatesSection({ companyId, initialRates }: ExchangeRatesProps) {
   const router = useRouter();
   // Initialize rates from all currencies
   const [rates, setRates] = useState<Record<string, string>>(() => {
@@ -59,7 +59,7 @@ export function ExchangeRatesSection({ companyCode, initialRates }: ExchangeRate
         }
       }
 
-      const response = await fetch(`/api/companies/${companyCode}/exchange-rates`, {
+      const response = await fetch(`/api/companies/${companyId}/exchange-rates`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exchangeRates }),

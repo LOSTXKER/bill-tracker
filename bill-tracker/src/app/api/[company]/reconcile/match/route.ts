@@ -27,33 +27,81 @@ export interface AISuggestion {
   reason: string;
 }
 
+const MAX_ITEMS = 200;
+
+function isValidItem(item: unknown): item is ReconcileItem {
+  if (!item || typeof item !== "object") return false;
+  const obj = item as Record<string, unknown>;
+  return (
+    typeof obj.vendorName === "string" &&
+    typeof obj.amount === "number" &&
+    typeof obj.vatAmount === "number" &&
+    typeof obj.date === "string"
+  );
+}
+
 export const POST = withCompanyAccessFromParams(
   async (request, { company }) => {
     const body = await request.json();
     const { systemItems, accountingItems } = body as {
-      systemItems: ReconcileItem[];
-      accountingItems: ReconcileItem[];
+      systemItems: unknown[];
+      accountingItems: unknown[];
     };
 
-    if (!systemItems?.length || !accountingItems?.length) {
-      return apiResponse.success({ suggestions: [] });
+    if (!Array.isArray(systemItems) || !Array.isArray(accountingItems)) {
+      return apiResponse.badRequest("systemItems and accountingItems must be arrays");
     }
 
-    const prompt = buildMatchingPrompt(systemItems, accountingItems);
+    if (!systemItems.length || !accountingItems.length) {
+      return apiResponse.success({ suggestions: [], aiError: false });
+    }
+
+    if (systemItems.length > MAX_ITEMS || accountingItems.length > MAX_ITEMS) {
+      return apiResponse.badRequest(`Maximum ${MAX_ITEMS} items per side`);
+    }
+
+    const validSystem = systemItems.filter(isValidItem);
+    const validAccounting = accountingItems.filter(isValidItem);
+
+    if (!validSystem.length || !validAccounting.length) {
+      return apiResponse.success({ suggestions: [], aiError: false });
+    }
+
+    const prompt = buildMatchingPrompt(validSystem, validAccounting);
     const response = await generateText(prompt);
+
+    if (response.error) {
+      console.error("[reconcile/match] AI error:", response.error);
+      return apiResponse.success({
+        suggestions: [],
+        aiError: true,
+        message: "AI วิเคราะห์ไม่สำเร็จ",
+      });
+    }
+
     const responseText = response.data;
 
     let suggestions: AISuggestion[] = [];
     try {
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
-        suggestions = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed)) {
+          suggestions = parsed.filter(
+            (s): s is AISuggestion =>
+              s &&
+              typeof s.systemId === "string" &&
+              typeof s.accountingIndex === "number" &&
+              typeof s.confidence === "number" &&
+              typeof s.reason === "string"
+          );
+        }
       }
     } catch {
       suggestions = [];
     }
 
-    return apiResponse.success({ suggestions });
+    return apiResponse.success({ suggestions, aiError: false });
   },
   {
     permission: "reports:read",

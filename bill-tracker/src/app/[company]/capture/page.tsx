@@ -43,7 +43,6 @@ export default function CapturePage({ params }: CapturePageProps) {
     // Try to get data from sessionStorage
     try {
       const stored = sessionStorage.getItem("prefillExpenseData");
-      console.log("Reading prefill data from sessionStorage:", stored);
       if (stored) {
         const data = JSON.parse(stored);
         // Verify this is for the correct reimbursement
@@ -52,7 +51,6 @@ export default function CapturePage({ params }: CapturePageProps) {
           if (data.billDate) {
             data.billDate = new Date(data.billDate);
           }
-          console.log("Parsed prefill data:", data);
           setPrefillData(data);
           // Clear after reading
           sessionStorage.removeItem("prefillExpenseData");

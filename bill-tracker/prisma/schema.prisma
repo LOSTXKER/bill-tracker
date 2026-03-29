@@ -1,3 +1,4 @@
+// TODO: Run prisma migrate to apply enum changes (ReconcileSessionType, ReconcileMatchType, ReconcileMatchStatus, DeliveryMethod)
 generator client {
   provider = "prisma-client-js"
 }
@@ -202,14 +203,14 @@ model Contact {
   defaultsLastUpdatedAt DateTime? // วันที่อัปเดตค่าเริ่มต้นล่าสุด
 
   // วิธีส่งเอกสาร (Document Delivery Preferences)
-  preferredDeliveryMethod String? // 'email' | 'physical' | 'line' | 'pickup'
-  deliveryEmail           String? // อีเมลสำหรับส่งเอกสาร (อาจแตกต่างจาก email หลัก)
-  deliveryNotes           String? // หมายเหตุการส่งเอกสาร
+  preferredDeliveryMethod DeliveryMethod?
+  deliveryEmail           String?
+  deliveryNotes           String?
 
   // วิธีขอใบกำกับภาษี (Tax Invoice Request Preferences)
-  taxInvoiceRequestMethod String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive' | 'shopee' | 'other'
-  taxInvoiceRequestEmail  String? // อีเมลสำหรับขอใบกำกับ
-  taxInvoiceRequestNotes  String? // หมายเหตุการขอใบกำกับ เช่น "ติดต่อคุณสมชาย 081-xxx-xxxx" หรือ ชื่อแชทร้าน Shopee / ลิงค์
+  taxInvoiceRequestMethod DeliveryMethod?
+  taxInvoiceRequestEmail  String?
+  taxInvoiceRequestNotes  String?
 
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Expense              Expense[]
@@ -307,13 +308,13 @@ model Expense {
   // Internal company tracking (บริษัทจริงภายใน - ถ้าต่างจากที่บันทึก)
   internalCompanyId                          String?
   // วิธีส่งใบหัก ณ ที่จ่าย (Override จาก Contact)
-  whtDeliveryMethod                          String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive'
-  whtDeliveryEmail                           String? // อีเมลสำหรับส่ง WHT (ถ้าวิธีส่งเป็น email)
-  whtDeliveryNotes                           String? // หมายเหตุการส่ง WHT
+  whtDeliveryMethod                          DeliveryMethod?
+  whtDeliveryEmail                           String?
+  whtDeliveryNotes                           String?
   // วิธีขอใบกำกับภาษี (Override จาก Contact)
-  taxInvoiceRequestMethod                    String? // 'email' | 'physical' | 'line' | 'pickup' | 'google_drive' | 'shopee' | 'other'
-  taxInvoiceRequestEmail                     String? // อีเมลสำหรับขอใบกำกับ (ถ้าวิธีเป็น email)
-  taxInvoiceRequestNotes                     String? // หมายเหตุการขอใบกำกับ หรือ ชื่อแชทร้าน Shopee / ลิงค์
+  taxInvoiceRequestMethod                    DeliveryMethod?
+  taxInvoiceRequestEmail                     String?
+  taxInvoiceRequestNotes                     String?
   taxInvoiceRequestedAt                      DateTime? // วันที่ขอใบกำกับล่าสุด
   // สกุลเงินต้นทาง (ถ้าไม่ใช่ THB)
   originalCurrency                           String? // เช่น "USD", "AED"
@@ -888,7 +889,7 @@ model ReconcileSession {
   companyId             String
   month                 Int
   year                  Int
-  type                  String // "expense" | "income"
+  type                  ReconcileSessionType
   status                ReconcileSessionStatus @default(IN_PROGRESS)
   matchedCount          Int                    @default(0)
   unmatchedSystemCount  Int                    @default(0)
@@ -918,6 +919,36 @@ enum ReconcileSessionStatus {
   ARCHIVED
 }
 
+enum ReconcileSessionType {
+  EXPENSE
+  INCOME
+  PP36
+}
+
+enum ReconcileMatchType {
+  EXACT
+  STRONG
+  FUZZY
+  AI
+  MANUAL
+}
+
+enum ReconcileMatchStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum DeliveryMethod {
+  EMAIL
+  PHYSICAL
+  LINE
+  PICKUP
+  GOOGLE_DRIVE
+  SHOPEE
+  OTHER
+}
+
 model ReconcileMatch {
   id        String @id @default(cuid())
   sessionId String
@@ -939,7 +970,7 @@ model ReconcileMatch {
   acctTotal   Decimal @db.Decimal(12, 2)
 
   // ข้อมูลการจับคู่
-  matchType  String // "exact" | "strong" | "fuzzy" | "ai" | "manual"
+  matchType  ReconcileMatchType
   confidence Decimal? @db.Decimal(3, 2)
   aiReason   String?
   amountDiff Decimal? @db.Decimal(12, 2)
@@ -951,7 +982,7 @@ model ReconcileMatch {
   payOnBehalfTo   String?
 
   // สถานะ
-  status         String    @default("pending") // "pending" | "confirmed" | "rejected"
+  status         ReconcileMatchStatus @default(PENDING)
   confirmedBy    String?
   confirmedAt    DateTime?
   rejectedReason String?

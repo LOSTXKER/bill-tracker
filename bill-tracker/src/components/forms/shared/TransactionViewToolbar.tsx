@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
+import { getDeliveryMethod, getTaxInvoiceRequestMethod } from "@/lib/constants/delivery-methods";
 import {
   EXPENSE_WORKFLOW_INFO,
   INCOME_WORKFLOW_INFO,
@@ -256,12 +256,12 @@ export function TransactionViewToolbar({
 
       {config.type === "expense" && transaction.workflowStatus === "WAITING_TAX_INVOICE" && (() => {
         const method = taxInvoiceRequestMethod || selectedContact?.taxInvoiceRequestMethod;
-        const email = taxInvoiceRequestMethod === "email"
+        const email = taxInvoiceRequestMethod === "EMAIL"
           ? (taxInvoiceRequestEmail || selectedContact?.taxInvoiceRequestEmail || selectedContact?.email)
           : (selectedContact?.taxInvoiceRequestEmail || selectedContact?.email);
         const notes = taxInvoiceRequestNotes || selectedContact?.taxInvoiceRequestNotes;
         const phone = selectedContact?.phone;
-        const methodInfo = getDeliveryMethod(method);
+        const methodInfo = getTaxInvoiceRequestMethod(method);
 
         return (
           <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-300 dark:border-orange-700 rounded-lg p-4">
@@ -278,7 +278,7 @@ export function TransactionViewToolbar({
                   <span className="flex items-center gap-1.5 font-medium text-orange-800 dark:text-orange-200">
                     <Icon className="h-4 w-4" />
                     {methodInfo.label}
-                    {method === "email" && email && (
+                    {method === "EMAIL" && email && (
                       <span className="font-normal text-orange-700 dark:text-orange-300">({email})</span>
                     )}
                   </span>

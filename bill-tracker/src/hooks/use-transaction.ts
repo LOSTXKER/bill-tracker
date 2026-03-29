@@ -4,6 +4,7 @@
  */
 
 import useSWR from "swr";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface UseTransactionOptions {
   type: "expense" | "income";
@@ -11,7 +12,7 @@ interface UseTransactionOptions {
   enabled?: boolean;
 }
 
-interface TransactionData {
+export interface TransactionData {
   // Common fields
   id: string;
   amount: number;
@@ -31,7 +32,7 @@ interface TransactionData {
   contactId: string | null;
   contactName: string | null;
   referenceUrls: string[] | null;
-  otherDocUrls: any;
+  otherDocUrls: string[] | null;
   createdAt: string;
   updatedAt: string;
   
@@ -64,22 +65,24 @@ interface TransactionData {
   billingUrls?: string[];
   
   // Any other fields
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface UseTransactionReturn {
   transaction: TransactionData | null;
   isLoading: boolean;
   error: Error | null;
-  mutate: (data?: any, opts?: { revalidate?: boolean }) => Promise<any>;
+  mutate: (data?: TransactionFetcherData, opts?: boolean | { revalidate?: boolean }) => Promise<TransactionFetcherData | undefined>;
 }
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error("Failed to fetch transaction");
-  }
-  return res.json();
+/** JSON body from GET /api/expenses/:id or /api/incomes/:id */
+export type TransactionFetcherData = {
+  data?: {
+    expense?: TransactionData;
+    income?: TransactionData;
+  };
+  expense?: TransactionData;
+  income?: TransactionData;
 };
 
 export function useTransaction({
@@ -90,7 +93,7 @@ export function useTransaction({
   const apiEndpoint = type === "expense" ? "/api/expenses" : "/api/incomes";
   const swrKey = enabled && transactionId ? `${apiEndpoint}/${transactionId}` : null;
 
-  const { data, error, isLoading, mutate } = useSWR(swrKey, fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<TransactionFetcherData>(swrKey, fetcher, {
     // Don't refetch on focus - we handle updates manually
     revalidateOnFocus: false,
     // Refetch on reconnect to ensure fresh data

@@ -37,6 +37,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface PettyCashPageProps {
   params: Promise<{ company: string }>;
@@ -60,8 +61,6 @@ interface Summary {
   totalBalance: number;
   lowBalanceFunds: number;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function PettyCashPage({ params }: PettyCashPageProps) {
   const { company: companyCode } = use(params);

@@ -76,9 +76,9 @@ export function InviteMemberDialog({
       setEmail("");
       setPermissions([]);
       setIsOwner(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error inviting member:", error);
-      toast.error(error.message || "ไม่สามารถเชิญสมาชิกได้");
+      toast.error(error instanceof Error ? error.message : "ไม่สามารถเชิญสมาชิกได้");
     } finally {
       setLoading(false);
     }

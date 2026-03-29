@@ -42,17 +42,18 @@ export function WorkflowProgressBar({
   // Map current status to flow index
   // Handle intermediate statuses that aren't in the simplified flow
   const getEffectiveIndex = (status: string): number => {
-    const directIndex = flow.indexOf(status as any);
+    const stringFlow = flow as readonly string[];
+    const directIndex = stringFlow.indexOf(status);
     if (directIndex >= 0) return directIndex;
 
     // Map intermediate statuses
     if (type === "expense") {
       if (status === "WAITING_TAX_INVOICE") return 0; // Still at PAID step
-      if (status === "WHT_PENDING_ISSUE") return flow.indexOf("WHT_ISSUED" as any);
+      if (status === "WHT_PENDING_ISSUE") return stringFlow.indexOf("WHT_ISSUED");
       if (status === "COMPLETED") return flow.length - 1;
     } else {
-      if (status === "WAITING_INVOICE_ISSUE" || status === "INVOICE_SENT") return flow.indexOf("INVOICE_ISSUED" as any);
-      if (status === "WHT_PENDING_CERT") return flow.indexOf("WHT_CERT_RECEIVED" as any) - 1;
+      if (status === "WAITING_INVOICE_ISSUE" || status === "INVOICE_SENT") return stringFlow.indexOf("INVOICE_ISSUED");
+      if (status === "WHT_PENDING_CERT") return stringFlow.indexOf("WHT_CERT_RECEIVED") - 1;
       if (status === "NO_INVOICE_NEEDED") return 1;
       if (status === "COMPLETED") return flow.length - 1;
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -67,7 +67,7 @@ interface Payment {
   } | null;
 }
 
-interface SettlementRound {
+export interface SettlementRound {
   roundKey: string;
   settledAt: string;
   settlementRef: string | null;
@@ -87,7 +87,7 @@ interface SettlementRoundsTableProps {
   onSuccess: () => void;
 }
 
-export function SettlementRoundsTable({
+function SettlementRoundsTableInner({
   rounds,
   companyCode,
   onSuccess,
@@ -444,3 +444,5 @@ export function SettlementRoundsTable({
     </>
   );
 }
+
+export const SettlementRoundsTable = memo(SettlementRoundsTableInner);

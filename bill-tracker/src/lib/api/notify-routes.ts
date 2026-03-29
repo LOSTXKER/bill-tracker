@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { withAuth } from "./with-auth";
 import { apiResponse } from "./response";
 import { notifyExpense, notifyIncome } from "@/lib/notifications/line-messaging";
+import type { TransactionDelegate } from "./transaction-types";
 
 // =============================================================================
 // Types
@@ -18,7 +19,7 @@ export interface NotifyRouteConfig {
   entityName: string;
   
   // Prisma model accessor
-  prismaModel: any;
+  prismaModel: TransactionDelegate;
   
   // Field mappings
   fields: {
@@ -118,60 +119,59 @@ export function createNotifyHandler(config: NotifyRouteConfig) {
       const url = new URL(request.url);
       const baseUrl = `${url.protocol}//${url.host}`;
 
-      // Build notification data
-      const notifyData = {
-        id: entity.id,
-        companyCode: entity.Company.code,
-        companyName: entity.Company.name,
-        [config.entityType === "expense" ? "vendorName" : "customerName"]: 
-          entity.Contact?.name || entity[config.fields.descriptionField] || undefined,
-        [config.fields.descriptionField]: entity[config.fields.descriptionField] || undefined,
-        amount: Number(entity[config.fields.amountField]),
-        vatAmount: entity[config.fields.vatAmountField] 
-          ? Number(entity[config.fields.vatAmountField]) 
-          : undefined,
-        [config.fields.whtField]: entity[config.fields.whtField],
-        whtRate: entity[config.fields.whtRateField] 
-          ? Number(entity[config.fields.whtRateField]) 
-          : undefined,
-        whtAmount: entity[config.fields.whtAmountField] 
-          ? Number(entity[config.fields.whtAmountField]) 
-          : undefined,
-        [config.fields.netAmountField]: Number(entity[config.fields.netAmountField]),
-        status: entity[config.fields.statusField],
-      };
+      const company = entity.Company;
+      if (!company) {
+        return apiResponse.badRequest("Company data not found");
+      }
 
-      // Send notification based on entity type
+      const contactOrDesc = entity.Contact?.name
+        || String(entity[config.fields.descriptionField] ?? "")
+        || undefined;
+      const desc = String(entity[config.fields.descriptionField] ?? "") || undefined;
+      const amount = Number(entity[config.fields.amountField]);
+      const vatAmount = entity[config.fields.vatAmountField]
+        ? Number(entity[config.fields.vatAmountField])
+        : undefined;
+      const whtFlag = entity[config.fields.whtField] as boolean | undefined;
+      const whtRate = entity[config.fields.whtRateField]
+        ? Number(entity[config.fields.whtRateField])
+        : undefined;
+      const whtAmount = entity[config.fields.whtAmountField]
+        ? Number(entity[config.fields.whtAmountField])
+        : undefined;
+      const netAmount = Number(entity[config.fields.netAmountField]);
+      const status = entity[config.fields.statusField] as string;
+
       let success: boolean;
       if (config.entityType === "expense") {
-        success = await notifyExpense(entity.Company.id, {
-          id: notifyData.id,
-          companyCode: notifyData.companyCode,
-          companyName: notifyData.companyName,
-          vendorName: notifyData.vendorName,
-          description: notifyData.description,
-          amount: notifyData.amount,
-          vatAmount: notifyData.vatAmount,
-          isWht: notifyData.isWht,
-          whtRate: notifyData.whtRate,
-          whtAmount: notifyData.whtAmount,
-          netPaid: notifyData.netPaid,
-          status: notifyData.status,
+        success = await notifyExpense(company.id, {
+          id: entity.id,
+          companyCode: company.code,
+          companyName: company.name,
+          vendorName: contactOrDesc,
+          description: desc,
+          amount,
+          vatAmount,
+          isWht: whtFlag ?? false,
+          whtRate,
+          whtAmount,
+          netPaid: netAmount,
+          status,
         }, baseUrl);
       } else {
-        success = await notifyIncome(entity.Company.id, {
-          id: notifyData.id,
-          companyCode: notifyData.companyCode,
-          companyName: notifyData.companyName,
-          customerName: notifyData.customerName,
-          source: notifyData.source,
-          amount: notifyData.amount,
-          vatAmount: notifyData.vatAmount,
-          isWhtDeducted: notifyData.isWhtDeducted,
-          whtRate: notifyData.whtRate,
-          whtAmount: notifyData.whtAmount,
-          netReceived: notifyData.netReceived,
-          status: notifyData.status,
+        success = await notifyIncome(company.id, {
+          id: entity.id,
+          companyCode: company.code,
+          companyName: company.name,
+          customerName: contactOrDesc,
+          source: desc,
+          amount,
+          vatAmount,
+          isWhtDeducted: whtFlag ?? false,
+          whtRate,
+          whtAmount,
+          netReceived: netAmount,
+          status,
         }, baseUrl);
       }
 

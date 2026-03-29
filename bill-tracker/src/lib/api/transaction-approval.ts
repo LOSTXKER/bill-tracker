@@ -11,6 +11,7 @@ import { createAuditLog } from "@/lib/audit/logger";
 import { createNotification } from "@/lib/notifications/in-app";
 import { notifyApprovalGranted, notifyRejection } from "@/lib/notifications/line-messaging";
 import { getBaseUrl } from "@/lib/utils/get-base-url";
+import type { TransactionDelegate } from "./transaction-types";
 
 interface TransactionApprovalConfig {
   type: "expense" | "income";
@@ -52,8 +53,8 @@ export function getApprovalConfig(type: "expense" | "income"): TransactionApprov
   return type === "expense" ? EXPENSE_CONFIG : INCOME_CONFIG;
 }
 
-function getPrismaModel(type: "expense" | "income") {
-  return type === "expense" ? prisma.expense : prisma.income;
+function getPrismaModel(type: "expense" | "income"): TransactionDelegate {
+  return (type === "expense" ? prisma.expense : prisma.income) as TransactionDelegate;
 }
 
 export function createTransactionApproveHandler(type: "expense" | "income") {
@@ -64,7 +65,7 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
       const { id } = await routeParams.params;
       const model = getPrismaModel(type);
 
-      const entity = await (model as any).findFirst({
+      const entity = await model.findFirst({
         where: { id, deletedAt: null },
         include: { Contact: true, Company: true },
       });
@@ -108,7 +109,7 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
         return apiResponse.badRequest("ไม่สามารถอนุมัติคำขอของตัวเองได้");
       }
 
-      const updated = await (model as any).update({
+      const updated = await model.update({
         where: { id },
         data: {
           approvalStatus: "APPROVED",
@@ -129,8 +130,8 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
         },
       });
 
-      const description = entity[config.descriptionField] || "ไม่ระบุ";
-      const amount = entity[config.netAmountField];
+      const description = String(entity[config.descriptionField] ?? "ไม่ระบุ");
+      const amount = Number(entity[config.netAmountField]);
 
       await createAuditLog({
         userId: session.user.id,
@@ -159,8 +160,9 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
         });
       }
 
-      const submitter = entity[config.submittedByField]
-        ? await prisma.user.findUnique({ where: { id: entity[config.submittedByField] }, select: { name: true } })
+      const submittedById = entity[config.submittedByField] as string | undefined;
+      const submitter = submittedById
+        ? await prisma.user.findUnique({ where: { id: submittedById }, select: { name: true } })
         : null;
 
       await notifyApprovalGranted(company.id, {
@@ -202,7 +204,7 @@ export function createTransactionRejectHandler(type: "expense" | "income") {
 
       const model = getPrismaModel(type);
 
-      const entity = await (model as any).findFirst({
+      const entity = await model.findFirst({
         where: { id, deletedAt: null },
         include: { Contact: true, Company: true },
       });
@@ -242,7 +244,7 @@ export function createTransactionRejectHandler(type: "expense" | "income") {
         return apiResponse.badRequest("สามารถปฏิเสธได้เฉพาะรายการที่รออนุมัติเท่านั้น");
       }
 
-      const updated = await (model as any).update({
+      const updated = await model.update({
         where: { id },
         data: {
           approvalStatus: "REJECTED",
@@ -264,7 +266,7 @@ export function createTransactionRejectHandler(type: "expense" | "income") {
         },
       });
 
-      const description = entity[config.descriptionField] || "ไม่ระบุ";
+      const description = String(entity[config.descriptionField] ?? "ไม่ระบุ");
 
       await createAuditLog({
         userId: session.user.id,
@@ -294,8 +296,9 @@ export function createTransactionRejectHandler(type: "expense" | "income") {
         });
       }
 
-      const submitter = entity[config.submittedByField]
-        ? await prisma.user.findUnique({ where: { id: entity[config.submittedByField] }, select: { name: true } })
+      const submittedById = entity[config.submittedByField] as string | undefined;
+      const submitter = submittedById
+        ? await prisma.user.findUnique({ where: { id: submittedById }, select: { name: true } })
         : null;
 
       await notifyRejection(company.id, {

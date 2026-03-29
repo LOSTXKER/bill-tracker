@@ -130,8 +130,9 @@ export function ReconcileHistoryList({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">ทั้งหมด</SelectItem>
-            <SelectItem value="expense">ภาษีซื้อ (รายจ่าย)</SelectItem>
-            <SelectItem value="income">ภาษีขาย (รายรับ)</SelectItem>
+            <SelectItem value="EXPENSE">ภาษีซื้อ (รายจ่าย)</SelectItem>
+            <SelectItem value="INCOME">ภาษีขาย (รายรับ)</SelectItem>
+            <SelectItem value="PP36">ภพ.36</SelectItem>
           </SelectContent>
         </Select>
 
@@ -183,7 +184,7 @@ export function ReconcileHistoryList({
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-base font-semibold">
-                            {s.type === "expense" ? "ภาษีซื้อ" : "ภาษีขาย"}{" "}
+                            {s.type === "EXPENSE" ? "ภาษีซื้อ" : s.type === "INCOME" ? "ภาษีขาย" : "ภพ.36"}{" "}
                             {MONTH_NAMES[s.month - 1]} {s.year + 543}
                           </span>
                           <Badge variant="outline" className={cn("text-[10px]", statusInfo.color)}>

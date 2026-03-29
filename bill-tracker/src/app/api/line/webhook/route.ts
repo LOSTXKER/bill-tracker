@@ -1,6 +1,11 @@
 /**
  * LINE Bot Webhook Handler
  * Receives events from LINE Messaging API and processes them
+ *
+ * NOTE: This route intentionally uses raw NextResponse.json instead of
+ * apiResponse/withAuth wrappers. LINE's webhook requires HMAC signature
+ * verification (not session auth), and the response format must conform
+ * to LINE's expected contract, not our internal API envelope.
  */
 
 import { NextRequest, NextResponse } from "next/server";

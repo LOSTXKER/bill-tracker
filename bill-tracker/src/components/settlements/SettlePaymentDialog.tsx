@@ -25,8 +25,13 @@ import { Loader2, Upload, X, CheckCircle2, Building2, User } from "lucide-react"
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { useSession } from "next-auth/react";
+import { fetcher } from "@/lib/utils/fetcher";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+type MembersSWRResponse = {
+  data: {
+    members: Array<{ id: string; name: string; email?: string }>;
+  };
+};
 
 interface SettlePaymentDialogProps {
   isOpen: boolean;
@@ -67,7 +72,7 @@ export function SettlePaymentDialog({
   const [selectedPayerId, setSelectedPayerId] = useState<string>("");
 
   // Fetch company members for payer dropdown
-  const { data: membersData } = useSWR(
+  const { data: membersData } = useSWR<MembersSWRResponse>(
     isOpen ? `/api/${companyCode}/members` : null,
     fetcher
   );

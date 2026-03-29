@@ -39,39 +39,39 @@ export type SerializedIncome<T extends Income = Income> = {
  * Generic transaction serializer
  * Converts Decimal fields to numbers based on provided field list
  */
-export function serializeTransaction<T extends Record<string, any>>(
+export function serializeTransaction<T extends object>(
   transaction: T,
   decimalFields: (keyof T)[]
 ): T {
-  const serialized = { ...transaction } as T;
+  const serialized = { ...transaction } as Record<string, unknown>;
   
   decimalFields.forEach((field) => {
-    if (field in serialized) {
-      (serialized[field] as any) = serializeDecimal(serialized[field]);
+    const key = field as string;
+    if (key in serialized) {
+      serialized[key] = serializeDecimal(serialized[key] as Decimal | number | string | null | undefined);
     }
   });
   
-  return serialized;
+  return serialized as T;
 }
 
 /**
  * Serialize contact data for client components
  * Converts Decimal fields to numbers
  */
-export function serializeContact<T extends Record<string, any>>(contact: T | null | undefined): T | null {
+export function serializeContact<T extends object>(contact: T | null | undefined): T | null {
   if (!contact) return null;
   
-  const serialized = { ...contact };
+  const serialized = { ...contact } as Record<string, unknown>;
   
-  // Serialize contact decimal fields
   const contactDecimalFields = ['defaultWhtRate', 'defaultVatRate', 'creditLimit'];
   contactDecimalFields.forEach((field) => {
     if (field in serialized) {
-      (serialized as any)[field] = serializeDecimal(serialized[field]);
+      serialized[field] = serializeDecimal(serialized[field] as Decimal | number | string | null | undefined);
     }
   });
   
-  return serialized;
+  return serialized as T;
 }
 
 /**
@@ -89,12 +89,11 @@ export function serializeExpense<T extends Expense>(expense: T): SerializedExpen
     'exchangeRate',
   ] as (keyof T)[]) as SerializedExpense<T>;
   
-  // Also serialize nested contact if present
   if ('contact' in serialized && serialized.contact) {
-    (serialized as any).contact = serializeContact(serialized.contact);
+    (serialized as Record<string, unknown>).contact = serializeContact(serialized.contact as Record<string, unknown>);
   }
   if ('Contact' in serialized && serialized.Contact) {
-    (serialized as any).Contact = serializeContact(serialized.Contact);
+    (serialized as Record<string, unknown>).Contact = serializeContact(serialized.Contact as Record<string, unknown>);
   }
   
   return serialized;
@@ -115,12 +114,11 @@ export function serializeIncome<T extends Income>(income: T): SerializedIncome<T
     'exchangeRate',
   ] as (keyof T)[]) as SerializedIncome<T>;
   
-  // Also serialize nested contact if present
   if ('contact' in serialized && serialized.contact) {
-    (serialized as any).contact = serializeContact(serialized.contact);
+    (serialized as Record<string, unknown>).contact = serializeContact(serialized.contact as Record<string, unknown>);
   }
   if ('Contact' in serialized && serialized.Contact) {
-    (serialized as any).Contact = serializeContact(serialized.Contact);
+    (serialized as Record<string, unknown>).Contact = serializeContact(serialized.Contact as Record<string, unknown>);
   }
   
   return serialized;
@@ -143,7 +141,7 @@ export function serializeIncomes<T extends Income>(incomes: T[]): SerializedInco
 /**
  * Generic array serializer
  */
-export function serializeTransactions<T extends Record<string, any>>(
+export function serializeTransactions<T extends object>(
   transactions: T[],
   decimalFields: (keyof T)[]
 ): T[] {

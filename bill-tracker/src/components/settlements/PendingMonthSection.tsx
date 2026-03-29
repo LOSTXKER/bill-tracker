@@ -38,7 +38,7 @@ interface Payment {
   } | null;
 }
 
-interface PayerGroup {
+export interface PayerGroup {
   payerType: string;
   payerId: string | null;
   payerName: string;
@@ -48,7 +48,7 @@ interface PayerGroup {
   payments: Payment[];
 }
 
-interface MonthGroup {
+export interface MonthGroup {
   monthKey: string;
   monthLabel: string;
   totalAmount: number;

@@ -119,9 +119,9 @@ export function ResetPasswordDialog({
       setSuccess(true);
       toast.success(`รีเซ็ตรหัสผ่านของ ${memberName} เรียบร้อย`);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error resetting password:", error);
-      toast.error(error.message || "ไม่สามารถรีเซ็ตรหัสผ่านได้");
+      toast.error(error instanceof Error ? error.message : "ไม่สามารถรีเซ็ตรหัสผ่านได้");
     } finally {
       setLoading(false);
     }

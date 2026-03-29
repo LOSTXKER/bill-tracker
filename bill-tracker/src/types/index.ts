@@ -171,6 +171,7 @@ export interface ContactSummary {
   paymentTerms?: number | null;
   peakCode?: string | null;
   source?: "PEAK" | "MANUAL";
+  contactCategory?: string | null;
   // Delivery preferences
   preferredDeliveryMethod?: string | null;
   deliveryEmail?: string | null;

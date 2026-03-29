@@ -28,6 +28,7 @@ import {
   PieChart,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { fetcher } from "@/lib/utils/fetcher";
 
 interface ExpenseOverviewPageProps {
   params: Promise<{ company: string }>;
@@ -72,8 +73,6 @@ interface OverviewData {
     }>;
   };
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function ExpenseOverviewPage({
   params,
@@ -133,7 +132,7 @@ export default function ExpenseOverviewPage({
         />
         <Tabs
           value={period}
-          onValueChange={(v) => setPeriod(v as any)}
+          onValueChange={(v) => setPeriod(v as "month" | "quarter" | "year")}
           className="w-full sm:w-auto"
         >
           <TabsList>

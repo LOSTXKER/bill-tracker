@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { withCompanyAccess } from "@/lib/api/with-company-access";
+import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
-
-// Helper to extract company code from URL path
-const getCompanyFromPath = (req: Request) => {
-  const url = new URL(req.url);
-  const pathParts = url.pathname.split("/");
-  return pathParts[2];
-};
 
 // GET /api/[company]/backup
 // Returns backup metadata/stats
@@ -232,12 +225,10 @@ async function handlePost(
   }
 }
 
-export const GET = withCompanyAccess(handleGet, {
-  requireOwner: true, // Only owner can access backup
-  getCompanyCode: getCompanyFromPath,
+export const GET = withCompanyAccessFromParams(handleGet, {
+  requireOwner: true,
 });
 
-export const POST = withCompanyAccess(handlePost, {
-  requireOwner: true, // Only owner can download backup
-  getCompanyCode: getCompanyFromPath,
+export const POST = withCompanyAccessFromParams(handlePost, {
+  requireOwner: true,
 });

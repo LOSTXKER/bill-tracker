@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
+import type { Expense, Income } from "@prisma/client";
 import { ClipboardCheck } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatsGrid } from "@/components/shared/StatsGrid";
 import { StatsSkeleton, TableSkeleton } from "@/components/shared/TableSkeleton";
-import { ApprovalsClient } from "@/components/approvals/ApprovalsClient";
+import { ApprovalsClient, type ApprovalItem } from "@/components/approvals/ApprovalsClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getSession } from "@/lib/auth";
 import { hasAnyPermission } from "@/lib/permissions/checker";
@@ -171,18 +172,8 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
   const page = parseInt((searchParams.page as string) || "1");
   const limit = parseInt((searchParams.limit as string) || "20");
 
-  // Build order by
-  const orderBy: any = {};
-  if (sortBy === "submittedAt") {
-    orderBy.submittedAt = sortOrder;
-  } else if (sortBy === "amount") {
-    orderBy.netPaid = sortOrder; // Will be netReceived for incomes
-  } else {
-    orderBy.submittedAt = "asc";
-  }
-
   // Fetch pending expenses
-  let expenses: any[] = [];
+  let expenses: Expense[] = [];
   let expensesTotal = 0;
   if (type === "all" || type === "expense") {
     const [expensesRaw, count] = await Promise.all([
@@ -227,7 +218,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
   }
 
   // Fetch pending incomes
-  let incomes: any[] = [];
+  let incomes: Income[] = [];
   let incomesTotal = 0;
   if (type === "all" || type === "income") {
     const [incomesRaw, count] = await Promise.all([
@@ -274,8 +265,8 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
   return (
     <ApprovalsClient
       companyCode={companyCode}
-      expenses={serializedExpenses as any[]}
-      incomes={serializedIncomes as any[]}
+      expenses={serializedExpenses as unknown as ApprovalItem[]}
+      incomes={serializedIncomes as unknown as ApprovalItem[]}
       expensesTotal={expensesTotal}
       incomesTotal={incomesTotal}
       currentUserId={currentUserId}

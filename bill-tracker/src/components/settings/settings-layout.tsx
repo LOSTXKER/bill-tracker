@@ -161,7 +161,7 @@ export function SettingsLayout({
       case "exchange-rates":
         return (
           <ExchangeRatesSection
-            companyCode={company.code}
+            companyId={company.id}
             initialRates={(company.exchangeRates as Record<string, number>) || {}}
           />
         );

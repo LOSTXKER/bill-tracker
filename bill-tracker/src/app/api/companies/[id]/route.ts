@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { apiResponse } from "@/lib/api/response";
 
 /**
  * PATCH /api/companies/[id]
@@ -13,7 +13,7 @@ export async function PATCH(
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiResponse.unauthorized();
     }
 
     const { id } = await params;
@@ -29,7 +29,7 @@ export async function PATCH(
     });
 
     if (!access || !access.isOwner) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return apiResponse.forbidden();
     }
 
     const body = await request.json();
@@ -50,12 +50,11 @@ export async function PATCH(
       data: updateData,
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    return apiResponse.success(updated);
   } catch (error) {
     console.error("Company update error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return apiResponse.error(
+      error instanceof Error ? error : new Error("Internal server error")
     );
   }
 }
@@ -71,7 +70,7 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiResponse.unauthorized();
     }
 
     const { id } = await params;
@@ -87,7 +86,7 @@ export async function GET(
     });
 
     if (!access) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return apiResponse.forbidden();
     }
 
     const company = await prisma.company.findUnique({
@@ -95,15 +94,14 @@ export async function GET(
     });
 
     if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+      return apiResponse.notFound("Company not found");
     }
 
-    return NextResponse.json({ success: true, data: company });
+    return apiResponse.success(company);
   } catch (error) {
     console.error("Company fetch error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return apiResponse.error(
+      error instanceof Error ? error : new Error("Internal server error")
     );
   }
 }

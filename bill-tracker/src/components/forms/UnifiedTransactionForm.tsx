@@ -3,36 +3,13 @@
 import { useState, useEffect, useCallback, ReactNode, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import Link from "next/link";
 import { toast } from "sonner";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Loader2,
   LucideIcon,
   ArrowLeft,
-  Trash2,
-  Receipt,
-  FileText,
-  CreditCard,
-  Calendar,
-  User,
   AlertCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 
 // Hooks
@@ -47,24 +24,22 @@ import { useTransactionSubmission } from "@/hooks/use-transaction-submission";
 import { useMergeHandler } from "@/hooks/use-merge-handler";
 
 // Shared form components
-import { InputMethodSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
-import { MergeOptionsDialog, MergeData, MergeDecision } from "./shared/MergeOptionsDialog";
-import { ConflictDialog, ConflictField, ConflictResolution, detectConflicts } from "./shared/ConflictDialog";
-import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
-import { TransactionFieldsSection, TransactionFieldsConfig } from "./shared/TransactionFieldsSection";
-import { TransactionAmountCard } from "./shared/TransactionAmountCard";
-import { CalculationSummary } from "./shared/CalculationSummary";
-import { PayerSection, PayerInfo } from "./shared/PayerSection";
-import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
+import { CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
+import { MergeData, MergeDecision } from "./shared/MergeOptionsDialog";
+import { detectConflicts } from "./shared/ConflictDialog";
+import { TransactionDialogs } from "./shared/TransactionDialogs";
+import { TransactionFormProvider, type TransactionFormContextValue } from "./TransactionFormContext";
+import { PayerInfo } from "./shared/PayerSection";
 import { TransactionViewToolbar } from "./shared/TransactionViewToolbar";
+import { CreateModeContent } from "./CreateModeContent";
+import type { AccountSuggestion, CurrencyConversionValue } from "./CreateModeContent";
+import { ViewEditModeContent } from "./ViewEditModeContent";
 
 // Transaction components
-import { DocumentSection, TransactionDetailSkeleton, CombinedHistorySection, TransactionViewHeader } from "@/components/transactions";
-import { CommentSection } from "@/components/comments/CommentSection";
+import { TransactionDetailSkeleton } from "@/components/transactions";
 
 // Types & Constants
 import type { ContactSummary } from "@/types";
-import type { ApprovalStatus } from "@prisma/client";
 import { StatusInfo, WHT_LOCKED_STATUSES, WHT_CONFIRM_STATUSES_ALL } from "@/lib/constants/transaction";
 
 // Permissions
@@ -247,14 +222,7 @@ export function UnifiedTransactionForm({
   const [aiApplied, setAiApplied] = useState(false);
 
   // Currency conversion state (persists across view/edit modes, populated from AI result or DB)
-  const [currencyConversion, setCurrencyConversion] = useState<{
-    detected: boolean;
-    currency: string | null;
-    originalAmount: number | null;
-    convertedAmount: number | null;
-    exchangeRate: number | null;
-    conversionNote: string | null;
-  } | null>(null);
+  const [currencyConversion, setCurrencyConversion] = useState<CurrencyConversionValue | null>(null);
 
   // Merge Dialog State
   const [showMergeDialog, setShowMergeDialog] = useState(false);
@@ -405,20 +373,7 @@ export function UnifiedTransactionForm({
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
 
   // AI Account Suggestion
-  const [accountSuggestion, setAccountSuggestion] = useState<{
-    accountId: string | null;
-    accountCode: string | null;
-    accountName: string | null;
-    confidence: number;
-    reason: string;
-    alternatives?: Array<{
-      accountId: string;
-      accountCode: string;
-      accountName: string;
-      confidence: number;
-      reason: string;
-    }>;
-  } | null>(null);
+  const [accountSuggestion, setAccountSuggestion] = useState<AccountSuggestion>(null);
   
   // Reference URLs (for external links to products, orders, etc.)
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
@@ -535,8 +490,6 @@ export function UnifiedTransactionForm({
       const slipUrls = config.defaultValues.slipUrls as string[] | undefined;
       const invoiceUrls = config.defaultValues.taxInvoiceUrls as string[] | undefined;
       
-      console.log("UnifiedTransactionForm initializing files:", { slipUrls, invoiceUrls });
-      
       if (slipUrls?.length || invoiceUrls?.length) {
         filesInitRef.current = true;
         const initialFiles = {
@@ -548,7 +501,6 @@ export function UnifiedTransactionForm({
         };
         setCategorizedFiles(initialFiles);
         setFilesInitialized(true);
-        console.log("UnifiedTransactionForm files set to:", initialFiles);
       }
     }
   }, [mode, config.defaultValues]);
@@ -580,9 +532,9 @@ export function UnifiedTransactionForm({
       referenceNo: data.referenceNo,
       notes: data.notes,
       documentType: data.documentType || "TAX_INVOICE",
-      [config.fields.dateField.name]: data[config.fields.dateField.name] ? new Date(data[config.fields.dateField.name]) : undefined,
+      [config.fields.dateField.name]: data[config.fields.dateField.name] ? new Date(data[config.fields.dateField.name] as string) : undefined,
       ...(config.fields.descriptionField ? { [config.fields.descriptionField.name]: data[config.fields.descriptionField.name] } : {}),
-      ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate) : undefined } : {}),
+      ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate as string) : undefined } : {}),
     });
 
     // Set contact (Prisma returns Contact with capital C)
@@ -612,50 +564,50 @@ export function UnifiedTransactionForm({
 
     // Set internal company (expense only)
     if (data.internalCompanyId) {
-      setInternalCompanyId(data.internalCompanyId);
+      setInternalCompanyId(data.internalCompanyId as string);
     }
 
     // Set WHT delivery method (expense only)
     if (data.whtDeliveryMethod) {
-      setWhtDeliveryMethod(data.whtDeliveryMethod);
+      setWhtDeliveryMethod(String(data.whtDeliveryMethod));
     }
     if (data.whtDeliveryEmail) {
-      setWhtDeliveryEmail(data.whtDeliveryEmail);
+      setWhtDeliveryEmail(String(data.whtDeliveryEmail));
     }
     if (data.whtDeliveryNotes) {
-      setWhtDeliveryNotes(data.whtDeliveryNotes);
+      setWhtDeliveryNotes(String(data.whtDeliveryNotes));
     }
 
     // Set tax invoice request method (expense only)
     if (data.taxInvoiceRequestMethod) {
-      setTaxInvoiceRequestMethod(data.taxInvoiceRequestMethod);
+      setTaxInvoiceRequestMethod(String(data.taxInvoiceRequestMethod));
     }
     if (data.taxInvoiceRequestEmail) {
-      setTaxInvoiceRequestEmail(data.taxInvoiceRequestEmail);
+      setTaxInvoiceRequestEmail(String(data.taxInvoiceRequestEmail));
     }
     if (data.taxInvoiceRequestNotes) {
-      setTaxInvoiceRequestNotes(data.taxInvoiceRequestNotes);
+      setTaxInvoiceRequestNotes(String(data.taxInvoiceRequestNotes));
     }
 
     // Set categorized files (normalize other docs for backward compatibility)
     setCategorizedFiles({
-      invoice: data[config.fileFields.invoice.urlsField] || [],
-      slip: data[config.fileFields.slip.urlsField] || [],
-      whtCert: data[config.fileFields.wht.urlsField] || [],
+      invoice: (data[config.fileFields.invoice.urlsField] as string[]) || [],
+      slip: (data[config.fileFields.slip.urlsField] as string[]) || [],
+      whtCert: (data[config.fileFields.wht.urlsField] as string[]) || [],
       other: normalizeOtherDocs(data.otherDocUrls),
       uncategorized: [],
     });
     
     // Set reference URLs
     if (data.referenceUrls && Array.isArray(data.referenceUrls)) {
-      setReferenceUrls(data.referenceUrls);
+      setReferenceUrls(data.referenceUrls as string[]);
     }
 
     // Set currency conversion info from DB (if transaction was in foreign currency)
     if (data.originalCurrency && data.originalCurrency !== "THB") {
       setCurrencyConversion({
         detected: true,
-        currency: data.originalCurrency,
+        currency: data.originalCurrency as string,
         originalAmount: Number(data.originalAmount) || 0,
         convertedAmount: Number(data.amount) || 0,
         exchangeRate: Number(data.exchangeRate) || 0,
@@ -941,9 +893,11 @@ export function UnifiedTransactionForm({
     });
     // Handle otherDocUrls separately (not in config.fileFields)
     if (type === "other") {
-      currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as any[]) || []).map((item: any) => 
-        typeof item === 'string' ? item : item.url
-      ).filter(Boolean);
+      currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as (string | { url: string })[]) || [])
+        .map((item: string | { url: string }) =>
+          typeof item === "string" ? item : item.url
+        )
+        .filter(Boolean);
     }
     await handleFileUpload(file, type, currentUrls, transaction);
   };
@@ -956,9 +910,11 @@ export function UnifiedTransactionForm({
     });
     // Handle otherDocUrls separately (not in config.fileFields)
     if (type === "other") {
-      currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as any[]) || []).map((item: any) => 
-        typeof item === 'string' ? item : item.url
-      ).filter(Boolean);
+      currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as (string | { url: string })[]) || [])
+        .map((item: string | { url: string }) =>
+          typeof item === "string" ? item : item.url
+        )
+        .filter(Boolean);
     }
     await handleDeleteFile(type, urlToDelete, currentUrls, transaction);
   };
@@ -1010,9 +966,9 @@ export function UnifiedTransactionForm({
     
     // Store confirmation flag for API
     if (confirmed) {
-      setValue("_whtChangeConfirmed" as any, true);
+      setValue("_whtChangeConfirmed" as Parameters<typeof setValue>[0], true);
       if (reason) {
-        setValue("_whtChangeReason" as any, reason);
+        setValue("_whtChangeReason" as Parameters<typeof setValue>[0], reason);
       }
     }
   }, [setValue, config.fields.whtField.name]);
@@ -1063,13 +1019,94 @@ export function UnifiedTransactionForm({
 
   const isDeleted = transaction?.deletedAt ? true : false;
 
-  // Build fields config for TransactionFieldsSection
-  const fieldsConfig: TransactionFieldsConfig = {
-    type: config.type,
-    dateField: config.fields.dateField,
-    descriptionField: config.fields.descriptionField,
-    statusOptions: config.statusOptions,
-    showDueDate: config.showDueDate,
+  // Build context value — shared state consumed by TransactionFieldsSection via context
+  const transactionFormContextValue: TransactionFormContextValue = {
+    // Contact slice
+    contacts,
+    contactsLoading,
+    selectedContact,
+    onContactSelect: (contact) => {
+      setSelectedContact(contact);
+      if (contact) setAiVendorSuggestion(null);
+    },
+    onContactCreated: (contact) => {
+      refetchContacts();
+      setSelectedContact(contact);
+      setAiVendorSuggestion(null);
+    },
+    oneTimeContactName,
+    onOneTimeContactNameChange: setOneTimeContactName,
+    aiVendorSuggestion,
+
+    // Account slice
+    selectedAccount,
+    onAccountChange: setSelectedAccount,
+    suggestedAccountId:
+      accountSuggestion?.accountId ||
+      aiResult?.aiAccountSuggestion?.accountId ||
+      undefined,
+    suggestedAccountAlternatives: accountSuggestion?.alternatives,
+
+    // WHT delivery slice — editable only for expenses in create/edit mode
+    whtDeliveryMethod,
+    onWhtDeliveryMethodChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setWhtDeliveryMethod
+        : undefined,
+    whtDeliveryEmail,
+    onWhtDeliveryEmailChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setWhtDeliveryEmail
+        : undefined,
+    whtDeliveryNotes,
+    onWhtDeliveryNotesChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setWhtDeliveryNotes
+        : undefined,
+    updateContactDelivery,
+    onUpdateContactDeliveryChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setUpdateContactDelivery
+        : undefined,
+
+    // Tax invoice slice — editable only for expenses in create/edit mode
+    taxInvoiceRequestMethod,
+    onTaxInvoiceRequestMethodChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setTaxInvoiceRequestMethod
+        : undefined,
+    taxInvoiceRequestEmail,
+    onTaxInvoiceRequestEmailChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setTaxInvoiceRequestEmail
+        : undefined,
+    taxInvoiceRequestNotes,
+    onTaxInvoiceRequestNotesChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setTaxInvoiceRequestNotes
+        : undefined,
+    updateContactTaxInvoiceRequest,
+    onUpdateContactTaxInvoiceRequestChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setUpdateContactTaxInvoiceRequest
+        : undefined,
+
+    // Internal company slice — editable only for expenses in create/edit mode
+    internalCompanyId,
+    onInternalCompanyChange:
+      config.type === "expense" && (mode === "create" || mode === "edit")
+        ? setInternalCompanyId
+        : undefined,
+    accessibleCompanies: accessibleCompanies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      code: c.code,
+    })),
+
+    // Reference URLs — editable in create/edit mode only
+    referenceUrls,
+    onReferenceUrlsChange:
+      mode === "create" || mode === "edit" ? setReferenceUrls : undefined,
   };
 
   // =============================================================================
@@ -1077,7 +1114,7 @@ export function UnifiedTransactionForm({
   // =============================================================================
 
   return (
-    <>
+    <TransactionFormProvider value={transactionFormContextValue}>
       {/* View/Edit Mode Header */}
       {mode !== "create" && transaction && (
         <TransactionViewToolbar
@@ -1108,574 +1145,98 @@ export function UnifiedTransactionForm({
       <form onSubmit={mode === "create" ? handleSubmit(onSubmit) : (e) => e.preventDefault()}>
         {/* CREATE MODE */}
         {mode === "create" && (
-          <Card className="border-border/50 shadow-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-3 text-lg font-semibold">
-                <div className={`p-2 rounded-xl ${config.iconColor}`}>
-                  <config.icon className="h-5 w-5" />
-                </div>
-                {config.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid lg:grid-cols-5 gap-6">
-              <div className="lg:col-span-3 space-y-6">
-                  {/* Fields Section */}
-                  <TransactionFieldsSection
-                    config={fieldsConfig}
-                    companyCode={companyCode}
-                    mode={mode}
-                    register={register}
-                    watch={watch}
-                    setValue={setValue}
-                    contacts={contacts}
-                    contactsLoading={contactsLoading}
-                    selectedContact={selectedContact}
-                    onContactSelect={(contact) => {
-                      setSelectedContact(contact);
-                      if (contact) {
-                        setAiVendorSuggestion(null);
-                      }
-                    }}
-                    onContactCreated={(contact) => {
-                      refetchContacts();
-                      setSelectedContact(contact);
-                      setAiVendorSuggestion(null);
-                    }}
-                    oneTimeContactName={oneTimeContactName}
-                    onOneTimeContactNameChange={setOneTimeContactName}
-                    selectedAccount={selectedAccount}
-                    onAccountChange={setSelectedAccount}
-                    suggestedAccountId={
-                      accountSuggestion?.accountId ||
-                      aiResult?.aiAccountSuggestion?.accountId ||
-                      undefined
-                    }
-                    suggestedAccountAlternatives={accountSuggestion?.alternatives}
-                    aiVendorSuggestion={aiVendorSuggestion}
-                    referenceUrls={referenceUrls}
-                    onReferenceUrlsChange={setReferenceUrls}
-                    vatRate={watchVatRate || 0}
-                    renderAdditionalFields={() =>
-                      config.renderAdditionalFields?.({ register, watch, setValue, mode })
-                    }
-                    internalCompanyId={internalCompanyId}
-                    onInternalCompanyChange={config.type === "expense" ? setInternalCompanyId : undefined}
-                    accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
-                    isWht={watchIsWht || false}
-                    whtDeliveryMethod={whtDeliveryMethod}
-                    onWhtDeliveryMethodChange={config.type === "expense" ? setWhtDeliveryMethod : undefined}
-                    whtDeliveryEmail={whtDeliveryEmail}
-                    onWhtDeliveryEmailChange={config.type === "expense" ? setWhtDeliveryEmail : undefined}
-                    whtDeliveryNotes={whtDeliveryNotes}
-                    onWhtDeliveryNotesChange={config.type === "expense" ? setWhtDeliveryNotes : undefined}
-                    updateContactDelivery={updateContactDelivery}
-                    onUpdateContactDeliveryChange={config.type === "expense" ? setUpdateContactDelivery : undefined}
-                    taxInvoiceRequestMethod={taxInvoiceRequestMethod}
-                    onTaxInvoiceRequestMethodChange={config.type === "expense" ? setTaxInvoiceRequestMethod : undefined}
-                    taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-                    onTaxInvoiceRequestEmailChange={config.type === "expense" ? setTaxInvoiceRequestEmail : undefined}
-                    taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-                    onTaxInvoiceRequestNotesChange={config.type === "expense" ? setTaxInvoiceRequestNotes : undefined}
-                    updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-                    onUpdateContactTaxInvoiceRequestChange={config.type === "expense" ? setUpdateContactTaxInvoiceRequest : undefined}
-                    onAiSuggestAccount={(suggestion) => {
-                      setAccountSuggestion({
-                        accountId: suggestion.accountId,
-                        accountCode: null,
-                        accountName: null,
-                        confidence: 80,
-                        reason: "AI จำแนกจากรายละเอียด",
-                        alternatives: suggestion.alternatives,
-                      });
-                    }}
-                  />
-
-                  {/* Contact Defaults Suggestion */}
-                  {selectedContact && hasContactDefaults && contactDefaults && !defaultsSuggestionDismissed && (
-                    <ContactDefaultsSuggestion
-                      contactName={selectedContact.name}
-                      defaults={contactDefaults}
-                      onApply={applyContactDefaults}
-                      onDismiss={() => setDefaultsSuggestionDismissed(true)}
-                    />
-                  )}
-
-                  {/* Currency Conversion Note - manual toggle + AI-detected */}
-                  <CurrencyConversionNote
-                    currencyConversion={currencyConversion ?? undefined}
-                    manualMode={mode === "create"}
-                    onManualToggle={(enabled) => {
-                      if (enabled) {
-                        setCurrencyConversion({
-                          detected: true,
-                          currency: "USD",
-                          originalAmount: 0,
-                          convertedAmount: 0,
-                          exchangeRate: 0,
-                          conversionNote: null,
-                        });
-                      } else {
-                        setCurrencyConversion(null);
-                        setValue("amount", 0);
-                      }
-                    }}
-                    onCurrencyChange={(currency) => {
-                      setCurrencyConversion((prev) =>
-                        prev ? { ...prev, currency } : null
-                      );
-                    }}
-                    onOriginalAmountChange={(originalAmount) => {
-                      setCurrencyConversion((prev) => {
-                        if (!prev) return null;
-                        const rate = prev.exchangeRate || 0;
-                        const converted = rate > 0 ? Math.trunc(originalAmount * rate * 100) / 100 : 0;
-                        if (converted > 0) setValue("amount", converted);
-                        return { ...prev, originalAmount, convertedAmount: converted };
-                      });
-                    }}
-                    onRateChange={(newRate, newConvertedAmount) => {
-                      setValue("amount", newConvertedAmount);
-                      setCurrencyConversion((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              exchangeRate: newRate,
-                              convertedAmount: newConvertedAmount,
-                              conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                            }
-                          : null
-                      );
-                      if (aiResult?.currencyConversion) {
-                        setAiResult((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                currencyConversion: {
-                                  ...prev.currencyConversion!,
-                                  exchangeRate: newRate,
-                                  convertedAmount: newConvertedAmount,
-                                  conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                                },
-                              }
-                            : null
-                        );
-                      }
-                    }}
-                  />
-
-                  {/* Divider */}
-                  <div className="border-t border-border" />
-
-                  {/* Tax & Amount Section */}
-                  <TransactionAmountCard
-                    mode={mode}
-                    type={config.type}
-                    amount={watchAmount || 0}
-                    onAmountChange={(value) => setValue("amount", value)}
-                    vatRate={watchVatRate || 0}
-                    onVatRateChange={(value) => setValue("vatRate", value)}
-                    vatAmount={calculation.vatAmount}
-                    whtEnabled={watchIsWht || false}
-                    onWhtToggle={handleWhtToggle}
-                    whtRate={watchWhtRate}
-                    whtType={watchWhtType}
-                    onWhtRateSelect={(rate, type) => {
-                      setValue("whtRate", rate);
-                      setValue("whtType", type);
-                    }}
-                    whtAmount={calculation.whtAmount}
-                    whtLabel={config.fields.whtField.label}
-                    whtDescription={config.fields.whtField.description}
-                    whtChangeInfo={whtChangeInfo}
-                    documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
-                    onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
-                    totalWithVat={calculation.totalWithVat}
-                    netAmount={calculation.netAmount}
-                    netAmountLabel={config.fields.netAmountLabel}
-                  />
-
-                  {/* Payer Section (expense only, create mode) */}
-                  {config.type === "expense" && mode === "create" && (
-                    <PayerSection
-                      companyCode={companyCode}
-                      totalAmount={calculation.netAmount}
-                      mode={mode}
-                      payers={payers}
-                      onPayersChange={setPayers}
-                    />
-                  )}
-
-                  {/* Notes (view/edit mode only) */}
-                  {mode !== "create" && (
-                    <div className="pt-2">
-                      <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
-                      {mode === "edit" ? (
-                        <Textarea
-                          {...register("notes")}
-                          placeholder="เพิ่มหมายเหตุ..."
-                          rows={2}
-                          className="bg-muted/30 resize-none"
-                        />
-                      ) : (
-                        <p className="text-base text-muted-foreground">
-                          {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
-                        </p>
-                      )}
-                    </div>
-                  )}
-              </div>
-
-              {/* Right Column for CREATE mode */}
-              <div className="lg:col-span-2">
-                <InputMethodSection
-                  key={filesInitialized ? "with-prefill" : "fresh"}
-                  companyCode={companyCode}
-                  transactionType={config.type}
-                  onFilesChange={setCategorizedFiles}
-                  onAiResult={handleAiResult}
-                  showWhtCert={watchIsWht}
-                  initialFiles={filesInitialized ? categorizedFiles : undefined}
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="flex gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1 h-11"
-                onClick={() => router.back()}
-              >
-                ยกเลิก
-              </Button>
-              <Button
-                type="submit"
-                className={`flex-1 h-11 ${config.buttonColor}`}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    กำลังบันทึก...
-                  </>
-                ) : (
-                  `บันทึก${config.title}`
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
+          <CreateModeContent
+            config={config}
+            companyCode={companyCode}
+            mode={mode}
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            isLoading={isLoading}
+            calculation={calculation}
+            watchAmount={watchAmount || 0}
+            watchVatRate={watchVatRate || 0}
+            watchIsWht={watchIsWht || false}
+            watchWhtRate={watchWhtRate}
+            watchWhtType={watchWhtType}
+            watchDocumentType={watchDocumentType}
+            categorizedFiles={categorizedFiles}
+            setCategorizedFiles={setCategorizedFiles}
+            currencyConversion={currencyConversion}
+            setCurrencyConversion={setCurrencyConversion}
+            aiResult={aiResult}
+            setAiResult={setAiResult}
+            payers={payers}
+            setPayers={setPayers}
+            filesInitialized={filesInitialized}
+            selectedContact={selectedContact}
+            contactDefaults={contactDefaults}
+            hasContactDefaults={hasContactDefaults}
+            defaultsSuggestionDismissed={defaultsSuggestionDismissed}
+            setDefaultsSuggestionDismissed={setDefaultsSuggestionDismissed}
+            applyContactDefaults={applyContactDefaults}
+            setAccountSuggestion={setAccountSuggestion}
+            whtChangeInfo={whtChangeInfo}
+            handleWhtToggle={handleWhtToggle}
+            handleDocumentTypeChange={handleDocumentTypeChange}
+            handleAiResult={handleAiResult}
+            router={router}
+          />
         )}
 
-        {/* VIEW/EDIT MODE - Separate Cards */}
+        {/* VIEW/EDIT MODE */}
         {mode !== "create" && transaction && (
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="grid lg:grid-cols-5 gap-6">
-              {/* Left Column: Main Info - PROMINENT */}
-              <Card className="lg:col-span-3 shadow-lg border-border">
-                <CardContent className="p-6 lg:p-8 space-y-6">
-                  <TransactionFieldsSection
-                    config={fieldsConfig}
-                    companyCode={companyCode}
-                    mode={mode}
-                    register={register}
-                    watch={watch}
-                    setValue={setValue}
-                    contacts={contacts}
-                    contactsLoading={contactsLoading}
-                    selectedContact={selectedContact}
-                    onContactSelect={(contact) => {
-                      setSelectedContact(contact);
-                      if (contact) setAiVendorSuggestion(null);
-                    }}
-                    onContactCreated={(contact) => {
-                      refetchContacts();
-                      setSelectedContact(contact);
-                      setAiVendorSuggestion(null);
-                    }}
-                    oneTimeContactName={oneTimeContactName}
-                    onOneTimeContactNameChange={setOneTimeContactName}
-                    selectedAccount={selectedAccount}
-                    onAccountChange={setSelectedAccount}
-                    suggestedAccountId={
-                      accountSuggestion?.accountId ||
-                      aiResult?.aiAccountSuggestion?.accountId ||
-                      undefined
-                    }
-                    suggestedAccountAlternatives={accountSuggestion?.alternatives}
-                    aiVendorSuggestion={aiVendorSuggestion}
-                    referenceUrls={referenceUrls}
-                    onReferenceUrlsChange={mode === "edit" ? setReferenceUrls : undefined}
-                    vatRate={watchVatRate || 0}
-                    renderAdditionalFields={() =>
-                      config.renderAdditionalFields?.({ register, watch, setValue, mode })
-                    }
-                    internalCompanyId={internalCompanyId}
-                    onInternalCompanyChange={config.type === "expense" && mode === "edit" ? setInternalCompanyId : undefined}
-                    accessibleCompanies={accessibleCompanies.map(c => ({ id: c.id, name: c.name, code: c.code }))}
-                    isWht={config.type === "expense" ? transaction?.isWht : transaction?.isWhtDeducted}
-                    whtDeliveryMethod={whtDeliveryMethod}
-                    onWhtDeliveryMethodChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryMethod : undefined}
-                    whtDeliveryEmail={whtDeliveryEmail}
-                    onWhtDeliveryEmailChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryEmail : undefined}
-                    whtDeliveryNotes={whtDeliveryNotes}
-                    onWhtDeliveryNotesChange={config.type === "expense" && mode === "edit" ? setWhtDeliveryNotes : undefined}
-                    updateContactDelivery={updateContactDelivery}
-                    onUpdateContactDeliveryChange={config.type === "expense" && mode === "edit" ? setUpdateContactDelivery : undefined}
-                    taxInvoiceRequestMethod={taxInvoiceRequestMethod}
-                    onTaxInvoiceRequestMethodChange={config.type === "expense" && mode === "edit" ? setTaxInvoiceRequestMethod : undefined}
-                    taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-                    onTaxInvoiceRequestEmailChange={config.type === "expense" && mode === "edit" ? setTaxInvoiceRequestEmail : undefined}
-                    taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-                    onTaxInvoiceRequestNotesChange={config.type === "expense" && mode === "edit" ? setTaxInvoiceRequestNotes : undefined}
-                    updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-                    onUpdateContactTaxInvoiceRequestChange={config.type === "expense" && mode === "edit" ? setUpdateContactTaxInvoiceRequest : undefined}
-                    onAiSuggestAccount={mode === "edit" ? (suggestion) => {
-                      setAccountSuggestion({
-                        accountId: suggestion.accountId,
-                        accountCode: null,
-                        accountName: null,
-                        confidence: 80,
-                        reason: "AI จำแนกจากรายละเอียด",
-                        alternatives: suggestion.alternatives,
-                      });
-                    } : undefined}
-                  />
-
-                  {/* Currency Conversion Note - show in view/edit mode when currency data exists */}
-                  {currencyConversion && (
-                    <CurrencyConversionNote 
-                      currencyConversion={currencyConversion}
-                      onRateChange={mode === "edit" ? (newRate, newConvertedAmount) => {
-                        // Update the amount field with new converted amount
-                        setValue("amount", newConvertedAmount);
-                        // Update currency conversion state
-                        setCurrencyConversion((prev) => prev ? {
-                          ...prev,
-                          exchangeRate: newRate,
-                          convertedAmount: newConvertedAmount,
-                          conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                        } : null);
-                      } : undefined}
-                    />
-                  )}
-
-                  <div className="border-t border-border" />
-
-                  <TransactionAmountCard
-                    mode={mode}
-                    type={config.type}
-                    amount={watchAmount || 0}
-                    onAmountChange={(value) => setValue("amount", value)}
-                    vatRate={watchVatRate || 0}
-                    onVatRateChange={(value) => setValue("vatRate", value)}
-                    vatAmount={calculation.vatAmount}
-                    whtEnabled={watchIsWht || false}
-                    onWhtToggle={handleWhtToggle}
-                    whtRate={watchWhtRate}
-                    whtType={watchWhtType}
-                    onWhtRateSelect={(rate, type) => {
-                      setValue("whtRate", rate);
-                      setValue("whtType", type);
-                    }}
-                    whtAmount={calculation.whtAmount}
-                    whtLabel={config.fields.whtField.label}
-                    whtDescription={config.fields.whtField.description}
-                    whtChangeInfo={whtChangeInfo}
-                    documentType={(transaction?.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || (watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
-                    onDocumentTypeChange={config.type === "expense" && mode === "edit" ? handleDocumentTypeChange : undefined}
-                    totalWithVat={calculation.totalWithVat}
-                    netAmount={calculation.netAmount}
-                    netAmountLabel={config.fields.netAmountLabel}
-                  />
-
-                  {/* Payer Section (expense only, view/edit mode) */}
-                  {config.type === "expense" && (
-                    <PayerSection
-                      companyCode={companyCode}
-                      totalAmount={calculation.netAmount}
-                      mode={mode}
-                      payers={payers}
-                      onPayersChange={setPayers}
-                    />
-                  )}
-
-                  <div className="pt-2">
-                    <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
-                    {mode === "edit" ? (
-                      <Textarea
-                        {...register("notes")}
-                        placeholder="เพิ่มหมายเหตุ..."
-                        rows={2}
-                        className="bg-muted/30 resize-none"
-                      />
-                    ) : (
-                      <p className="text-muted-foreground whitespace-pre-wrap">
-                        {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Right Column: Documents - SUBTLE */}
-              <div className="lg:col-span-2 space-y-4">
-                <Card className="shadow-sm border-border bg-card">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Receipt className="h-4 w-4 text-muted-foreground" />
-                      {config.type === "expense" ? "หลักฐานการจ่าย" : "หลักฐานการรับเงิน"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    <DocumentSection
-                      label={config.fileFields.slip.label}
-                      urls={(transaction[config.fileFields.slip.urlsField] as string[]) || []}
-                      onUpload={(file) => handleFileUploadWrapper(file, "slip")}
-                      onDelete={(url) => handleDeleteFileWrapper("slip", url)}
-                      isUploading={uploadingType === "slip"}
-                      icon={<CreditCard className="h-4 w-4" />}
-                    />
-                    <DocumentSection
-                      label={config.fileFields.invoice.label}
-                      urls={(transaction[config.fileFields.invoice.urlsField] as string[]) || []}
-                      onUpload={(file) => handleFileUploadWrapper(file, "invoice")}
-                      onDelete={(url) => handleDeleteFileWrapper("invoice", url)}
-                      isUploading={uploadingType === "invoice"}
-                      icon={<FileText className="h-4 w-4" />}
-                    />
-
-                          {(transaction[config.fields.whtField.name] as boolean) && (
-                            <DocumentSection
-                              label={config.fileFields.wht.label}
-                              urls={(transaction[config.fileFields.wht.urlsField] as string[]) || []}
-                              onUpload={(file) => handleFileUploadWrapper(file, "wht")}
-                              onDelete={(url) => handleDeleteFileWrapper("wht", url)}
-                              isUploading={uploadingType === "wht"}
-                              icon={<FileText className="h-4 w-4" />}
-                            />
-                          )}
-
-                          <DocumentSection
-                            label="เอกสารอื่นๆ"
-                            urls={
-                              ((transaction.otherDocUrls as any[]) || []).map((item: any) => 
-                                typeof item === 'string' ? item : item.url
-                              ).filter(Boolean)
-                            }
-                            onUpload={(file) => handleFileUploadWrapper(file, "other")}
-                            onDelete={(url) => handleDeleteFileWrapper("other", url)}
-                            isUploading={uploadingType === "other"}
-                            icon={<FileText className="h-4 w-4" />}
-                          />
-                  </CardContent>
-
-                  {/* Meta Info */}
-                  <div className="px-6 py-4 border-t bg-muted/40 text-xs text-muted-foreground space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5" />
-                        สร้างโดย
-                      </span>
-                      <span className="font-medium text-foreground">
-                        {transaction.creator?.name || "-"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        วันที่สร้าง
-                      </span>
-                      <span>{new Date(transaction.createdAt).toLocaleDateString("th-TH")}</span>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* History */}
-                <CombinedHistorySection
-                  companyCode={companyCode}
-                  companyId={transaction.companyId}
-                  entityType={config.entityType}
-                  entityId={transaction.id}
-                  expenseId={config.type === "expense" ? transaction.id : undefined}
-                  incomeId={config.type === "income" ? transaction.id : undefined}
-                  refreshKey={auditRefreshKey}
-                />
-
-                {/* Comments */}
-                {currentUserId && (
-                  <Card className="shadow-sm border-border bg-card">
-                    <CardContent className="pt-6">
-                      <CommentSection
-                        companyCode={companyCode}
-                        entityType={config.type}
-                        entityId={transaction.id}
-                        currentUserId={currentUserId}
-                      />
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-          </div>
+          <ViewEditModeContent
+            config={config}
+            companyCode={companyCode}
+            mode={mode}
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            calculation={calculation}
+            watchAmount={watchAmount || 0}
+            watchVatRate={watchVatRate || 0}
+            watchIsWht={watchIsWht || false}
+            watchWhtRate={watchWhtRate}
+            watchWhtType={watchWhtType}
+            watchDocumentType={watchDocumentType}
+            transaction={transaction}
+            currencyConversion={currencyConversion}
+            setCurrencyConversion={setCurrencyConversion}
+            payers={payers}
+            setPayers={setPayers}
+            whtChangeInfo={whtChangeInfo}
+            handleWhtToggle={handleWhtToggle}
+            handleDocumentTypeChange={handleDocumentTypeChange}
+            setAccountSuggestion={setAccountSuggestion}
+            uploadingType={uploadingType}
+            handleFileUploadWrapper={handleFileUploadWrapper}
+            handleDeleteFileWrapper={handleDeleteFileWrapper}
+            auditRefreshKey={auditRefreshKey}
+            currentUserId={currentUserId}
+          />
         )}
       </form>
 
-      {/* Merge Options Dialog */}
-      {existingFormData && newAiData && (
-        <MergeOptionsDialog
-          open={showMergeDialog}
-          onOpenChange={setShowMergeDialog}
-          existingData={existingFormData}
-          newData={newAiData}
-          onDecision={handleMergeDecision}
-        />
-      )}
-
-      {/* Conflict Resolution Dialog */}
-      {pendingConflicts.length > 0 && (
-        <ConflictDialog
-          open={showConflictDialog}
-          onOpenChange={setShowConflictDialog}
-          conflicts={pendingConflicts}
-          onResolve={handleConflictResolution}
-        />
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบรายการ</AlertDialogTitle>
-            <AlertDialogDescription>
-              คุณต้องการลบรายการนี้ใช่หรือไม่? การลบสามารถกู้คืนได้โดยผู้ดูแลระบบ
-              <br />
-              {transaction && (
-                <span className="font-medium text-foreground">
-                  {(transaction[config.fields.descriptionField?.name || ""] as string) || config.title} -{" "}
-                  {formatCurrency(transaction[config.fields.netAmountField] as number)}
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  กำลังลบ...
-                </>
-              ) : (
-                "ลบรายการ"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      <TransactionDialogs
+        showDeleteConfirm={showDeleteConfirm}
+        onDeleteOpenChange={setShowDeleteConfirm}
+        onDeleteConfirm={handleDelete}
+        isDeleting={deleting}
+        deleteTitle={config.title}
+        deleteDescription={transaction ? (transaction[config.fields.descriptionField?.name || ""] as string) || config.title : undefined}
+        deleteAmount={transaction ? (transaction[config.fields.netAmountField] as number) : undefined}
+        showMergeDialog={showMergeDialog}
+        onMergeOpenChange={setShowMergeDialog}
+        existingData={existingFormData}
+        newData={newAiData}
+        onMergeDecision={handleMergeDecision}
+        showConflictDialog={showConflictDialog}
+        onConflictOpenChange={setShowConflictDialog}
+        conflicts={pendingConflicts}
+        onConflictResolve={handleConflictResolution}
+      />
+    </TransactionFormProvider>
   );
 }
 

@@ -71,7 +71,7 @@ export const GET = withCompanyAccessFromParams(
         
         // Use expense-level delivery method if set, otherwise fall back to contact's preference
         const expenseDeliveryMethod = expense.whtDeliveryMethod || expense.contact?.preferredDeliveryMethod || null;
-        const expenseDeliveryEmail = expense.whtDeliveryMethod === "email" 
+        const expenseDeliveryEmail = expense.whtDeliveryMethod === "EMAIL" 
           ? (expense.whtDeliveryEmail || expense.contact?.deliveryEmail || expense.contact?.email)
           : (expense.contact?.deliveryEmail || expense.contact?.email);
         const expenseDeliveryNotes = expense.whtDeliveryNotes || expense.contact?.deliveryNotes || null;

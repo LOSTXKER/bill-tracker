@@ -308,7 +308,7 @@ export default function WhtDeliveriesPage() {
                                 <span className="flex items-center gap-1">
                                   <Icon className="h-4 w-4" />
                                   {deliveryInfo.label}
-                                  {group.deliveryEmail && group.deliveryMethod === "email" && (
+                                  {group.deliveryEmail && group.deliveryMethod === "EMAIL" && (
                                     <span className="text-xs">({group.deliveryEmail})</span>
                                   )}
                                 </span>
@@ -381,7 +381,7 @@ export default function WhtDeliveriesPage() {
                                           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                             <Icon className="h-3 w-3" />
                                             <span>{expenseDeliveryInfo.label}</span>
-                                            {expense.whtDeliveryMethod === "email" && expense.whtDeliveryEmail && (
+                                            {expense.whtDeliveryMethod === "EMAIL" && expense.whtDeliveryEmail && (
                                               <span>({expense.whtDeliveryEmail})</span>
                                             )}
                                           </div>

@@ -45,7 +45,7 @@ export function useTransactionFileUpload({
     file: File,
     type: "slip" | "invoice" | "wht" | "other",
     currentUrls: Record<string, string[]>,
-    transactionData: any
+    transactionData: unknown
   ) => {
     setUploadingType(type);
     try {
@@ -82,7 +82,7 @@ export function useTransactionFileUpload({
       // Get the appropriate field name for this transaction type
       const fieldName = FILE_URL_FIELDS[transactionType][type];
       // Only send the file URL field - this allows users with change-status permission to upload
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, string[]> = {
         [fieldName]: [...(currentUrls[fieldName] || []), url],
       };
 
@@ -107,7 +107,7 @@ export function useTransactionFileUpload({
     type: "slip" | "invoice" | "wht" | "other",
     urlToDelete: string,
     currentUrls: Record<string, string[]>,
-    transactionData: any
+    transactionData: unknown
   ) => {
     if (!confirm("ต้องการลบไฟล์นี้หรือไม่?")) return;
 
@@ -117,7 +117,7 @@ export function useTransactionFileUpload({
         (url: string) => url !== urlToDelete
       );
       // Only send the file URL field - this allows users with change-status permission to delete
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, string[]> = {
         [fieldName]: updatedUrls,
       };
 

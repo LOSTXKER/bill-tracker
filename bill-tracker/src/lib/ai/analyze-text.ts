@@ -9,9 +9,55 @@
 
 import { prisma } from "@/lib/db";
 import { generateText } from "./gemini";
+import { parseAIJsonResponse } from "./utils/parse-ai-json";
 import { findBestMatchingContact } from "@/lib/utils/string-similarity";
 import { createLogger } from "@/lib/utils/logger";
-import type { ReceiptAnalysisResult } from "./types";
+import type {
+  AccountAlternative,
+  AnalyzedAccount,
+  ReceiptAnalysisResult,
+} from "./types";
+
+/** Shape of JSON returned by the text-analysis prompt (best-effort; validated at runtime). */
+interface TextAnalysisAIResponse {
+  vendor?: {
+    name?: string;
+    taxId?: string;
+    matchedContactId?: string;
+    matchedContactName?: string;
+  };
+  account?: {
+    id?: string;
+    code?: string;
+    name?: string;
+    confidence?: number;
+    reason?: string;
+  };
+  accountAlternatives?: Array<{
+    id?: string;
+    code?: string;
+    name?: string;
+    confidence?: number;
+    reason?: string;
+  }>;
+  date?: string | null;
+  amount?: number;
+  vatRate?: number | null;
+  vatAmount?: number;
+  wht?: { rate?: number | null; amount?: number | null; type?: string | null };
+  netAmount?: number;
+  invoiceNumber?: string | null;
+  currency?: string;
+  items?: unknown[];
+  description?: string;
+  confidence?: {
+    overall?: number;
+    vendor?: number;
+    amount?: number;
+    date?: number;
+    account?: number;
+  };
+}
 
 const log = createLogger("ai-text");
 
@@ -229,18 +275,13 @@ function parseAIResponse(
   contacts: { id: string; name: string; taxId: string | null }[],
   companyTaxId: string | null = null
 ): ReceiptAnalysisResult {
-  let jsonText = rawResponse.trim();
-
-  // ลบ markdown code blocks
-  if (jsonText.startsWith("```")) {
-    jsonText = jsonText.replace(/```json?\n?/g, "").replace(/```\n?$/g, "");
-  }
-
   try {
-    const parsed = JSON.parse(jsonText);
+    const parsed = parseAIJsonResponse(rawResponse) as TextAnalysisAIResponse;
 
     // Helper: Find account by ID, code, or name
-    const findAccount = (aiAccount: { id?: string; code?: string; name?: string } | null) => {
+    const findAccount = (
+      aiAccount: { id?: string; code?: string; name?: string } | null | undefined
+    ) => {
       if (!aiAccount) return null;
       
       if (aiAccount.id) {
@@ -266,7 +307,7 @@ function parseAIResponse(
     };
 
     // Validate account
-    let account: any = { id: null, code: null, name: null };
+    let account: AnalyzedAccount = { id: null, code: null, name: null };
     const matchedAccount = findAccount(parsed.account);
     
     if (matchedAccount) {
@@ -280,7 +321,7 @@ function parseAIResponse(
     }
 
     // Parse account alternatives
-    const accountAlternatives: any[] = [];
+    const accountAlternatives: AccountAlternative[] = [];
     if (parsed.accountAlternatives && Array.isArray(parsed.accountAlternatives)) {
       for (const alt of parsed.accountAlternatives) {
         const matchedAlt = findAccount(alt);
@@ -300,8 +341,9 @@ function parseAIResponse(
     let matchedContactId: string | null = null;
     let matchedContactName: string | null = null;
     
-    if (parsed.vendor?.matchedContactId) {
-      const matchedContact = contacts.find(c => c.id === parsed.vendor.matchedContactId);
+    const vendorMatchedId = parsed.vendor?.matchedContactId;
+    if (vendorMatchedId) {
+      const matchedContact = contacts.find(c => c.id === vendorMatchedId);
       if (matchedContact) {
         matchedContactId = matchedContact.id;
         matchedContactName = matchedContact.name;
@@ -347,7 +389,7 @@ function parseAIResponse(
     // Normalize VAT rate
     let vatRate = parsed.vatRate;
     if (vatRate !== 0 && vatRate !== 7 && vatRate !== null) {
-      vatRate = parsed.vatAmount > 0 ? 7 : 0;
+      vatRate = (parsed.vatAmount ?? 0) > 0 ? 7 : 0;
     }
 
     // Normalize currency
@@ -382,7 +424,9 @@ function parseAIResponse(
       accountAlternatives: accountAlternatives.slice(0, 2),
       documentType: "TEXT_INPUT",
       invoiceNumber: parsed.invoiceNumber || null,
-      items: Array.isArray(parsed.items) ? parsed.items : [],
+      items: Array.isArray(parsed.items)
+        ? parsed.items.map((item) => (typeof item === "string" ? item : String(item)))
+        : [],
       confidence: {
         overall: parsed.confidence?.overall || 0,
         vendor: parsed.confidence?.vendor || 0,

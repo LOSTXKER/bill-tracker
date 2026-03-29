@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
+import { Prisma, ExpenseWorkflowStatus } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { serializeExpenses } from "@/lib/utils/serializers";
@@ -168,6 +169,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   // Parse URL params
   const sortBy = (searchParams.sortBy as string) || "createdAt";
   const sortOrder = (searchParams.sortOrder as string) || "desc";
+  const sortDir = sortOrder as Prisma.SortOrder;
   const page = parseInt((searchParams.page as string) || "1");
   const limit = parseInt((searchParams.limit as string) || "20");
   const search = searchParams.search as string | undefined;
@@ -185,7 +187,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   // Filter: Only show regular expenses OR reimbursements that have been PAID
   // Official view: what we recorded in our books (by companyId)
   // Internal view: actual ownership (internalCompanyId or default to companyId if null)
-  const whereClause: any = viewMode === "internal"
+  const whereClause: Prisma.ExpenseWhereInput = viewMode === "internal"
     ? {
         // Internal view: Show expenses where this company is the "real" owner
         // Either explicitly set as internalCompanyId, or recorded by us with no internal company
@@ -229,9 +231,9 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
 
   if (status) {
     if (status.includes(",")) {
-      whereClause.workflowStatus = { in: status.split(",") };
+      whereClause.workflowStatus = { in: status.split(",") as ExpenseWorkflowStatus[] };
     } else {
-      whereClause.workflowStatus = status;
+      whereClause.workflowStatus = status as ExpenseWorkflowStatus;
     }
   }
 
@@ -248,10 +250,6 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     if (currentUserId) {
       whereClause.createdBy = currentUserId;
     }
-  }
-
-  if (category) {
-    whereClause.categoryId = category;
   }
 
   if (contact) {
@@ -273,23 +271,23 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   }
 
   // Build orderBy - always include secondary sort for consistency
-  const orderBy: any[] = [];
+  const orderBy: Prisma.ExpenseOrderByWithRelationInput[] = [];
   if (sortBy === "billDate") {
-    orderBy.push({ billDate: sortOrder });
+    orderBy.push({ billDate: sortDir });
     orderBy.push({ createdAt: "desc" }); // Secondary sort
   } else if (sortBy === "createdAt") {
-    orderBy.push({ createdAt: sortOrder });
+    orderBy.push({ createdAt: sortDir });
   } else if (sortBy === "amount") {
-    orderBy.push({ netPaid: sortOrder });
+    orderBy.push({ netPaid: sortDir });
     orderBy.push({ createdAt: "desc" });
   } else if (sortBy === "creator") {
-    orderBy.push({ User_Expense_createdByToUser: { name: sortOrder } });
+    orderBy.push({ User_Expense_createdByToUser: { name: sortDir } });
     orderBy.push({ createdAt: "desc" });
   } else if (sortBy === "contact") {
-    orderBy.push({ Contact: { name: sortOrder } });
+    orderBy.push({ Contact: { name: sortDir } });
     orderBy.push({ createdAt: "desc" });
   } else if (sortBy === "updatedAt") {
-    orderBy.push({ updatedAt: sortOrder });
+    orderBy.push({ updatedAt: sortDir });
   } else {
     orderBy.push({ billDate: "desc" });
     orderBy.push({ createdAt: "desc" });

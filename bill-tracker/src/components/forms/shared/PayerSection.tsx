@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
+import { fetcher } from "@/lib/utils/fetcher";
 
 // =============================================================================
 // Types
@@ -71,11 +72,17 @@ interface PettyCashFund {
   isActive: boolean;
 }
 
-// =============================================================================
-// Fetcher
-// =============================================================================
+type CompanyMembersSWRResponse = {
+  data: {
+    members: Member[];
+  };
+};
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+type PettyCashListSWRResponse = {
+  data: {
+    funds: PettyCashFund[];
+  };
+};
 
 // =============================================================================
 // Payer Type Options
@@ -120,19 +127,19 @@ export function PayerSection({
   const [isSharedPayment, setIsSharedPayment] = useState(payers.length > 1);
   
   // Fetch company members
-  const { data: membersData, isLoading: membersLoading } = useSWR(
+  const { data: membersData, isLoading: membersLoading } = useSWR<CompanyMembersSWRResponse>(
     companyCode ? `/api/companies/${companyCode}/members` : null,
     fetcher
   );
   
   // Fetch petty cash funds
-  const { data: fundsData, isLoading: fundsLoading } = useSWR(
+  const { data: fundsData, isLoading: fundsLoading } = useSWR<PettyCashListSWRResponse>(
     companyCode ? `/api/${companyCode}/petty-cash` : null,
     fetcher
   );
   
   const members: Member[] = membersData?.data?.members || [];
-  const pettyCashFunds: PettyCashFund[] = (fundsData?.funds || []).filter(
+  const pettyCashFunds: PettyCashFund[] = (fundsData?.data?.funds || []).filter(
     (f: PettyCashFund) => f.isActive
   );
 

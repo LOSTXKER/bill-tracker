@@ -3,6 +3,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { ApiErrors } from "@/lib/api/errors";
 import { createAuditLog } from "@/lib/audit/logger";
+import { ReconcileSessionStatus, ReconcileSessionType, ReconcileMatchStatus, ReconcileMatchType } from "@prisma/client";
 
 interface AccountingRowInput {
   date: string;
@@ -42,7 +43,7 @@ interface MatchInput {
 interface CreateSessionBody {
   month: number;
   year: number;
-  type: "expense" | "income";
+  type: ReconcileSessionType;
   sourceFileName?: string;
   sourceFileUrl?: string;
   notes?: string;
@@ -164,8 +165,18 @@ export const GET = withCompanyAccessFromParams(
     const month = searchParams.get("month")
       ? parseInt(searchParams.get("month")!)
       : undefined;
-    const type = searchParams.get("type") || undefined;
-    const status = searchParams.get("status") || undefined;
+    const typeParam = searchParams.get("type") || undefined;
+    const statusParam = searchParams.get("status") || undefined;
+
+    const validTypes = Object.values(ReconcileSessionType) as string[];
+    const type = typeParam && validTypes.includes(typeParam)
+      ? (typeParam as ReconcileSessionType)
+      : undefined;
+
+    const validStatuses = Object.values(ReconcileSessionStatus) as string[];
+    const status = statusParam && validStatuses.includes(statusParam)
+      ? (statusParam as ReconcileSessionStatus)
+      : undefined;
 
     const sessions = await prisma.reconcileSession.findMany({
       where: {
@@ -173,7 +184,7 @@ export const GET = withCompanyAccessFromParams(
         ...(year && { year }),
         ...(month && { month }),
         ...(type && { type }),
-        ...(status && { status: status as any }),
+        ...(status && { status }),
       },
       include: {
         _count: { select: { Matches: true, AccountingRows: true } },
@@ -200,7 +211,7 @@ function toMatchCreate(m: MatchInput, userId: string, userName: string) {
     acctBase: m.acctBase,
     acctVat: m.acctVat,
     acctTotal: m.acctTotal,
-    matchType: m.matchType,
+    matchType: m.matchType as ReconcileMatchType,
     confidence: m.confidence ?? null,
     aiReason: m.aiReason || null,
     amountDiff: m.amountDiff ?? null,
@@ -208,7 +219,7 @@ function toMatchCreate(m: MatchInput, userId: string, userName: string) {
     isPayOnBehalf: m.isPayOnBehalf ?? false,
     payOnBehalfFrom: m.payOnBehalfFrom || null,
     payOnBehalfTo: m.payOnBehalfTo || null,
-    status: m.status ?? "pending",
+    status: (m.status as ReconcileMatchStatus) ?? ReconcileMatchStatus.PENDING,
     matchedBy: userId,
     matchedByName: userName,
     skipped: m.skipped ?? false,
