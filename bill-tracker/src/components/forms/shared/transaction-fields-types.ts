@@ -18,6 +18,25 @@ export interface TransactionFieldsConfig {
   showDueDate?: boolean;
 }
 
+/**
+ * Build TransactionFieldsConfig from a UnifiedTransactionConfig.
+ * Shared by CreateModeContent and ViewEditModeContent.
+ */
+export function buildFieldsConfig(config: {
+  type: "expense" | "income";
+  fields: { dateField: { name: string; label: string }; descriptionField?: { name: string; label: string; placeholder: string } };
+  statusOptions: TransactionFieldsConfig["statusOptions"];
+  showDueDate?: boolean;
+}): TransactionFieldsConfig {
+  return {
+    type: config.type,
+    dateField: config.fields.dateField,
+    descriptionField: config.fields.descriptionField,
+    statusOptions: config.statusOptions,
+    showDueDate: config.showDueDate,
+  };
+}
+
 export type FormRegister = (name: string) => Record<string, unknown>;
 export type FormWatch = (name?: string) => unknown;
 export type FormSetValue = (name: string, value: unknown) => void;

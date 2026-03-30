@@ -63,6 +63,23 @@ export interface UseTransactionSubmissionProps {
   setSelectedContact: (contact: ContactSummary | null) => void;
 }
 
+function validateExpenseFields(
+  documentType: unknown,
+  taxInvoiceRequestMethod: string | null | undefined,
+  isWht: unknown,
+  whtDeliveryMethod: string | null | undefined,
+): string[] {
+  const errors: string[] = [];
+  if (documentType !== "NO_DOCUMENT" && !taxInvoiceRequestMethod) {
+    const docLabel = documentType === "CASH_RECEIPT" ? "บิลเงินสด" : "ใบกำกับภาษี";
+    errors.push(`กรุณาระบุช่องทางขอ${docLabel}`);
+  }
+  if (isWht && !whtDeliveryMethod) {
+    errors.push("กรุณาระบุวิธีส่งเอกสาร 50 ทวิ");
+  }
+  return errors;
+}
+
 export function useTransactionSubmission({
   config,
   companyCode,
@@ -114,6 +131,10 @@ export function useTransactionSubmission({
     }
     if (!data.amount || (data.amount as number) <= 0) {
       validationErrors.push("กรุณาระบุจำนวนเงิน");
+    }
+
+    if (config.type === "expense") {
+      validationErrors.push(...validateExpenseFields(data.documentType, taxInvoiceRequestMethod, data.isWht, whtDeliveryMethod));
     }
 
     // Validate payers for expense (บังคับระบุผู้จ่าย)
@@ -225,6 +246,15 @@ export function useTransactionSubmission({
       setSaving(true);
       const formData = watch();
       const whtEnabled = formData[config.fields.whtField.name] as boolean;
+
+      if (config.type === "expense") {
+        const saveErrors = validateExpenseFields(formData.documentType, taxInvoiceRequestMethod, whtEnabled, whtDeliveryMethod);
+        if (saveErrors.length > 0) {
+          toast.error(saveErrors.join(", "));
+          setSaving(false);
+          return;
+        }
+      }
       const calc = config.calculateTotals(
         Number(formData.amount) || 0,
         Number(formData.vatRate) || 0,

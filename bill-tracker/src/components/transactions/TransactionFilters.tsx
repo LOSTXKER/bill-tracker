@@ -21,10 +21,8 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import { 
-  EXPENSE_STATUS_LABELS, 
-  INCOME_STATUS_LABELS,
-  EXPENSE_WORKFLOW_INFO,
-  INCOME_WORKFLOW_INFO 
+  WORKFLOW_STATUS_LABELS,
+  WORKFLOW_STATUS_INFO,
 } from "@/lib/constants/transaction";
 
 interface TransactionFiltersProps {
@@ -95,7 +93,7 @@ export function TransactionFilters({
   };
 
   const getFilterLabel = (key: string, value: string) => {
-    const statusLabels = type === "expense" ? EXPENSE_STATUS_LABELS : INCOME_STATUS_LABELS;
+    const statusLabels = WORKFLOW_STATUS_LABELS;
     
     switch (key) {
       case "status":
@@ -317,7 +315,7 @@ export function TransactionFilters({
             {displayFilters.map(({ key, value }) => {
               // For status filter, render individual colored badges
               if (key === "status") {
-                const workflowInfo = type === "expense" ? EXPENSE_WORKFLOW_INFO : INCOME_WORKFLOW_INFO;
+                const workflowInfo = WORKFLOW_STATUS_INFO;
                 const statusList = value.includes(",") ? value.split(",") : [value];
                 
                 const removeStatus = (statusToRemove: string) => {

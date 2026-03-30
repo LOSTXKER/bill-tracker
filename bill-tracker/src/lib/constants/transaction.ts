@@ -79,20 +79,18 @@ export const VAT_OPTIONS = [
 export const WHT_LOCKED_STATUSES = ["SENT_TO_ACCOUNTANT", "COMPLETED"] as const;
 
 /**
- * สถานะที่ต้อง confirm ก่อนเปลี่ยน WHT
- * แยกตาม transaction type เนื่องจาก workflow ต่างกัน
+ * สถานะที่ต้อง confirm ก่อนเปลี่ยน WHT (ใช้ macro statuses)
  */
 export const WHT_CONFIRM_REQUIRED_STATUSES = {
-  expense: ["WHT_ISSUED", "READY_FOR_ACCOUNTING"] as const,
-  income: ["WHT_CERT_RECEIVED", "READY_FOR_ACCOUNTING"] as const,
+  expense: ["ACTIVE", "READY_FOR_ACCOUNTING"] as const,
+  income: ["ACTIVE", "READY_FOR_ACCOUNTING"] as const,
 } as const;
 
 /**
  * Combined WHT confirm statuses (for components that check both types)
  */
 export const WHT_CONFIRM_STATUSES_ALL = [
-  "WHT_ISSUED",
-  "WHT_CERT_RECEIVED", 
+  "ACTIVE",
   "READY_FOR_ACCOUNTING",
 ] as const;
 
@@ -111,80 +109,43 @@ export interface StatusInfo {
 }
 
 // =============================================================================
-// Expense Workflow Status Configuration
+// Unified Workflow Status Configuration (Macro Statuses)
 // =============================================================================
 
-export const EXPENSE_WORKFLOW_FLOW = [
+export const WORKFLOW_STATUS_FLOW = [
   "DRAFT",
-  "PAID",
-  "TAX_INVOICE_RECEIVED",
-  "WHT_ISSUED",  // ถ้ามี WHT
-  "WHT_SENT_TO_VENDOR",  // ส่งใบหัก ณ ที่จ่ายให้ vendor แล้ว
+  "PENDING_APPROVAL",
+  "ACTIVE",
   "READY_FOR_ACCOUNTING",
   "SENT_TO_ACCOUNTANT",
+  "COMPLETED",
 ] as const;
 
-export const EXPENSE_WORKFLOW_FLOW_NO_WHT = [
-  "DRAFT",
-  "PAID",
-  "TAX_INVOICE_RECEIVED",
-  "READY_FOR_ACCOUNTING",
-  "SENT_TO_ACCOUNTANT",
-] as const;
-
-export const EXPENSE_WORKFLOW_INFO: Record<string, StatusInfo> = {
+export const WORKFLOW_STATUS_INFO: Record<string, StatusInfo> = {
   DRAFT: {
     label: "ร่าง",
-    description: "รายการร่าง ยังไม่จ่ายเงิน",
+    description: "รายการร่าง ยังไม่ส่ง",
     color: "text-slate-600",
     bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
     dotColor: "bg-slate-400",
   },
-  PAID: {
-    label: "จ่ายเงินแล้ว",
-    description: "จ่ายเงินแล้ว รอใบกำกับภาษี",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
-    dotColor: "bg-blue-500",
-  },
-  WAITING_TAX_INVOICE: {
-    label: "รอเอกสาร",
-    description: "รอเอกสารจากร้านค้า",
-    color: "text-orange-600",
-    bgColor: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900",
-    dotColor: "bg-orange-500",
-  },
-  TAX_INVOICE_RECEIVED: {
-    label: "ได้เอกสารแล้ว",
-    description: "ได้รับเอกสารแล้ว",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
-  },
-  WHT_PENDING_ISSUE: {
-    label: "รอออก 50 ทวิ",
-    description: "รอออกใบหัก ณ ที่จ่ายให้ vendor",
+  PENDING_APPROVAL: {
+    label: "รออนุมัติ",
+    description: "ส่งแล้ว รอคนอนุมัติ",
     color: "text-amber-600",
     bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
     dotColor: "bg-amber-500",
   },
-  WHT_ISSUED: {
-    label: "ออก 50 ทวิแล้ว",
-    description: "ออกใบหัก ณ ที่จ่ายแล้ว",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-900",
-    dotColor: "bg-purple-500",
-  },
-  WHT_SENT_TO_VENDOR: {
-    label: "ส่ง 50 ทวิแล้ว",
-    description: "ส่งใบหัก ณ ที่จ่ายให้ vendor แล้ว",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
+  ACTIVE: {
+    label: "ดำเนินการ",
+    description: "จ่ายเงิน/รับเงินแล้ว กำลังจัดการเอกสาร",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
+    dotColor: "bg-blue-500",
   },
   READY_FOR_ACCOUNTING: {
-    label: "รอส่งบัญชี",
-    description: "เอกสารครบ รอส่งบัญชี",
+    label: "พร้อมส่งบัญชี",
+    description: "เอกสารครบ พร้อมส่งบัญชี",
     color: "text-indigo-600",
     bgColor: "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-900",
     dotColor: "bg-indigo-500",
@@ -205,106 +166,13 @@ export const EXPENSE_WORKFLOW_INFO: Record<string, StatusInfo> = {
   },
 };
 
-// =============================================================================
-// Income Workflow Status Configuration
-// =============================================================================
-
-export const INCOME_WORKFLOW_FLOW = [
-  "DRAFT",
-  "RECEIVED",
-  "INVOICE_ISSUED",
-  "WHT_CERT_RECEIVED",  // ถ้าลูกค้าหักภาษี
-  "READY_FOR_ACCOUNTING",
-  "SENT_TO_ACCOUNTANT",
-] as const;
-
-export const INCOME_WORKFLOW_FLOW_NO_WHT = [
-  "DRAFT",
-  "RECEIVED",
-  "INVOICE_ISSUED",
-  "READY_FOR_ACCOUNTING",
-  "SENT_TO_ACCOUNTANT",
-] as const;
-
-export const INCOME_WORKFLOW_INFO: Record<string, StatusInfo> = {
-  DRAFT: {
-    label: "ร่าง",
-    description: "รายการร่าง ยังไม่รับเงิน",
-    color: "text-slate-600",
-    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
-    dotColor: "bg-slate-400",
-  },
-  RECEIVED: {
-    label: "รับเงินแล้ว",
-    description: "รับเงินจากลูกค้าแล้ว",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-900",
-    dotColor: "bg-blue-500",
-  },
-  NO_INVOICE_NEEDED: {
-    label: "ไม่ต้องออกบิล",
-    description: "ไม่ต้องออกใบกำกับภาษี",
-    color: "text-slate-600",
-    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800",
-    dotColor: "bg-slate-400",
-  },
-  WAITING_INVOICE_ISSUE: {
-    label: "รอออกบิล",
-    description: "รอออกใบกำกับภาษีให้ลูกค้า",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
-    dotColor: "bg-amber-500",
-  },
-  INVOICE_ISSUED: {
-    label: "ออกบิลแล้ว",
-    description: "ออกใบกำกับภาษีให้ลูกค้าแล้ว",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
-  },
-  INVOICE_SENT: {
-    label: "ส่งบิลแล้ว",
-    description: "ส่งใบกำกับภาษีให้ลูกค้าแล้ว",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
-  },
-  WHT_PENDING_CERT: {
-    label: "รอใบ 50 ทวิ",
-    description: "รอใบหัก ณ ที่จ่ายจากลูกค้า",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900",
-    dotColor: "bg-amber-500",
-  },
-  WHT_CERT_RECEIVED: {
-    label: "ได้ใบ 50 ทวิ",
-    description: "ได้รับใบหัก ณ ที่จ่ายจากลูกค้าแล้ว",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-900",
-    dotColor: "bg-purple-500",
-  },
-  READY_FOR_ACCOUNTING: {
-    label: "รอส่งบัญชี",
-    description: "เอกสารครบ รอส่งบัญชี",
-    color: "text-indigo-600",
-    bgColor: "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-900",
-    dotColor: "bg-indigo-500",
-  },
-  SENT_TO_ACCOUNTANT: {
-    label: "ส่งบัญชีแล้ว",
-    description: "ส่งให้บัญชีแล้ว",
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900",
-    dotColor: "bg-emerald-500",
-  },
-  COMPLETED: {
-    label: "เสร็จสิ้น",
-    description: "ดำเนินการเสร็จสิ้น",
-    color: "text-emerald-700",
-    bgColor: "bg-emerald-100 border-emerald-300 dark:bg-emerald-950/50 dark:border-emerald-800",
-    dotColor: "bg-emerald-600",
-  },
-};
+// Legacy aliases for backward compatibility during transition
+export const EXPENSE_WORKFLOW_INFO = WORKFLOW_STATUS_INFO;
+export const INCOME_WORKFLOW_INFO = WORKFLOW_STATUS_INFO;
+export const EXPENSE_WORKFLOW_FLOW = WORKFLOW_STATUS_FLOW;
+export const INCOME_WORKFLOW_FLOW = WORKFLOW_STATUS_FLOW;
+export const EXPENSE_WORKFLOW_FLOW_NO_WHT = WORKFLOW_STATUS_FLOW;
+export const INCOME_WORKFLOW_FLOW_NO_WHT = WORKFLOW_STATUS_FLOW;
 
 // =============================================================================
 // Reimbursement Status Configuration
@@ -360,34 +228,19 @@ export const REIMBURSEMENT_STATUS_INFO: Record<string, StatusInfo> = {
 // Status Labels for StatusBadge component (consolidated)
 // =============================================================================
 
-// Expense Status Labels (Workflow)
-export const EXPENSE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+// Unified Workflow Status Labels (shared by expense and income)
+export const WORKFLOW_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   DRAFT: { label: "ร่าง", color: "gray" },
-  PAID: { label: "จ่ายเงินแล้ว", color: "blue" },
-  WAITING_TAX_INVOICE: { label: "รอใบกำกับ", color: "orange" },
-  TAX_INVOICE_RECEIVED: { label: "ได้ใบกำกับแล้ว", color: "green" },
-  WHT_PENDING_ISSUE: { label: "รอออก 50 ทวิ", color: "amber" },
-  WHT_ISSUED: { label: "ออก 50 ทวิแล้ว", color: "purple" },
-  WHT_SENT_TO_VENDOR: { label: "ส่ง 50 ทวิแล้ว", color: "green" },
-  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "indigo" },
+  PENDING_APPROVAL: { label: "รออนุมัติ", color: "amber" },
+  ACTIVE: { label: "ดำเนินการ", color: "blue" },
+  READY_FOR_ACCOUNTING: { label: "พร้อมส่งบัญชี", color: "indigo" },
   SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "green" },
   COMPLETED: { label: "เสร็จสิ้น", color: "green" },
 };
 
-// Income Status Labels (Workflow)
-export const INCOME_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: "ร่าง", color: "gray" },
-  RECEIVED: { label: "รับเงินแล้ว", color: "blue" },
-  NO_INVOICE_NEEDED: { label: "ไม่ต้องออกบิล", color: "gray" },
-  WAITING_INVOICE_ISSUE: { label: "รอออกบิล", color: "amber" },
-  INVOICE_ISSUED: { label: "ออกบิลแล้ว", color: "green" },
-  INVOICE_SENT: { label: "ส่งบิลแล้ว", color: "green" },
-  WHT_PENDING_CERT: { label: "รอใบ 50 ทวิ", color: "amber" },
-  WHT_CERT_RECEIVED: { label: "ได้ใบ 50 ทวิ", color: "purple" },
-  READY_FOR_ACCOUNTING: { label: "รอส่งบัญชี", color: "indigo" },
-  SENT_TO_ACCOUNTANT: { label: "ส่งบัญชีแล้ว", color: "green" },
-  COMPLETED: { label: "เสร็จสิ้น", color: "green" },
-};
+// Legacy aliases
+export const EXPENSE_STATUS_LABELS = WORKFLOW_STATUS_LABELS;
+export const INCOME_STATUS_LABELS = WORKFLOW_STATUS_LABELS;
 
 // Reimbursement Status Labels
 export const REIMBURSEMENT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -494,46 +347,14 @@ export const EXPENSE_DOCUMENT_TYPE_LABELS: Record<string, string> = {
   NO_DOCUMENT: "ไม่มีเอกสาร",
 };
 
-// Dynamic labels based on document type
-export const EXPENSE_WORKFLOW_LABELS_BY_DOC_TYPE: Record<string, Record<string, string>> = {
-  TAX_INVOICE: {
-    WAITING_TAX_INVOICE: "รอใบกำกับ",
-    TAX_INVOICE_RECEIVED: "ได้ใบกำกับแล้ว",
-  },
-  CASH_RECEIPT: {
-    WAITING_TAX_INVOICE: "รอบิลเงินสด",
-    TAX_INVOICE_RECEIVED: "ได้บิลเงินสดแล้ว",
-  },
-  NO_DOCUMENT: {
-    // No document steps - skip directly to READY_FOR_ACCOUNTING
-  },
-};
-
-// Helper function to get workflow label based on document type
+// Helper function to get workflow label (now uses unified labels)
 export function getExpenseWorkflowLabel(
   status: string,
-  documentType: string = "TAX_INVOICE"
+  _documentType: string = "TAX_INVOICE"
 ): string {
-  // Check if there's a document-type specific label
-  const docTypeLabels = EXPENSE_WORKFLOW_LABELS_BY_DOC_TYPE[documentType];
-  if (docTypeLabels && docTypeLabels[status]) {
-    return docTypeLabels[status];
-  }
-  // Fall back to default labels
-  return EXPENSE_WORKFLOW_INFO[status]?.label || status;
+  return WORKFLOW_STATUS_INFO[status]?.label || status;
 }
 
-// Workflow flows based on document type
-export const EXPENSE_WORKFLOW_FLOW_NO_DOC = [
-  "DRAFT",
-  "READY_FOR_ACCOUNTING",
-  "SENT_TO_ACCOUNTANT",
-] as const;
-
-export const EXPENSE_WORKFLOW_FLOW_CASH_RECEIPT = [
-  "DRAFT",
-  "WAITING_TAX_INVOICE",  // Shows as "รอบิลเงินสด"
-  "TAX_INVOICE_RECEIVED", // Shows as "ได้บิลเงินสดแล้ว"
-  "READY_FOR_ACCOUNTING",
-  "SENT_TO_ACCOUNTANT",
-] as const;
+// All document-type specific flows now use the same macro statuses
+export const EXPENSE_WORKFLOW_FLOW_NO_DOC = WORKFLOW_STATUS_FLOW;
+export const EXPENSE_WORKFLOW_FLOW_CASH_RECEIPT = WORKFLOW_STATUS_FLOW;

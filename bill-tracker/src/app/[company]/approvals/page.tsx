@@ -76,21 +76,21 @@ async function ApprovalStats({ companyCode }: { companyCode: string }) {
     prisma.expense.count({
       where: {
         companyId,
-        approvalStatus: "PENDING",
+        workflowStatus: "PENDING_APPROVAL",
         deletedAt: null,
       },
     }),
     prisma.income.count({
       where: {
         companyId,
-        approvalStatus: "PENDING",
+        workflowStatus: "PENDING_APPROVAL",
         deletedAt: null,
       },
     }),
     prisma.expense.findFirst({
       where: {
         companyId,
-        approvalStatus: "PENDING",
+        workflowStatus: "PENDING_APPROVAL",
         deletedAt: null,
       },
       orderBy: { submittedAt: "asc" },
@@ -99,7 +99,7 @@ async function ApprovalStats({ companyCode }: { companyCode: string }) {
     prisma.income.findFirst({
       where: {
         companyId,
-        approvalStatus: "PENDING",
+        workflowStatus: "PENDING_APPROVAL",
         deletedAt: null,
       },
       orderBy: { submittedAt: "asc" },
@@ -180,7 +180,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
       prisma.expense.findMany({
         where: {
           companyId,
-          approvalStatus: "PENDING",
+          workflowStatus: "PENDING_APPROVAL",
           deletedAt: null,
         },
         orderBy: { submittedAt: sortOrder as "asc" | "desc" },
@@ -200,7 +200,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
       prisma.expense.count({
         where: {
           companyId,
-          approvalStatus: "PENDING",
+          workflowStatus: "PENDING_APPROVAL",
           deletedAt: null,
         },
       }),
@@ -225,7 +225,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
       prisma.income.findMany({
         where: {
           companyId,
-          approvalStatus: "PENDING",
+          workflowStatus: "PENDING_APPROVAL",
           deletedAt: null,
         },
         orderBy: { submittedAt: sortOrder as "asc" | "desc" },
@@ -242,7 +242,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
       prisma.income.count({
         where: {
           companyId,
-          approvalStatus: "PENDING",
+          workflowStatus: "PENDING_APPROVAL",
           deletedAt: null,
         },
       }),

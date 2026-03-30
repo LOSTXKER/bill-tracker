@@ -101,7 +101,7 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
         return apiResponse.forbidden(`คุณไม่มีสิทธิ์อนุมัติ${config.displayName}`);
       }
 
-      if (entity.approvalStatus !== "PENDING") {
+      if (entity.workflowStatus !== "PENDING_APPROVAL" && entity.approvalStatus !== "PENDING") {
         return apiResponse.badRequest("สามารถอนุมัติได้เฉพาะรายการที่รออนุมัติเท่านั้น");
       }
 
@@ -112,6 +112,7 @@ export function createTransactionApproveHandler(type: "expense" | "income") {
       const updated = await model.update({
         where: { id },
         data: {
+          workflowStatus: "ACTIVE",
           approvalStatus: "APPROVED",
           approvedBy: session.user.id,
           approvedAt: new Date(),
@@ -247,6 +248,7 @@ export function createTransactionRejectHandler(type: "expense" | "income") {
       const updated = await model.update({
         where: { id },
         data: {
+          workflowStatus: "DRAFT",
           approvalStatus: "REJECTED",
           rejectedReason: reason.trim(),
           approvedBy: session.user.id,

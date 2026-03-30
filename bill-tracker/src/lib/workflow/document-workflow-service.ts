@@ -2,10 +2,11 @@ import { prisma } from "@/lib/db";
 import type { Expense, Income, Contact } from "@prisma/client";
 import {
   DocumentEventType,
-  ExpenseWorkflowStatus,
-  IncomeWorkflowStatus,
+  WorkflowStatus,
   Prisma,
 } from "@prisma/client";
+import { REVERT_MAP } from "./status-rules";
+import { checkPermissionFromAccess } from "@/lib/permissions/checker";
 
 type ExpenseWithContact = Expense & { Contact: Contact | null; contact: Contact | null };
 type IncomeWithContact = Income & { Contact: Contact | null; contact: Contact | null };
@@ -55,8 +56,9 @@ export async function getWorkflowPendingItems(
       where: {
         companyId,
         deletedAt: null,
-        workflowStatus: { in: ["PAID", "WAITING_TAX_INVOICE"] },
+        workflowStatus: "ACTIVE",
         hasTaxInvoice: false,
+        documentType: { not: "NO_DOCUMENT" },
       },
       include: { Contact: true },
       orderBy: { billDate: "desc" },
@@ -72,7 +74,7 @@ export async function getWorkflowPendingItems(
         companyId,
         deletedAt: null,
         isWht: true,
-        workflowStatus: { in: ["TAX_INVOICE_RECEIVED", "WHT_PENDING_ISSUE"] },
+        workflowStatus: "ACTIVE",
         hasWhtCert: false,
       },
       include: { Contact: true },
@@ -115,7 +117,7 @@ export async function getWorkflowPendingItems(
         companyId,
         deletedAt: null,
         isWhtDeducted: true,
-        workflowStatus: "WHT_PENDING_CERT",
+        workflowStatus: "ACTIVE",
         hasWhtCert: false,
       },
       include: { Contact: true },
@@ -172,58 +174,95 @@ export interface WorkflowActionParams {
   targetStatus?: string;
 }
 
-async function checkRevertPermission(userId: string, companyId: string) {
+async function checkRevertPermission(
+  userId: string,
+  companyId: string,
+  transactionType: string,
+) {
   const access = await prisma.companyAccess.findUnique({
     where: { userId_companyId: { userId, companyId } },
   });
-  if (!access?.isOwner) {
-    throw new WorkflowError(
-      "เฉพาะ Owner เท่านั้นที่สามารถย้อนสถานะได้",
-      "FORBIDDEN"
-    );
+  if (!access) {
+    throw new WorkflowError("ไม่มีสิทธิ์เข้าถึง", "FORBIDDEN");
   }
+
+  const requiredPerm = transactionType === "expense"
+    ? "expenses:change-status"
+    : "incomes:change-status";
+
+  if (checkPermissionFromAccess(access, requiredPerm)) return;
+
+  throw new WorkflowError(
+    "คุณไม่มีสิทธิ์ย้อนสถานะ",
+    "FORBIDDEN"
+  );
 }
 
 function resolveExpenseAction(
   action: string,
-  expense: { isWht: boolean; workflowStatus: string },
+  expense: { isWht: boolean; workflowStatus: string; documentType: string; hasTaxInvoice: boolean; hasWhtCert: boolean; whtCertSentAt: Date | null },
   targetStatus: string | undefined,
   now: Date
 ): {
   updateData: Record<string, unknown>;
-  newStatus: ExpenseWorkflowStatus | null;
+  newStatus: WorkflowStatus | null;
   eventType: DocumentEventType | null;
 } {
   const updateData: Record<string, unknown> = {};
-  let newStatus: ExpenseWorkflowStatus | null = null;
+  let newStatus: WorkflowStatus | null = null;
   let eventType: DocumentEventType | null = null;
 
   switch (action) {
-    case "receive_tax_invoice":
+    case "mark_tax_invoice_requested": {
+      updateData.taxInvoiceRequestedAt = now;
+      eventType = "TAX_INVOICE_REQUESTED";
+      break;
+    }
+    case "cancel_tax_invoice_request": {
+      updateData.taxInvoiceRequestedAt = null;
+      eventType = "TAX_INVOICE_REQUESTED";
+      break;
+    }
+    case "receive_tax_invoice": {
       updateData.hasTaxInvoice = true;
       updateData.taxInvoiceAt = now;
-      newStatus = expense.isWht ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
       eventType = "TAX_INVOICE_RECEIVED";
       break;
+    }
     case "skip_to_wht":
-      newStatus = "WHT_PENDING_ISSUE";
+    case "skip_to_accounting": {
       eventType = "STATUS_CHANGED";
       break;
-    case "skip_to_accounting":
-      newStatus = "READY_FOR_ACCOUNTING";
-      eventType = "STATUS_CHANGED";
-      break;
-    case "issue_wht":
+    }
+    case "issue_wht": {
       updateData.hasWhtCert = true;
       updateData.whtCertIssuedAt = now;
-      newStatus = "WHT_ISSUED";
       eventType = "WHT_CERT_ISSUED";
       break;
-    case "send_wht":
+    }
+    case "send_wht": {
       updateData.whtCertSentAt = now;
-      newStatus = "WHT_SENT_TO_VENDOR";
       eventType = "WHT_CERT_SENT";
       break;
+    }
+    case "undo_receive_tax_invoice": {
+      updateData.hasTaxInvoice = false;
+      updateData.taxInvoiceAt = null;
+      eventType = "STATUS_CHANGED";
+      break;
+    }
+    case "undo_issue_wht": {
+      updateData.hasWhtCert = false;
+      updateData.whtCertIssuedAt = null;
+      updateData.whtCertSentAt = null;
+      eventType = "STATUS_CHANGED";
+      break;
+    }
+    case "undo_send_wht": {
+      updateData.whtCertSentAt = null;
+      eventType = "STATUS_CHANGED";
+      break;
+    }
     case "send_to_accounting":
       updateData.sentToAccountAt = now;
       newStatus = "SENT_TO_ACCOUNTANT";
@@ -235,7 +274,7 @@ function resolveExpenseAction(
       eventType = "STATUS_CHANGED";
       break;
     case "revert":
-      newStatus = targetStatus as ExpenseWorkflowStatus;
+      newStatus = targetStatus as WorkflowStatus;
       eventType = "STATUS_CHANGED";
       break;
     default:
@@ -248,43 +287,59 @@ function resolveExpenseAction(
 
 function resolveIncomeAction(
   action: string,
-  income: { isWhtDeducted: boolean; workflowStatus: string },
+  income: { isWhtDeducted: boolean; workflowStatus: string; hasInvoice: boolean; invoiceSentAt: Date | null; hasWhtCert: boolean },
   targetStatus: string | undefined,
   now: Date
 ): {
   updateData: Record<string, unknown>;
-  newStatus: IncomeWorkflowStatus | null;
+  newStatus: WorkflowStatus | null;
   eventType: DocumentEventType | null;
 } {
   const updateData: Record<string, unknown> = {};
-  let newStatus: IncomeWorkflowStatus | null = null;
+  let newStatus: WorkflowStatus | null = null;
   let eventType: DocumentEventType | null = null;
 
   switch (action) {
-    case "issue_invoice":
+    case "issue_invoice": {
       updateData.hasInvoice = true;
       updateData.invoiceIssuedAt = now;
-      newStatus = "INVOICE_ISSUED";
       eventType = "INVOICE_ISSUED";
       break;
-    case "send_invoice":
+    }
+    case "send_invoice": {
       updateData.invoiceSentAt = now;
-      newStatus = income.isWhtDeducted
-        ? "WHT_PENDING_CERT"
-        : "READY_FOR_ACCOUNTING";
       eventType = "INVOICE_SENT";
       break;
-    case "receive_wht":
+    }
+    case "receive_wht": {
       updateData.hasWhtCert = true;
       updateData.whtCertReceivedAt = now;
-      newStatus = "READY_FOR_ACCOUNTING";
       eventType = "WHT_CERT_RECEIVED";
       break;
+    }
     case "remind_wht":
       updateData.whtCertRemindedAt = now;
       updateData.whtCertRemindCount = { increment: 1 };
       eventType = "WHT_REMINDER_SENT";
       break;
+    case "undo_issue_invoice": {
+      updateData.hasInvoice = false;
+      updateData.invoiceIssuedAt = null;
+      updateData.invoiceSentAt = null;
+      eventType = "STATUS_CHANGED";
+      break;
+    }
+    case "undo_send_invoice": {
+      updateData.invoiceSentAt = null;
+      eventType = "STATUS_CHANGED";
+      break;
+    }
+    case "undo_receive_wht": {
+      updateData.hasWhtCert = false;
+      updateData.whtCertReceivedAt = null;
+      eventType = "STATUS_CHANGED";
+      break;
+    }
     case "send_to_accounting":
       updateData.sentToAccountAt = now;
       newStatus = "SENT_TO_ACCOUNTANT";
@@ -296,7 +351,7 @@ function resolveIncomeAction(
       eventType = "STATUS_CHANGED";
       break;
     case "revert":
-      newStatus = targetStatus as IncomeWorkflowStatus;
+      newStatus = targetStatus as WorkflowStatus;
       eventType = "STATUS_CHANGED";
       break;
     default:
@@ -322,7 +377,7 @@ export async function executeWorkflowAction(
   } = params;
 
   if (action === "revert") {
-    await checkRevertPermission(userId, companyId);
+    await checkRevertPermission(userId, companyId, transactionType);
     if (!targetStatus) {
       throw new WorkflowError(
         "targetStatus is required for revert action",
@@ -339,6 +394,16 @@ export async function executeWorkflowAction(
     });
     if (!expense || expense.companyId !== companyId) {
       throw new WorkflowError("Expense not found", "NOT_FOUND");
+    }
+
+    if (action === "revert") {
+      const allowed = REVERT_MAP[expense.workflowStatus];
+      if (!allowed || allowed !== targetStatus) {
+        throw new WorkflowError(
+          `ไม่สามารถย้อนจาก ${expense.workflowStatus} ไป ${targetStatus} ได้`,
+          "BAD_REQUEST"
+        );
+      }
     }
 
     const { updateData, newStatus, eventType } = resolveExpenseAction(
@@ -378,6 +443,16 @@ export async function executeWorkflowAction(
     });
     if (!income || income.companyId !== companyId) {
       throw new WorkflowError("Income not found", "NOT_FOUND");
+    }
+
+    if (action === "revert") {
+      const allowed = REVERT_MAP[income.workflowStatus];
+      if (!allowed || allowed !== targetStatus) {
+        throw new WorkflowError(
+          `ไม่สามารถย้อนจาก ${income.workflowStatus} ไป ${targetStatus} ได้`,
+          "BAD_REQUEST"
+        );
+      }
     }
 
     const { updateData, newStatus, eventType } = resolveIncomeAction(

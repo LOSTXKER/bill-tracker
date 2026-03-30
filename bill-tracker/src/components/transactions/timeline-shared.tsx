@@ -12,10 +12,7 @@ import {
   AlertCircle,
   Bell,
 } from "lucide-react";
-import {
-  EXPENSE_WORKFLOW_INFO,
-  INCOME_WORKFLOW_INFO,
-} from "@/lib/constants/transaction";
+import { WORKFLOW_STATUS_INFO } from "@/lib/constants/transaction";
 
 export interface TimelineEvent {
   id: string;
@@ -32,11 +29,8 @@ export interface TimelineEvent {
   };
 }
 
-export const getStatusLabel = (status: string, isExpense: boolean) => {
-  const info = isExpense
-    ? EXPENSE_WORKFLOW_INFO[status as keyof typeof EXPENSE_WORKFLOW_INFO]
-    : INCOME_WORKFLOW_INFO[status as keyof typeof INCOME_WORKFLOW_INFO];
-  return info?.label || status;
+export const getStatusLabel = (status: string, _isExpense: boolean) => {
+  return WORKFLOW_STATUS_INFO[status]?.label || status;
 };
 
 export type EventConfigMap = Record<

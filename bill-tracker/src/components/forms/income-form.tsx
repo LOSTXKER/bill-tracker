@@ -4,8 +4,8 @@ import { Wallet } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import {
-  INCOME_WORKFLOW_FLOW,
-  INCOME_WORKFLOW_INFO,
+  WORKFLOW_STATUS_FLOW,
+  WORKFLOW_STATUS_INFO,
 } from "@/lib/constants/transaction";
 
 interface IncomeFormProps {
@@ -30,10 +30,10 @@ export function getIncomeConfig(companyCode: string): UnifiedTransactionConfig {
     entityType: "Income",
 
     // Status configuration - using new workflow
-    statusFlow: INCOME_WORKFLOW_FLOW,
-    statusInfo: INCOME_WORKFLOW_INFO,
+    statusFlow: WORKFLOW_STATUS_FLOW,
+    statusInfo: WORKFLOW_STATUS_INFO,
     completedStatus: "SENT_TO_ACCOUNTANT",
-    defaultStatus: "WAITING_INVOICE_ISSUE",
+    defaultStatus: "ACTIVE",
 
     // Field configurations
     fields: {

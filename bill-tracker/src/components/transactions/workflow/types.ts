@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { ExpenseDocumentType } from "@prisma/client";
 
 export interface WorkflowActionsProps {
   companyCode: string;
@@ -9,7 +10,7 @@ export interface WorkflowActionsProps {
   workflowStatus?: string;
   isWht?: boolean;
   isWhtDeducted?: boolean;
-  documentType?: "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
+  documentType?: ExpenseDocumentType;
   taxInvoiceRequestedAt?: string | Date | null;
   onActionComplete?: () => void;
   variant?: "default" | "compact";

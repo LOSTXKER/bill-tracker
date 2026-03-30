@@ -4,8 +4,8 @@ import { Receipt } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import {
-  EXPENSE_WORKFLOW_FLOW,
-  EXPENSE_WORKFLOW_INFO,
+  WORKFLOW_STATUS_FLOW,
+  WORKFLOW_STATUS_INFO,
 } from "@/lib/constants/transaction";
 
 interface ExpenseFormProps {
@@ -24,17 +24,17 @@ export function getExpenseConfig(companyCode: string): UnifiedTransactionConfig 
     title: "รายจ่าย",
     icon: Receipt,
     iconColor: "bg-destructive/10 text-destructive",
-    buttonColor: "bg-destructive hover:bg-destructive/90 text-destructive-foreground",
+    buttonColor: "bg-primary hover:bg-primary/90 text-primary-foreground",
     apiEndpoint: "/api/expenses",
     redirectPath: `/${companyCode.toLowerCase()}/dashboard`,
     listUrl: "expenses",
     entityType: "Expense",
 
     // Status configuration - using new workflow
-    statusFlow: EXPENSE_WORKFLOW_FLOW,
-    statusInfo: EXPENSE_WORKFLOW_INFO,
+    statusFlow: WORKFLOW_STATUS_FLOW,
+    statusInfo: WORKFLOW_STATUS_INFO,
     completedStatus: "SENT_TO_ACCOUNTANT",
-    defaultStatus: "WAITING_TAX_INVOICE",
+    defaultStatus: "ACTIVE",
 
     // Field configurations
     fields: {

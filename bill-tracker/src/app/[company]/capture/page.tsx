@@ -63,18 +63,9 @@ export default function CapturePage({ params }: CapturePageProps) {
   }, [fromReimbursement]);
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          บันทึกรายการ
-        </h1>
-        <p className="text-muted-foreground">
-          บันทึกรายรับหรือรายจ่ายพร้อมคำนวณภาษีอัตโนมัติ
-        </p>
-      </div>
-
+    <div className="max-w-6xl mx-auto px-4">
       {fromReimbursement && (
-        <Alert className="mb-6 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+        <Alert className="mb-4 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
           <ReceiptText className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800 dark:text-blue-200">
             กำลังสร้างรายจ่ายจากคำขอเบิกจ่าย - ข้อมูลถูกกรอกให้อัตโนมัติ
@@ -83,7 +74,7 @@ export default function CapturePage({ params }: CapturePageProps) {
       )}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "expense" | "income")}>
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+        <TabsList className="grid w-full max-w-xs grid-cols-2 mb-4">
           <TabsTrigger
             value="expense"
             className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground"
@@ -105,7 +96,7 @@ export default function CapturePage({ params }: CapturePageProps) {
             <ExpenseForm 
               companyCode={companyCode} 
               prefillData={prefillData}
-              key={fromReimbursement || "new"} // Force re-mount when reimbursement changes
+              key={fromReimbursement || "new"}
             />
           ) : (
             <div className="flex items-center justify-center p-8">

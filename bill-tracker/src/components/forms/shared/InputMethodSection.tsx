@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, MessageSquareText } from "lucide-react";
+import { ChevronDown, MessageSquareText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { DocumentUploadSection, CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs, type OtherDocType, type TypedOtherDoc } from "./DocumentUploadSection";
 import { TextInputSection } from "./TextInputSection";
 
@@ -23,45 +24,50 @@ export function InputMethodSection({
   showWhtCert = false,
   initialFiles,
 }: InputMethodSectionProps) {
-  const [activeTab, setActiveTab] = useState<"document" | "text">("document");
+  const [showTextInput, setShowTextInput] = useState(false);
 
   return (
-    <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "document" | "text")}>
-        <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="document" className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            อัปโหลดเอกสาร
-          </TabsTrigger>
-          <TabsTrigger value="text" className="flex items-center gap-2">
-            <MessageSquareText className="h-4 w-4" />
-            วางข้อความ
-          </TabsTrigger>
-        </TabsList>
+    <div className="space-y-3">
+      {/* Document Upload - always visible */}
+      <DocumentUploadSection
+        companyCode={companyCode}
+        transactionType={transactionType}
+        onFilesChange={onFilesChange}
+        onAiResult={onAiResult}
+        showWhtCert={showWhtCert}
+        initialFiles={initialFiles}
+      />
 
-        <TabsContent value="document" className="mt-0">
-          <DocumentUploadSection
-            companyCode={companyCode}
-            transactionType={transactionType}
-            onFilesChange={onFilesChange}
-            onAiResult={onAiResult}
-            showWhtCert={showWhtCert}
-            initialFiles={initialFiles}
-          />
-        </TabsContent>
+      {/* Text Input - collapsible */}
+      <div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-xs text-muted-foreground hover:text-foreground gap-2 h-8"
+          onClick={() => setShowTextInput(!showTextInput)}
+        >
+          <MessageSquareText className="h-3.5 w-3.5" />
+          วางข้อความจาก LINE / อีเมล ให้ AI อ่าน
+          <ChevronDown className={cn(
+            "h-3.5 w-3.5 ml-auto transition-transform",
+            showTextInput && "rotate-180"
+          )} />
+        </Button>
 
-        <TabsContent value="text" className="mt-0">
-          <TextInputSection
-            companyCode={companyCode}
-            transactionType={transactionType}
-            onAiResult={onAiResult}
-          />
-        </TabsContent>
-      </Tabs>
+        {showTextInput && (
+          <div className="mt-2">
+            <TextInputSection
+              companyCode={companyCode}
+              transactionType={transactionType}
+              onAiResult={onAiResult}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// Re-export types and helpers for convenience
 export type { CategorizedFiles, MultiDocAnalysisResult, OtherDocType, TypedOtherDoc };
 export { normalizeOtherDocs };

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import { getPreviousStatus, type TransactionWorkflowContext } from "@/lib/workflow/status-rules";
-import { EXPENSE_WORKFLOW_INFO, INCOME_WORKFLOW_INFO } from "@/lib/constants/transaction";
+import { WORKFLOW_STATUS_INFO } from "@/lib/constants/transaction";
 import type { WorkflowActionsProps } from "./workflow/types";
 import { buildFilteredActions } from "./workflow/action-configs";
 import { RevertButton, WorkflowDialogs } from "./workflow/ConfirmDialog";
@@ -35,13 +35,7 @@ export function WorkflowActions({
   const txType = type || transactionType || "expense";
   const status = currentStatus || workflowStatus || "";
 
-  const statusLabel = (() => {
-    const info =
-      txType === "expense"
-        ? EXPENSE_WORKFLOW_INFO[status as keyof typeof EXPENSE_WORKFLOW_INFO]
-        : INCOME_WORKFLOW_INFO[status as keyof typeof INCOME_WORKFLOW_INFO];
-    return info?.label || status;
-  })();
+  const statusLabel = WORKFLOW_STATUS_INFO[status]?.label || status;
 
   const workflowContext: TransactionWorkflowContext = {
     isWht: txType === "expense" ? isWht : undefined,
@@ -53,13 +47,7 @@ export function WorkflowActions({
     ? getPreviousStatus(status, txType, workflowContext)
     : null;
 
-  const filteredActions = buildFilteredActions({
-    txType,
-    status,
-    documentType,
-    isWht,
-    taxInvoiceRequestedAt,
-  });
+  const filteredActions = buildFilteredActions(status);
 
   const {
     loading,

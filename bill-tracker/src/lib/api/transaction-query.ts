@@ -45,7 +45,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         where.approvalStatus = "REJECTED";
         where.createdBy = session.user.id;
       } else if (tab === "active") {
-        where.workflowStatus = { not: "DRAFT" };
+        where.workflowStatus = { notIn: ["DRAFT", "PENDING_APPROVAL"] };
         where.OR = [
           { approvalStatus: "NOT_REQUIRED" },
           { approvalStatus: "APPROVED" },

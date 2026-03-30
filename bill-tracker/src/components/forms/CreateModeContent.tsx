@@ -6,26 +6,30 @@ import {
   UseFormWatch,
   UseFormSetValue,
 } from "react-hook-form";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ContactSummary } from "@/types";
 import type { ContactDefaults } from "@/hooks/use-contact-defaults";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import {
   TransactionFieldsSection,
-  type TransactionFieldsConfig,
+  buildFieldsConfig,
 } from "./shared/TransactionFieldsSection";
 import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
+import { CalculationSummary } from "./shared/CalculationSummary";
 import { PayerSection, type PayerInfo } from "./shared/PayerSection";
 import {
   InputMethodSection,
   type CategorizedFiles,
   type MultiDocAnalysisResult,
 } from "./shared/InputMethodSection";
+import { DocumentSettingsBlock } from "./shared/DocumentSettingsBlock";
+import { useTransactionFormContext } from "./TransactionFormContext";
 
 // ---------------------------------------------------------------------------
 // Shared local types
@@ -152,188 +156,278 @@ export function CreateModeContent({
   handleAiResult,
   router,
 }: CreateModeContentProps) {
-  const fieldsConfig: TransactionFieldsConfig = {
-    type: config.type,
-    dateField: config.fields.dateField,
-    descriptionField: config.fields.descriptionField,
-    statusOptions: config.statusOptions,
-    showDueDate: config.showDueDate,
-  };
+  const {
+    whtDeliveryMethod,
+    onWhtDeliveryMethodChange,
+    whtDeliveryEmail,
+    onWhtDeliveryEmailChange,
+    whtDeliveryNotes,
+    onWhtDeliveryNotesChange,
+    updateContactDelivery = false,
+    onUpdateContactDeliveryChange,
+    taxInvoiceRequestMethod,
+    onTaxInvoiceRequestMethodChange,
+    taxInvoiceRequestEmail,
+    onTaxInvoiceRequestEmailChange,
+    taxInvoiceRequestNotes,
+    onTaxInvoiceRequestNotesChange,
+    updateContactTaxInvoiceRequest = false,
+    onUpdateContactTaxInvoiceRequestChange,
+    referenceUrls = [],
+    onReferenceUrlsChange,
+  } = useTransactionFormContext();
+
+
+  const fieldsConfig = buildFieldsConfig(config);
 
   return (
-    <Card className="border-border/50 shadow-card">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-lg font-semibold">
-          <div className={`p-2 rounded-xl ${config.iconColor}`}>
-            <config.icon className="h-5 w-5" />
+    <>
+      {/* Header row — mirrors TransactionViewToolbar layout */}
+      <div className="flex items-center justify-between gap-4 py-3 mb-4 border-b border-border/60">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn("shrink-0 rounded-full h-9 w-9", config.iconColor)}
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
+            {aiResult && (
+              <p className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400">
+                <Sparkles className="h-3 w-3" />
+                AI วิเคราะห์เอกสารแล้ว — กรุณาตรวจสอบข้อมูลด้านล่าง
+              </p>
+            )}
           </div>
-          {config.title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3 space-y-6">
-          {/* Fields Section */}
-          <TransactionFieldsSection
-            config={fieldsConfig}
-            companyCode={companyCode}
-            mode={mode}
-            register={register}
-            watch={watch}
-            setValue={setValue}
-            vatRate={watchVatRate || 0}
-            renderAdditionalFields={() =>
-              config.renderAdditionalFields?.({ register, watch, setValue, mode })
-            }
-            isWht={watchIsWht || false}
-            onAiSuggestAccount={(suggestion) => {
-              setAccountSuggestion({
-                accountId: suggestion.accountId,
-                accountCode: null,
-                accountName: null,
-                confidence: 80,
-                reason: "AI จำแนกจากรายละเอียด",
-                alternatives: suggestion.alternatives,
-              });
-            }}
-          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => router.back()}
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                กำลังบันทึก...
+              </>
+            ) : (
+              `บันทึก${config.title}`
+            )}
+          </Button>
+        </div>
+      </div>
 
-          {/* Contact Defaults Suggestion */}
-          {selectedContact && hasContactDefaults && contactDefaults && !defaultsSuggestionDismissed && (
-            <ContactDefaultsSuggestion
-              contactName={selectedContact.name}
-              defaults={contactDefaults}
-              onApply={applyContactDefaults}
-              onDismiss={() => setDefaultsSuggestionDismissed(true)}
-            />
-          )}
-
-          {/* Currency Conversion Note - manual toggle + AI-detected */}
-          <CurrencyConversionNote
-            currencyConversion={currencyConversion ?? undefined}
-            manualMode={mode === "create"}
-            onManualToggle={(enabled) => {
-              if (enabled) {
-                setCurrencyConversion({
-                  detected: true,
-                  currency: "USD",
-                  originalAmount: 0,
-                  convertedAmount: 0,
-                  exchangeRate: 0,
-                  conversionNote: null,
-                });
-              } else {
-                setCurrencyConversion(null);
-                setValue("amount", 0);
+      {/* Two-column grid — same structure as ViewEditModeContent */}
+      <div className="grid lg:grid-cols-5 gap-6">
+        {/* Left Column: Main Info Card */}
+        <Card className="lg:col-span-3 shadow-sm border-border">
+          <CardContent className="p-6 lg:p-8 space-y-6">
+            <TransactionFieldsSection
+              config={fieldsConfig}
+              companyCode={companyCode}
+              mode={mode}
+              register={register}
+              watch={watch}
+              setValue={setValue}
+              vatRate={watchVatRate || 0}
+              renderAdditionalFields={() =>
+                config.renderAdditionalFields?.({ register, watch, setValue, mode })
               }
-            }}
-            onCurrencyChange={(currency) => {
-              setCurrencyConversion((prev) =>
-                prev ? { ...prev, currency } : null
-              );
-            }}
-            onOriginalAmountChange={(originalAmount) => {
-              setCurrencyConversion((prev) => {
-                if (!prev) return null;
-                const rate = prev.exchangeRate || 0;
-                const converted = rate > 0 ? Math.trunc(originalAmount * rate * 100) / 100 : 0;
-                if (converted > 0) setValue("amount", converted);
-                return { ...prev, originalAmount, convertedAmount: converted };
-              });
-            }}
-            onRateChange={(newRate, newConvertedAmount) => {
-              setValue("amount", newConvertedAmount);
-              setCurrencyConversion((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      exchangeRate: newRate,
-                      convertedAmount: newConvertedAmount,
-                      conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                    }
-                  : null
-              );
-              if (aiResult?.currencyConversion) {
-                setAiResult((prev) =>
+              isWht={watchIsWht || false}
+              onAiSuggestAccount={(suggestion) => {
+                setAccountSuggestion({
+                  accountId: suggestion.accountId,
+                  accountCode: null,
+                  accountName: null,
+                  confidence: 80,
+                  reason: "AI จำแนกจากรายละเอียด",
+                  alternatives: suggestion.alternatives,
+                });
+              }}
+            />
+
+            {selectedContact && hasContactDefaults && contactDefaults && !defaultsSuggestionDismissed && (
+              <ContactDefaultsSuggestion
+                contactName={selectedContact.name}
+                defaults={contactDefaults}
+                onApply={applyContactDefaults}
+                onDismiss={() => setDefaultsSuggestionDismissed(true)}
+              />
+            )}
+
+            <CurrencyConversionNote
+              currencyConversion={currencyConversion ?? undefined}
+              manualMode={mode === "create"}
+              onManualToggle={(enabled) => {
+                if (enabled) {
+                  setCurrencyConversion({
+                    detected: true,
+                    currency: "USD",
+                    originalAmount: 0,
+                    convertedAmount: 0,
+                    exchangeRate: 0,
+                    conversionNote: null,
+                  });
+                } else {
+                  setCurrencyConversion(null);
+                  setValue("amount", 0);
+                }
+              }}
+              onCurrencyChange={(currency) => {
+                setCurrencyConversion((prev) =>
+                  prev ? { ...prev, currency } : null
+                );
+              }}
+              onOriginalAmountChange={(originalAmount) => {
+                setCurrencyConversion((prev) => {
+                  if (!prev) return null;
+                  const rate = prev.exchangeRate || 0;
+                  const converted = rate > 0 ? Math.trunc(originalAmount * rate * 100) / 100 : 0;
+                  if (converted > 0) setValue("amount", converted);
+                  return { ...prev, originalAmount, convertedAmount: converted };
+                });
+              }}
+              onRateChange={(newRate, newConvertedAmount) => {
+                setValue("amount", newConvertedAmount);
+                setCurrencyConversion((prev) =>
                   prev
                     ? {
                         ...prev,
-                        currencyConversion: {
-                          ...prev.currencyConversion!,
-                          exchangeRate: newRate,
-                          convertedAmount: newConvertedAmount,
-                          conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                        },
+                        exchangeRate: newRate,
+                        convertedAmount: newConvertedAmount,
+                        conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
                       }
                     : null
                 );
-              }
-            }}
-          />
-
-          {/* Divider */}
-          <div className="border-t border-border" />
-
-          {/* Tax & Amount Section */}
-          <TransactionAmountCard
-            mode={mode}
-            type={config.type}
-            amount={watchAmount || 0}
-            onAmountChange={(value) => setValue("amount", value)}
-            vatRate={watchVatRate || 0}
-            onVatRateChange={(value) => setValue("vatRate", value)}
-            vatAmount={calculation.vatAmount}
-            whtEnabled={watchIsWht || false}
-            onWhtToggle={handleWhtToggle}
-            whtRate={watchWhtRate}
-            whtType={watchWhtType}
-            onWhtRateSelect={(rate, type) => {
-              setValue("whtRate", rate);
-              setValue("whtType", type);
-            }}
-            whtAmount={calculation.whtAmount}
-            whtLabel={config.fields.whtField.label}
-            whtDescription={config.fields.whtField.description}
-            whtChangeInfo={whtChangeInfo}
-            documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
-            onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
-            totalWithVat={calculation.totalWithVat}
-            netAmount={calculation.netAmount}
-            netAmountLabel={config.fields.netAmountLabel}
-          />
-
-          {/* Payer Section (expense only, create mode) */}
-          {config.type === "expense" && mode === "create" && (
-            <PayerSection
-              companyCode={companyCode}
-              totalAmount={calculation.netAmount}
-              mode={mode}
-              payers={payers}
-              onPayersChange={setPayers}
+                if (aiResult?.currencyConversion) {
+                  setAiResult((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          currencyConversion: {
+                            ...prev.currencyConversion!,
+                            exchangeRate: newRate,
+                            convertedAmount: newConvertedAmount,
+                            conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
+                          },
+                        }
+                      : null
+                  );
+                }
+              }}
             />
-          )}
 
-          {/* Notes (view/edit mode only) */}
-          {mode !== "create" && (
+            <div className="border-t border-border" />
+
+            <TransactionAmountCard
+              mode={mode}
+              type={config.type}
+              amount={watchAmount || 0}
+              onAmountChange={(value) => setValue("amount", value)}
+              vatRate={watchVatRate || 0}
+              onVatRateChange={(value) => setValue("vatRate", value)}
+              vatAmount={calculation.vatAmount}
+              whtEnabled={watchIsWht || false}
+              onWhtToggle={handleWhtToggle}
+              whtRate={watchWhtRate}
+              whtType={watchWhtType}
+              onWhtRateSelect={(rate, type) => {
+                setValue("whtRate", rate);
+                setValue("whtType", type);
+              }}
+              whtAmount={calculation.whtAmount}
+              whtLabel={config.fields.whtField.label}
+              whtDescription={config.fields.whtField.description}
+              whtChangeInfo={whtChangeInfo}
+              documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
+              onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
+              totalWithVat={calculation.totalWithVat}
+              netAmount={calculation.netAmount}
+              netAmountLabel={config.fields.netAmountLabel}
+              showCalculationSummary={false}
+            />
+
+            <div className="lg:hidden">
+              <Card className="shadow-sm border-border">
+                <CardContent className="p-4">
+                  <CalculationSummary
+                    baseAmount={watchAmount || 0}
+                    vatRate={watchVatRate || 0}
+                    vatAmount={calculation.vatAmount}
+                    totalWithVat={calculation.totalWithVat}
+                    whtRate={watchWhtRate}
+                    whtAmount={calculation.whtAmount}
+                    netAmount={calculation.netAmount}
+                    type={config.type}
+                    showWhtNote={(watchIsWht || false) && !!watchWhtRate}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {config.type === "expense" && mode === "create" && (
+              <PayerSection
+                companyCode={companyCode}
+                totalAmount={calculation.netAmount}
+                mode={mode}
+                payers={payers}
+                onPayersChange={setPayers}
+              />
+            )}
+
+            <DocumentSettingsBlock
+              mode="edit"
+              configType={config.type}
+              documentType={watchDocumentType}
+              isWht={watchIsWht || false}
+              selectedContact={selectedContact}
+              whtDeliveryMethod={whtDeliveryMethod ?? null}
+              onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
+              whtDeliveryEmail={whtDeliveryEmail}
+              onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
+              whtDeliveryNotes={whtDeliveryNotes}
+              onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
+              updateContactDelivery={updateContactDelivery}
+              onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
+              taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
+              onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
+              taxInvoiceRequestEmail={taxInvoiceRequestEmail}
+              onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
+              taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+              onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
+              updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
+              onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
+              referenceUrls={referenceUrls}
+              onReferenceUrlsChange={onReferenceUrlsChange}
+            />
+
             <div className="pt-2">
               <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
-              {mode === "edit" ? (
-                <Textarea
-                  {...register("notes")}
-                  placeholder="เพิ่มหมายเหตุ..."
-                  rows={2}
-                  className="bg-muted/30 resize-none"
-                />
-              ) : (
-                <p className="text-base text-muted-foreground">
-                  {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
-                </p>
-              )}
+              <Textarea
+                {...register("notes")}
+                placeholder="เพิ่มหมายเหตุ (ถ้ามี)..."
+                rows={2}
+                className="bg-muted/30 resize-none"
+              />
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Right Column for CREATE mode */}
-        <div className="lg:col-span-2">
+        {/* Right Column: Uploads + Sticky Summary */}
+        <div className="lg:col-span-2 order-first lg:order-none space-y-4">
           <InputMethodSection
             key={filesInitialized ? "with-prefill" : "fresh"}
             companyCode={companyCode}
@@ -343,32 +437,26 @@ export function CreateModeContent({
             showWhtCert={watchIsWht}
             initialFiles={filesInitialized ? categorizedFiles : undefined}
           />
+
+          <div className="hidden lg:block sticky top-20">
+            <Card className="shadow-sm border-border">
+              <CardContent className="p-4">
+                <CalculationSummary
+                  baseAmount={watchAmount || 0}
+                  vatRate={watchVatRate || 0}
+                  vatAmount={calculation.vatAmount}
+                  totalWithVat={calculation.totalWithVat}
+                  whtRate={watchWhtRate}
+                  whtAmount={calculation.whtAmount}
+                  netAmount={calculation.netAmount}
+                  type={config.type}
+                  showWhtNote={(watchIsWht || false) && !!watchWhtRate}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </CardContent>
-      <CardFooter className="flex gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1 h-11"
-          onClick={() => router.back()}
-        >
-          ยกเลิก
-        </Button>
-        <Button
-          type="submit"
-          className={`flex-1 h-11 ${config.buttonColor}`}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              กำลังบันทึก...
-            </>
-          ) : (
-            `บันทึก${config.title}`
-          )}
-        </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </>
   );
 }

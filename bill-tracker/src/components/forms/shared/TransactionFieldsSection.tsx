@@ -17,10 +17,8 @@ import { AccountSelector } from "./account-selector";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AmountInput } from "./AmountInput";
-import { WhtDeliverySection } from "./WhtDeliverySection";
-import { TaxInvoiceRequestSection } from "./TaxInvoiceRequestSection";
-import { ReferenceUrlsSection } from "./ReferenceUrlsSection";
 import { TransactionFieldsViewMode } from "./TransactionFieldsViewMode";
+import { DocumentSettingsBlock } from "./DocumentSettingsBlock";
 import { useTransactionFormContext } from "../TransactionFormContext";
 
 export type {
@@ -29,6 +27,7 @@ export type {
   AmountInputMode,
   InternalCompanyOption,
 } from "./transaction-fields-types";
+export { buildFieldsConfig } from "./transaction-fields-types";
 
 import type { TransactionFieldsSectionProps } from "./transaction-fields-types";
 
@@ -83,6 +82,7 @@ export function TransactionFieldsSection({
   const isEditable = mode === "create" || mode === "edit";
   const watchStatus = watch("status") as string | undefined;
   const watchDate = watch(config.dateField.name);
+  const watchDocumentType = watch("documentType") as string | undefined;
   const formData = watch() as Record<string, unknown>;
 
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
@@ -323,10 +323,13 @@ export function TransactionFieldsSection({
         )}
       </div>
 
-      {/* WHT Delivery Method */}
-      {config.type === "expense" && isWht && onWhtDeliveryMethodChange && (
-        <WhtDeliverySection
+      {mode === "edit" && (
+        <DocumentSettingsBlock
           mode="edit"
+          configType={config.type}
+          documentType={watchDocumentType}
+          isWht={isWht}
+          selectedContact={selectedContact}
           whtDeliveryMethod={whtDeliveryMethod ?? null}
           onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
           whtDeliveryEmail={whtDeliveryEmail}
@@ -335,14 +338,6 @@ export function TransactionFieldsSection({
           onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
           updateContactDelivery={updateContactDelivery}
           onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
-          selectedContact={selectedContact}
-        />
-      )}
-
-      {/* Tax Invoice Request Method */}
-      {config.type === "expense" && onTaxInvoiceRequestMethodChange && (
-        <TaxInvoiceRequestSection
-          mode="edit"
           taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
           onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
           taxInvoiceRequestEmail={taxInvoiceRequestEmail}
@@ -351,14 +346,6 @@ export function TransactionFieldsSection({
           onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
           updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
           onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
-          selectedContact={selectedContact}
-        />
-      )}
-
-      {/* Reference URLs */}
-      {onReferenceUrlsChange && (
-        <ReferenceUrlsSection
-          mode="edit"
           referenceUrls={referenceUrls}
           onReferenceUrlsChange={onReferenceUrlsChange}
         />

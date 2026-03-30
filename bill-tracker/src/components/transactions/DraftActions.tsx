@@ -10,13 +10,13 @@ import {
   Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { ApprovalStatus, ExpenseWorkflowStatus, IncomeWorkflowStatus } from "@prisma/client";
+import type { ApprovalStatus, WorkflowStatus } from "@prisma/client";
 
 interface DraftActionsProps {
   companyCode: string;
   transactionId: string;
   transactionType: "expense" | "income";
-  workflowStatus: ExpenseWorkflowStatus | IncomeWorkflowStatus;
+  workflowStatus: WorkflowStatus;
   approvalStatus: ApprovalStatus;
   rejectedReason?: string | null;
   submittedAt?: string | null;
@@ -26,26 +26,7 @@ interface DraftActionsProps {
   onSuccess?: () => void;
 }
 
-// Format date for display
-function formatSubmittedDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "เมื่อสักครู่";
-  if (diffMins < 60) return `${diffMins} นาทีที่แล้ว`;
-  if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
-  if (diffDays < 7) return `${diffDays} วันที่แล้ว`;
-  
-  return date.toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: diffDays > 365 ? "numeric" : undefined,
-  });
-}
+import { formatRelativeTime } from "@/lib/utils/format-relative-time";
 
 export function DraftActions({
   companyCode,
@@ -140,8 +121,7 @@ export function DraftActions({
     }
   };
 
-  // Only show actions for DRAFT status
-  if (workflowStatus !== "DRAFT") {
+  if (workflowStatus !== "DRAFT" && workflowStatus !== "PENDING_APPROVAL") {
     return null;
   }
 
@@ -192,7 +172,7 @@ export function DraftActions({
             <div className="font-medium">รอการอนุมัติ</div>
             {submittedAt && (
               <div className="text-xs text-amber-500/80 mt-0.5">
-                ส่งเมื่อ {formatSubmittedDate(submittedAt)}
+                ส่งเมื่อ {formatRelativeTime(submittedAt)}
                 {submittedByName && ` โดย ${submittedByName}`}
               </div>
             )}

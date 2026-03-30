@@ -2,15 +2,22 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FileText } from "lucide-react";
 import { getTaxInvoiceRequestMethod, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
 import type { ContactSummary } from "@/types";
 
 interface TaxInvoiceRequestEditProps {
   mode: "edit";
+  documentType?: string;
   taxInvoiceRequestMethod: string | null;
   onTaxInvoiceRequestMethodChange: (method: string | null) => void;
   taxInvoiceRequestEmail?: string | null;
@@ -24,6 +31,7 @@ interface TaxInvoiceRequestEditProps {
 
 interface TaxInvoiceRequestViewProps {
   mode: "view";
+  documentType?: string;
   taxInvoiceRequestMethod?: string | null;
   taxInvoiceRequestEmail?: string | null;
   taxInvoiceRequestNotes?: string | null;
@@ -40,11 +48,14 @@ export function TaxInvoiceRequestSection(props: TaxInvoiceRequestSectionProps) {
 }
 
 function TaxInvoiceRequestView({
+  documentType,
   taxInvoiceRequestMethod,
   taxInvoiceRequestEmail,
   taxInvoiceRequestNotes,
   selectedContact,
 }: TaxInvoiceRequestViewProps) {
+  const isCashReceipt = documentType === "CASH_RECEIPT";
+  const sectionLabel = isCashReceipt ? "ช่องทางขอบิลเงินสด" : "ช่องทางขอใบกำกับภาษี";
   const displayMethod = taxInvoiceRequestMethod || selectedContact?.taxInvoiceRequestMethod;
   const displayEmail = taxInvoiceRequestMethod === "EMAIL" ? taxInvoiceRequestEmail : selectedContact?.taxInvoiceRequestEmail;
   const displayNotes = taxInvoiceRequestNotes || selectedContact?.taxInvoiceRequestNotes;
@@ -56,7 +67,7 @@ function TaxInvoiceRequestView({
       <div className="flex items-center gap-2 mb-3">
         <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
         <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
-          ช่องทางขอใบกำกับภาษี
+          {sectionLabel}
         </p>
       </div>
       <div className="space-y-2 text-sm">
@@ -85,6 +96,7 @@ function TaxInvoiceRequestView({
 }
 
 function TaxInvoiceRequestEdit({
+  documentType,
   taxInvoiceRequestMethod,
   onTaxInvoiceRequestMethodChange,
   taxInvoiceRequestEmail,
@@ -95,90 +107,74 @@ function TaxInvoiceRequestEdit({
   onUpdateContactTaxInvoiceRequestChange,
   selectedContact,
 }: TaxInvoiceRequestEditProps) {
+  const isCashReceipt = documentType === "CASH_RECEIPT";
+  const sectionLabel = isCashReceipt ? "ช่องทางขอบิลเงินสด" : "ช่องทางขอใบกำกับภาษี";
+  const placeholder = isCashReceipt ? "เลือกช่องทางขอบิลเงินสด *" : "เลือกช่องทางขอใบกำกับ *";
+
   return (
-    <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4 space-y-4">
+    <div className="space-y-2.5">
       <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-        <Label className="text-sm font-medium text-orange-900 dark:text-orange-100">
-          ช่องทางขอใบกำกับภาษี
-        </Label>
+        <FileText className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+        <Label className="text-sm font-medium">{sectionLabel}</Label>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {TAX_INVOICE_REQUEST_METHODS.map((method) => {
-          const Icon = method.Icon;
-          const isSelected = taxInvoiceRequestMethod === method.value;
-          return (
-            <Button
-              key={method.value}
-              type="button"
-              variant={isSelected ? "default" : "outline"}
-              className={`justify-start gap-2 h-auto py-3 ${
-                isSelected
-                  ? "bg-orange-600 hover:bg-orange-700 text-white"
-                  : "border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/50"
-              }`}
-              onClick={() => onTaxInvoiceRequestMethodChange(isSelected ? null : method.value)}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="text-sm">{method.label}</span>
-            </Button>
-          );
-        })}
-      </div>
+      <Select
+        value={taxInvoiceRequestMethod || ""}
+        onValueChange={(v) => onTaxInvoiceRequestMethodChange(v || null)}
+      >
+        <SelectTrigger className="h-9 bg-background">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {TAX_INVOICE_REQUEST_METHODS.map((method) => {
+            const Icon = method.Icon;
+            return (
+              <SelectItem key={method.value} value={method.value}>
+                <span className="flex items-center gap-2">
+                  <Icon className="h-3.5 w-3.5" />
+                  {method.label}
+                </span>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
 
       {taxInvoiceRequestMethod === "EMAIL" && onTaxInvoiceRequestEmailChange && (
-        <div className="space-y-2">
-          <Label className="text-sm text-orange-900 dark:text-orange-100">
-            อีเมลสำหรับขอใบกำกับ
-          </Label>
-          <Input
-            type="email"
-            placeholder="email@example.com"
-            value={taxInvoiceRequestEmail || ""}
-            onChange={(e) => onTaxInvoiceRequestEmailChange(e.target.value || null)}
-            className="h-10 bg-white dark:bg-background border-orange-200 dark:border-orange-800"
-          />
-        </div>
+        <Input
+          type="email"
+          placeholder={isCashReceipt ? "อีเมลสำหรับขอบิลเงินสด" : "อีเมลสำหรับขอใบกำกับ"}
+          value={taxInvoiceRequestEmail || ""}
+          onChange={(e) => onTaxInvoiceRequestEmailChange(e.target.value || null)}
+          className="h-9 bg-background"
+        />
       )}
 
       {taxInvoiceRequestMethod === "SHOPEE" && onTaxInvoiceRequestNotesChange && (
-        <div className="space-y-2">
-          <Label className="text-sm text-orange-900 dark:text-orange-100">
-            ชื่อแชทร้าน / ลิงค์ Shopee <span className="text-orange-400">(จำเป็น)</span>
-          </Label>
-          <Input
-            placeholder="เช่น ชื่อร้าน Shopee หรือ https://shopee.co.th/..."
-            value={taxInvoiceRequestNotes || ""}
-            onChange={(e) => onTaxInvoiceRequestNotesChange(e.target.value || null)}
-            className="h-10 bg-white dark:bg-background border-orange-200 dark:border-orange-800"
-          />
-          <p className="text-xs text-orange-600 dark:text-orange-400">
-            ระบุชื่อแชทร้านหรือลิงค์ เพื่อให้บัญชีไปตามทวงใบกำกับได้
-          </p>
-        </div>
+        <Input
+          placeholder="ชื่อแชทร้าน / ลิงค์ Shopee"
+          value={taxInvoiceRequestNotes || ""}
+          onChange={(e) => onTaxInvoiceRequestNotesChange(e.target.value || null)}
+          className="h-9 bg-background"
+        />
       )}
 
-      {taxInvoiceRequestMethod !== "SHOPEE" && onTaxInvoiceRequestNotesChange && (
-        <div className="space-y-2">
-          <Label className="text-sm text-orange-900 dark:text-orange-100">
-            {taxInvoiceRequestMethod === "OTHER" ? "ระบุช่องทาง / รายละเอียด" : "หมายเหตุการขอใบกำกับ (ถ้ามี)"}
-          </Label>
-          <Textarea
-            placeholder={
-              taxInvoiceRequestMethod === "OTHER"
-                ? "ระบุช่องทาง เช่น Facebook, Lazada, เว็บไซต์ร้านค้า..."
-                : "เช่น ติดต่อคุณสมชาย 081-xxx-xxxx ฝ่ายบัญชี..."
-            }
-            value={taxInvoiceRequestNotes || ""}
-            onChange={(e) => onTaxInvoiceRequestNotesChange(e.target.value || null)}
-            className="min-h-[60px] bg-white dark:bg-background border-orange-200 dark:border-orange-800"
-          />
-        </div>
+      {taxInvoiceRequestMethod && taxInvoiceRequestMethod !== "SHOPEE" && onTaxInvoiceRequestNotesChange && (
+        <Textarea
+          placeholder={
+            taxInvoiceRequestMethod === "OTHER"
+              ? "ระบุช่องทาง เช่น Facebook, Lazada..."
+              : isCashReceipt ? "หมายเหตุการขอบิลเงินสด (ถ้ามี)" : "หมายเหตุการขอใบกำกับ (ถ้ามี)"
+          }
+          value={taxInvoiceRequestNotes || ""}
+          onChange={(e) => onTaxInvoiceRequestNotesChange(e.target.value || null)}
+          className="min-h-[40px] bg-background resize-none"
+          rows={1}
+        />
       )}
 
       {selectedContact && onUpdateContactTaxInvoiceRequestChange && taxInvoiceRequestMethod && (
-        <div className="flex items-center space-x-2 pt-2 border-t border-orange-200 dark:border-orange-800">
+        <div className="flex items-center space-x-2">
           <Checkbox
             id="updateContactTaxInvoiceRequest"
             checked={updateContactTaxInvoiceRequest}
@@ -186,7 +182,7 @@ function TaxInvoiceRequestEdit({
           />
           <label
             htmlFor="updateContactTaxInvoiceRequest"
-            className="text-sm text-orange-900 dark:text-orange-100 cursor-pointer"
+            className="text-xs text-muted-foreground cursor-pointer"
           >
             บันทึกเป็นค่าเริ่มต้นของ &quot;{selectedContact.name}&quot;
           </label>

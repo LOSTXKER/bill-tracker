@@ -28,7 +28,7 @@ import { CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./
 import { MergeData, MergeDecision } from "./shared/MergeOptionsDialog";
 import { detectConflicts } from "./shared/ConflictDialog";
 import { TransactionDialogs } from "./shared/TransactionDialogs";
-import { TransactionFormProvider, type TransactionFormContextValue } from "./TransactionFormContext";
+import { TransactionFormProvider } from "./TransactionFormContext";
 import { PayerInfo } from "./shared/PayerSection";
 import { TransactionViewToolbar } from "./shared/TransactionViewToolbar";
 import { CreateModeContent } from "./CreateModeContent";
@@ -48,6 +48,8 @@ import { usePermissions } from "@/components/providers/permission-provider";
 // Import and re-export BaseTransaction type from hooks
 import type { BaseTransaction } from "./hooks/useTransactionForm";
 export type { BaseTransaction };
+import { useDocumentTypeEffects } from "./hooks/useDocumentTypeEffects";
+import { useFormContextFactory } from "./hooks/useFormContextFactory";
 
 // =============================================================================
 // Types
@@ -978,23 +980,16 @@ export function UnifiedTransactionForm({
     setValue("documentType", docType);
   }, [setValue]);
 
-  // Auto-set default document type based on VAT (WHT is independent of VAT)
-  const prevVatRateRef = useRef(watchVatRate);
-  useEffect(() => {
-    if (config.type === "expense" && prevVatRateRef.current !== watchVatRate) {
-      if (watchVatRate === 0) {
-        // VAT changed to 0% - set default document type to CASH_RECEIPT
-        // NOTE: WHT is NOT disabled - can still withhold tax from non-VAT registered vendors (e.g., freelancers)
-        if (!watchDocumentType || watchDocumentType === "TAX_INVOICE") {
-          setValue("documentType", "CASH_RECEIPT");
-        }
-      } else {
-        // VAT changed to 7% - set document type to TAX_INVOICE
-        setValue("documentType", "TAX_INVOICE");
-      }
-      prevVatRateRef.current = watchVatRate;
-    }
-  }, [watchVatRate, watchDocumentType, config.type, setValue]);
+  useDocumentTypeEffects({
+    configType: config.type,
+    watchVatRate,
+    watchDocumentType,
+    setValue,
+    taxInvoiceRequestMethod,
+    setTaxInvoiceRequestMethod,
+    setTaxInvoiceRequestEmail,
+    setTaxInvoiceRequestNotes,
+  });
 
   // Loading state for view/edit mode
   if (mode !== "create" && loading) {
@@ -1019,95 +1014,48 @@ export function UnifiedTransactionForm({
 
   const isDeleted = transaction?.deletedAt ? true : false;
 
-  // Build context value — shared state consumed by TransactionFieldsSection via context
-  const transactionFormContextValue: TransactionFormContextValue = {
-    // Contact slice
+  const transactionFormContextValue = useFormContextFactory({
+    configType: config.type,
+    mode,
     contacts,
     contactsLoading,
     selectedContact,
-    onContactSelect: (contact) => {
-      setSelectedContact(contact);
-      if (contact) setAiVendorSuggestion(null);
-    },
-    onContactCreated: (contact) => {
-      refetchContacts();
-      setSelectedContact(contact);
-      setAiVendorSuggestion(null);
-    },
+    setSelectedContact,
+    refetchContacts,
     oneTimeContactName,
-    onOneTimeContactNameChange: setOneTimeContactName,
+    setOneTimeContactName,
     aiVendorSuggestion,
-
-    // Account slice
+    setAiVendorSuggestion,
     selectedAccount,
-    onAccountChange: setSelectedAccount,
-    suggestedAccountId:
-      accountSuggestion?.accountId ||
-      aiResult?.aiAccountSuggestion?.accountId ||
-      undefined,
-    suggestedAccountAlternatives: accountSuggestion?.alternatives,
-
-    // WHT delivery slice — editable only for expenses in create/edit mode
+    setSelectedAccount,
+    accountSuggestion,
+    aiResult,
     whtDeliveryMethod,
-    onWhtDeliveryMethodChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setWhtDeliveryMethod
-        : undefined,
+    setWhtDeliveryMethod,
     whtDeliveryEmail,
-    onWhtDeliveryEmailChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setWhtDeliveryEmail
-        : undefined,
+    setWhtDeliveryEmail,
     whtDeliveryNotes,
-    onWhtDeliveryNotesChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setWhtDeliveryNotes
-        : undefined,
+    setWhtDeliveryNotes,
     updateContactDelivery,
-    onUpdateContactDeliveryChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setUpdateContactDelivery
-        : undefined,
-
-    // Tax invoice slice — editable only for expenses in create/edit mode
+    setUpdateContactDelivery,
     taxInvoiceRequestMethod,
-    onTaxInvoiceRequestMethodChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setTaxInvoiceRequestMethod
-        : undefined,
+    setTaxInvoiceRequestMethod,
     taxInvoiceRequestEmail,
-    onTaxInvoiceRequestEmailChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setTaxInvoiceRequestEmail
-        : undefined,
+    setTaxInvoiceRequestEmail,
     taxInvoiceRequestNotes,
-    onTaxInvoiceRequestNotesChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setTaxInvoiceRequestNotes
-        : undefined,
+    setTaxInvoiceRequestNotes,
     updateContactTaxInvoiceRequest,
-    onUpdateContactTaxInvoiceRequestChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setUpdateContactTaxInvoiceRequest
-        : undefined,
-
-    // Internal company slice — editable only for expenses in create/edit mode
+    setUpdateContactTaxInvoiceRequest,
     internalCompanyId,
-    onInternalCompanyChange:
-      config.type === "expense" && (mode === "create" || mode === "edit")
-        ? setInternalCompanyId
-        : undefined,
+    setInternalCompanyId,
     accessibleCompanies: accessibleCompanies.map((c) => ({
       id: c.id,
       name: c.name,
       code: c.code,
     })),
-
-    // Reference URLs — editable in create/edit mode only
     referenceUrls,
-    onReferenceUrlsChange:
-      mode === "create" || mode === "edit" ? setReferenceUrls : undefined,
-  };
+    setReferenceUrls,
+  });
 
   // =============================================================================
   // Render
@@ -1128,10 +1076,6 @@ export function UnifiedTransactionForm({
           hasPermission={hasPermission}
           canCreateDirect={canCreateDirect}
           canMarkPaid={canMarkPaid}
-          selectedContact={selectedContact}
-          taxInvoiceRequestMethod={taxInvoiceRequestMethod}
-          taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-          taxInvoiceRequestNotes={taxInvoiceRequestNotes}
           onNavigateToList={navigateToList}
           onEditClick={handleEditClick}
           onCancelEdit={handleCancelEdit}

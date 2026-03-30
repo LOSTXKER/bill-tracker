@@ -198,8 +198,8 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
       },
       {
         key: "expenses:change-status",
-        label: "เปลี่ยนสถานะเอกสาร",
-        description: "เปลี่ยนสถานะเอกสาร (รอเอกสาร, ส่งบัญชีแล้ว, ฯลฯ)",
+        label: "จัดการเวิร์กโฟลว์",
+        description: "ทำเช็คลิสต์เอกสาร, ส่งบัญชี, ปิดงาน, ย้อนสถานะ",
       },
     ],
   },
@@ -246,8 +246,8 @@ export const PERMISSION_GROUPS: Record<string, PermissionGroup> = {
       },
       {
         key: "incomes:change-status",
-        label: "เปลี่ยนสถานะเอกสาร",
-        description: "เปลี่ยนสถานะเอกสาร (รอออกบิล, ส่งสำเนาแล้ว, ฯลฯ)",
+        label: "จัดการเวิร์กโฟลว์",
+        description: "ทำเช็คลิสต์เอกสาร, ส่งบัญชี, ปิดงาน, ย้อนสถานะ",
       },
     ],
   },

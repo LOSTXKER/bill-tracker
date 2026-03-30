@@ -299,7 +299,7 @@ model Expense {
   taxInvoiceAt                               DateTime?
   whtCertIssuedAt                            DateTime?
   whtCertSentAt                              DateTime?
-  workflowStatus                             ExpenseWorkflowStatus  @default(DRAFT)
+  workflowStatus                             WorkflowStatus         @default(DRAFT)
   referenceUrls                              Json                   @default("[]")
   // Approval workflow fields
   approvalStatus                             ApprovalStatus         @default(NOT_REQUIRED)
@@ -340,6 +340,8 @@ model Expense {
   @@index([accountId])
   @@index([companyId, billDate])
   @@index([companyId, workflowStatus, billDate])
+  @@index([companyId, workflowStatus, hasTaxInvoice, billDate])
+  @@index([companyId, workflowStatus, isWht, hasWhtCert, billDate])
   @@index([companyId, approvalStatus, createdAt])
   @@index([contactId])
   @@index([createdAt])
@@ -391,7 +393,7 @@ model Income {
   whtCertReceivedAt             DateTime?
   whtCertRemindCount            Int                  @default(0)
   whtCertRemindedAt             DateTime?
-  workflowStatus                IncomeWorkflowStatus @default(DRAFT)
+  workflowStatus                WorkflowStatus       @default(DRAFT)
   referenceUrls                 Json                 @default("[]")
   // Approval workflow fields
   approvalStatus                ApprovalStatus       @default(NOT_REQUIRED)
@@ -710,14 +712,10 @@ enum ExpenseDocumentType {
   NO_DOCUMENT // ไม่มีเอกสาร (VAT 0%)
 }
 
-enum ExpenseWorkflowStatus {
+enum WorkflowStatus {
   DRAFT
-  PAID
-  WAITING_TAX_INVOICE
-  TAX_INVOICE_RECEIVED
-  WHT_PENDING_ISSUE
-  WHT_ISSUED
-  WHT_SENT_TO_VENDOR
+  PENDING_APPROVAL
+  ACTIVE
   READY_FOR_ACCOUNTING
   SENT_TO_ACCOUNTANT
   COMPLETED
@@ -731,19 +729,7 @@ enum IncomeDocStatus {
   SENT_COPY
 }
 
-enum IncomeWorkflowStatus {
-  DRAFT
-  RECEIVED
-  NO_INVOICE_NEEDED
-  WAITING_INVOICE_ISSUE
-  INVOICE_ISSUED
-  INVOICE_SENT
-  WHT_PENDING_CERT
-  WHT_CERT_RECEIVED
-  READY_FOR_ACCOUNTING
-  SENT_TO_ACCOUNTANT
-  COMPLETED
-}
+// IncomeWorkflowStatus removed - replaced by shared WorkflowStatus enum
 
 enum IntegrationType {
   ACCOUNTING_SOFTWARE

@@ -42,66 +42,12 @@ export class ExpenseStrategy extends BaseTransactionStrategy {
   };
 
   readonly workflowStatuses: WorkflowStatus[] = [
-    {
-      value: "DRAFT",
-      label: "ร่าง",
-      description: "รายการร่าง ยังไม่จ่ายเงิน",
-      color: "slate",
-    },
-    {
-      value: "PAID",
-      label: "จ่ายเงินแล้ว",
-      description: "จ่ายเงินแล้ว รอใบกำกับภาษี",
-      color: "blue",
-    },
-    {
-      value: "WAITING_TAX_INVOICE",
-      label: "รอเอกสาร",
-      description: "รอเอกสารจากร้านค้า",
-      color: "orange",
-    },
-    {
-      value: "TAX_INVOICE_RECEIVED",
-      label: "ได้เอกสารแล้ว",
-      description: "ได้รับเอกสารแล้ว",
-      color: "emerald",
-    },
-    {
-      value: "WHT_PENDING_ISSUE",
-      label: "รอออก 50 ทวิ",
-      description: "รอออกใบหัก ณ ที่จ่ายให้ vendor",
-      color: "amber",
-    },
-    {
-      value: "WHT_ISSUED",
-      label: "ออก 50 ทวิแล้ว",
-      description: "ออกใบหัก ณ ที่จ่ายแล้ว",
-      color: "purple",
-    },
-    {
-      value: "WHT_SENT_TO_VENDOR",
-      label: "ส่ง 50 ทวิแล้ว",
-      description: "ส่งใบหัก ณ ที่จ่ายให้ vendor แล้ว",
-      color: "teal",
-    },
-    {
-      value: "READY_FOR_ACCOUNTING",
-      label: "รอส่งบัญชี",
-      description: "เอกสารครบ รอส่งบัญชี",
-      color: "indigo",
-    },
-    {
-      value: "SENT_TO_ACCOUNTANT",
-      label: "ส่งบัญชีแล้ว",
-      description: "ส่งให้บัญชีแล้ว",
-      color: "emerald",
-    },
-    {
-      value: "COMPLETED",
-      label: "เสร็จสิ้น",
-      description: "ดำเนินการเสร็จสิ้น",
-      color: "emerald",
-    },
+    { value: "DRAFT", label: "ร่าง", description: "รายการร่าง ยังไม่ส่ง", color: "slate" },
+    { value: "PENDING_APPROVAL", label: "รออนุมัติ", description: "ส่งแล้ว รอคนอนุมัติ", color: "amber" },
+    { value: "ACTIVE", label: "ดำเนินการ", description: "จ่ายเงินแล้ว กำลังจัดการเอกสาร", color: "blue" },
+    { value: "READY_FOR_ACCOUNTING", label: "พร้อมส่งบัญชี", description: "เอกสารครบ พร้อมส่งบัญชี", color: "indigo" },
+    { value: "SENT_TO_ACCOUNTANT", label: "ส่งบัญชีแล้ว", description: "ส่งให้บัญชีแล้ว", color: "emerald" },
+    { value: "COMPLETED", label: "เสร็จสิ้น", description: "ดำเนินการเสร็จสิ้น", color: "emerald" },
   ];
 
   validateCreate(data: Record<string, unknown>): ValidationResult {
@@ -190,25 +136,8 @@ export class ExpenseStrategy extends BaseTransactionStrategy {
     return updates;
   }
 
-  determineWorkflowStatus(data: Record<string, unknown>): string {
-    const isWht = Boolean(data.isWht);
-    const hasTaxInvoice = Boolean(data.hasTaxInvoice);
-    const documentType = data.documentType as string | undefined;
-
-    // NO_DOCUMENT type - skip directly to READY_FOR_ACCOUNTING
-    if (documentType === "NO_DOCUMENT") {
-      return "READY_FOR_ACCOUNTING";
-    }
-
-    // Has document already
-    if (hasTaxInvoice) {
-      return isWht && documentType === "TAX_INVOICE" 
-        ? "WHT_PENDING_ISSUE" 
-        : "READY_FOR_ACCOUNTING";
-    }
-
-    // Waiting for document
-    return "WAITING_TAX_INVOICE";
+  determineWorkflowStatus(_data: Record<string, unknown>): string {
+    return "ACTIVE";
   }
 
   getPrismaModel(): string {

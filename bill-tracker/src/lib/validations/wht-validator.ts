@@ -72,10 +72,10 @@ export interface WhtValidatorConfig {
 
 export const EXPENSE_WHT_CONFIG: WhtValidatorConfig = {
   type: "expense",
-  whtCertStatus: "WHT_ISSUED",
+  whtCertStatus: "ACTIVE",
   readyForAccountingStatus: "READY_FOR_ACCOUNTING",
-  rollbackStatusWhenRemovingWht: "TAX_INVOICE_RECEIVED",
-  rollbackStatusWhenAddingWht: "WHT_PENDING_ISSUE",
+  rollbackStatusWhenRemovingWht: "ACTIVE",
+  rollbackStatusWhenAddingWht: "ACTIVE",
   messages: {
     locked: "ไม่สามารถเปลี่ยนสถานะหัก ณ ที่จ่ายได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว",
     certIssuedRemoveWht: "คุณได้ออกหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) แล้ว การยกเลิกจะต้อง void เอกสาร 50 ทวิด้วย",
@@ -86,10 +86,10 @@ export const EXPENSE_WHT_CONFIG: WhtValidatorConfig = {
 
 export const INCOME_WHT_CONFIG: WhtValidatorConfig = {
   type: "income",
-  whtCertStatus: "WHT_CERT_RECEIVED",
+  whtCertStatus: "ACTIVE",
   readyForAccountingStatus: "READY_FOR_ACCOUNTING",
-  rollbackStatusWhenRemovingWht: "INVOICE_ISSUED",
-  rollbackStatusWhenAddingWht: "WHT_PENDING_CERT",
+  rollbackStatusWhenRemovingWht: "ACTIVE",
+  rollbackStatusWhenAddingWht: "ACTIVE",
   messages: {
     locked: "ไม่สามารถเปลี่ยนสถานะหัก ณ ที่จ่ายได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว",
     certIssuedRemoveWht: "คุณได้รับหนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) จากลูกค้าแล้ว การยกเลิกจะต้องลบเอกสารด้วย",

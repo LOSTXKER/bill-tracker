@@ -180,9 +180,10 @@ async function handleGet(
           where: {
             companyId: company.id,
             deletedAt: null,
+            workflowStatus: "ACTIVE",
             isWht: true,
             hasWhtCert: true,
-            workflowStatus: "WHT_ISSUED", // Issued but not sent
+            whtCertSentAt: null,
           },
         });
       })()
@@ -195,8 +196,9 @@ async function handleGet(
           where: {
             companyId: company.id,
             deletedAt: null,
+            workflowStatus: "ACTIVE",
+            hasTaxInvoice: false,
             documentType: "TAX_INVOICE",
-            workflowStatus: "WAITING_TAX_INVOICE",
           },
         });
       })()

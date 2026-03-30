@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import {
@@ -5,6 +6,7 @@ import {
   executeWorkflowAction,
   WorkflowError,
 } from "@/lib/workflow/document-workflow-service";
+import { checkPermissionFromAccess } from "@/lib/permissions/checker";
 
 export const GET = withCompanyAccessFromParams(
   async (req, { session, company }) => {
@@ -23,6 +25,27 @@ export const POST = withCompanyAccessFromParams(
 
     if (!transactionType || !transactionId || !action) {
       return apiResponse.badRequest("transactionType, transactionId, and action are required");
+    }
+
+    if (transactionType !== "expense" && transactionType !== "income") {
+      return apiResponse.badRequest("transactionType must be 'expense' or 'income'");
+    }
+
+    const requiredPermission = transactionType === "expense"
+      ? "expenses:change-status"
+      : "incomes:change-status";
+
+    const access = await prisma.companyAccess.findUnique({
+      where: {
+        userId_companyId: {
+          userId: session.user.id,
+          companyId: company.id,
+        },
+      },
+    });
+
+    if (!access || !checkPermissionFromAccess(access, requiredPermission)) {
+      return apiResponse.forbidden("คุณไม่มีสิทธิ์เปลี่ยนสถานะเอกสาร");
     }
 
     try {

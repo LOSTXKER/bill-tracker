@@ -56,13 +56,12 @@ export function useDocumentUpload({
                       files.whtCert.length > 0 ||
                       files.other.length > 0;
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
+  const uploadToCategory = useCallback(
+    async (acceptedFiles: File[], targetCategory: DocumentCategory = "uncategorized") => {
       if (acceptedFiles.length === 0) return;
 
       setError(null);
       setIsUploading(true);
-      setIsAnalyzed(false);
 
       try {
         const uploadPromises = acceptedFiles.map((file) =>
@@ -71,20 +70,40 @@ export function useDocumentUpload({
         const results = await Promise.all(uploadPromises);
         const newUrls = results.map((r) => r.url);
 
-        const updatedFiles: CategorizedFiles = {
-          ...files,
-          uncategorized: [...files.uncategorized, ...newUrls],
-        };
-
-        setFiles(updatedFiles);
-        onFilesChange(updatedFiles);
+        let updated: CategorizedFiles | null = null;
+        setFiles((prev) => {
+          if (targetCategory === "other") {
+            updated = {
+              ...prev,
+              other: [...prev.other, ...newUrls.map((url) => ({ url, type: "OTHER" as OtherDocType }))],
+            };
+          } else {
+            updated = {
+              ...prev,
+              [targetCategory]: [...(prev[targetCategory] as string[]), ...newUrls],
+            };
+          }
+          return updated;
+        });
+        if (updated) {
+          const snapshot = updated;
+          queueMicrotask(() => onFilesChange(snapshot));
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "การอัปโหลดล้มเหลว");
       } finally {
         setIsUploading(false);
       }
     },
-    [files, onFilesChange]
+    [onFilesChange]
+  );
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      await uploadToCategory(acceptedFiles, "uncategorized");
+      setIsAnalyzed(false);
+    },
+    [uploadToCategory]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -250,6 +269,7 @@ export function useDocumentUpload({
     getRootProps,
     getInputProps,
     isDragActive,
+    uploadToCategory,
     removeFile,
     moveFile,
     changeOtherDocType,

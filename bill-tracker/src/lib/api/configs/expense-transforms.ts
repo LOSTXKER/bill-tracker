@@ -162,16 +162,14 @@ export function transformExpenseUpdateData(body: TransactionRequestBody, existin
       updateData.workflowStatus = validation.rollbackStatus;
     } else {
       if (!wasWht && nowWht) {
-        if (currentStatus === "READY_FOR_ACCOUNTING" || currentStatus === "TAX_INVOICE_RECEIVED") {
+        if (currentStatus === "READY_FOR_ACCOUNTING") {
           if (!hasWhtCert) {
-            updateData.workflowStatus = "WHT_PENDING_ISSUE";
+            updateData.workflowStatus = "ACTIVE";
           }
         }
       } else if (wasWht && !nowWht) {
-        if (currentStatus === "WHT_PENDING_ISSUE") {
-          if (hasTaxInvoice) {
-            updateData.workflowStatus = "READY_FOR_ACCOUNTING";
-          }
+        if (currentStatus === "ACTIVE" && hasTaxInvoice) {
+          updateData.workflowStatus = "READY_FOR_ACCOUNTING";
         }
       }
     }

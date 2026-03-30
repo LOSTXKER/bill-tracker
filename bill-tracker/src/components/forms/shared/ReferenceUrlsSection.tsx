@@ -127,7 +127,7 @@ function ReferenceUrlsEdit({
 
       <div className="flex gap-2">
         <Input
-          placeholder="พิมพ์ลิงค์ เช่น shopee.co.th/..."
+          placeholder="วางลิงค์ เช่น shopee.co.th/... (เติม https:// อัตโนมัติ)"
           value={newReferenceUrl}
           onChange={(e) => setNewReferenceUrl(e.target.value)}
           onKeyDown={(e) => {
@@ -136,22 +136,19 @@ function ReferenceUrlsEdit({
               addReferenceUrl();
             }
           }}
-          className="h-10 bg-muted/30 border-border focus:bg-background"
+          className="h-9 bg-muted/30 border-border focus:bg-background text-sm"
         />
         <Button
           type="button"
           variant="default"
           size="icon"
-          className="h-10 w-10 flex-shrink-0 bg-primary hover:bg-primary/90"
+          className="h-9 w-9 flex-shrink-0"
           onClick={addReferenceUrl}
           disabled={!newReferenceUrl.trim()}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        เพิ่มลิงค์สินค้า, ลิงค์ติดตามพัสดุ, หรือลิงค์อ้างอิงอื่นๆ (ระบบจะเติม https:// ให้อัตโนมัติ)
-      </p>
     </div>
   );
 }

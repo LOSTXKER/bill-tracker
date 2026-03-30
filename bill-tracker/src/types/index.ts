@@ -9,7 +9,8 @@ import type {
   ExpenseDocStatus,
   IncomeDocStatus,
   PaymentMethod,
-  WhtType
+  WhtType,
+  ExpenseDocumentType,
 } from "@prisma/client";
 
 // Re-export Prisma types
@@ -18,6 +19,7 @@ export type {
   Company,
   Expense,
   Income,
+  ExpenseDocumentType,
   Contact,
   CompanyAccess,
   UserRole,

@@ -14,25 +14,25 @@ export async function ActionRequired({ companyCode }: { companyCode: string }) {
   const [waitingDocs, waitingWht, waitingIssue, whtPendingIssue] = await Promise.all([
     // Expenses waiting for tax invoice
     prisma.expense.findMany({
-      where: { companyId: companyId, workflowStatus: "WAITING_TAX_INVOICE", deletedAt: null },
+      where: { companyId, workflowStatus: "ACTIVE", hasTaxInvoice: false, documentType: { not: "NO_DOCUMENT" }, deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),
     // Incomes waiting for WHT cert from customer
     prisma.income.findMany({
-      where: { companyId: companyId, workflowStatus: "WHT_PENDING_CERT", deletedAt: null },
+      where: { companyId, workflowStatus: "ACTIVE", isWhtDeducted: true, hasWhtCert: false, deletedAt: null },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
     // Incomes waiting to issue invoice
     prisma.income.findMany({
-      where: { companyId: companyId, workflowStatus: "WAITING_INVOICE_ISSUE", deletedAt: null },
+      where: { companyId, workflowStatus: "ACTIVE", hasInvoice: false, deletedAt: null },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
     // Expenses needing to issue WHT cert to vendor
     prisma.expense.findMany({
-      where: { companyId: companyId, workflowStatus: "WHT_PENDING_ISSUE", deletedAt: null },
+      where: { companyId, workflowStatus: "ACTIVE", isWht: true, hasWhtCert: false, deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),

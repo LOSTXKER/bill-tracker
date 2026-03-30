@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
-import { Prisma, IncomeWorkflowStatus } from "@prisma/client";
+import { Prisma, WorkflowStatus } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { serializeIncomes } from "@/lib/utils/serializers";
@@ -190,16 +190,15 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
 
   if (status) {
     if (status.includes(",")) {
-      whereClause.workflowStatus = { in: status.split(",") as IncomeWorkflowStatus[] };
+      whereClause.workflowStatus = { in: status.split(",") as WorkflowStatus[] };
     } else {
-      whereClause.workflowStatus = status as IncomeWorkflowStatus;
+      whereClause.workflowStatus = status as WorkflowStatus;
     }
   }
 
   // Handle special tab filters (approval status)
   if (tab === "pending") {
-    // Show items pending approval
-    whereClause.approvalStatus = "PENDING";
+    whereClause.workflowStatus = "PENDING_APPROVAL";
   } else if (tab === "rejected") {
     // Show rejected items
     whereClause.approvalStatus = "REJECTED";
@@ -284,22 +283,19 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       currentUserId 
         ? prisma.income.count({ where: { ...baseWhereClause, workflowStatus: "DRAFT", createdBy: currentUserId } })
         : Promise.resolve(0), // draft (my drafts)
-      prisma.income.count({ where: { ...baseWhereClause, approvalStatus: "PENDING" } }), // pending
+      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: "PENDING_APPROVAL" } }), // pending
       prisma.income.count({ where: { ...baseWhereClause, approvalStatus: "REJECTED" } }), // rejected
-      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: { in: ["RECEIVED", "NO_INVOICE_NEEDED", "WAITING_INVOICE_ISSUE", "WHT_PENDING_CERT"] } } }), // waiting_doc
-      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: { in: ["INVOICE_ISSUED", "INVOICE_SENT", "WHT_CERT_RECEIVED"] } } }), // doc_issued
+      prisma.income.count({ where: { ...baseWhereClause, workflowStatus: "ACTIVE" } }), // active
       prisma.income.count({ where: { ...baseWhereClause, workflowStatus: "READY_FOR_ACCOUNTING" } }), // ready
       prisma.income.count({ where: { ...baseWhereClause, workflowStatus: { in: ["SENT_TO_ACCOUNTANT", "COMPLETED"] } } }), // sent
-    ]).then(([all, draft, pending, rejected, waiting_doc, doc_issued, ready, sent]) => ({
+    ]).then(([all, draft, pending, rejected, active, ready, sent]) => ({
       all,
       draft,
       pending,
       rejected,
-      waiting_doc,
-      doc_issued,
+      active,
       ready,
       sent,
-      recent: null, // Recent doesn't need a count
     })),
   ]);
 

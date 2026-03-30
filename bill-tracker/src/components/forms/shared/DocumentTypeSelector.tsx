@@ -5,7 +5,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FileText, Receipt, FileX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ExpenseDocumentType = "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT";
+import type { ExpenseDocumentType } from "@prisma/client";
+export type { ExpenseDocumentType };
 
 interface DocumentTypeSelectorProps {
   value: ExpenseDocumentType;

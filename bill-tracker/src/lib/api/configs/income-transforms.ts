@@ -127,16 +127,14 @@ export function transformIncomeUpdateData(body: TransactionRequestBody, existing
       updateData.workflowStatus = validation.rollbackStatus;
     } else {
       if (!wasWht && nowWht) {
-        if (currentStatus === "READY_FOR_ACCOUNTING" || currentStatus === "INVOICE_ISSUED") {
+        if (currentStatus === "READY_FOR_ACCOUNTING") {
           if (!hasWhtCert) {
-            updateData.workflowStatus = "WHT_PENDING_CERT";
+            updateData.workflowStatus = "ACTIVE";
           }
         }
       } else if (wasWht && !nowWht) {
-        if (currentStatus === "WHT_PENDING_CERT") {
-          if (hasInvoice) {
-            updateData.workflowStatus = "READY_FOR_ACCOUNTING";
-          }
+        if (currentStatus === "ACTIVE" && hasInvoice) {
+          updateData.workflowStatus = "READY_FOR_ACCOUNTING";
         }
       }
     }

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
-import { Prisma, ExpenseWorkflowStatus } from "@prisma/client";
+import { Prisma, WorkflowStatus } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { serializeExpenses } from "@/lib/utils/serializers";
@@ -231,16 +231,15 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
 
   if (status) {
     if (status.includes(",")) {
-      whereClause.workflowStatus = { in: status.split(",") as ExpenseWorkflowStatus[] };
+      whereClause.workflowStatus = { in: status.split(",") as WorkflowStatus[] };
     } else {
-      whereClause.workflowStatus = status as ExpenseWorkflowStatus;
+      whereClause.workflowStatus = status as WorkflowStatus;
     }
   }
 
   // Handle special tab filters (approval status)
   if (tab === "pending") {
-    // Show items pending approval
-    whereClause.approvalStatus = "PENDING";
+    whereClause.workflowStatus = "PENDING_APPROVAL";
   } else if (tab === "rejected") {
     // Show rejected items
     whereClause.approvalStatus = "REJECTED";
@@ -349,22 +348,19 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       currentUserId 
         ? prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "DRAFT", createdBy: currentUserId } })
         : Promise.resolve(0), // draft (my drafts)
-      prisma.expense.count({ where: { ...baseWhereClause, approvalStatus: "PENDING" } }), // pending
+      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "PENDING_APPROVAL" } }), // pending
       prisma.expense.count({ where: { ...baseWhereClause, approvalStatus: "REJECTED" } }), // rejected
-      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["PAID", "WAITING_TAX_INVOICE", "WHT_PENDING_ISSUE"] } } }), // waiting_doc
-      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["TAX_INVOICE_RECEIVED", "WHT_ISSUED", "WHT_SENT_TO_VENDOR"] } } }), // doc_received
+      prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "ACTIVE" } }), // active
       prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "READY_FOR_ACCOUNTING" } }), // ready
       prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["SENT_TO_ACCOUNTANT", "COMPLETED"] } } }), // sent
-    ]).then(([all, draft, pending, rejected, waiting_doc, doc_received, ready, sent]) => ({
+    ]).then(([all, draft, pending, rejected, active, ready, sent]) => ({
       all,
       draft,
       pending,
       rejected,
-      waiting_doc,
-      doc_received,
+      active,
       ready,
       sent,
-      recent: null, // Recent doesn't need a count
     })),
     // Count cross-company expenses (paid by others for this company) — for warning banner in official mode
     prisma.expense.count({

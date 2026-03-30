@@ -122,7 +122,7 @@ async function _expenseStatsImpl(
           _sum: { netPaid: true },
         }),
     prisma.expense.count({
-      where: { ...filteredExpenseFilter, workflowStatus: "WAITING_TAX_INVOICE" },
+      where: { ...filteredExpenseFilter, workflowStatus: "ACTIVE", hasTaxInvoice: false },
     }),
     prisma.expense.count({
       where: { ...filteredExpenseFilter, workflowStatus: "READY_FOR_ACCOUNTING" },
@@ -233,10 +233,10 @@ async function _incomeStatsImpl(companyId: string, dateFilter?: DateRangeFilter)
           _sum: { netReceived: true },
         }),
     prisma.income.count({
-      where: { ...filteredIncomeFilter, workflowStatus: "WAITING_INVOICE_ISSUE" },
+      where: { ...filteredIncomeFilter, workflowStatus: "ACTIVE", hasInvoice: false },
     }),
     prisma.income.count({
-      where: { ...filteredIncomeFilter, workflowStatus: "WHT_PENDING_CERT" },
+      where: { ...filteredIncomeFilter, workflowStatus: "ACTIVE", isWhtDeducted: true, hasWhtCert: false },
     }),
     prisma.income.count({
       where: { ...filteredIncomeFilter, workflowStatus: "SENT_TO_ACCOUNTANT" },

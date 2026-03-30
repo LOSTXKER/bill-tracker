@@ -17,6 +17,21 @@ import type { User } from "@prisma/client";
 export type PermissionKey = string;
 
 /**
+ * Check permission from an already-loaded access object (no DB query).
+ * Use when you already have the CompanyAccess row.
+ */
+export function checkPermissionFromAccess(
+  access: { isOwner: boolean; permissions: unknown },
+  permission: string
+): boolean {
+  if (access.isOwner) return true;
+  const permissions = (access.permissions as string[]) || [];
+  if (permissions.includes(permission)) return true;
+  const [mod] = permission.split(":");
+  return permissions.includes(`${mod}:*`);
+}
+
+/**
  * Check if a user has a specific permission in a company
  * 
  * @param userId - The user ID to check

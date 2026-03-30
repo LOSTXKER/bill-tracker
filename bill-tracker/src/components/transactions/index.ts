@@ -1,8 +1,6 @@
 export { DocumentSection } from "./DocumentSection";
-export { StatusProgressBar } from "./StatusProgressBar";
-export { WorkflowProgressBar } from "./WorkflowProgressBar";
-export { WorkflowCard } from "./WorkflowCard";
-export { TimelineStepper } from "./TimelineStepper";
+export { DocumentChecklist } from "./DocumentChecklist";
+export { WorkflowStepper } from "./WorkflowStepper";
 export { AmountSummaryCard } from "./AmountSummaryCard";
 export { TransactionDetailSkeleton } from "./TransactionDetailSkeleton";
 export { TransactionDetailPage } from "./TransactionDetailPage";

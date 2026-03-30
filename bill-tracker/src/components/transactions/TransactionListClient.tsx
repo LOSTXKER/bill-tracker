@@ -82,13 +82,9 @@ interface TabCounts {
   all: number;
   draft: number;
   pending: number;
-  rejected: number;
-  waiting_doc: number;
-  doc_received?: number; // For expenses
-  doc_issued?: number;   // For incomes
+  active: number;
   ready: number;
   sent: number;
-  recent: null;
 }
 
 interface TransactionListClientProps {
@@ -174,9 +170,7 @@ export function TransactionListClient({
   
   const statusTabs = config.type === "expense" ? EXPENSE_STATUS_TABS : INCOME_STATUS_TABS;
   
-  // Determine active tab from URL params
   const getActiveTab = () => {
-    if (sortBy === "updatedAt") return "recent";
     if (filters.tab) return filters.tab;
     if (!filters.status) return "all";
     
@@ -192,21 +186,14 @@ export function TransactionListClient({
   
   const activeTab = getActiveTab();
   
-  // Handle tab change - updates URL which triggers server re-render
   const handleTabChange = (tabKey: string) => {
     const tab = statusTabs.find(t => t.key === tabKey);
     
-    if (tabKey === "recent") {
-      updateFilters({ tab: "", status: "" });
-      // Also update sort separately
-      setFilterWithSort("status", "", "updatedAt", "desc");
-    } else if (tabKey === "draft" || tabKey === "pending" || tabKey === "rejected") {
-      // Use updateFilters to update both status and tab in single navigation
+    if (tabKey === "draft") {
       updateFilters({ status: "", tab: tabKey });
     } else if (tab && tab.statuses.length > 0) {
       updateFilters({ tab: "", status: tab.statuses.join(",") });
     } else {
-      // "all" tab - clear all filters
       updateFilters({ tab: "", status: "" });
     }
   };
@@ -224,34 +211,20 @@ export function TransactionListClient({
 
   const EmptyIcon = config.emptyIcon;
 
-  // Count items per tab (for badges) - use server-provided counts if available
   const getTabCount = (tab: StatusTab) => {
-    if (tab.key === "recent") return null;
-    
-    // Use server-provided counts if available
     if (tabCounts) {
       const key = tab.key as keyof TabCounts;
       const count = tabCounts[key];
       return count ?? null;
     }
     
-    // Fallback: count from current data (less accurate when filtered)
     if (tab.key === "all") return total;
     
-    // For draft tab, only count items created by current user
     if (tab.key === "draft") {
       return data.filter(item => 
-        (item.workflowStatus === "DRAFT" || item.status === "DRAFT") && 
+        item.workflowStatus === "DRAFT" && 
         (item.creator as Record<string, unknown> | undefined)?.id === currentUserId
       ).length;
-    }
-    
-    // For pending/rejected tabs, count by approvalStatus
-    if (tab.isApprovalTab) {
-      return data.filter(item => item.approvalStatus === "PENDING").length;
-    }
-    if (tab.isRejectedTab) {
-      return data.filter(item => item.approvalStatus === "REJECTED").length;
     }
     
     return data.filter(item => tab.statuses.includes(((item.workflowStatus ?? item.status) as string | undefined) ?? "")).length;

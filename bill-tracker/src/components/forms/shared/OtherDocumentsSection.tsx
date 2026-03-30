@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { X, FileText, GripVertical, CheckCircle2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { X, FileText, GripVertical, CheckCircle2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { extractDisplayName } from "@/lib/storage/upload";
 import {
@@ -21,6 +22,7 @@ interface OtherDocumentsSectionProps {
   availableCategories: DocumentCategory[];
   disabled?: boolean;
   transactionType: "expense" | "income";
+  onUpload?: (files: File[]) => void;
 }
 
 export function OtherDocumentsSection({
@@ -31,7 +33,9 @@ export function OtherDocumentsSection({
   availableCategories,
   disabled = false,
   transactionType,
+  onUpload,
 }: OtherDocumentsSectionProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const config = CATEGORY_CONFIG.other;
   const Icon = config.icon;
   const label = transactionType === "income" ? config.labelIncome : config.label;
@@ -43,25 +47,58 @@ export function OtherDocumentsSection({
     return acc;
   }, {} as Record<OtherDocType, TypedOtherDoc[]>);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (fileList && fileList.length > 0 && onUpload) {
+      onUpload(Array.from(fileList));
+      e.target.value = "";
+    }
+  };
+
   return (
-    <div
-      className={cn(
-        "rounded-xl border p-3 transition-colors",
-        files.length > 0 ? config.bgColor : "bg-muted/20"
-      )}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className={cn("h-4 w-4", config.color)} />
-        <span className="text-sm font-medium">{label}</span>
-        {files.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            ({files.length} ไฟล์)
-          </span>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center", config.bgColor)}>
+            <Icon className={cn("h-4 w-4", config.color)} />
+          </div>
+          <div>
+            <p className="text-sm font-medium">{label}</p>
+            <p className="text-xs text-muted-foreground">
+              {files.length > 0 ? `${files.length} ไฟล์` : "ยังไม่มีเอกสาร"}
+            </p>
+          </div>
+        </div>
+        {onUpload && (
+          <label className="cursor-pointer">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={disabled}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 hover:bg-primary/10 hover:text-primary"
+              disabled={disabled}
+              asChild
+            >
+              <span>
+                <Plus className="h-4 w-4 mr-1.5" />
+                เพิ่มไฟล์
+              </span>
+            </Button>
+          </label>
         )}
       </div>
 
-      {files.length > 0 ? (
-        <div className="space-y-3">
+      {files.length > 0 && (
+        <div className="space-y-3 mt-2">
           {OTHER_DOC_TYPE_OPTIONS.map((docType) => {
             const typeFiles = filesByType[docType.value] || [];
             if (typeFiles.length === 0) return null;
@@ -91,10 +128,6 @@ export function OtherDocumentsSection({
             );
           })}
         </div>
-      ) : (
-        <p className="text-xs text-muted-foreground py-2">
-          ไม่มีไฟล์
-        </p>
       )}
     </div>
   );

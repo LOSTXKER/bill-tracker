@@ -6,7 +6,8 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
-import { ExpenseWorkflowStatus, DocumentEventType } from "@prisma/client";
+import { DocumentEventType } from "@prisma/client";
+import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
 
 // =============================================================================
 // GET: ดึงรายการ WHT ที่รอส่ง
@@ -24,7 +25,8 @@ export const GET = withCompanyAccessFromParams(
         deletedAt: null,
         isWht: true,
         hasWhtCert: true,
-        workflowStatus: "WHT_ISSUED", // Issued but not sent yet
+        workflowStatus: "ACTIVE",
+        whtCertSentAt: null,
       },
       select: {
         id: true,
@@ -154,19 +156,18 @@ export const POST = withCompanyAccessFromParams(
     }
 
     const now = new Date();
-    const newStatus: ExpenseWorkflowStatus = "WHT_SENT_TO_VENDOR";
     const eventType: DocumentEventType = "WHT_CERT_SENT";
 
-    // Update all expenses in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Verify all expenses belong to this company and are in correct status
       const expenses = await tx.expense.findMany({
         where: {
           id: { in: expenseIds },
           companyId: company.id,
           deletedAt: null,
           isWht: true,
-          workflowStatus: "WHT_ISSUED",
+          workflowStatus: "ACTIVE",
+          hasWhtCert: true,
+          whtCertSentAt: null,
         },
       });
 
@@ -174,33 +175,31 @@ export const POST = withCompanyAccessFromParams(
         throw new Error("บางรายการไม่พบหรือไม่อยู่ในสถานะที่สามารถส่งได้");
       }
 
-      // Update all expenses
-      await tx.expense.updateMany({
-        where: {
-          id: { in: expenseIds },
-        },
-        data: {
-          workflowStatus: newStatus,
-          whtCertSentAt: now,
-        },
+      const updatePromises = expenses.map(async (expense) => {
+        await tx.expense.update({
+          where: { id: expense.id },
+          data: {
+            whtCertSentAt: now,
+          },
+        });
+
+        const methodInfo = getDeliveryMethod(deliveryMethod);
+        await tx.documentEvent.create({
+          data: {
+            id: crypto.randomUUID(),
+            expenseId: expense.id,
+            eventType,
+            eventDate: now,
+            fromStatus: expense.workflowStatus,
+            toStatus: expense.workflowStatus,
+            notes: notes || `ส่ง WHT ทาง ${methodInfo?.label || deliveryMethod}`,
+            metadata: { deliveryMethod },
+            createdBy: session.user.id,
+          },
+        });
       });
 
-      // Create document events for each expense
-      const events = expenses.map((expense) => ({
-        id: crypto.randomUUID(),
-        expenseId: expense.id,
-        eventType,
-        eventDate: now,
-        fromStatus: expense.workflowStatus,
-        toStatus: newStatus,
-        notes: notes || `ส่ง WHT ทาง ${getDeliveryMethodLabel(deliveryMethod)}`,
-        metadata: { deliveryMethod },
-        createdBy: session.user.id,
-      }));
-
-      await tx.documentEvent.createMany({
-        data: events,
-      });
+      await Promise.all(updatePromises);
 
       return {
         updatedCount: expenses.length,
@@ -216,13 +215,3 @@ export const POST = withCompanyAccessFromParams(
   { permission: "expenses:change-status" }
 );
 
-// Helper function
-function getDeliveryMethodLabel(method: string): string {
-  const labels: Record<string, string> = {
-    email: "อีเมล",
-    physical: "ตัวจริง",
-    line: "LINE",
-    pickup: "มารับเอง",
-  };
-  return labels[method] || method;
-}

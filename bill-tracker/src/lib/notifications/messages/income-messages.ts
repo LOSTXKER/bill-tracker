@@ -15,6 +15,7 @@ export interface IncomeMessageData {
   whtAmount?: number;
   netReceived: number;
   status: string;
+  hasWhtCert?: boolean;
 }
 
 export function createIncomeFlexMessage(
@@ -161,7 +162,7 @@ export function createIncomeFlexMessage(
     margin: "lg",
   });
 
-  if (income.status === "WHT_PENDING_CERT") {
+  if (income.status === "ACTIVE" && income.isWhtDeducted && !income.hasWhtCert) {
     bodyContents.push({
       type: "box",
       layout: "horizontal",

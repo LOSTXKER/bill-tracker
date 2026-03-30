@@ -8,7 +8,7 @@ import {
   Calendar,
   User,
 } from "lucide-react";
-import { DocumentSection } from "@/components/transactions";
+import { DocumentSection, DocumentChecklist } from "@/components/transactions";
 import { CombinedHistorySection } from "@/components/transactions";
 import { CommentSection } from "@/components/comments/CommentSection";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
@@ -35,8 +35,32 @@ export function TransactionSidePanel({
   auditRefreshKey,
   currentUserId,
 }: TransactionSidePanelProps) {
+  const handleChecklistAction = async (action: string) => {
+    const res = await fetch(`/api/${companyCode}/document-workflow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transactionType: config.type,
+        transactionId: transaction.id,
+        action,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "เกิดข้อผิดพลาด");
+    }
+    window.location.reload();
+  };
+
   return (
     <div className="lg:col-span-2 space-y-4">
+      <DocumentChecklist
+        transactionType={config.type}
+        transaction={{ ...transaction, workflowStatus: transaction.workflowStatus ?? "DRAFT" }}
+        companyCode={companyCode}
+        onAction={handleChecklistAction}
+      />
+
       <Card className="shadow-sm border-border bg-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -87,7 +111,7 @@ export function TransactionSidePanel({
           />
         </CardContent>
 
-        <div className="px-6 py-4 border-t bg-muted/40 text-xs text-muted-foreground space-y-2">
+        <div className="px-6 py-4 border-t text-xs text-muted-foreground space-y-2">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <User className="h-3.5 w-3.5" />

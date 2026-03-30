@@ -12,34 +12,12 @@ import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { apiResponse } from "./response";
 import { ApiError, ApiErrors } from "./errors";
 import { withAuth, type AuthenticatedContext } from "./with-auth";
+import { checkPermissionFromAccess } from "@/lib/permissions/checker";
 import type { Company } from "@prisma/client";
 
 export interface CompanyAccessContext extends AuthenticatedContext {
   company: Company;
   companyCode: string;
-}
-
-/**
- * Check if user has a specific permission based on already-fetched access data
- * This avoids the duplicate DB query that hasPermission() would make
- */
-function checkPermissionFromAccess(
-  access: { isOwner: boolean; permissions: unknown },
-  permission: string
-): boolean {
-  // OWNER has all permissions
-  if (access.isOwner) return true;
-
-  const permissions = (access.permissions as string[]) || [];
-  
-  // Check exact match
-  if (permissions.includes(permission)) return true;
-
-  // Check module wildcard (e.g., "expenses:*" covers "expenses:create")
-  const [module] = permission.split(":");
-  if (permissions.includes(`${module}:*`)) return true;
-
-  return false;
 }
 
 interface CompanyAccessOptions {

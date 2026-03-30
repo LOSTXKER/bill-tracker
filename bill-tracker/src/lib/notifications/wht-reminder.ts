@@ -185,36 +185,33 @@ export async function sendPendingDocsReminders(): Promise<WhtReminderResult> {
  * Get pending documents summary for a company
  */
 async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promise<PendingDocsSummary> {
-  // Pending tax invoices
   const pendingTaxInvoice = await prisma.expense.count({
     where: {
       companyId,
       deletedAt: null,
-      workflowStatus: { in: ["PAID", "WAITING_TAX_INVOICE"] },
+      workflowStatus: "ACTIVE",
       hasTaxInvoice: false,
       billDate: { lte: cutoffDate },
     },
   });
 
-  // Pending WHT issue (we need to issue)
   const pendingWhtIssue = await prisma.expense.count({
     where: {
       companyId,
       deletedAt: null,
+      workflowStatus: "ACTIVE",
       isWht: true,
-      workflowStatus: { in: ["TAX_INVOICE_RECEIVED", "WHT_PENDING_ISSUE"] },
       hasWhtCert: false,
       billDate: { lte: cutoffDate },
     },
   });
 
-  // Pending WHT cert from customers
   const pendingWhtCert = await prisma.income.count({
     where: {
       companyId,
       deletedAt: null,
+      workflowStatus: "ACTIVE",
       isWhtDeducted: true,
-      workflowStatus: "WHT_PENDING_CERT",
       hasWhtCert: false,
       receiveDate: { lte: cutoffDate },
     },
@@ -236,8 +233,9 @@ async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promi
     where: {
       companyId,
       deletedAt: null,
+      workflowStatus: "ACTIVE",
       OR: [
-        { hasTaxInvoice: false, workflowStatus: { in: ["PAID", "WAITING_TAX_INVOICE"] } },
+        { hasTaxInvoice: false },
         { isWht: true, hasWhtCert: false },
       ],
     },
@@ -249,6 +247,7 @@ async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promi
     where: {
       companyId,
       deletedAt: null,
+      workflowStatus: "ACTIVE",
       isWhtDeducted: true,
       hasWhtCert: false,
     },

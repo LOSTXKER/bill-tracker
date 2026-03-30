@@ -8,11 +8,12 @@ import {
 } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { MessageSquareText } from "lucide-react";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import type { BaseTransaction } from "./hooks/useTransactionForm";
 import {
   TransactionFieldsSection,
-  type TransactionFieldsConfig,
+  buildFieldsConfig,
 } from "./shared/TransactionFieldsSection";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
@@ -92,19 +93,13 @@ export function ViewEditModeContent({
   auditRefreshKey,
   currentUserId,
 }: ViewEditModeContentProps) {
-  const fieldsConfig: TransactionFieldsConfig = {
-    type: config.type,
-    dateField: config.fields.dateField,
-    descriptionField: config.fields.descriptionField,
-    statusOptions: config.statusOptions,
-    showDueDate: config.showDueDate,
-  };
+  const fieldsConfig = buildFieldsConfig(config);
 
   return (
     <div className="max-w-6xl mx-auto px-4">
       <div className="grid lg:grid-cols-5 gap-6">
         {/* Left Column: Main Info */}
-        <Card className="lg:col-span-3 shadow-lg border-border">
+        <Card className="lg:col-span-3 shadow-sm border-border">
           <CardContent className="p-6 lg:p-8 space-y-6">
             <TransactionFieldsSection
               config={fieldsConfig}
@@ -187,7 +182,10 @@ export function ViewEditModeContent({
             )}
 
             <div className="pt-2">
-              <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
+              <p className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                <MessageSquareText className="h-3.5 w-3.5" />
+                หมายเหตุ
+              </p>
               {mode === "edit" ? (
                 <Textarea
                   {...register("notes")}
@@ -197,7 +195,7 @@ export function ViewEditModeContent({
                 />
               ) : (
                 <p className="text-muted-foreground whitespace-pre-wrap">
-                  {(watch("notes") as string) || <span className="italic">ไม่มีหมายเหตุ</span>}
+                  {(watch("notes") as string) || <span className="italic text-muted-foreground/60">ไม่มีหมายเหตุ</span>}
                 </p>
               )}
             </div>

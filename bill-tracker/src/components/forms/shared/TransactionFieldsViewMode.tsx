@@ -3,9 +3,7 @@
 import { useState, useEffect } from "react";
 import type { TransactionFieldsConfig, FormWatch, InternalCompanyOption } from "./transaction-fields-types";
 import type { ContactSummary } from "@/types";
-import { WhtDeliverySection } from "./WhtDeliverySection";
-import { TaxInvoiceRequestSection } from "./TaxInvoiceRequestSection";
-import { ReferenceUrlsSection } from "./ReferenceUrlsSection";
+import { DocumentSettingsBlock } from "./DocumentSettingsBlock";
 
 interface TransactionFieldsViewModeProps {
   config: TransactionFieldsConfig;
@@ -76,13 +74,7 @@ export function TransactionFieldsViewMode({
     }
   }, [selectedAccount, companyCode]);
 
-  const showWhtDelivery = config.type === "expense" && isWht && (
-    whtDeliveryMethod || (selectedContact && (selectedContact.preferredDeliveryMethod || selectedContact.deliveryNotes))
-  );
-
-  const showTaxInvoice = config.type === "expense" && (
-    taxInvoiceRequestMethod || (selectedContact && (selectedContact.taxInvoiceRequestMethod || selectedContact.taxInvoiceRequestNotes))
-  );
+  const watchDocumentType = watch("documentType") as string | undefined;
 
   return (
     <div className="space-y-6">
@@ -154,27 +146,20 @@ export function TransactionFieldsViewMode({
 
       {renderAdditionalFields?.()}
 
-      {showWhtDelivery && (
-        <WhtDeliverySection
-          mode="view"
-          whtDeliveryMethod={whtDeliveryMethod}
-          whtDeliveryEmail={whtDeliveryEmail}
-          whtDeliveryNotes={whtDeliveryNotes}
-          selectedContact={selectedContact}
-        />
-      )}
-
-      {showTaxInvoice && (
-        <TaxInvoiceRequestSection
-          mode="view"
-          taxInvoiceRequestMethod={taxInvoiceRequestMethod}
-          taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-          taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-          selectedContact={selectedContact}
-        />
-      )}
-
-      <ReferenceUrlsSection mode="view" referenceUrls={referenceUrls} />
+      <DocumentSettingsBlock
+        mode="view"
+        configType={config.type}
+        documentType={watchDocumentType}
+        isWht={isWht}
+        selectedContact={selectedContact}
+        whtDeliveryMethod={whtDeliveryMethod ?? null}
+        whtDeliveryEmail={whtDeliveryEmail ?? null}
+        whtDeliveryNotes={whtDeliveryNotes ?? null}
+        taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
+        taxInvoiceRequestEmail={taxInvoiceRequestEmail ?? null}
+        taxInvoiceRequestNotes={taxInvoiceRequestNotes ?? null}
+        referenceUrls={referenceUrls}
+      />
     </div>
   );
 }

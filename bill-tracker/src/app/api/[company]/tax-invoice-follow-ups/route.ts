@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { DocumentEventType } from "@prisma/client";
+import { getTaxInvoiceRequestMethod } from "@/lib/constants/delivery-methods";
 
 // =============================================================================
 // GET: ดึงรายการ expense ที่รอใบกำกับภาษี (จัดกลุ่มตาม Vendor)
@@ -23,7 +24,8 @@ export const GET = withCompanyAccessFromParams(
         companyId: company.id,
         deletedAt: null,
         documentType: "TAX_INVOICE",
-        workflowStatus: "WAITING_TAX_INVOICE",
+        workflowStatus: "ACTIVE",
+        hasTaxInvoice: false,
       },
       select: {
         id: true,
@@ -179,7 +181,8 @@ export const POST = withCompanyAccessFromParams(
           id: { in: expenseIds },
           companyId: company.id,
           deletedAt: null,
-          workflowStatus: "WAITING_TAX_INVOICE",
+          workflowStatus: "ACTIVE",
+          hasTaxInvoice: false,
         },
       });
 
@@ -205,7 +208,7 @@ export const POST = withCompanyAccessFromParams(
           eventDate: now,
           fromStatus: expense.workflowStatus,
           toStatus: expense.workflowStatus, // Status doesn't change
-          notes: notes || `ขอใบกำกับภาษี${requestMethod ? ` ทาง${getRequestMethodLabel(requestMethod)}` : ""}`,
+          notes: notes || `ขอใบกำกับภาษี${requestMethod ? ` ทาง${getTaxInvoiceRequestMethod(requestMethod)?.label || requestMethod}` : ""}`,
           metadata: { action: "mark_requested", requestMethod },
           createdBy: session.user.id,
         }));
@@ -247,15 +250,11 @@ export const POST = withCompanyAccessFromParams(
           expenses: expenses.map((e) => e.id),
         };
       } else {
-        // mark_received: Change status to TAX_INVOICE_RECEIVED
+        // mark_received: Record tax invoice received (status stays ACTIVE)
         const updatePromises = expenses.map(async (expense) => {
-          // Determine next status based on WHT requirement
-          const newStatus = expense.isWht ? "WHT_PENDING_ISSUE" : "READY_FOR_ACCOUNTING";
-
           await tx.expense.update({
             where: { id: expense.id },
             data: {
-              workflowStatus: newStatus,
               hasTaxInvoice: true,
               taxInvoiceAt: now,
             },
@@ -268,7 +267,7 @@ export const POST = withCompanyAccessFromParams(
               eventType: "TAX_INVOICE_RECEIVED" as DocumentEventType,
               eventDate: now,
               fromStatus: expense.workflowStatus,
-              toStatus: newStatus,
+              toStatus: expense.workflowStatus,
               notes: notes || "ได้รับใบกำกับภาษีแล้ว",
               metadata: { action: "mark_received" },
               createdBy: session.user.id,
@@ -300,14 +299,3 @@ export const POST = withCompanyAccessFromParams(
   { permission: "expenses:change-status" }
 );
 
-// Helper function
-function getRequestMethodLabel(method: string): string {
-  const labels: Record<string, string> = {
-    email: "อีเมล",
-    physical: "ไปรับเอง/ส่งคนไป",
-    line: "LINE",
-    pickup: "ไปรับที่ร้าน",
-    google_drive: "Google Drive",
-  };
-  return labels[method] || method;
-}

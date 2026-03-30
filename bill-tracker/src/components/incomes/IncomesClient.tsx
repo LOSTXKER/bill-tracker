@@ -11,12 +11,9 @@ interface TabCounts {
   all: number;
   draft: number;
   pending: number;
-  rejected: number;
-  waiting_doc: number;
-  doc_issued: number;
+  active: number;
   ready: number;
   sent: number;
-  recent: null;
 }
 
 interface IncomesClientProps {
