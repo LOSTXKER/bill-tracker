@@ -1,4 +1,5 @@
-// TODO: Run prisma migrate to apply enum changes (ReconcileSessionType, ReconcileMatchType, ReconcileMatchStatus, DeliveryMethod)
+// NOTE: ReconcileSessionType, ReconcileMatchType, ReconcileMatchStatus, DeliveryMethod enums are defined below
+// but fields still use String until a proper prisma migrate is run against the production database.
 generator client {
   provider = "prisma-client-js"
 }
@@ -203,12 +204,12 @@ model Contact {
   defaultsLastUpdatedAt DateTime? // วันที่อัปเดตค่าเริ่มต้นล่าสุด
 
   // วิธีส่งเอกสาร (Document Delivery Preferences)
-  preferredDeliveryMethod DeliveryMethod?
+  preferredDeliveryMethod String?
   deliveryEmail           String?
   deliveryNotes           String?
 
   // วิธีขอใบกำกับภาษี (Tax Invoice Request Preferences)
-  taxInvoiceRequestMethod DeliveryMethod?
+  taxInvoiceRequestMethod String?
   taxInvoiceRequestEmail  String?
   taxInvoiceRequestNotes  String?
 
@@ -308,11 +309,11 @@ model Expense {
   // Internal company tracking (บริษัทจริงภายใน - ถ้าต่างจากที่บันทึก)
   internalCompanyId                          String?
   // วิธีส่งใบหัก ณ ที่จ่าย (Override จาก Contact)
-  whtDeliveryMethod                          DeliveryMethod?
+  whtDeliveryMethod                          String?
   whtDeliveryEmail                           String?
   whtDeliveryNotes                           String?
   // วิธีขอใบกำกับภาษี (Override จาก Contact)
-  taxInvoiceRequestMethod                    DeliveryMethod?
+  taxInvoiceRequestMethod                    String?
   taxInvoiceRequestEmail                     String?
   taxInvoiceRequestNotes                     String?
   taxInvoiceRequestedAt                      DateTime? // วันที่ขอใบกำกับล่าสุด
@@ -889,7 +890,7 @@ model ReconcileSession {
   companyId             String
   month                 Int
   year                  Int
-  type                  ReconcileSessionType
+  type                  String
   status                ReconcileSessionStatus @default(IN_PROGRESS)
   matchedCount          Int                    @default(0)
   unmatchedSystemCount  Int                    @default(0)
@@ -970,7 +971,7 @@ model ReconcileMatch {
   acctTotal   Decimal @db.Decimal(12, 2)
 
   // ข้อมูลการจับคู่
-  matchType  ReconcileMatchType
+  matchType  String
   confidence Decimal? @db.Decimal(3, 2)
   aiReason   String?
   amountDiff Decimal? @db.Decimal(12, 2)
@@ -982,7 +983,7 @@ model ReconcileMatch {
   payOnBehalfTo   String?
 
   // สถานะ
-  status         ReconcileMatchStatus @default(PENDING)
+  status         String               @default("PENDING")
   confirmedBy    String?
   confirmedAt    DateTime?
   rejectedReason String?
