@@ -155,9 +155,7 @@ async function handleDelete(
   }
 }
 
-export const GET = withCompanyAccessFromParams(handleGet, {
-  permission: "reports:read",
-});
+export const GET = withCompanyAccessFromParams(handleGet, {});
 
 export const PATCH = withCompanyAccessFromParams(handlePatch, {
   permission: "settings:write",

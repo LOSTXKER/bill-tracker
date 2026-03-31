@@ -100,7 +100,6 @@ async function handlePost(
 }
 
 export const GET = withCompanyAccess(handleGet, {
-  permission: "reports:read",
   getCompanyCode: getCompanyFromPath,
 });
 
