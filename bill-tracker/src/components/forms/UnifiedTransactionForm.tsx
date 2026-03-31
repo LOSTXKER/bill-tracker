@@ -991,29 +991,6 @@ export function UnifiedTransactionForm({
     setTaxInvoiceRequestNotes,
   });
 
-  // Loading state for view/edit mode
-  if (mode !== "create" && loading) {
-    return <TransactionDetailSkeleton />;
-  }
-
-  // Error state
-  if (mode !== "create" && (error || !transaction)) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-        </div>
-        <p className="text-destructive font-medium">{error || "ไม่พบรายการ"}</p>
-        <Button variant="outline" onClick={navigateToList}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            กลับหน้า{config.title}
-          </Button>
-      </div>
-    );
-  }
-
-  const isDeleted = transaction?.deletedAt ? true : false;
-
   const transactionFormContextValue = useFormContextFactory({
     configType: config.type,
     mode,
@@ -1056,6 +1033,27 @@ export function UnifiedTransactionForm({
     referenceUrls,
     setReferenceUrls,
   });
+
+  // Loading state for view/edit mode
+  if (mode !== "create" && loading) {
+    return <TransactionDetailSkeleton />;
+  }
+
+  // Error state
+  if (mode !== "create" && (error || !transaction)) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+        </div>
+        <p className="text-destructive font-medium">{error || "ไม่พบรายการ"}</p>
+        <Button variant="outline" onClick={navigateToList}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            กลับหน้า{config.title}
+          </Button>
+      </div>
+    );
+  }
 
   // =============================================================================
   // Render
