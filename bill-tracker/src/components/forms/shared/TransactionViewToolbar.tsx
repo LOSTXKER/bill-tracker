@@ -62,14 +62,14 @@ function ActiveStatusCTA({
         body: JSON.stringify({
           transactionType: config.type,
           transactionId: transaction.id,
-          action: "send_to_accounting",
+          action: "mark_ready_for_accounting",
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error || "เกิดข้อผิดพลาด");
       }
-      toast.success("ส่งบัญชีเรียบร้อย");
+      toast.success("เปลี่ยนสถานะเป็นพร้อมส่งบัญชีแล้ว");
       onActionComplete();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -94,7 +94,7 @@ function ActiveStatusCTA({
         title={!allDone ? `เหลืออีก ${remaining} รายการในเช็คลิสต์` : undefined}
       >
         <Send className="h-3.5 w-3.5" />
-        ส่งบัญชี
+        พร้อมส่งบัญชี
       </LoadingButton>
       {!allDone && (
         <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -248,7 +248,7 @@ export function TransactionViewToolbar({
                 />
               )}
 
-              {/* ACTIVE: show "ส่งบัญชี" button, disabled until checklist is complete */}
+              {/* ACTIVE: show "พร้อมส่งบัญชี" button, disabled until checklist is complete */}
               {transaction.workflowStatus === "ACTIVE" && (
                 <ActiveStatusCTA
                   config={config}

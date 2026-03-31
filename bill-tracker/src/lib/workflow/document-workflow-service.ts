@@ -263,6 +263,10 @@ function resolveExpenseAction(
       eventType = "STATUS_CHANGED";
       break;
     }
+    case "mark_ready_for_accounting":
+      newStatus = "READY_FOR_ACCOUNTING";
+      eventType = "STATUS_CHANGED";
+      break;
     case "send_to_accounting":
       updateData.sentToAccountAt = now;
       newStatus = "SENT_TO_ACCOUNTANT";
@@ -340,6 +344,10 @@ function resolveIncomeAction(
       eventType = "STATUS_CHANGED";
       break;
     }
+    case "mark_ready_for_accounting":
+      newStatus = "READY_FOR_ACCOUNTING";
+      eventType = "STATUS_CHANGED";
+      break;
     case "send_to_accounting":
       updateData.sentToAccountAt = now;
       newStatus = "SENT_TO_ACCOUNTANT";
