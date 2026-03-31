@@ -28,20 +28,23 @@ export function useDocumentTypeEffects({
   setTaxInvoiceRequestEmail,
   setTaxInvoiceRequestNotes,
 }: UseDocumentTypeEffectsParams) {
-  const prevVatRateRef = useRef(watchVatRate);
+  const safeVatRate = typeof watchVatRate === "number" && !Number.isNaN(watchVatRate)
+    ? watchVatRate
+    : 0;
+  const prevVatRateRef = useRef(safeVatRate);
 
   useEffect(() => {
-    if (configType === "expense" && prevVatRateRef.current !== watchVatRate) {
-      if (watchVatRate === 0) {
+    if (configType === "expense" && prevVatRateRef.current !== safeVatRate) {
+      if (safeVatRate === 0) {
         if (!watchDocumentType || watchDocumentType === "TAX_INVOICE") {
           setValue("documentType", "CASH_RECEIPT");
         }
       } else {
         setValue("documentType", "TAX_INVOICE");
       }
-      prevVatRateRef.current = watchVatRate;
+      prevVatRateRef.current = safeVatRate;
     }
-  }, [watchVatRate, watchDocumentType, configType, setValue]);
+  }, [safeVatRate, watchDocumentType, configType, setValue]);
 
   useEffect(() => {
     if (configType === "expense" && watchDocumentType === "NO_DOCUMENT") {

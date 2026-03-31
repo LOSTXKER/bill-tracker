@@ -709,15 +709,19 @@ export function UnifiedTransactionForm({
     }
   }, [config.type, mode, transactionId, transaction]);
 
-  // Recalculate when values change
+  // Recalculate when values change (use safe numeric values to prevent NaN propagation)
+  const safeAmount = typeof watchAmount === "number" && Number.isFinite(watchAmount) ? watchAmount : 0;
+  const safeVatRate = typeof watchVatRate === "number" && Number.isFinite(watchVatRate) ? watchVatRate : 0;
+  const safeWhtRate = typeof watchWhtRate === "number" && Number.isFinite(watchWhtRate) ? watchWhtRate : 0;
+
   useEffect(() => {
     const calc = config.calculateTotals(
-      watchAmount || 0,
-      watchVatRate || 0,
-      watchIsWht ? watchWhtRate || 0 : 0
+      safeAmount,
+      safeVatRate,
+      watchIsWht ? safeWhtRate : 0
     );
     setCalculation(calc);
-  }, [watchAmount, watchVatRate, watchIsWht, watchWhtRate, config]);
+  }, [safeAmount, safeVatRate, watchIsWht, safeWhtRate, config]);
 
   // Check if form has existing data
   const hasExistingData = useCallback(() => {
@@ -991,6 +995,11 @@ export function UnifiedTransactionForm({
     setTaxInvoiceRequestNotes,
   });
 
+  const stableAccessibleCompanies = useMemo(
+    () => accessibleCompanies.map((c) => ({ id: c.id, name: c.name, code: c.code })),
+    [accessibleCompanies],
+  );
+
   const transactionFormContextValue = useFormContextFactory({
     configType: config.type,
     mode,
@@ -1025,11 +1034,7 @@ export function UnifiedTransactionForm({
     setUpdateContactTaxInvoiceRequest,
     internalCompanyId,
     setInternalCompanyId,
-    accessibleCompanies: accessibleCompanies.map((c) => ({
-      id: c.id,
-      name: c.name,
-      code: c.code,
-    })),
+    accessibleCompanies: stableAccessibleCompanies,
     referenceUrls,
     setReferenceUrls,
   });

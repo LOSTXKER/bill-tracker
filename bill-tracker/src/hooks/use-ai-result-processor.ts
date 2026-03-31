@@ -91,22 +91,25 @@ export function useAiResultProcessor({
         result.currencyConversion?.convertedAmount !== undefined &&
         result.currencyConversion?.currency !== "THB";
 
-      if (hasCurrencyConversion && result.currencyConversion?.convertedAmount) {
-        setValue("amount", result.currencyConversion.convertedAmount);
-      } else if (extendedCombined.amount) {
+      const safeNum = (v: unknown): number | null =>
+        typeof v === "number" && Number.isFinite(v) ? v : null;
+
+      if (hasCurrencyConversion && safeNum(result.currencyConversion?.convertedAmount)) {
+        setValue("amount", result.currencyConversion!.convertedAmount);
+      } else if (safeNum(extendedCombined.amount)) {
         setValue("amount", extendedCombined.amount);
-      } else if (combined.totalAmount && extendedCombined.vatRate) {
-        const amountBeforeVat = combined.totalAmount / (1 + extendedCombined.vatRate / 100);
+      } else if (safeNum(combined.totalAmount) && safeNum(extendedCombined.vatRate)) {
+        const amountBeforeVat = combined.totalAmount! / (1 + extendedCombined.vatRate! / 100);
         setValue("amount", Math.round(amountBeforeVat * 100) / 100);
-      } else if (combined.totalAmount) {
+      } else if (safeNum(combined.totalAmount)) {
         setValue("amount", combined.totalAmount);
-      } else if (suggested.amount !== null && suggested.amount !== undefined) {
+      } else if (safeNum(suggested.amount as number)) {
         setValue("amount", suggested.amount);
       }
 
-      // Apply VAT rate
+      // Apply VAT rate (guard against NaN to prevent infinite re-render loop)
       const vatRate = suggested.vatRate ?? extendedCombined.vatRate;
-      if (vatRate !== null && vatRate !== undefined) {
+      if (vatRate !== null && vatRate !== undefined && typeof vatRate === "number" && !Number.isNaN(vatRate)) {
         setValue("vatRate", vatRate);
       }
 
