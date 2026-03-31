@@ -134,5 +134,5 @@ export const GET = withCompanyAccessFromParams(
       { maxAge: 5, staleWhileRevalidate: 30 }
     );
   },
-  { permission: "settlements:read" }
+  {}
 );
