@@ -216,7 +216,7 @@ export function TransactionAmountCard({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">จำนวนเงินก่อนภาษี</span>
+            <span className="text-sm text-muted-foreground">{vatRate > 0 ? "จำนวนเงินก่อนภาษี" : "จำนวนเงิน"}</span>
             <span className="font-mono text-sm font-medium">{formatCurrency(amount)}</span>
           </div>
 
@@ -264,7 +264,7 @@ export function TransactionAmountCard({
       <div className="space-y-3 text-sm">
         {/* Amount */}
         <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">จำนวนเงินก่อนภาษี</span>
+          <span className="text-muted-foreground">{vatRate > 0 ? "จำนวนเงินก่อนภาษี" : "จำนวนเงิน"}</span>
           <Input
             type="number"
             step="0.01"
