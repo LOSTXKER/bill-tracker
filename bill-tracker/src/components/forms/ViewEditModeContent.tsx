@@ -163,7 +163,10 @@ export function ViewEditModeContent({
               whtLabel={config.fields.whtField.label}
               whtDescription={config.fields.whtField.description}
               whtChangeInfo={whtChangeInfo}
-              documentType={(transaction?.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || (watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
+              documentType={mode === "edit"
+                ? (watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"
+                : (transaction?.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"
+              }
               onDocumentTypeChange={config.type === "expense" && mode === "edit" ? handleDocumentTypeChange : undefined}
               totalWithVat={calculation.totalWithVat}
               netAmount={calculation.netAmount}

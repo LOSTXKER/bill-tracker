@@ -32,19 +32,22 @@ export function useDocumentTypeEffects({
     ? watchVatRate
     : 0;
   const prevVatRateRef = useRef(safeVatRate);
+  const docTypeRef = useRef(watchDocumentType);
+  docTypeRef.current = watchDocumentType;
 
   useEffect(() => {
-    if (configType === "expense" && prevVatRateRef.current !== safeVatRate) {
-      if (safeVatRate === 0) {
-        if (!watchDocumentType || watchDocumentType === "TAX_INVOICE") {
-          setValue("documentType", "CASH_RECEIPT");
-        }
-      } else {
-        setValue("documentType", "TAX_INVOICE");
+    if (configType !== "expense" || prevVatRateRef.current === safeVatRate) return;
+
+    if (safeVatRate === 0) {
+      const current = docTypeRef.current;
+      if (!current || current === "TAX_INVOICE") {
+        setValue("documentType", "CASH_RECEIPT");
       }
-      prevVatRateRef.current = safeVatRate;
+    } else {
+      setValue("documentType", "TAX_INVOICE");
     }
-  }, [safeVatRate, watchDocumentType, configType, setValue]);
+    prevVatRateRef.current = safeVatRate;
+  }, [safeVatRate, configType, setValue]);
 
   useEffect(() => {
     if (configType === "expense" && watchDocumentType === "NO_DOCUMENT") {
