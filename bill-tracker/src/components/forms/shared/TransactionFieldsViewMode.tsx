@@ -92,7 +92,9 @@ export function TransactionFieldsViewMode({
           </p>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1">จำนวนเงิน (ก่อน VAT)</p>
+          <p className="text-sm text-muted-foreground mb-1">
+            {(watch("vatRate") as number) > 0 ? "จำนวนเงิน (ก่อน VAT)" : "จำนวนเงิน"}
+          </p>
           <p className="text-xl font-bold text-foreground">
             ฿{formatCurrency((watch("amount") as number) || 0)}
           </p>

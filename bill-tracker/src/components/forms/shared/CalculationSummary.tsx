@@ -36,7 +36,7 @@ export function CalculationSummary({
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">ยอดก่อน VAT</span>
+          <span className="text-muted-foreground">{vatRate > 0 ? "ยอดก่อน VAT" : "ยอดเงิน"}</span>
           <span className="text-foreground">{formatCurrency(baseAmount)}</span>
         </div>
         {vatRate > 0 && (
@@ -46,7 +46,7 @@ export function CalculationSummary({
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-muted-foreground">ยอดรวม VAT</span>
+          <span className="text-muted-foreground">{vatRate > 0 ? "ยอดรวม VAT" : "รวมเป็นเงิน"}</span>
           <span className="text-foreground">{formatCurrency(totalWithVat)}</span>
         </div>
         {whtRate && whtRate > 0 && (

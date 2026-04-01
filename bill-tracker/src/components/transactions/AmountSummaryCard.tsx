@@ -79,7 +79,9 @@ export function AmountSummaryCard({
       <CardContent className="space-y-4">
         {/* Amount before tax */}
         <div className="flex items-center justify-between">
-          <Label className="text-sm text-muted-foreground">จำนวนเงินก่อนภาษี</Label>
+          <Label className="text-sm text-muted-foreground">
+            {data.vatRate > 0 ? "จำนวนเงินก่อนภาษี" : "จำนวนเงิน"}
+          </Label>
           {isEditing ? (
             <Input
               type="number"
