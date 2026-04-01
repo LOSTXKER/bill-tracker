@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { revalidateSidebarBadges } from "@/lib/utils/revalidate";
 
 interface UseTransactionActionsOptions {
   transactionType: "expense" | "income";
@@ -38,6 +39,7 @@ export function useTransactionActions({
       }
 
       toast.success("ลบรายการสำเร็จ");
+      revalidateSidebarBadges(companyCode);
       router.refresh();
       router.push(`/${companyCode}/${transactionType}s`);
     } catch (err) {
@@ -66,7 +68,7 @@ export function useTransactionActions({
         `เปลี่ยนสถานะเป็น "${statusInfo[newStatus]?.label || newStatus}" สำเร็จ`
       );
       
-      // Trigger real-time update
+      revalidateSidebarBadges(companyCode);
       router.refresh();
       onSuccess?.();
     } catch (err) {

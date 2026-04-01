@@ -16,10 +16,9 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    // Cache client-side navigations for faster page transitions
     staleTimes: {
-      dynamic: 300, // Cache dynamic pages for 5 minutes
-      static: 600, // Cache static pages for 10 minutes
+      dynamic: 0,
+      static: 600,
     },
   },
 };

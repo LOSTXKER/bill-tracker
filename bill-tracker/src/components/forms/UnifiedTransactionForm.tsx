@@ -620,9 +620,8 @@ export function UnifiedTransactionForm({
     setFormPopulated(true);
   }, [mode, swrTransaction, formPopulated, config, reset]);
 
-  // Refresh all data (using SWR mutate)
+  // Refresh all data (SWR mutate + router refresh for full page tree)
   const refreshAll = useCallback(async () => {
-    // Force SWR to refetch and update local state
     const result = await mutateTransaction();
     if (result) {
       const data = result.data?.[config.type] || result[config.type];
@@ -631,7 +630,8 @@ export function UnifiedTransactionForm({
       }
     }
     setAuditRefreshKey((prev) => prev + 1);
-  }, [mutateTransaction, config.type]);
+    router.refresh();
+  }, [mutateTransaction, config.type, router]);
 
   // File upload hooks for view/edit mode
   const { uploadingType, handleFileUpload, handleDeleteFile } = useTransactionFileUpload({

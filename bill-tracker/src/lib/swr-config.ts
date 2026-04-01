@@ -16,20 +16,13 @@ export { fetcher };
  */
 export const swrConfig: SWRConfiguration = {
   fetcher,
-  // Dedupe requests within 2 seconds
   dedupingInterval: 2000,
-  // Revalidate on focus after 5 minutes
-  focusThrottleInterval: 5 * 60 * 1000,
-  // Keep previous data while revalidating
+  focusThrottleInterval: 30_000,
   keepPreviousData: true,
-  // Don't revalidate on focus for better UX
-  revalidateOnFocus: false,
-  // Revalidate on reconnect
+  revalidateOnFocus: true,
   revalidateOnReconnect: true,
-  // Error retry configuration
   errorRetryCount: 3,
   errorRetryInterval: 5000,
-  // Loading timeout
   loadingTimeout: 10000,
 };
 
