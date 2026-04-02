@@ -154,12 +154,13 @@ function TaxInvoiceRequestEdit({
               : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
           )}
         >
-          <Switch
-            checked={!!hasDocument}
-            onCheckedChange={onHasDocumentChange}
-            tabIndex={-1}
-            className="pointer-events-none"
-          />
+          <span onClick={(e) => e.stopPropagation()} className="flex items-center">
+            <Switch
+              checked={!!hasDocument}
+              tabIndex={-1}
+              className="pointer-events-none"
+            />
+          </span>
           <span className="select-none">
             {hasDocument ? `ได้รับ${docLabel}แล้ว` : `ได้รับ${docLabel}แล้ว?`}
           </span>
