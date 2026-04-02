@@ -1,9 +1,12 @@
 "use client";
 
+import { useCallback } from "react";
 import useSWR from "swr";
 import type { ContactSummary } from "@/types";
 import { swrKeys } from "@/lib/swr-config";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
+
+const EMPTY_CONTACTS: ContactSummary[] = [];
 
 interface ApiResponse {
   success: boolean;
@@ -36,11 +39,11 @@ export function useContacts(companyCode: string): UseContactsReturn {
     revalidateOnFocus: false,
   });
 
-  const contacts = data?.success ? (data.data?.contacts || []) : [];
+  const contacts = data?.success ? (data.data?.contacts ?? EMPTY_CONTACTS) : EMPTY_CONTACTS;
 
-  const refetch = async () => {
+  const refetch = useCallback(async () => {
     await mutate();
-  };
+  }, [mutate]);
 
   return {
     contacts,

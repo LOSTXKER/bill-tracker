@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "./DatePicker";
 import { ContactSelector } from "./ContactSelector";
+
+const EMPTY_URLS: string[] = [];
 import { AccountSelector } from "./account-selector";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -77,7 +79,7 @@ export function TransactionFieldsSection({
     internalCompanyId,
     onInternalCompanyChange,
     accessibleCompanies = [],
-    referenceUrls = [],
+    referenceUrls = EMPTY_URLS,
     onReferenceUrlsChange,
   } = useTransactionFormContext();
 

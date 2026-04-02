@@ -719,14 +719,22 @@ export function UnifiedTransactionForm({
   const safeVatRate = typeof watchVatRate === "number" && Number.isFinite(watchVatRate) ? watchVatRate : 0;
   const safeWhtRate = typeof watchWhtRate === "number" && Number.isFinite(watchWhtRate) ? watchWhtRate : 0;
 
+  const calculateTotalsRef = useRef(config.calculateTotals);
+  calculateTotalsRef.current = config.calculateTotals;
+
   useEffect(() => {
-    const calc = config.calculateTotals(
+    const calc = calculateTotalsRef.current(
       safeAmount,
       safeVatRate,
       watchIsWht ? safeWhtRate : 0
     );
-    setCalculation(calc);
-  }, [safeAmount, safeVatRate, watchIsWht, safeWhtRate, config]);
+    setCalculation(prev => {
+      if (prev.baseAmount === calc.baseAmount && prev.vatAmount === calc.vatAmount &&
+          prev.whtAmount === calc.whtAmount && prev.totalWithVat === calc.totalWithVat &&
+          prev.netAmount === calc.netAmount) return prev;
+      return calc;
+    });
+  }, [safeAmount, safeVatRate, watchIsWht, safeWhtRate]);
 
   // Check if form has existing data
   const hasExistingData = useCallback(() => {

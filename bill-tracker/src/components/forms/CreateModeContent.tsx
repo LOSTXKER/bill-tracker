@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContactSummary } from "@/types";
+
+const EMPTY_URLS: string[] = [];
 import type { ContactDefaults } from "@/hooks/use-contact-defaults";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import {
@@ -175,7 +177,7 @@ export function CreateModeContent({
     onUpdateContactTaxInvoiceRequestChange,
     hasDocument,
     onHasDocumentChange,
-    referenceUrls = [],
+    referenceUrls = EMPTY_URLS,
     onReferenceUrlsChange,
   } = useTransactionFormContext();
 

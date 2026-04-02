@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Wallet } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
@@ -103,7 +104,7 @@ export function IncomeForm({
   onModeChange,
   currentUserId,
 }: IncomeFormProps) {
-  const config = getIncomeConfig(companyCode);
+  const config = useMemo(() => getIncomeConfig(companyCode), [companyCode]);
 
   return (
     <UnifiedTransactionForm

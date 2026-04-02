@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Receipt } from "lucide-react";
 import { UnifiedTransactionForm, UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
@@ -109,18 +110,12 @@ export function ExpenseForm({
   prefillData,
   currentUserId,
 }: ExpenseFormProps) {
-  const baseConfig = getExpenseConfig(companyCode);
-  
-  // Merge prefillData with defaultValues if provided
-  const config = prefillData
-    ? {
-        ...baseConfig,
-        defaultValues: {
-          ...baseConfig.defaultValues,
-          ...prefillData,
-        },
-      }
-    : baseConfig;
+  const config = useMemo(() => {
+    const base = getExpenseConfig(companyCode);
+    return prefillData
+      ? { ...base, defaultValues: { ...base.defaultValues, ...prefillData } }
+      : base;
+  }, [companyCode, prefillData]);
 
   return (
     <UnifiedTransactionForm
