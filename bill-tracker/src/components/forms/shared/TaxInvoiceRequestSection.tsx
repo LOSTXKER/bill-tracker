@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileText, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { getTaxInvoiceRequestMethod, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
 import type { ContactSummary } from "@/types";
 
@@ -141,24 +142,30 @@ function TaxInvoiceRequestEdit({
       </div>
 
       {onHasDocumentChange && (
-        <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-muted/30">
-          <label htmlFor="hasDocument" className="text-sm cursor-pointer select-none">
-            ได้รับ{docLabel}แล้ว
-          </label>
+        <button
+          type="button"
+          onClick={() => onHasDocumentChange(!hasDocument)}
+          className={cn(
+            "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors w-full text-left",
+            hasDocument
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
+          )}
+        >
           <Switch
             id="hasDocument"
             checked={!!hasDocument}
             onCheckedChange={onHasDocumentChange}
+            className="pointer-events-none"
           />
-        </div>
+          <span className="select-none">
+            {hasDocument ? `ได้รับ${docLabel}แล้ว` : `ได้รับ${docLabel}แล้ว?`}
+          </span>
+          {hasDocument && <CheckCircle2 className="h-3.5 w-3.5 ml-auto shrink-0" />}
+        </button>
       )}
 
-      {hasDocument ? (
-        <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          มีเอกสารแล้ว ไม่ต้องระบุช่องทางขอ
-        </p>
-      ) : (
+      {!hasDocument && (
         <>
           <Select
             value={taxInvoiceRequestMethod || ""}
