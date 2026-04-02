@@ -142,27 +142,29 @@ function TaxInvoiceRequestEdit({
       </div>
 
       {onHasDocumentChange && (
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => onHasDocumentChange(!hasDocument)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onHasDocumentChange(!hasDocument); } }}
           className={cn(
-            "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors w-full text-left",
+            "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors w-full cursor-pointer",
             hasDocument
               ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
               : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
           )}
         >
           <Switch
-            id="hasDocument"
             checked={!!hasDocument}
             onCheckedChange={onHasDocumentChange}
+            tabIndex={-1}
             className="pointer-events-none"
           />
           <span className="select-none">
             {hasDocument ? `ได้รับ${docLabel}แล้ว` : `ได้รับ${docLabel}แล้ว?`}
           </span>
           {hasDocument && <CheckCircle2 className="h-3.5 w-3.5 ml-auto shrink-0" />}
-        </button>
+        </div>
       )}
 
       {!hasDocument && (
