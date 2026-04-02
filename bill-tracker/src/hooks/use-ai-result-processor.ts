@@ -1,6 +1,7 @@
 /**
- * Hook for processing AI analysis results and applying them to transaction forms
- * Extracted from UnifiedTransactionForm to reduce component complexity
+ * Hook for processing AI analysis results and applying them to transaction forms.
+ * Uses grouped state setters (patchContactState / patchAiState) to produce
+ * fewer setState calls and avoid cascading re-render chains (React #185).
  */
 
 import { useCallback } from "react";
@@ -10,51 +11,27 @@ import { normalizeWhtType } from "@/lib/utils/tax-calculator";
 import type { ContactSummary } from "@/types";
 import type { MultiDocAnalysisResult } from "@/components/forms/shared/InputMethodSection";
 import type { UnifiedTransactionConfig } from "@/components/forms/UnifiedTransactionForm";
+import type {
+  ContactFormState,
+  AiFormState,
+} from "@/components/forms/hooks/useTransactionFormState";
 
-export interface AiVendorSuggestion {
-  name: string;
-  taxId: string | null | undefined;
-  branchNumber: string | null;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
-}
-
-export interface AccountSuggestion {
-  accountId: string | null;
-  accountCode: string | null;
-  accountName: string | null;
-  confidence: number;
-  reason: string;
-  alternatives?: Array<{
-    accountId: string;
-    accountCode: string;
-    accountName: string;
-    confidence: number;
-    reason: string;
-  }>;
-}
+export type { AiFormState, ContactFormState };
 
 export interface UseAiResultProcessorProps {
   config: UnifiedTransactionConfig;
   setValue: UseFormSetValue<any>;
   contacts: ContactSummary[];
-  setSelectedContact: (contact: ContactSummary | null) => void;
-  setAiVendorSuggestion: (suggestion: AiVendorSuggestion | null) => void;
-  setAccountSuggestion: (suggestion: AccountSuggestion | null) => void;
-  setPendingContactId: (id: string | null) => void;
-  setAiApplied: (applied: boolean) => void;
+  patchContactState: (patch: Partial<ContactFormState>) => void;
+  patchAiState: (patch: Partial<AiFormState>) => void;
 }
 
 export function useAiResultProcessor({
   config,
   setValue,
   contacts,
-  setSelectedContact,
-  setAiVendorSuggestion,
-  setAccountSuggestion,
-  setPendingContactId,
-  setAiApplied,
+  patchContactState,
+  patchAiState,
 }: UseAiResultProcessorProps) {
   const applyAiResult = useCallback(
     (result: MultiDocAnalysisResult) => {
@@ -85,7 +62,8 @@ export function useAiResultProcessor({
         items?: string[];
       };
 
-      // Apply amount
+      // --- Apply form values via setValue (batched by react-hook-form) ---
+
       const hasCurrencyConversion =
         result.currencyConversion?.convertedAmount !== null &&
         result.currencyConversion?.convertedAmount !== undefined &&
@@ -107,13 +85,11 @@ export function useAiResultProcessor({
         setValue("amount", suggested.amount);
       }
 
-      // Apply VAT rate (guard against NaN to prevent infinite re-render loop)
       const vatRate = suggested.vatRate ?? extendedCombined.vatRate;
       if (vatRate !== null && vatRate !== undefined && typeof vatRate === "number" && !Number.isNaN(vatRate)) {
         setValue("vatRate", vatRate);
       }
 
-      // Apply date
       if (combined.date || suggested.date) {
         const dateStr = combined.date || (suggested.date as string);
         if (dateStr) {
@@ -121,24 +97,20 @@ export function useAiResultProcessor({
         }
       }
 
-      // Apply invoice number (รองรับ invoiceNumbers จาก AI)
-      const invoiceNum = combined.invoiceNumbers && combined.invoiceNumbers.length > 0 
-        ? combined.invoiceNumbers.join(", ") 
+      const invoiceNum = combined.invoiceNumbers && combined.invoiceNumbers.length > 0
+        ? combined.invoiceNumbers.join(", ")
         : null;
       if (invoiceNum) {
         setValue("invoiceNumber", invoiceNum);
       }
 
-      // Apply description - ใช้ AI สรุปมาก่อน
       if (config.fields.descriptionField) {
         let description: string | null = null;
-        
-        // 1. ใช้ description จาก AI (สรุปค่าใช้จ่าย)
+
         if (extendedCombined.description && typeof extendedCombined.description === "string") {
           description = extendedCombined.description;
         }
-        
-        // 2. ถ้าไม่มี ลองรวม items จาก OCR
+
         if (!description) {
           const allItems: string[] = [];
           for (const file of result.files || []) {
@@ -162,12 +134,10 @@ export function useAiResultProcessor({
           }
         }
 
-        // 3. ถ้ายังไม่มี ลอง suggested
         if (!description && suggested.description) {
           description = suggested.description as string;
         }
 
-        // 4. Fallback เป็นชื่อร้าน
         if (!description && combined.vendorName) {
           const prefix = config.type === "expense" ? "ค่าใช้จ่ายจาก" : "รายรับจาก";
           description = `${prefix} ${combined.vendorName}`;
@@ -178,75 +148,21 @@ export function useAiResultProcessor({
         }
       }
 
-      // Apply contact
-      const contactIdToUse = (suggested.contactId as string) || result.smart?.foundContact?.id;
-      if (contactIdToUse) {
-        const contact = contacts.find((c) => c.id === contactIdToUse);
-        if (contact) {
-          setSelectedContact(contact);
-          setAiVendorSuggestion(null); // Clear suggestion when contact is found
-        } else {
-          setPendingContactId(contactIdToUse);
-        }
-      } else if (result.smart?.isNewVendor && (combined.vendorName || combined.vendorTaxId)) {
-        // ไม่พบผู้ติดต่อ → แนะนำสร้างใหม่
-        setAiVendorSuggestion({
-          name: combined.vendorName || "",
-          taxId: combined.vendorTaxId,
-          branchNumber: extendedCombined.vendorBranchNumber ?? null,
-          address: null,
-          phone: null,
-          email: extendedCombined.vendorEmail ?? null,
-        });
-      }
-
-      // ไม่ auto-fill บัญชี - ให้ผู้ใช้เลือกเอง
-      // แต่เก็บ suggestion พร้อม alternatives ไว้แสดงใน UI
-      if (result.aiAccountSuggestion?.accountId) {
-        setAccountSuggestion({
-          accountId: result.aiAccountSuggestion.accountId,
-          accountCode: result.aiAccountSuggestion.accountCode,
-          accountName: result.aiAccountSuggestion.accountName,
-          confidence: result.aiAccountSuggestion.confidence,
-          reason: result.aiAccountSuggestion.reason || "AI วิเคราะห์จากเอกสาร",
-          alternatives: result.aiAccountSuggestion.alternatives || [],
-        });
-      }
-
-      // แสดงคำเตือนจาก AI (ถ้ามี)
-      if (result.warnings && Array.isArray(result.warnings)) {
-        for (const warning of result.warnings) {
-          if (warning.severity === "warning") {
-            toast.warning(warning.message, {
-              duration: 8000, // แสดงนานขึ้นให้อ่าน
-            });
-          } else {
-            toast.info(warning.message, {
-              duration: 5000,
-            });
-          }
-        }
-      }
-
-      // Apply WHT (Withholding Tax) from AI
+      // WHT
       const whtRate = (suggested.whtRate as number | null | undefined) ?? extendedCombined.whtRate;
       const whtAmount = (suggested.whtAmount as number | null | undefined) ?? extendedCombined.whtAmount;
       const rawWhtType = (suggested.whtType as string | null | undefined) ?? extendedCombined.whtType;
-      // Normalize AI's whtType to valid enum key (e.g., "ค่าธรรมเนียม" -> "SERVICE_3")
       const whtType = normalizeWhtType(rawWhtType);
-      
-      // Enable WHT if we have rate OR amount
-      const hasWht = (whtRate !== null && whtRate !== undefined && whtRate > 0) || 
+
+      const hasWht = (whtRate !== null && whtRate !== undefined && whtRate > 0) ||
                      (whtAmount !== null && whtAmount !== undefined && whtAmount > 0);
-      
+
       if (hasWht) {
         setValue(config.fields.whtField.name, true);
-        
-        // Set rate (calculate from amount if not provided)
+
         if (whtRate && whtRate > 0) {
           setValue("whtRate", whtRate);
         } else if (whtAmount) {
-          // Calculate rate from amount: rate = (whtAmount / baseAmount) * 100
           const aiAmount = extendedCombined.amount || (suggested.amount as number | null);
           if (aiAmount && aiAmount > 0) {
             const calculatedRate = Math.round((whtAmount / aiAmount) * 100);
@@ -255,15 +171,71 @@ export function useAiResultProcessor({
             }
           }
         }
-        
+
         if (whtType) {
           setValue("whtType", whtType);
         }
       }
 
-      setAiApplied(true);
-      
-      // Build success message with document type info
+      // --- Apply grouped contact state in one batch ---
+
+      const contactPatch: Partial<ContactFormState> = {};
+      const contactIdToUse = (suggested.contactId as string) || result.smart?.foundContact?.id;
+
+      if (contactIdToUse) {
+        const contact = contacts.find((c) => c.id === contactIdToUse);
+        if (contact) {
+          contactPatch.selectedContact = contact;
+          contactPatch.aiVendorSuggestion = null;
+        } else {
+          contactPatch.pendingContactId = contactIdToUse;
+        }
+      } else if (result.smart?.isNewVendor && (combined.vendorName || combined.vendorTaxId)) {
+        contactPatch.aiVendorSuggestion = {
+          name: combined.vendorName || "",
+          taxId: combined.vendorTaxId,
+          branchNumber: extendedCombined.vendorBranchNumber ?? null,
+          address: null,
+          phone: null,
+          email: extendedCombined.vendorEmail ?? null,
+        };
+      }
+
+      if (Object.keys(contactPatch).length > 0) {
+        patchContactState(contactPatch);
+      }
+
+      // --- Apply grouped AI state in one batch ---
+
+      const aiPatch: Partial<AiFormState> = { aiApplied: true };
+
+      if (result.aiAccountSuggestion?.accountId) {
+        aiPatch.accountSuggestion = {
+          accountId: result.aiAccountSuggestion.accountId,
+          accountCode: result.aiAccountSuggestion.accountCode,
+          accountName: result.aiAccountSuggestion.accountName,
+          confidence: result.aiAccountSuggestion.confidence,
+          reason: result.aiAccountSuggestion.reason || "AI วิเคราะห์จากเอกสาร",
+          alternatives: result.aiAccountSuggestion.alternatives || [],
+        };
+      }
+
+      patchAiState(aiPatch);
+
+      // --- Warnings ---
+
+      if (result.warnings && Array.isArray(result.warnings)) {
+        for (const warning of result.warnings) {
+          if (warning.severity === "warning") {
+            toast.warning(warning.message, { duration: 8000 });
+          } else {
+            toast.info(warning.message, { duration: 5000 });
+          }
+        }
+      }
+
+      // --- Success toast ---
+
       const documentType = (suggested.documentType as string | null | undefined) || extendedCombined.documentType;
       const docTypeNames: Record<string, string> = {
         TAX_INVOICE: "ใบกำกับภาษี",
@@ -273,14 +245,14 @@ export function useAiResultProcessor({
         WHT_CERT: "ใบหัก ณ ที่จ่าย",
       };
       const docTypeName = documentType ? docTypeNames[documentType] : null;
-      
+
       toast.success("กรอกข้อมูลจาก AI แล้ว", {
-        description: docTypeName 
+        description: docTypeName
           ? `ตรวจพบ${docTypeName} - โปรดตรวจสอบความถูกต้องก่อนบันทึก`
           : "โปรดตรวจสอบความถูกต้องก่อนบันทึก",
       });
     },
-    [setValue, config, contacts, setSelectedContact, setAiVendorSuggestion, setAccountSuggestion, setPendingContactId, setAiApplied]
+    [setValue, config, contacts, patchContactState, patchAiState]
   );
 
   return { applyAiResult };

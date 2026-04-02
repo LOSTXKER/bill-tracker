@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -143,12 +143,18 @@ export function PayerSection({
     (f: PettyCashFund) => f.isActive
   );
 
-  // Update amounts when total changes (only for single payer)
+  // Update amounts when total changes (only for single payer).
+  // Use a ref for payers to avoid re-firing when the array reference
+  // changes but the content is already correct.
+  const payersRef = useRef(payers);
+  payersRef.current = payers;
+
   useEffect(() => {
-    if (payers.length === 1 && payers[0].amount !== totalAmount) {
-      onPayersChange([{ ...payers[0], amount: totalAmount }]);
+    const current = payersRef.current;
+    if (current.length === 1 && current[0].amount !== totalAmount) {
+      onPayersChange([{ ...current[0], amount: totalAmount }]);
     }
-  }, [totalAmount, payers, onPayersChange]);
+  }, [totalAmount, onPayersChange]);
 
   const handlePayerTypeChange = (index: number, type: PaidByType) => {
     const newPayers = [...payers];

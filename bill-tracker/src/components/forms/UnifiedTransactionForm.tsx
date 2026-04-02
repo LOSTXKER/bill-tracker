@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, ReactNode, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, ReactNode, useRef, useMemo, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ import { TransactionFormProvider } from "./TransactionFormContext";
 import { PayerInfo } from "./shared/PayerSection";
 import { TransactionViewToolbar } from "./shared/TransactionViewToolbar";
 import { CreateModeContent } from "./CreateModeContent";
-import type { AccountSuggestion, CurrencyConversionValue } from "./CreateModeContent";
+import type { CurrencyConversionValue } from "./CreateModeContent";
 import { ViewEditModeContent } from "./ViewEditModeContent";
 
 // Transaction components
@@ -50,6 +50,8 @@ import type { BaseTransaction } from "./hooks/useTransactionForm";
 export type { BaseTransaction };
 import { useDocumentTypeEffects } from "./hooks/useDocumentTypeEffects";
 import { useFormContextFactory } from "./hooks/useFormContextFactory";
+import { useTransactionFormState } from "./hooks/useTransactionFormState";
+import type { ContactFormState } from "./hooks/useTransactionFormState";
 
 // =============================================================================
 // Types
@@ -151,10 +153,8 @@ interface UnifiedTransactionFormProps {
   mode: "create" | "view" | "edit";
   transactionId?: string;
   onModeChange?: (mode: "view" | "edit") => void;
-  currentUserId?: string; // For comment section
+  currentUserId?: string;
 }
-
-// BaseTransaction is now imported from hooks/useTransactionForm
 
 // =============================================================================
 // Component
@@ -169,20 +169,21 @@ export function UnifiedTransactionForm({
   currentUserId,
 }: UnifiedTransactionFormProps) {
   const router = useRouter();
-  
-  // Permissions for draft/approval workflow
+
+  // ---------------------------------------------------------------------------
+  // Permissions
+  // ---------------------------------------------------------------------------
   const { hasPermission, isOwner } = usePermissions();
-  const canCreateDirect = config.type === "expense" 
-    ? hasPermission("expenses:create-direct") 
+  const canCreateDirect = config.type === "expense"
+    ? hasPermission("expenses:create-direct")
     : hasPermission("incomes:create-direct");
   const canMarkPaid = config.type === "expense"
     ? hasPermission("expenses:mark-paid")
     : hasPermission("incomes:mark-received");
-  
-  // Use mode from props directly (controlled by parent)
-  // Note: isLoading and saving are now managed by useTransactionSubmission hook
-  
-  // Use SWR for transaction fetching (provides caching across navigations)
+
+  // ---------------------------------------------------------------------------
+  // SWR transaction fetch (view/edit mode)
+  // ---------------------------------------------------------------------------
   const {
     transaction: swrTransaction,
     isLoading: swrLoading,
@@ -193,15 +194,93 @@ export function UnifiedTransactionForm({
     transactionId,
     enabled: mode !== "create",
   });
-  
-  // Local state for transaction (populated from SWR)
+
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
   const loading = mode !== "create" && swrLoading && !transaction;
   const error = swrError?.message || null;
-  // Note: saving is now managed by useTransactionSubmission hook
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
+  // ---------------------------------------------------------------------------
+  // Contacts (list)
+  // ---------------------------------------------------------------------------
+  const { contacts, isLoading: contactsLoading, refetch: refetchContacts } = useContacts(companyCode);
+
+  // ---------------------------------------------------------------------------
+  // Grouped state: contact + delivery + AI
+  // (replaces ~20 individual useState + 3 cascading contact effects)
+  // ---------------------------------------------------------------------------
+  const {
+    contactState,
+    setContactState,
+    patchContactState,
+    aiState,
+    setAiState,
+    patchAiState,
+  } = useTransactionFormState({
+    configType: config.type,
+    mode,
+    contacts,
+  });
+
+  // Convenience wrappers that support SetStateAction (function updaters)
+  // so child components keep the same Dispatch<SetStateAction<T>> interface.
+  const setCurrencyConversion = useCallback(
+    (v: SetStateAction<CurrencyConversionValue | null>) => {
+      setAiState(prev => ({
+        ...prev,
+        currencyConversion: typeof v === "function" ? v(prev.currencyConversion) : v,
+      }));
+    },
+    [setAiState],
+  );
+
+  const setAiResult = useCallback(
+    (v: SetStateAction<MultiDocAnalysisResult | null>) => {
+      setAiState(prev => ({
+        ...prev,
+        aiResult: typeof v === "function" ? v(prev.aiResult) : v,
+      }));
+    },
+    [setAiState],
+  );
+
+  const setAccountSuggestion = useCallback(
+    (v: SetStateAction<{
+      accountId: string | null;
+      accountCode: string | null;
+      accountName: string | null;
+      confidence: number;
+      reason: string;
+      alternatives?: Array<{
+        accountId: string;
+        accountCode: string;
+        accountName: string;
+        confidence: number;
+        reason: string;
+      }>;
+    } | null>) => {
+      setAiState(prev => ({
+        ...prev,
+        accountSuggestion: typeof v === "function" ? v(prev.accountSuggestion) : v,
+      }));
+    },
+    [setAiState],
+  );
+
+  const setDefaultsSuggestionDismissed = useCallback(
+    (v: SetStateAction<boolean>) => {
+      setContactState(prev => ({
+        ...prev,
+        defaultsSuggestionDismissed: typeof v === "function" ? v(prev.defaultsSuggestionDismissed) : v,
+      }));
+    },
+    [setContactState],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Calculation
+  // ---------------------------------------------------------------------------
   const [calculation, setCalculation] = useState({
     baseAmount: 0,
     vatAmount: 0,
@@ -210,7 +289,9 @@ export function UnifiedTransactionForm({
     netAmount: 0,
   });
 
-  // Document files state
+  // ---------------------------------------------------------------------------
+  // Document files
+  // ---------------------------------------------------------------------------
   const [categorizedFiles, setCategorizedFiles] = useState<CategorizedFiles>({
     invoice: [],
     slip: [],
@@ -219,52 +300,26 @@ export function UnifiedTransactionForm({
     uncategorized: [],
   });
 
-  // AI Analysis State
-  const [aiResult, setAiResult] = useState<MultiDocAnalysisResult | null>(null);
-  const [aiApplied, setAiApplied] = useState(false);
-
-  // Currency conversion state (persists across view/edit modes, populated from AI result or DB)
-  const [currencyConversion, setCurrencyConversion] = useState<CurrencyConversionValue | null>(null);
-
-  // Merge Dialog State
+  // ---------------------------------------------------------------------------
+  // Merge dialog
+  // ---------------------------------------------------------------------------
   const [showMergeDialog, setShowMergeDialog] = useState(false);
-  // Note: pendingAiResult, existingFormData, newAiData, pendingConflicts, pendingMergedData, 
-  // showConflictDialog are now managed by useMergeHandler hook
 
-  // Contacts
-  const { contacts, isLoading: contactsLoading, refetch: refetchContacts } = useContacts(companyCode);
-  const [selectedContact, setSelectedContact] = useState<ContactSummary | null>(null);
-  const [oneTimeContactName, setOneTimeContactName] = useState("");
-  const [pendingContactId, setPendingContactId] = useState<string | null>(null);
-  
-  // Payers (for expense only)
+  // ---------------------------------------------------------------------------
+  // Payers (expense only)
+  // ---------------------------------------------------------------------------
   const [payers, setPayers] = useState<PayerInfo[]>([]);
   const [payersInitialized, setPayersInitialized] = useState(false);
-  
+
   // Internal company tracking (expense only)
   const { companies: contextCompanies } = useSafeCompany();
   const [fetchedCompanies, setFetchedCompanies] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [internalCompanyId, setInternalCompanyId] = useState<string | null>(null);
-  
-  // WHT delivery method (expense only)
-  const [whtDeliveryMethod, setWhtDeliveryMethod] = useState<string | null>(null);
-  const [whtDeliveryEmail, setWhtDeliveryEmail] = useState<string | null>(null);
-  const [whtDeliveryNotes, setWhtDeliveryNotes] = useState<string | null>(null);
-  const [updateContactDelivery, setUpdateContactDelivery] = useState(false);
-  
-  // Tax invoice request method (expense only)
-  const [taxInvoiceRequestMethod, setTaxInvoiceRequestMethod] = useState<string | null>(null);
-  const [taxInvoiceRequestEmail, setTaxInvoiceRequestEmail] = useState<string | null>(null);
-  const [taxInvoiceRequestNotes, setTaxInvoiceRequestNotes] = useState<string | null>(null);
-  const [updateContactTaxInvoiceRequest, setUpdateContactTaxInvoiceRequest] = useState(false);
-  const [hasDocument, setHasDocument] = useState(false);
-  
-  // Use context companies if available, otherwise fetch from API
-  const accessibleCompanies = contextCompanies.length > 0 
-    ? contextCompanies 
+
+  const accessibleCompanies = contextCompanies.length > 0
+    ? contextCompanies
     : fetchedCompanies;
 
-  // Fetch companies from API if context is not available (for internal company selector)
   useEffect(() => {
     if (config.type === "expense" && contextCompanies.length === 0) {
       fetch("/api/companies")
@@ -277,9 +332,7 @@ export function UnifiedTransactionForm({
             code: c.code,
           })));
         })
-        .catch(() => {
-          // Ignore errors - internal company is optional
-        });
+        .catch(() => {});
     }
   }, [config.type, contextCompanies.length]);
 
@@ -290,20 +343,18 @@ export function UnifiedTransactionForm({
         id?: string;
         name?: string;
       } | undefined;
-      
+
       const settlementInfo = config.defaultValues.settlementInfo as {
         settledAt?: string;
         settlementRef?: string;
       } | undefined;
 
       if (requesterInfo?.id || requesterInfo?.name) {
-        // From reimbursement - pre-fill with USER payer (already settled)
         setPayers([{
           paidByType: "USER",
           paidByUserId: requesterInfo.id || null,
           paidByName: requesterInfo.name || null,
           amount: Number(config.defaultValues.amount) || 0,
-          // Include settlement info for the API
           ...(settlementInfo?.settledAt ? {
             settlementStatus: "SETTLED" as const,
             settledAt: settlementInfo.settledAt,
@@ -315,73 +366,25 @@ export function UnifiedTransactionForm({
     }
   }, [mode, config.type, config.defaultValues, payersInitialized]);
 
-  // AI Vendor Suggestion (for auto-creating contact)
-  const [aiVendorSuggestion, setAiVendorSuggestion] = useState<{
-    name: string;
-    taxId?: string | null;
-    branchNumber?: string | null;
-    address?: string | null;
-    phone?: string | null;
-    email?: string | null;
-  } | null>(null);
-
-  // Contact Defaults Suggestion
-  const [defaultsSuggestionDismissed, setDefaultsSuggestionDismissed] = useState(false);
-  const { defaults: contactDefaults, hasDefaults: hasContactDefaults } = useContactDefaults(
-    companyCode,
-    selectedContact?.id || null
-  );
-
-  // Reset defaults suggestion dismissed state when contact changes
-  useEffect(() => {
-    setDefaultsSuggestionDismissed(false);
-  }, [selectedContact?.id]);
-
-  // Auto-fill WHT delivery method from contact when contact is selected (expense only, create mode)
-  useEffect(() => {
-    if (config.type !== "expense" || mode !== "create") return;
-    if (!selectedContact) return;
-    
-    // Auto-fill delivery method from contact's preference
-    if (selectedContact.preferredDeliveryMethod && !whtDeliveryMethod) {
-      setWhtDeliveryMethod(selectedContact.preferredDeliveryMethod);
-      if (selectedContact.deliveryEmail) {
-        setWhtDeliveryEmail(selectedContact.deliveryEmail);
-      }
-      if (selectedContact.deliveryNotes) {
-        setWhtDeliveryNotes(selectedContact.deliveryNotes);
-      }
-    }
-  }, [selectedContact, config.type, mode, whtDeliveryMethod]);
-
-  // Auto-fill tax invoice request method from contact when contact is selected (expense only, create mode)
-  useEffect(() => {
-    if (config.type !== "expense" || mode !== "create") return;
-    if (!selectedContact) return;
-    
-    // Auto-fill tax invoice request method from contact's preference
-    if (selectedContact.taxInvoiceRequestMethod && !taxInvoiceRequestMethod) {
-      setTaxInvoiceRequestMethod(selectedContact.taxInvoiceRequestMethod);
-      if (selectedContact.taxInvoiceRequestEmail) {
-        setTaxInvoiceRequestEmail(selectedContact.taxInvoiceRequestEmail);
-      }
-      if (selectedContact.taxInvoiceRequestNotes) {
-        setTaxInvoiceRequestNotes(selectedContact.taxInvoiceRequestNotes);
-      }
-    }
-  }, [selectedContact, config.type, mode, taxInvoiceRequestMethod]);
-
+  // ---------------------------------------------------------------------------
   // Account
+  // ---------------------------------------------------------------------------
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
-  const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
 
-  // AI Account Suggestion
-  const [accountSuggestion, setAccountSuggestion] = useState<AccountSuggestion>(null);
-  
-  // Reference URLs (for external links to products, orders, etc.)
+  // Reference URLs
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
 
-  // Form setup
+  // ---------------------------------------------------------------------------
+  // Contact defaults (SWR-based)
+  // ---------------------------------------------------------------------------
+  const { defaults: contactDefaults, hasDefaults: hasContactDefaults } = useContactDefaults(
+    companyCode,
+    contactState.selectedContact?.id || null
+  );
+
+  // ---------------------------------------------------------------------------
+  // React-Hook-Form
+  // ---------------------------------------------------------------------------
   const {
     register,
     handleSubmit,
@@ -401,19 +404,20 @@ export function UnifiedTransactionForm({
   const watchDate = watch(config.fields.dateField.name);
   const watchDocumentType = watch("documentType") as string | undefined;
 
-  // AI Result Processor Hook (Phase 5 Integration)
+  // ---------------------------------------------------------------------------
+  // AI Result Processor (uses grouped state)
+  // ---------------------------------------------------------------------------
   const { applyAiResult } = useAiResultProcessor({
     config,
     setValue,
     contacts,
-    setSelectedContact,
-    setAiVendorSuggestion,
-    setAccountSuggestion,
-    setPendingContactId,
-    setAiApplied,
+    patchContactState,
+    patchAiState,
   });
 
-  // Merge Handler Hook (Phase 5 Integration)
+  // ---------------------------------------------------------------------------
+  // Merge Handler (uses grouped state)
+  // ---------------------------------------------------------------------------
   const {
     pendingAiResult,
     setPendingAiResult,
@@ -422,28 +426,35 @@ export function UnifiedTransactionForm({
     newAiData,
     setNewAiData,
     pendingConflicts,
-    pendingMergedData,
     showConflictDialog,
     setShowConflictDialog,
     handleMergeDecision: handleMergeDecisionRaw,
     handleConflictResolution,
-    applyMergedData,
   } = useMergeHandler({
     config,
     setValue,
     contacts,
-    setSelectedContact,
+    patchContactState,
     setSelectedAccount,
-    setAiResult,
-    setAiApplied,
+    patchAiState,
   });
 
-  // Wrap handleMergeDecision to pass detectConflicts
   const handleMergeDecision = (decision: MergeDecision) => {
     handleMergeDecisionRaw(decision, detectConflicts);
   };
 
-  // Transaction Submission Hook (Phase 5 Integration)
+  // ---------------------------------------------------------------------------
+  // Transaction Submission (reads from grouped state)
+  // ---------------------------------------------------------------------------
+  const setSelectedContactForSubmission = useCallback(
+    (c: ContactSummary | null) => patchContactState({ selectedContact: c }),
+    [patchContactState],
+  );
+  const setOneTimeContactNameForSubmission = useCallback(
+    (name: string) => patchContactState({ oneTimeContactName: name }),
+    [patchContactState],
+  );
+
   const {
     onSubmit,
     handleSave,
@@ -455,9 +466,9 @@ export function UnifiedTransactionForm({
     config,
     companyCode,
     transactionId,
-    selectedContact,
-    oneTimeContactName,
-    setOneTimeContactName,
+    selectedContact: contactState.selectedContact,
+    oneTimeContactName: contactState.oneTimeContactName,
+    setOneTimeContactName: setOneTimeContactNameForSubmission,
     selectedAccount,
     setSelectedAccount,
     calculation,
@@ -465,16 +476,16 @@ export function UnifiedTransactionForm({
     referenceUrls,
     payers,
     internalCompanyId,
-    whtDeliveryMethod,
-    whtDeliveryEmail,
-    whtDeliveryNotes,
-    updateContactDelivery,
-    taxInvoiceRequestMethod,
-    taxInvoiceRequestEmail,
-    taxInvoiceRequestNotes,
-    updateContactTaxInvoiceRequest,
-    hasDocument,
-    currencyConversion,
+    whtDeliveryMethod: contactState.whtDeliveryMethod,
+    whtDeliveryEmail: contactState.whtDeliveryEmail,
+    whtDeliveryNotes: contactState.whtDeliveryNotes,
+    updateContactDelivery: contactState.updateContactDelivery,
+    taxInvoiceRequestMethod: contactState.taxInvoiceRequestMethod,
+    taxInvoiceRequestEmail: contactState.taxInvoiceRequestEmail,
+    taxInvoiceRequestNotes: contactState.taxInvoiceRequestNotes,
+    updateContactTaxInvoiceRequest: contactState.updateContactTaxInvoiceRequest,
+    hasDocument: contactState.hasDocument,
+    currencyConversion: aiState.currencyConversion,
     watch,
     reset,
     transaction,
@@ -482,49 +493,49 @@ export function UnifiedTransactionForm({
     mutateTransaction,
     setAuditRefreshKey,
     onModeChange,
-    setSelectedContact,
+    setSelectedContact: setSelectedContactForSubmission,
   });
 
-  // Initialize files from prefill data (e.g., from reimbursement)
+  // ---------------------------------------------------------------------------
+  // File initialisation from prefill data
+  // ---------------------------------------------------------------------------
   const [filesInitialized, setFilesInitialized] = useState(false);
-  const filesInitRef = useRef(false); // Prevent double-init in StrictMode
-  
+  const filesInitRef = useRef(false);
+
   useEffect(() => {
     if (mode === "create" && config.defaultValues && !filesInitRef.current) {
       const slipUrls = config.defaultValues.slipUrls as string[] | undefined;
       const invoiceUrls = config.defaultValues.taxInvoiceUrls as string[] | undefined;
-      
+
       if (slipUrls?.length || invoiceUrls?.length) {
         filesInitRef.current = true;
-        const initialFiles = {
+        setCategorizedFiles({
           invoice: invoiceUrls || [],
           slip: slipUrls || [],
           whtCert: [],
           other: [],
           uncategorized: [],
-        };
-        setCategorizedFiles(initialFiles);
+        });
         setFilesInitialized(true);
       }
     }
   }, [mode, config.defaultValues]);
 
-  // Track if we've already populated the form from SWR data
+  // ---------------------------------------------------------------------------
+  // Populate form from SWR data (view/edit)
+  // ---------------------------------------------------------------------------
   const [formPopulated, setFormPopulated] = useState(false);
-  
-  // Reset formPopulated when transactionId changes (e.g., navigation or refresh)
+
   useEffect(() => {
     setFormPopulated(false);
   }, [transactionId]);
-  
-  // Populate form when SWR data arrives (only once per transaction)
+
   useEffect(() => {
     if (mode === "create" || !swrTransaction || formPopulated) return;
-    
+
     const data = swrTransaction;
     setTransaction(data as unknown as BaseTransaction);
-    
-    // Populate form with transaction data
+
     reset({
       amount: data.amount,
       vatRate: data.vatRate,
@@ -541,62 +552,40 @@ export function UnifiedTransactionForm({
       ...(config.showDueDate ? { dueDate: data.dueDate ? new Date(data.dueDate as string) : undefined } : {}),
     });
 
-    // Set contact (Prisma returns Contact with capital C)
-    // Cast to any to access all fields from the API response
+    // Build a single contact-state patch from all SWR fields
+    const contactPatch: Partial<ContactFormState> = {};
+
     const contactData = (data.Contact || data.contact) as ContactSummary | undefined;
     if (contactData) {
-      setSelectedContact({
+      contactPatch.selectedContact = {
         id: contactData.id,
         name: contactData.name,
         taxId: contactData.taxId,
-        // Delivery preferences
         preferredDeliveryMethod: contactData.preferredDeliveryMethod,
         deliveryEmail: contactData.deliveryEmail,
         deliveryNotes: contactData.deliveryNotes,
-      });
-      setOneTimeContactName("");
+      };
+      contactPatch.oneTimeContactName = "";
     } else if (data.contactName) {
-      // One-time contact name (typed manually, not saved as Contact)
-      setSelectedContact(null);
-      setOneTimeContactName(data.contactName);
+      contactPatch.selectedContact = null;
+      contactPatch.oneTimeContactName = data.contactName;
     }
 
-    // Set account
-    if (data.accountId) {
-      setSelectedAccount(data.accountId);
+    if (data.whtDeliveryMethod) contactPatch.whtDeliveryMethod = String(data.whtDeliveryMethod);
+    if (data.whtDeliveryEmail) contactPatch.whtDeliveryEmail = String(data.whtDeliveryEmail);
+    if (data.whtDeliveryNotes) contactPatch.whtDeliveryNotes = String(data.whtDeliveryNotes);
+    if (data.taxInvoiceRequestMethod) contactPatch.taxInvoiceRequestMethod = String(data.taxInvoiceRequestMethod);
+    if (data.taxInvoiceRequestEmail) contactPatch.taxInvoiceRequestEmail = String(data.taxInvoiceRequestEmail);
+    if (data.taxInvoiceRequestNotes) contactPatch.taxInvoiceRequestNotes = String(data.taxInvoiceRequestNotes);
+    if (data.hasTaxInvoice) contactPatch.hasDocument = true;
+
+    if (Object.keys(contactPatch).length > 0) {
+      patchContactState(contactPatch);
     }
 
-    // Set internal company (expense only)
-    if (data.internalCompanyId) {
-      setInternalCompanyId(data.internalCompanyId as string);
-    }
+    if (data.accountId) setSelectedAccount(data.accountId);
+    if (data.internalCompanyId) setInternalCompanyId(data.internalCompanyId as string);
 
-    // Set WHT delivery method (expense only)
-    if (data.whtDeliveryMethod) {
-      setWhtDeliveryMethod(String(data.whtDeliveryMethod));
-    }
-    if (data.whtDeliveryEmail) {
-      setWhtDeliveryEmail(String(data.whtDeliveryEmail));
-    }
-    if (data.whtDeliveryNotes) {
-      setWhtDeliveryNotes(String(data.whtDeliveryNotes));
-    }
-
-    // Set tax invoice request method (expense only)
-    if (data.taxInvoiceRequestMethod) {
-      setTaxInvoiceRequestMethod(String(data.taxInvoiceRequestMethod));
-    }
-    if (data.taxInvoiceRequestEmail) {
-      setTaxInvoiceRequestEmail(String(data.taxInvoiceRequestEmail));
-    }
-    if (data.taxInvoiceRequestNotes) {
-      setTaxInvoiceRequestNotes(String(data.taxInvoiceRequestNotes));
-    }
-    if (data.hasTaxInvoice) {
-      setHasDocument(true);
-    }
-
-    // Set categorized files (normalize other docs for backward compatibility)
     setCategorizedFiles({
       invoice: (data[config.fileFields.invoice.urlsField] as string[]) || [],
       slip: (data[config.fileFields.slip.urlsField] as string[]) || [],
@@ -604,35 +593,35 @@ export function UnifiedTransactionForm({
       other: normalizeOtherDocs(data.otherDocUrls),
       uncategorized: [],
     });
-    
-    // Set reference URLs
+
     if (data.referenceUrls && Array.isArray(data.referenceUrls)) {
       setReferenceUrls(data.referenceUrls as string[]);
     }
 
-    // Set currency conversion info from DB (if transaction was in foreign currency)
     if (data.originalCurrency && data.originalCurrency !== "THB") {
-      setCurrencyConversion({
-        detected: true,
-        currency: data.originalCurrency as string,
-        originalAmount: Number(data.originalAmount) || 0,
-        convertedAmount: Number(data.amount) || 0,
-        exchangeRate: Number(data.exchangeRate) || 0,
-        conversionNote: null,
+      patchAiState({
+        currencyConversion: {
+          detected: true,
+          currency: data.originalCurrency as string,
+          originalAmount: Number(data.originalAmount) || 0,
+          convertedAmount: Number(data.amount) || 0,
+          exchangeRate: Number(data.exchangeRate) || 0,
+          conversionNote: null,
+        },
       });
     }
-    
-    setFormPopulated(true);
-  }, [mode, swrTransaction, formPopulated, config, reset]);
 
-  // Refresh all data (SWR mutate + router refresh for full page tree)
+    setFormPopulated(true);
+  }, [mode, swrTransaction, formPopulated, config, reset, patchContactState, patchAiState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---------------------------------------------------------------------------
+  // Refresh
+  // ---------------------------------------------------------------------------
   const refreshAll = useCallback(async () => {
     const result = await mutateTransaction();
     if (result) {
       const data = result.data?.[config.type] || result[config.type];
-      if (data) {
-        setTransaction(data as unknown as BaseTransaction);
-      }
+      if (data) setTransaction(data as unknown as BaseTransaction);
     }
     setAuditRefreshKey((prev) => prev + 1);
     router.refresh();
@@ -646,7 +635,6 @@ export function UnifiedTransactionForm({
     onSuccess: refreshAll,
   });
 
-  // Transaction actions for view/edit mode
   const {
     deleting,
     handleDelete,
@@ -659,22 +647,11 @@ export function UnifiedTransactionForm({
     onSuccess: refreshAll,
   });
 
-  // Apply pending contact when contacts are loaded
-  useEffect(() => {
-    if (pendingContactId && contacts.length > 0 && !selectedContact) {
-      const contact = contacts.find((c) => c.id === pendingContactId);
-      if (contact) {
-        setSelectedContact(contact);
-        setPendingContactId(null);
-      }
-    }
-  }, [pendingContactId, contacts, selectedContact]);
-
   // Fetch payers for expense (view/edit mode)
   useEffect(() => {
     const fetchPayers = async () => {
       if (config.type !== "expense" || mode === "create" || !transactionId) return;
-      
+
       try {
         const res = await fetch(`/api/expenses/${transactionId}/payments`);
         if (res.ok) {
@@ -689,7 +666,6 @@ export function UnifiedTransactionForm({
               paidByBankAccount: p.paidByBankAccount as string | null,
               amount: Number(p.amount),
             }));
-            // Deduplicate: keep only unique payers by type+userId
             const seen = new Set<string>();
             const unique = mapped.filter((p: PayerInfo) => {
               const key = p.paidByType === "USER"
@@ -709,12 +685,12 @@ export function UnifiedTransactionForm({
       }
     };
 
-    if (transaction && transactionId) {
-      fetchPayers();
-    }
+    if (transaction && transactionId) fetchPayers();
   }, [config.type, mode, transactionId, transaction]);
 
-  // Recalculate when values change (use safe numeric values to prevent NaN propagation)
+  // ---------------------------------------------------------------------------
+  // Calculation (safe numeric values prevent NaN propagation)
+  // ---------------------------------------------------------------------------
   const safeAmount = typeof watchAmount === "number" && Number.isFinite(watchAmount) ? watchAmount : 0;
   const safeVatRate = typeof watchVatRate === "number" && Number.isFinite(watchVatRate) ? watchVatRate : 0;
   const safeWhtRate = typeof watchWhtRate === "number" && Number.isFinite(watchWhtRate) ? watchWhtRate : 0;
@@ -736,48 +712,40 @@ export function UnifiedTransactionForm({
     });
   }, [safeAmount, safeVatRate, watchIsWht, safeWhtRate]);
 
-  // Check if form has existing data
+  // ---------------------------------------------------------------------------
+  // AI helpers
+  // ---------------------------------------------------------------------------
   const hasExistingData = useCallback(() => {
     const hasAmount = watchAmount !== null && watchAmount !== undefined && watchAmount !== 0;
-    const hasContact = selectedContact !== null;
+    const hasContact = contactState.selectedContact !== null;
     return hasAmount || hasContact;
-  }, [watchAmount, selectedContact]);
+  }, [watchAmount, contactState.selectedContact]);
 
-  // Apply contact defaults to form
   const applyContactDefaults = useCallback(() => {
     if (!contactDefaults) return;
 
-    // Apply VAT rate
     if (contactDefaults.defaultVatRate !== null) {
       setValue("vatRate", contactDefaults.defaultVatRate);
     }
 
-    // Apply WHT settings
     if (contactDefaults.defaultWhtEnabled !== null) {
       const whtField = config.type === "expense" ? "isWht" : "isWhtDeducted";
       setValue(whtField, contactDefaults.defaultWhtEnabled);
-      
+
       if (contactDefaults.defaultWhtEnabled) {
-        if (contactDefaults.defaultWhtRate !== null) {
-          setValue("whtRate", Number(contactDefaults.defaultWhtRate));
-        }
-        if (contactDefaults.defaultWhtType) {
-          setValue("whtType", contactDefaults.defaultWhtType);
-        }
+        if (contactDefaults.defaultWhtRate !== null) setValue("whtRate", Number(contactDefaults.defaultWhtRate));
+        if (contactDefaults.defaultWhtType) setValue("whtType", contactDefaults.defaultWhtType);
       }
     }
 
-    // Apply description template
     if (contactDefaults.descriptionTemplate && config.fields.descriptionField) {
       setValue(config.fields.descriptionField.name, contactDefaults.descriptionTemplate);
     }
 
-    // Dismiss the suggestion after applying
-    setDefaultsSuggestionDismissed(true);
+    patchContactState({ defaultsSuggestionDismissed: true });
     toast.success("ใช้ค่าแนะนำจากผู้ติดต่อแล้ว");
-  }, [contactDefaults, setValue, config.type, config.fields.descriptionField]);
+  }, [contactDefaults, setValue, config.type, config.fields.descriptionField, patchContactState]);
 
-  // Extract current form data as MergeData
   const extractFormData = useCallback((): MergeData => {
     return {
       amount: watchAmount ? Number(watchAmount) : null,
@@ -785,46 +753,30 @@ export function UnifiedTransactionForm({
       vatRate: watchVatRate || null,
       whtAmount: calculation.whtAmount || null,
       whtRate: watchWhtRate || null,
-      vendorName: selectedContact?.name || null,
-      vendorTaxId: selectedContact?.taxId || null,
-      contactId: selectedContact?.id || null,
+      vendorName: contactState.selectedContact?.name || null,
+      vendorTaxId: contactState.selectedContact?.taxId || null,
+      contactId: contactState.selectedContact?.id || null,
       date: watchDate ? new Date(watchDate as string).toISOString() : null,
       invoiceNumber: (watch("invoiceNumber") as string) || null,
       description: config.fields.descriptionField
         ? (watch(config.fields.descriptionField.name) as string) || null
         : null,
       accountId: selectedAccount || null,
-      accountName: accountSuggestion?.accountName || null,
+      accountName: aiState.accountSuggestion?.accountName || null,
     };
-  }, [watchAmount, calculation.vatAmount, calculation.whtAmount, watchVatRate, watchWhtRate, selectedContact, watchDate, watch, config, selectedAccount, accountSuggestion]);
+  }, [watchAmount, calculation.vatAmount, calculation.whtAmount, watchVatRate, watchWhtRate, contactState.selectedContact, watchDate, watch, config, selectedAccount, aiState.accountSuggestion]);
 
-  // Extract AI result as MergeData
   const extractAiData = useCallback(
     (result: MultiDocAnalysisResult): MergeData => {
       if (!result) {
         return {
-          amount: null,
-          vatAmount: null,
-          vatRate: null,
-          whtAmount: null,
-          whtRate: null,
-          vendorName: null,
-          vendorTaxId: null,
-          contactId: null,
-          date: null,
-          invoiceNumber: null,
-          description: null,
-          accountId: null,
-          accountName: null,
+          amount: null, vatAmount: null, vatRate: null, whtAmount: null, whtRate: null,
+          vendorName: null, vendorTaxId: null, contactId: null, date: null,
+          invoiceNumber: null, description: null, accountId: null, accountName: null,
         };
       }
       const combined = result.combined || {
-        totalAmount: 0,
-        vatAmount: 0,
-        date: null,
-        invoiceNumbers: [],
-        vendorName: null,
-        vendorTaxId: null,
+        totalAmount: 0, vatAmount: 0, date: null, invoiceNumbers: [], vendorName: null, vendorTaxId: null,
       };
       const smart = result.smart;
       const suggested = (smart?.suggested || {}) as Record<string, unknown>;
@@ -871,16 +823,16 @@ export function UnifiedTransactionForm({
     [config]
   );
 
-  // Handle AI analysis result
+  // Handle AI analysis result — single patchAiState call keeps depth low
   const handleAiResult = useCallback(
     (result: MultiDocAnalysisResult) => {
-      setAiResult(result);
-      setAiApplied(false);
-
-      // Sync currency conversion state from AI result
-      if (result.currencyConversion && result.currencyConversion.currency !== "THB") {
-        setCurrencyConversion(result.currencyConversion);
-      }
+      patchAiState({
+        aiResult: result,
+        aiApplied: false,
+        ...(result.currencyConversion && result.currencyConversion.currency !== "THB"
+          ? { currencyConversion: result.currencyConversion }
+          : {}),
+      });
 
       if (hasExistingData()) {
         setPendingAiResult(result);
@@ -891,31 +843,29 @@ export function UnifiedTransactionForm({
         applyAiResult(result);
       }
     },
-    [hasExistingData, extractFormData, extractAiData, applyAiResult]
+    [hasExistingData, extractFormData, extractAiData, applyAiResult, patchAiState, setPendingAiResult, setExistingFormData, setNewAiData]
   );
 
-  // Note: handleMergeDecision, handleConflictResolution, applyMergedData are now from useMergeHandler hook
-  // Note: onSubmit, handleSave, handleEditClick, handleCancelEdit are now from useTransactionSubmission hook
-
-  // Navigate to list page with refresh
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
   const navigateToList = () => {
     router.push(`/${companyCode}/${config.listUrl}`);
     router.refresh();
   };
 
-  // File upload wrappers for view/edit mode
+  // ---------------------------------------------------------------------------
+  // File upload wrappers (view/edit)
+  // ---------------------------------------------------------------------------
   const handleFileUploadWrapper = async (file: File, type: "slip" | "invoice" | "wht" | "other") => {
     if (!transaction) return;
     const currentUrls: Record<string, string[]> = {};
-    Object.entries(config.fileFields).forEach(([key, field]) => {
+    Object.entries(config.fileFields).forEach(([, field]) => {
       currentUrls[field.urlsField] = (transaction[field.urlsField] as string[]) || [];
     });
-    // Handle otherDocUrls separately (not in config.fileFields)
     if (type === "other") {
       currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as (string | { url: string })[]) || [])
-        .map((item: string | { url: string }) =>
-          typeof item === "string" ? item : item.url
-        )
+        .map((item: string | { url: string }) => typeof item === "string" ? item : item.url)
         .filter(Boolean);
     }
     await handleFileUpload(file, type, currentUrls, transaction);
@@ -924,43 +874,31 @@ export function UnifiedTransactionForm({
   const handleDeleteFileWrapper = async (type: "slip" | "invoice" | "wht" | "other", urlToDelete: string) => {
     if (!transaction) return;
     const currentUrls: Record<string, string[]> = {};
-    Object.entries(config.fileFields).forEach(([key, field]) => {
+    Object.entries(config.fileFields).forEach(([, field]) => {
       currentUrls[field.urlsField] = (transaction[field.urlsField] as string[]) || [];
     });
-    // Handle otherDocUrls separately (not in config.fileFields)
     if (type === "other") {
       currentUrls["otherDocUrls"] = ((transaction.otherDocUrls as (string | { url: string })[]) || [])
-        .map((item: string | { url: string }) =>
-          typeof item === "string" ? item : item.url
-        )
+        .map((item: string | { url: string }) => typeof item === "string" ? item : item.url)
         .filter(Boolean);
     }
     await handleDeleteFile(type, urlToDelete, currentUrls, transaction);
   };
-  
-  // ==========================================================================
-  // WHT Change Rules (must be before early returns to maintain hooks order)
-  // ==========================================================================
-  
+
+  // ---------------------------------------------------------------------------
+  // WHT change rules
+  // ---------------------------------------------------------------------------
   const whtChangeInfo = useMemo(() => {
-    if (!transaction || mode !== "edit") {
-      return undefined;
-    }
-    
+    if (!transaction || mode !== "edit") return undefined;
+
     const currentStatus = transaction.workflowStatus || "";
     const hasWhtCert = transaction.hasWhtCert || false;
     const currentWht = config.type === "expense" ? transaction.isWht : transaction.isWhtDeducted;
-    
-    // Check if locked
+
     if (WHT_LOCKED_STATUSES.includes(currentStatus as typeof WHT_LOCKED_STATUSES[number])) {
-      return {
-        isLocked: true,
-        requiresConfirmation: false,
-        message: "ไม่สามารถเปลี่ยนได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว",
-      };
+      return { isLocked: true, requiresConfirmation: false, message: "ไม่สามารถเปลี่ยนได้ เนื่องจากรายการนี้ส่งบัญชีแล้ว" };
     }
-    
-    // Check if requires confirmation
+
     if (WHT_CONFIRM_STATUSES_ALL.includes(currentStatus as typeof WHT_CONFIRM_STATUSES_ALL[number]) || hasWhtCert) {
       return {
         isLocked: false,
@@ -970,44 +908,47 @@ export function UnifiedTransactionForm({
           : "คุณกำลังจะเพิ่มหัก ณ ที่จ่าย ต้องออกหนังสือรับรอง (50 ทวิ) ก่อนส่งบัญชี",
       };
     }
-    
+
     return undefined;
   }, [transaction, mode, config.type]);
-  
-  // Handle WHT toggle with confirmation
+
   const handleWhtToggle = useCallback((enabled: boolean, confirmed?: boolean, reason?: string) => {
     setValue(config.fields.whtField.name, enabled);
-    
     if (!enabled) {
       setValue("whtRate", undefined);
       setValue("whtType", undefined);
     }
-    
-    // Store confirmation flag for API
     if (confirmed) {
       setValue("_whtChangeConfirmed" as Parameters<typeof setValue>[0], true);
-      if (reason) {
-        setValue("_whtChangeReason" as Parameters<typeof setValue>[0], reason);
-      }
+      if (reason) setValue("_whtChangeReason" as Parameters<typeof setValue>[0], reason);
     }
   }, [setValue, config.fields.whtField.name]);
 
-  // Handle document type change (for VAT 0% expenses)
   const handleDocumentTypeChange = useCallback((docType: string) => {
     setValue("documentType", docType);
   }, [setValue]);
+
+  // Batch-clear tax invoice fields (used by useDocumentTypeEffects)
+  const clearTaxInvoiceRequest = useCallback(() => {
+    patchContactState({
+      taxInvoiceRequestMethod: null,
+      taxInvoiceRequestEmail: null,
+      taxInvoiceRequestNotes: null,
+    });
+  }, [patchContactState]);
 
   useDocumentTypeEffects({
     configType: config.type,
     watchVatRate,
     watchDocumentType,
     setValue,
-    taxInvoiceRequestMethod,
-    setTaxInvoiceRequestMethod,
-    setTaxInvoiceRequestEmail,
-    setTaxInvoiceRequestNotes,
+    taxInvoiceRequestMethod: contactState.taxInvoiceRequestMethod,
+    clearTaxInvoiceRequest,
   });
 
+  // ---------------------------------------------------------------------------
+  // Form context
+  // ---------------------------------------------------------------------------
   const stableAccessibleCompanies = useMemo(
     () => accessibleCompanies.map((c) => ({ id: c.id, name: c.name, code: c.code })),
     [accessibleCompanies],
@@ -1016,37 +957,15 @@ export function UnifiedTransactionForm({
   const transactionFormContextValue = useFormContextFactory({
     configType: config.type,
     mode,
+    contactState,
+    patchContactState,
+    aiState,
+    patchAiState,
     contacts,
     contactsLoading,
-    selectedContact,
-    setSelectedContact,
     refetchContacts,
-    oneTimeContactName,
-    setOneTimeContactName,
-    aiVendorSuggestion,
-    setAiVendorSuggestion,
     selectedAccount,
     setSelectedAccount,
-    accountSuggestion,
-    aiResult,
-    whtDeliveryMethod,
-    setWhtDeliveryMethod,
-    whtDeliveryEmail,
-    setWhtDeliveryEmail,
-    whtDeliveryNotes,
-    setWhtDeliveryNotes,
-    updateContactDelivery,
-    setUpdateContactDelivery,
-    taxInvoiceRequestMethod,
-    setTaxInvoiceRequestMethod,
-    taxInvoiceRequestEmail,
-    setTaxInvoiceRequestEmail,
-    taxInvoiceRequestNotes,
-    setTaxInvoiceRequestNotes,
-    updateContactTaxInvoiceRequest,
-    setUpdateContactTaxInvoiceRequest,
-    hasDocument,
-    setHasDocument,
     internalCompanyId,
     setInternalCompanyId,
     accessibleCompanies: stableAccessibleCompanies,
@@ -1054,12 +973,13 @@ export function UnifiedTransactionForm({
     setReferenceUrls,
   });
 
-  // Loading state for view/edit mode
+  // ---------------------------------------------------------------------------
+  // Early returns (loading / error)
+  // ---------------------------------------------------------------------------
   if (mode !== "create" && loading) {
     return <TransactionDetailSkeleton />;
   }
 
-  // Error state
   if (mode !== "create" && (error || !transaction)) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4">
@@ -1081,7 +1001,6 @@ export function UnifiedTransactionForm({
 
   return (
     <TransactionFormProvider value={transactionFormContextValue}>
-      {/* View/Edit Mode Header */}
       {mode !== "create" && transaction && (
         <TransactionViewToolbar
           config={config}
@@ -1103,9 +1022,7 @@ export function UnifiedTransactionForm({
         />
       )}
 
-      {/* Form Content */}
       <form onSubmit={mode === "create" ? handleSubmit(onSubmit) : (e) => e.preventDefault()}>
-        {/* CREATE MODE */}
         {mode === "create" && (
           <CreateModeContent
             config={config}
@@ -1124,17 +1041,17 @@ export function UnifiedTransactionForm({
             watchDocumentType={watchDocumentType}
             categorizedFiles={categorizedFiles}
             setCategorizedFiles={setCategorizedFiles}
-            currencyConversion={currencyConversion}
+            currencyConversion={aiState.currencyConversion}
             setCurrencyConversion={setCurrencyConversion}
-            aiResult={aiResult}
+            aiResult={aiState.aiResult}
             setAiResult={setAiResult}
             payers={payers}
             setPayers={setPayers}
             filesInitialized={filesInitialized}
-            selectedContact={selectedContact}
+            selectedContact={contactState.selectedContact}
             contactDefaults={contactDefaults}
             hasContactDefaults={hasContactDefaults}
-            defaultsSuggestionDismissed={defaultsSuggestionDismissed}
+            defaultsSuggestionDismissed={contactState.defaultsSuggestionDismissed}
             setDefaultsSuggestionDismissed={setDefaultsSuggestionDismissed}
             applyContactDefaults={applyContactDefaults}
             setAccountSuggestion={setAccountSuggestion}
@@ -1146,7 +1063,6 @@ export function UnifiedTransactionForm({
           />
         )}
 
-        {/* VIEW/EDIT MODE */}
         {mode !== "create" && transaction && (
           <ViewEditModeContent
             config={config}
@@ -1163,7 +1079,7 @@ export function UnifiedTransactionForm({
             watchWhtType={watchWhtType}
             watchDocumentType={watchDocumentType}
             transaction={transaction}
-            currencyConversion={currencyConversion}
+            currencyConversion={aiState.currencyConversion}
             setCurrencyConversion={setCurrencyConversion}
             payers={payers}
             setPayers={setPayers}
@@ -1201,4 +1117,3 @@ export function UnifiedTransactionForm({
     </TransactionFormProvider>
   );
 }
-

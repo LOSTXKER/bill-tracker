@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { ContactSummary } from "@/types";
 import type { TransactionFormContextValue } from "../TransactionFormContext";
-import type { AiVendorSuggestion } from "../shared/ContactSelector";
+import type { ContactFormState, AiFormState } from "./useTransactionFormState";
 
 interface InternalCompanyOption {
   id: string;
@@ -14,41 +14,17 @@ interface InternalCompanyOption {
 interface FormContextFactoryParams {
   configType: string;
   mode: string;
-  // Contact
+  contactState: ContactFormState;
+  patchContactState: (patch: Partial<ContactFormState>) => void;
+  aiState: AiFormState;
+  patchAiState: (patch: Partial<AiFormState>) => void;
+  // Contact list (from useContacts)
   contacts: ContactSummary[];
   contactsLoading: boolean;
-  selectedContact: ContactSummary | null;
-  setSelectedContact: (c: ContactSummary | null) => void;
   refetchContacts: () => void;
-  oneTimeContactName: string;
-  setOneTimeContactName: (n: string) => void;
-  aiVendorSuggestion: AiVendorSuggestion | null;
-  setAiVendorSuggestion: (v: AiVendorSuggestion | null) => void;
   // Account
   selectedAccount: string | null;
   setSelectedAccount: (id: string | null) => void;
-  accountSuggestion: { accountId: string | null; alternatives?: Array<{ accountId: string; accountCode: string; accountName: string; confidence: number; reason: string }> } | null;
-  aiResult: { aiAccountSuggestion?: { accountId: string | null } | null } | null;
-  // WHT delivery
-  whtDeliveryMethod: string | null;
-  setWhtDeliveryMethod: (v: string | null) => void;
-  whtDeliveryEmail: string | null;
-  setWhtDeliveryEmail: (v: string | null) => void;
-  whtDeliveryNotes: string | null;
-  setWhtDeliveryNotes: (v: string | null) => void;
-  updateContactDelivery: boolean;
-  setUpdateContactDelivery: (v: boolean) => void;
-  // Tax invoice
-  taxInvoiceRequestMethod: string | null;
-  setTaxInvoiceRequestMethod: (v: string | null) => void;
-  taxInvoiceRequestEmail: string | null;
-  setTaxInvoiceRequestEmail: (v: string | null) => void;
-  taxInvoiceRequestNotes: string | null;
-  setTaxInvoiceRequestNotes: (v: string | null) => void;
-  updateContactTaxInvoiceRequest: boolean;
-  setUpdateContactTaxInvoiceRequest: (v: boolean) => void;
-  hasDocument: boolean;
-  setHasDocument: (v: boolean) => void;
   // Internal company
   internalCompanyId: string | null;
   setInternalCompanyId: (id: string | null) => void;
@@ -59,57 +35,81 @@ interface FormContextFactoryParams {
 }
 
 /**
- * Builds the TransactionFormContextValue from all the state slices.
+ * Builds the TransactionFormContextValue from grouped state objects.
  * Centralizes the "can edit" logic: only expenses in create/edit mode get onChange handlers.
  */
 export function useFormContextFactory(params: FormContextFactoryParams): TransactionFormContextValue {
   const isEditable = params.mode === "create" || params.mode === "edit";
   const isExpenseEditable = params.configType === "expense" && isEditable;
+  const cs = params.contactState;
+  const ai = params.aiState;
 
   return useMemo<TransactionFormContextValue>(() => ({
     contacts: params.contacts,
     contactsLoading: params.contactsLoading,
-    selectedContact: params.selectedContact,
+    selectedContact: cs.selectedContact,
     onContactSelect: (contact) => {
-      params.setSelectedContact(contact);
-      if (contact) params.setAiVendorSuggestion(null);
+      params.patchContactState({
+        selectedContact: contact,
+        aiVendorSuggestion: contact ? null : cs.aiVendorSuggestion,
+      });
     },
     onContactCreated: (contact) => {
       params.refetchContacts();
-      params.setSelectedContact(contact);
-      params.setAiVendorSuggestion(null);
+      params.patchContactState({
+        selectedContact: contact,
+        aiVendorSuggestion: null,
+      });
     },
-    oneTimeContactName: params.oneTimeContactName,
-    onOneTimeContactNameChange: params.setOneTimeContactName,
-    aiVendorSuggestion: params.aiVendorSuggestion,
+    oneTimeContactName: cs.oneTimeContactName,
+    onOneTimeContactNameChange: (name: string) => params.patchContactState({ oneTimeContactName: name }),
+    aiVendorSuggestion: cs.aiVendorSuggestion,
 
     selectedAccount: params.selectedAccount,
     onAccountChange: params.setSelectedAccount,
     suggestedAccountId:
-      params.accountSuggestion?.accountId ||
-      params.aiResult?.aiAccountSuggestion?.accountId ||
+      ai.accountSuggestion?.accountId ||
+      ai.aiResult?.aiAccountSuggestion?.accountId ||
       undefined,
-    suggestedAccountAlternatives: params.accountSuggestion?.alternatives,
+    suggestedAccountAlternatives: ai.accountSuggestion?.alternatives,
 
-    whtDeliveryMethod: params.whtDeliveryMethod,
-    onWhtDeliveryMethodChange: isExpenseEditable ? params.setWhtDeliveryMethod : undefined,
-    whtDeliveryEmail: params.whtDeliveryEmail,
-    onWhtDeliveryEmailChange: isExpenseEditable ? params.setWhtDeliveryEmail : undefined,
-    whtDeliveryNotes: params.whtDeliveryNotes,
-    onWhtDeliveryNotesChange: isExpenseEditable ? params.setWhtDeliveryNotes : undefined,
-    updateContactDelivery: params.updateContactDelivery,
-    onUpdateContactDeliveryChange: isExpenseEditable ? params.setUpdateContactDelivery : undefined,
+    whtDeliveryMethod: cs.whtDeliveryMethod,
+    onWhtDeliveryMethodChange: isExpenseEditable
+      ? (v: string | null) => params.patchContactState({ whtDeliveryMethod: v })
+      : undefined,
+    whtDeliveryEmail: cs.whtDeliveryEmail,
+    onWhtDeliveryEmailChange: isExpenseEditable
+      ? (v: string | null) => params.patchContactState({ whtDeliveryEmail: v })
+      : undefined,
+    whtDeliveryNotes: cs.whtDeliveryNotes,
+    onWhtDeliveryNotesChange: isExpenseEditable
+      ? (v: string | null) => params.patchContactState({ whtDeliveryNotes: v })
+      : undefined,
+    updateContactDelivery: cs.updateContactDelivery,
+    onUpdateContactDeliveryChange: isExpenseEditable
+      ? (v: boolean) => params.patchContactState({ updateContactDelivery: v })
+      : undefined,
 
-    taxInvoiceRequestMethod: params.taxInvoiceRequestMethod,
-    onTaxInvoiceRequestMethodChange: isExpenseEditable ? params.setTaxInvoiceRequestMethod : undefined,
-    taxInvoiceRequestEmail: params.taxInvoiceRequestEmail,
-    onTaxInvoiceRequestEmailChange: isExpenseEditable ? params.setTaxInvoiceRequestEmail : undefined,
-    taxInvoiceRequestNotes: params.taxInvoiceRequestNotes,
-    onTaxInvoiceRequestNotesChange: isExpenseEditable ? params.setTaxInvoiceRequestNotes : undefined,
-    updateContactTaxInvoiceRequest: params.updateContactTaxInvoiceRequest,
-    onUpdateContactTaxInvoiceRequestChange: isExpenseEditable ? params.setUpdateContactTaxInvoiceRequest : undefined,
-    hasDocument: params.hasDocument,
-    onHasDocumentChange: isExpenseEditable ? params.setHasDocument : undefined,
+    taxInvoiceRequestMethod: cs.taxInvoiceRequestMethod,
+    onTaxInvoiceRequestMethodChange: isExpenseEditable
+      ? (v: string | null) => params.patchContactState({ taxInvoiceRequestMethod: v })
+      : undefined,
+    taxInvoiceRequestEmail: cs.taxInvoiceRequestEmail,
+    onTaxInvoiceRequestEmailChange: isExpenseEditable
+      ? (v: string | null) => params.patchContactState({ taxInvoiceRequestEmail: v })
+      : undefined,
+    taxInvoiceRequestNotes: cs.taxInvoiceRequestNotes,
+    onTaxInvoiceRequestNotesChange: isExpenseEditable
+      ? (v: string | null) => params.patchContactState({ taxInvoiceRequestNotes: v })
+      : undefined,
+    updateContactTaxInvoiceRequest: cs.updateContactTaxInvoiceRequest,
+    onUpdateContactTaxInvoiceRequestChange: isExpenseEditable
+      ? (v: boolean) => params.patchContactState({ updateContactTaxInvoiceRequest: v })
+      : undefined,
+    hasDocument: cs.hasDocument,
+    onHasDocumentChange: isExpenseEditable
+      ? (v: boolean) => params.patchContactState({ hasDocument: v })
+      : undefined,
 
     internalCompanyId: params.internalCompanyId,
     onInternalCompanyChange: isExpenseEditable ? params.setInternalCompanyId : undefined,
@@ -119,13 +119,12 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
     onReferenceUrlsChange: isEditable ? params.setReferenceUrls : undefined,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
-    params.contacts, params.contactsLoading, params.selectedContact,
-    params.oneTimeContactName, params.aiVendorSuggestion,
-    params.selectedAccount, params.accountSuggestion, params.aiResult,
-    params.whtDeliveryMethod, params.whtDeliveryEmail, params.whtDeliveryNotes,
-    params.updateContactDelivery,
-    params.taxInvoiceRequestMethod, params.taxInvoiceRequestEmail, params.taxInvoiceRequestNotes,
-    params.updateContactTaxInvoiceRequest, params.hasDocument,
+    params.contacts, params.contactsLoading,
+    cs.selectedContact, cs.oneTimeContactName, cs.aiVendorSuggestion,
+    cs.whtDeliveryMethod, cs.whtDeliveryEmail, cs.whtDeliveryNotes, cs.updateContactDelivery,
+    cs.taxInvoiceRequestMethod, cs.taxInvoiceRequestEmail, cs.taxInvoiceRequestNotes,
+    cs.updateContactTaxInvoiceRequest, cs.hasDocument,
+    params.selectedAccount, ai.accountSuggestion, ai.aiResult,
     params.internalCompanyId, params.accessibleCompanies,
     params.referenceUrls,
     isEditable, isExpenseEditable,

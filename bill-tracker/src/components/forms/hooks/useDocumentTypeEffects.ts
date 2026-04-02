@@ -9,9 +9,7 @@ interface UseDocumentTypeEffectsParams {
   watchDocumentType: string | undefined;
   setValue: UseFormSetValue<Record<string, unknown>>;
   taxInvoiceRequestMethod: string | null;
-  setTaxInvoiceRequestMethod: (v: string | null) => void;
-  setTaxInvoiceRequestEmail: (v: string | null) => void;
-  setTaxInvoiceRequestNotes: (v: string | null) => void;
+  clearTaxInvoiceRequest: () => void;
 }
 
 /**
@@ -24,9 +22,7 @@ export function useDocumentTypeEffects({
   watchDocumentType,
   setValue,
   taxInvoiceRequestMethod,
-  setTaxInvoiceRequestMethod,
-  setTaxInvoiceRequestEmail,
-  setTaxInvoiceRequestNotes,
+  clearTaxInvoiceRequest,
 }: UseDocumentTypeEffectsParams) {
   const safeVatRate = typeof watchVatRate === "number" && !Number.isNaN(watchVatRate)
     ? watchVatRate
@@ -52,9 +48,7 @@ export function useDocumentTypeEffects({
   useEffect(() => {
     if (configType === "expense" && watchDocumentType === "NO_DOCUMENT") {
       if (taxInvoiceRequestMethod) {
-        setTaxInvoiceRequestMethod(null);
-        setTaxInvoiceRequestEmail(null);
-        setTaxInvoiceRequestNotes(null);
+        clearTaxInvoiceRequest();
       }
     }
   }, [watchDocumentType, configType]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -1,6 +1,7 @@
 /**
- * Hook for handling AI result merging and conflict resolution
- * Extracted from UnifiedTransactionForm to reduce component complexity
+ * Hook for handling AI result merging and conflict resolution.
+ * Uses grouped state setters (patchContactState / patchAiState) for
+ * fewer state updates per merge action.
  */
 
 import { useState, useCallback } from "react";
@@ -11,25 +12,24 @@ import type { MergeData, MergeDecision } from "@/components/forms/shared/MergeOp
 import type { ConflictField, ConflictResolution, detectConflicts } from "@/components/forms/shared/ConflictDialog";
 import type { UnifiedTransactionConfig } from "@/components/forms/UnifiedTransactionForm";
 import type { MultiDocAnalysisResult } from "@/components/forms/shared/InputMethodSection";
+import type { AiFormState, ContactFormState } from "@/components/forms/hooks/useTransactionFormState";
 
 export interface UseMergeHandlerProps {
   config: UnifiedTransactionConfig;
   setValue: UseFormSetValue<any>;
   contacts: ContactSummary[];
-  setSelectedContact: (contact: ContactSummary | null) => void;
+  patchContactState: (patch: Partial<ContactFormState>) => void;
   setSelectedAccount: (id: string | null) => void;
-  setAiResult: (result: MultiDocAnalysisResult | null) => void;
-  setAiApplied: (applied: boolean) => void;
+  patchAiState: (patch: Partial<AiFormState>) => void;
 }
 
 export function useMergeHandler({
   config,
   setValue,
   contacts,
-  setSelectedContact,
+  patchContactState,
   setSelectedAccount,
-  setAiResult,
-  setAiApplied,
+  patchAiState,
 }: UseMergeHandlerProps) {
   const [pendingAiResult, setPendingAiResult] = useState<MultiDocAnalysisResult | null>(null);
   const [existingFormData, setExistingFormData] = useState<MergeData | null>(null);
@@ -38,38 +38,28 @@ export function useMergeHandler({
   const [pendingMergedData, setPendingMergedData] = useState<MergeData | null>(null);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
 
-  // Apply merged data to form
   const applyMergedData = useCallback(
     (data: MergeData) => {
-      if (data.amount !== null) {
-        setValue("amount", data.amount);
-      }
-      if (data.vatRate !== null) {
-        setValue("vatRate", data.vatRate);
-      }
-      if (data.date) {
-        setValue(config.fields.dateField.name, new Date(data.date));
-      }
-      if (data.invoiceNumber) {
-        setValue("invoiceNumber", data.invoiceNumber);
-      }
+      if (data.amount !== null) setValue("amount", data.amount);
+      if (data.vatRate !== null) setValue("vatRate", data.vatRate);
+      if (data.date) setValue(config.fields.dateField.name, new Date(data.date));
+      if (data.invoiceNumber) setValue("invoiceNumber", data.invoiceNumber);
       if (data.description && config.fields.descriptionField) {
         setValue(config.fields.descriptionField.name, data.description);
       }
       if (data.contactId) {
         const contact = contacts.find((c) => c.id === data.contactId);
         if (contact) {
-          setSelectedContact(contact);
+          patchContactState({ selectedContact: contact });
         }
       }
       if (data.accountId) {
         setSelectedAccount(data.accountId);
       }
     },
-    [setValue, config, contacts, setSelectedContact, setSelectedAccount]
+    [setValue, config, contacts, patchContactState, setSelectedAccount]
   );
 
-  // Handle merge decision
   const handleMergeDecision = useCallback(
     (decision: MergeDecision, detectConflictsFn: typeof detectConflicts) => {
       if (decision.action === "cancel") {
@@ -81,8 +71,7 @@ export function useMergeHandler({
       if (decision.action === "replace" && decision.mergedData) {
         applyMergedData(decision.mergedData);
         if (pendingAiResult) {
-          setAiResult(pendingAiResult);
-          setAiApplied(true);
+          patchAiState({ aiResult: pendingAiResult, aiApplied: true });
         }
         setPendingAiResult(null);
         toast.success("แทนที่ข้อมูลด้วยข้อมูลจาก AI แล้ว");
@@ -102,18 +91,16 @@ export function useMergeHandler({
         } else {
           applyMergedData(decision.mergedData);
           if (pendingAiResult) {
-            setAiResult(pendingAiResult);
-            setAiApplied(true);
+            patchAiState({ aiResult: pendingAiResult, aiApplied: true });
           }
           setPendingAiResult(null);
           toast.success("รวมยอดเงินแล้ว");
         }
       }
     },
-    [existingFormData, newAiData, pendingAiResult, applyMergedData, setAiResult, setAiApplied]
+    [existingFormData, newAiData, pendingAiResult, applyMergedData, patchAiState]
   );
 
-  // Handle conflict resolution
   const handleConflictResolution = useCallback(
     (resolution: ConflictResolution) => {
       if (!pendingMergedData || !existingFormData || !newAiData) return;
@@ -129,15 +116,14 @@ export function useMergeHandler({
 
       applyMergedData(finalData);
       if (pendingAiResult) {
-        setAiResult(pendingAiResult);
-        setAiApplied(true);
+        patchAiState({ aiResult: pendingAiResult, aiApplied: true });
       }
       setPendingAiResult(null);
       setPendingConflicts([]);
       setPendingMergedData(null);
       toast.success("รวมข้อมูลสำเร็จ");
     },
-    [pendingMergedData, existingFormData, newAiData, pendingAiResult, applyMergedData, setAiResult, setAiApplied]
+    [pendingMergedData, existingFormData, newAiData, pendingAiResult, applyMergedData, patchAiState]
   );
 
   return {

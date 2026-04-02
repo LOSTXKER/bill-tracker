@@ -54,11 +54,11 @@ export type {
 
 // Transaction Form Helpers (Phase 5.1 Refactoring)
 export { useAiResultProcessor } from "./use-ai-result-processor";
+export type { UseAiResultProcessorProps } from "./use-ai-result-processor";
 export type {
-  UseAiResultProcessorProps,
   AiVendorSuggestion,
   AccountSuggestion as AiAccountSuggestion,
-} from "./use-ai-result-processor";
+} from "@/components/forms/hooks/useTransactionFormState";
 
 export { useTransactionSubmission } from "./use-transaction-submission";
 export type { UseTransactionSubmissionProps } from "./use-transaction-submission";
