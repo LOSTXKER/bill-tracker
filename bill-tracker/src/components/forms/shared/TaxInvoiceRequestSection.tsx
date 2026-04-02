@@ -145,7 +145,10 @@ function TaxInvoiceRequestEdit({
         <div
           role="button"
           tabIndex={0}
-          onClick={() => onHasDocumentChange(!hasDocument)}
+          onClick={(e) => {
+            if (e.nativeEvent.isTrusted === false) return;
+            onHasDocumentChange(!hasDocument);
+          }}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onHasDocumentChange(!hasDocument); } }}
           className={cn(
             "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors w-full cursor-pointer",
@@ -154,13 +157,11 @@ function TaxInvoiceRequestEdit({
               : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
           )}
         >
-          <span onClick={(e) => e.stopPropagation()} className="flex items-center">
-            <Switch
-              checked={!!hasDocument}
-              tabIndex={-1}
-              className="pointer-events-none"
-            />
-          </span>
+          <Switch
+            checked={!!hasDocument}
+            tabIndex={-1}
+            className="pointer-events-none"
+          />
           <span className="select-none">
             {hasDocument ? `ได้รับ${docLabel}แล้ว` : `ได้รับ${docLabel}แล้ว?`}
           </span>
