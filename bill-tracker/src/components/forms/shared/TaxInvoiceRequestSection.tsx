@@ -3,7 +3,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -145,10 +144,7 @@ function TaxInvoiceRequestEdit({
         <div
           role="button"
           tabIndex={0}
-          onClick={(e) => {
-            if (e.nativeEvent.isTrusted === false) return;
-            onHasDocumentChange(!hasDocument);
-          }}
+          onClick={() => onHasDocumentChange(!hasDocument)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onHasDocumentChange(!hasDocument); } }}
           className={cn(
             "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors w-full cursor-pointer",
@@ -157,11 +153,20 @@ function TaxInvoiceRequestEdit({
               : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
           )}
         >
-          <Switch
-            checked={!!hasDocument}
-            tabIndex={-1}
-            className="pointer-events-none"
-          />
+          <div
+            className={cn(
+              "relative inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-colors",
+              hasDocument ? "bg-primary" : "bg-input dark:bg-input/80"
+            )}
+            aria-hidden="true"
+          >
+            <div
+              className={cn(
+                "pointer-events-none block size-4 rounded-full bg-background ring-0 transition-transform",
+                hasDocument ? "translate-x-[calc(100%-2px)]" : "translate-x-0"
+              )}
+            />
+          </div>
           <span className="select-none">
             {hasDocument ? `ได้รับ${docLabel}แล้ว` : `ได้รับ${docLabel}แล้ว?`}
           </span>
