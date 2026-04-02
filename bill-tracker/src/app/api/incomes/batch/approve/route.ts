@@ -109,10 +109,12 @@ export const POST = (request: Request) => {
           continue;
         }
 
-        // Approve
+        // Approve — must also set workflowStatus so the item leaves the
+        // PENDING_APPROVAL filter used by the approvals page.
         await prisma.income.update({
           where: { id: income.id },
           data: {
+            workflowStatus: "ACTIVE",
             approvalStatus: "APPROVED",
             approvedBy: session.user.id,
             approvedAt: new Date(),
