@@ -258,13 +258,6 @@ export function UnifiedTransactionForm({
   const [taxInvoiceRequestNotes, setTaxInvoiceRequestNotes] = useState<string | null>(null);
   const [updateContactTaxInvoiceRequest, setUpdateContactTaxInvoiceRequest] = useState(false);
   const [hasDocument, setHasDocument] = useState(false);
-
-  useEffect(() => {
-    const hasInvoiceFiles = categorizedFiles.invoice.length > 0;
-    if (hasInvoiceFiles && !hasDocument) {
-      setHasDocument(true);
-    }
-  }, [categorizedFiles.invoice.length]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Use context companies if available, otherwise fetch from API
   const accessibleCompanies = contextCompanies.length > 0 
