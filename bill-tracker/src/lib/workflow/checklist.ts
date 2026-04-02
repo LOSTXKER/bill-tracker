@@ -42,8 +42,8 @@ export function getExpenseChecklist(expense: ExpenseChecklistInput): ChecklistIt
     items.push({
       key: "tax_invoice_requested",
       label: "ขอใบกำกับภาษี",
-      completed: !!expense.taxInvoiceRequestedAt,
-      completedAt: expense.taxInvoiceRequestedAt,
+      completed: !!expense.taxInvoiceRequestedAt || expense.hasTaxInvoice,
+      completedAt: expense.taxInvoiceRequestedAt || expense.taxInvoiceAt,
       actionLabel: "ขอแล้ว",
       action: "mark_tax_invoice_requested",
       undoAction: "cancel_tax_invoice_request",
@@ -61,8 +61,8 @@ export function getExpenseChecklist(expense: ExpenseChecklistInput): ChecklistIt
     items.push({
       key: "tax_invoice_requested",
       label: "ขอบิลเงินสด",
-      completed: !!expense.taxInvoiceRequestedAt,
-      completedAt: expense.taxInvoiceRequestedAt,
+      completed: !!expense.taxInvoiceRequestedAt || expense.hasTaxInvoice,
+      completedAt: expense.taxInvoiceRequestedAt || expense.taxInvoiceAt,
       actionLabel: "ขอแล้ว",
       action: "mark_tax_invoice_requested",
       undoAction: "cancel_tax_invoice_request",

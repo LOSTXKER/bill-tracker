@@ -53,6 +53,7 @@ export function transformExpenseCreateData(body: TransactionRequestBody) {
     workflowStatus: workflowStatus,
     documentType: data.documentType || "TAX_INVOICE",
     hasTaxInvoice: hasTaxInvoice,
+    ...(hasTaxInvoice ? { taxInvoiceAt: new Date(), taxInvoiceRequestedAt: new Date() } : {}),
     hasWhtCert: (data.whtCertUrls?.length || 0) > 0,
     notes: data.notes,
     slipUrls: data.slipUrls || [],
