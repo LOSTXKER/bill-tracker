@@ -257,6 +257,14 @@ export function UnifiedTransactionForm({
   const [taxInvoiceRequestEmail, setTaxInvoiceRequestEmail] = useState<string | null>(null);
   const [taxInvoiceRequestNotes, setTaxInvoiceRequestNotes] = useState<string | null>(null);
   const [updateContactTaxInvoiceRequest, setUpdateContactTaxInvoiceRequest] = useState(false);
+  const [hasDocument, setHasDocument] = useState(false);
+
+  useEffect(() => {
+    const hasInvoiceFiles = categorizedFiles.invoice.length > 0;
+    if (hasInvoiceFiles && !hasDocument) {
+      setHasDocument(true);
+    }
+  }, [categorizedFiles.invoice.length]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Use context companies if available, otherwise fetch from API
   const accessibleCompanies = contextCompanies.length > 0 
@@ -472,6 +480,7 @@ export function UnifiedTransactionForm({
     taxInvoiceRequestEmail,
     taxInvoiceRequestNotes,
     updateContactTaxInvoiceRequest,
+    hasDocument,
     currencyConversion,
     watch,
     reset,
@@ -589,6 +598,9 @@ export function UnifiedTransactionForm({
     }
     if (data.taxInvoiceRequestNotes) {
       setTaxInvoiceRequestNotes(String(data.taxInvoiceRequestNotes));
+    }
+    if (data.hasTaxInvoice) {
+      setHasDocument(true);
     }
 
     // Set categorized files (normalize other docs for backward compatibility)
@@ -1032,6 +1044,8 @@ export function UnifiedTransactionForm({
     setTaxInvoiceRequestNotes,
     updateContactTaxInvoiceRequest,
     setUpdateContactTaxInvoiceRequest,
+    hasDocument,
+    setHasDocument,
     internalCompanyId,
     setInternalCompanyId,
     accessibleCompanies: stableAccessibleCompanies,

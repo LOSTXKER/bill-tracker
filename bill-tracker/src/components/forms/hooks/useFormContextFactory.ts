@@ -47,6 +47,8 @@ interface FormContextFactoryParams {
   setTaxInvoiceRequestNotes: (v: string | null) => void;
   updateContactTaxInvoiceRequest: boolean;
   setUpdateContactTaxInvoiceRequest: (v: boolean) => void;
+  hasDocument: boolean;
+  setHasDocument: (v: boolean) => void;
   // Internal company
   internalCompanyId: string | null;
   setInternalCompanyId: (id: string | null) => void;
@@ -106,6 +108,8 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
     onTaxInvoiceRequestNotesChange: isExpenseEditable ? params.setTaxInvoiceRequestNotes : undefined,
     updateContactTaxInvoiceRequest: params.updateContactTaxInvoiceRequest,
     onUpdateContactTaxInvoiceRequestChange: isExpenseEditable ? params.setUpdateContactTaxInvoiceRequest : undefined,
+    hasDocument: params.hasDocument,
+    onHasDocumentChange: isExpenseEditable ? params.setHasDocument : undefined,
 
     internalCompanyId: params.internalCompanyId,
     onInternalCompanyChange: isExpenseEditable ? params.setInternalCompanyId : undefined,
@@ -121,7 +125,7 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
     params.whtDeliveryMethod, params.whtDeliveryEmail, params.whtDeliveryNotes,
     params.updateContactDelivery,
     params.taxInvoiceRequestMethod, params.taxInvoiceRequestEmail, params.taxInvoiceRequestNotes,
-    params.updateContactTaxInvoiceRequest,
+    params.updateContactTaxInvoiceRequest, params.hasDocument,
     params.internalCompanyId, params.accessibleCompanies,
     params.referenceUrls,
     isEditable, isExpenseEditable,

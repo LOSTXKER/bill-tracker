@@ -72,6 +72,8 @@ export function TransactionFieldsSection({
     onTaxInvoiceRequestNotesChange,
     updateContactTaxInvoiceRequest = false,
     onUpdateContactTaxInvoiceRequestChange,
+    hasDocument,
+    onHasDocumentChange,
     internalCompanyId,
     onInternalCompanyChange,
     accessibleCompanies = [],
@@ -179,6 +181,7 @@ export function TransactionFieldsSection({
         taxInvoiceRequestMethod={taxInvoiceRequestMethod}
         taxInvoiceRequestEmail={taxInvoiceRequestEmail}
         taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+        hasDocument={hasDocument}
       />
     );
   }
@@ -346,6 +349,8 @@ export function TransactionFieldsSection({
           onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
           updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
           onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
+          hasDocument={hasDocument}
+          onHasDocumentChange={onHasDocumentChange}
           referenceUrls={referenceUrls}
           onReferenceUrlsChange={onReferenceUrlsChange}
         />

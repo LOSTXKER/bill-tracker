@@ -29,6 +29,8 @@ interface DocumentSettingsBlockProps {
   onTaxInvoiceRequestNotesChange?: ((v: string | null) => void) | undefined;
   updateContactTaxInvoiceRequest?: boolean;
   onUpdateContactTaxInvoiceRequestChange?: ((v: boolean) => void) | undefined;
+  hasDocument?: boolean;
+  onHasDocumentChange?: ((v: boolean) => void) | undefined;
   // Reference URLs
   referenceUrls: string[];
   onReferenceUrlsChange?: ((urls: string[]) => void) | undefined;
@@ -56,6 +58,8 @@ export function DocumentSettingsBlock({
   onTaxInvoiceRequestNotesChange,
   updateContactTaxInvoiceRequest,
   onUpdateContactTaxInvoiceRequestChange,
+  hasDocument,
+  onHasDocumentChange,
   referenceUrls,
   onReferenceUrlsChange,
 }: DocumentSettingsBlockProps) {
@@ -73,7 +77,7 @@ export function DocumentSettingsBlock({
   const showTaxInvoice = isExpense && documentType !== "NO_DOCUMENT" && (
     mode === "edit"
       ? !!onTaxInvoiceRequestMethodChange
-      : !!(taxInvoiceRequestMethod || contactAny?.taxInvoiceRequestMethod || contactAny?.taxInvoiceRequestNotes)
+      : !!(taxInvoiceRequestMethod || contactAny?.taxInvoiceRequestMethod || contactAny?.taxInvoiceRequestNotes || hasDocument)
   );
 
   const showRefUrls = mode === "edit" ? !!onReferenceUrlsChange : referenceUrls.length > 0;
@@ -119,6 +123,8 @@ export function DocumentSettingsBlock({
           updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
           onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
           selectedContact={contact}
+          hasDocument={hasDocument}
+          onHasDocumentChange={onHasDocumentChange}
         />
       )}
       {showTaxInvoice && mode === "view" && (
@@ -129,6 +135,7 @@ export function DocumentSettingsBlock({
           taxInvoiceRequestEmail={taxInvoiceRequestEmail ?? null}
           taxInvoiceRequestNotes={taxInvoiceRequestNotes ?? null}
           selectedContact={contact}
+          hasDocument={hasDocument}
         />
       )}
 

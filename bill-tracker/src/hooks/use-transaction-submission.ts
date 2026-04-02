@@ -45,6 +45,7 @@ export interface UseTransactionSubmissionProps {
   taxInvoiceRequestEmail?: string | null;
   taxInvoiceRequestNotes?: string | null;
   updateContactTaxInvoiceRequest?: boolean;
+  hasDocument?: boolean;
   // Currency conversion info
   currencyConversion?: {
     detected: boolean;
@@ -69,9 +70,10 @@ function validateExpenseFields(
   taxInvoiceRequestMethod: string | null | undefined,
   isWht: unknown,
   whtDeliveryMethod: string | null | undefined,
+  hasDocument?: boolean,
 ): string[] {
   const errors: string[] = [];
-  if (documentType !== "NO_DOCUMENT" && !taxInvoiceRequestMethod) {
+  if (documentType !== "NO_DOCUMENT" && !taxInvoiceRequestMethod && !hasDocument) {
     const docLabel = documentType === "CASH_RECEIPT" ? "บิลเงินสด" : "ใบกำกับภาษี";
     errors.push(`กรุณาระบุช่องทางขอ${docLabel}`);
   }
@@ -103,6 +105,7 @@ export function useTransactionSubmission({
   taxInvoiceRequestEmail,
   taxInvoiceRequestNotes,
   updateContactTaxInvoiceRequest,
+  hasDocument,
   currencyConversion,
   watch,
   reset,
@@ -135,7 +138,7 @@ export function useTransactionSubmission({
     }
 
     if (config.type === "expense") {
-      validationErrors.push(...validateExpenseFields(data.documentType, taxInvoiceRequestMethod, data.isWht, whtDeliveryMethod));
+      validationErrors.push(...validateExpenseFields(data.documentType, taxInvoiceRequestMethod, data.isWht, whtDeliveryMethod, hasDocument));
     }
 
     // Validate payers for expense (บังคับระบุผู้จ่าย)
@@ -250,7 +253,7 @@ export function useTransactionSubmission({
       const whtEnabled = formData[config.fields.whtField.name] as boolean;
 
       if (config.type === "expense") {
-        const saveErrors = validateExpenseFields(formData.documentType, taxInvoiceRequestMethod, whtEnabled, whtDeliveryMethod);
+        const saveErrors = validateExpenseFields(formData.documentType, taxInvoiceRequestMethod, whtEnabled, whtDeliveryMethod, hasDocument);
         if (saveErrors.length > 0) {
           toast.error(saveErrors.join(", "));
           setSaving(false);

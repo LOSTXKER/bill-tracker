@@ -46,6 +46,8 @@ export interface TransactionFormContextValue {
   onTaxInvoiceRequestNotesChange?: (notes: string | null) => void;
   updateContactTaxInvoiceRequest?: boolean;
   onUpdateContactTaxInvoiceRequestChange?: (update: boolean) => void;
+  hasDocument?: boolean;
+  onHasDocumentChange?: (value: boolean) => void;
 
   // Internal company slice
   internalCompanyId?: string | null;

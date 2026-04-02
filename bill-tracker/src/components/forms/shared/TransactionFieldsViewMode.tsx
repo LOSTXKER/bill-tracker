@@ -23,6 +23,7 @@ interface TransactionFieldsViewModeProps {
   taxInvoiceRequestMethod?: string | null;
   taxInvoiceRequestEmail?: string | null;
   taxInvoiceRequestNotes?: string | null;
+  hasDocument?: boolean;
 }
 
 const formatCurrency = (amount: number) => {
@@ -50,6 +51,7 @@ export function TransactionFieldsViewMode({
   taxInvoiceRequestMethod,
   taxInvoiceRequestEmail,
   taxInvoiceRequestNotes,
+  hasDocument,
 }: TransactionFieldsViewModeProps) {
   const watchDate = watch(config.dateField.name);
 
@@ -160,6 +162,7 @@ export function TransactionFieldsViewMode({
         taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
         taxInvoiceRequestEmail={taxInvoiceRequestEmail ?? null}
         taxInvoiceRequestNotes={taxInvoiceRequestNotes ?? null}
+        hasDocument={hasDocument}
         referenceUrls={referenceUrls}
       />
     </div>

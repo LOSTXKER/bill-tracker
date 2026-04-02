@@ -173,6 +173,8 @@ export function CreateModeContent({
     onTaxInvoiceRequestNotesChange,
     updateContactTaxInvoiceRequest = false,
     onUpdateContactTaxInvoiceRequestChange,
+    hasDocument,
+    onHasDocumentChange,
     referenceUrls = [],
     onReferenceUrlsChange,
   } = useTransactionFormContext();
@@ -410,6 +412,8 @@ export function CreateModeContent({
               onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
               updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
               onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
+              hasDocument={hasDocument}
+              onHasDocumentChange={onHasDocumentChange}
               referenceUrls={referenceUrls}
               onReferenceUrlsChange={onReferenceUrlsChange}
             />
