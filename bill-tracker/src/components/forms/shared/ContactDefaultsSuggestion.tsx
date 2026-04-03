@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Lightbulb, Check, X } from "lucide-react";
 import type { ContactDefaults } from "@/hooks/use-contact-defaults";
+import { getDeliveryMethodLabel, getTaxInvoiceRequestMethodLabel } from "@/lib/constants/delivery-methods";
 
 // WHT Type labels
 const WHT_TYPE_LABELS: Record<string, string> = {
@@ -45,14 +46,20 @@ export function ContactDefaultsSuggestion({
   }
 
   if (defaults.descriptionTemplate) {
-    // Truncate description if too long
     const desc = defaults.descriptionTemplate.length > 30
       ? defaults.descriptionTemplate.substring(0, 30) + "..."
       : defaults.descriptionTemplate;
     suggestions.push(`"${desc}"`);
   }
 
-  // Don't show if no suggestions
+  if (defaults.preferredDeliveryMethod) {
+    suggestions.push(`ส่งเอกสาร: ${getDeliveryMethodLabel(defaults.preferredDeliveryMethod)}`);
+  }
+
+  if (defaults.taxInvoiceRequestMethod) {
+    suggestions.push(`ขอใบกำกับ: ${getTaxInvoiceRequestMethodLabel(defaults.taxInvoiceRequestMethod)}`);
+  }
+
   if (suggestions.length === 0) {
     return null;
   }

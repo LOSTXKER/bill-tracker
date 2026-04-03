@@ -13,6 +13,14 @@ export interface ContactDefaults {
   defaultWhtType: string | null;
   descriptionTemplate: string | null;
   defaultsLastUpdatedAt: string | null;
+  // Delivery preferences
+  preferredDeliveryMethod: string | null;
+  deliveryEmail: string | null;
+  deliveryNotes: string | null;
+  // Tax invoice request preferences
+  taxInvoiceRequestMethod: string | null;
+  taxInvoiceRequestEmail: string | null;
+  taxInvoiceRequestNotes: string | null;
 }
 
 /**
@@ -28,6 +36,12 @@ export interface ContactWithDefaults {
   defaultWhtType: string | null;
   descriptionTemplate: string | null;
   defaultsLastUpdatedAt: string | null;
+  preferredDeliveryMethod: string | null;
+  deliveryEmail: string | null;
+  deliveryNotes: string | null;
+  taxInvoiceRequestMethod: string | null;
+  taxInvoiceRequestEmail: string | null;
+  taxInvoiceRequestNotes: string | null;
 }
 
 interface ApiResponse {
@@ -81,6 +95,12 @@ export function useContactDefaults(
     defaultWhtType: contact.defaultWhtType,
     descriptionTemplate: contact.descriptionTemplate,
     defaultsLastUpdatedAt: contact.defaultsLastUpdatedAt,
+    preferredDeliveryMethod: contact.preferredDeliveryMethod,
+    deliveryEmail: contact.deliveryEmail,
+    deliveryNotes: contact.deliveryNotes,
+    taxInvoiceRequestMethod: contact.taxInvoiceRequestMethod,
+    taxInvoiceRequestEmail: contact.taxInvoiceRequestEmail,
+    taxInvoiceRequestNotes: contact.taxInvoiceRequestNotes,
   } : null;
 
   return {

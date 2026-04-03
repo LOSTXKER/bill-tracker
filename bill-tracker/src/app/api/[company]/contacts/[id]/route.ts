@@ -42,6 +42,14 @@ async function handleGet(
       defaultWhtType: true,
       descriptionTemplate: true,
       defaultsLastUpdatedAt: true,
+      // Delivery preferences
+      preferredDeliveryMethod: true,
+      deliveryEmail: true,
+      deliveryNotes: true,
+      // Tax invoice request preferences
+      taxInvoiceRequestMethod: true,
+      taxInvoiceRequestEmail: true,
+      taxInvoiceRequestNotes: true,
     },
   });
 
@@ -53,7 +61,9 @@ async function handleGet(
   const hasDefaults = 
     contact.defaultVatRate !== null ||
     contact.defaultWhtEnabled !== null ||
-    contact.descriptionTemplate !== null;
+    contact.descriptionTemplate !== null ||
+    contact.preferredDeliveryMethod !== null ||
+    contact.taxInvoiceRequestMethod !== null;
 
   return apiResponse.success({ 
     contact,

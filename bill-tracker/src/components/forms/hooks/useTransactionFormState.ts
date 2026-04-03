@@ -139,16 +139,29 @@ export function useTransactionFormState({
     const contact = contactState.selectedContact;
     const patch: Partial<ContactFormState> = { defaultsSuggestionDismissed: false };
 
-    if (configTypeRef.current === "expense" && modeRef.current === "create" && contact) {
-      if (contact.preferredDeliveryMethod) {
-        patch.whtDeliveryMethod = contact.preferredDeliveryMethod;
-        if (contact.deliveryEmail) patch.whtDeliveryEmail = contact.deliveryEmail;
-        if (contact.deliveryNotes) patch.whtDeliveryNotes = contact.deliveryNotes;
-      }
-      if (contact.taxInvoiceRequestMethod) {
-        patch.taxInvoiceRequestMethod = contact.taxInvoiceRequestMethod;
-        if (contact.taxInvoiceRequestEmail) patch.taxInvoiceRequestEmail = contact.taxInvoiceRequestEmail;
-        if (contact.taxInvoiceRequestNotes) patch.taxInvoiceRequestNotes = contact.taxInvoiceRequestNotes;
+    if (configTypeRef.current === "expense" && modeRef.current === "create") {
+      // Reset delivery fields when switching contacts to avoid stale values
+      patch.whtDeliveryMethod = null;
+      patch.whtDeliveryEmail = null;
+      patch.whtDeliveryNotes = null;
+      patch.updateContactDelivery = false;
+      patch.taxInvoiceRequestMethod = null;
+      patch.taxInvoiceRequestEmail = null;
+      patch.taxInvoiceRequestNotes = null;
+      patch.updateContactTaxInvoiceRequest = false;
+      patch.hasDocument = false;
+
+      if (contact) {
+        if (contact.preferredDeliveryMethod) {
+          patch.whtDeliveryMethod = contact.preferredDeliveryMethod;
+          if (contact.deliveryEmail) patch.whtDeliveryEmail = contact.deliveryEmail;
+          if (contact.deliveryNotes) patch.whtDeliveryNotes = contact.deliveryNotes;
+        }
+        if (contact.taxInvoiceRequestMethod) {
+          patch.taxInvoiceRequestMethod = contact.taxInvoiceRequestMethod;
+          if (contact.taxInvoiceRequestEmail) patch.taxInvoiceRequestEmail = contact.taxInvoiceRequestEmail;
+          if (contact.taxInvoiceRequestNotes) patch.taxInvoiceRequestNotes = contact.taxInvoiceRequestNotes;
+        }
       }
     }
 

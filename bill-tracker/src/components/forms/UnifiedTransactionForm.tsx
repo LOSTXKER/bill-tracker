@@ -742,7 +742,22 @@ export function UnifiedTransactionForm({
       setValue(config.fields.descriptionField.name, contactDefaults.descriptionTemplate);
     }
 
-    patchContactState({ defaultsSuggestionDismissed: true });
+    const deliveryPatch: Partial<ContactFormState> = { defaultsSuggestionDismissed: true };
+
+    if (config.type === "expense") {
+      if (contactDefaults.preferredDeliveryMethod) {
+        deliveryPatch.whtDeliveryMethod = contactDefaults.preferredDeliveryMethod;
+        if (contactDefaults.deliveryEmail) deliveryPatch.whtDeliveryEmail = contactDefaults.deliveryEmail;
+        if (contactDefaults.deliveryNotes) deliveryPatch.whtDeliveryNotes = contactDefaults.deliveryNotes;
+      }
+      if (contactDefaults.taxInvoiceRequestMethod) {
+        deliveryPatch.taxInvoiceRequestMethod = contactDefaults.taxInvoiceRequestMethod;
+        if (contactDefaults.taxInvoiceRequestEmail) deliveryPatch.taxInvoiceRequestEmail = contactDefaults.taxInvoiceRequestEmail;
+        if (contactDefaults.taxInvoiceRequestNotes) deliveryPatch.taxInvoiceRequestNotes = contactDefaults.taxInvoiceRequestNotes;
+      }
+    }
+
+    patchContactState(deliveryPatch);
     toast.success("ใช้ค่าแนะนำจากผู้ติดต่อแล้ว");
   }, [contactDefaults, setValue, config.type, config.fields.descriptionField, patchContactState]);
 
