@@ -537,10 +537,10 @@ export function UnifiedTransactionForm({
     setTransaction(data as unknown as BaseTransaction);
 
     reset({
-      amount: data.amount,
-      vatRate: data.vatRate,
+      amount: Number(data.amount) || 0,
+      vatRate: Number(data.vatRate) || 0,
       [config.fields.whtField.name]: data[config.fields.whtField.name],
-      whtRate: data.whtRate,
+      whtRate: data.whtRate != null ? Number(data.whtRate) : undefined,
       whtType: data.whtType,
       status: data.status,
       invoiceNumber: data.invoiceNumber,
@@ -691,9 +691,9 @@ export function UnifiedTransactionForm({
   // ---------------------------------------------------------------------------
   // Calculation (safe numeric values prevent NaN propagation)
   // ---------------------------------------------------------------------------
-  const safeAmount = typeof watchAmount === "number" && Number.isFinite(watchAmount) ? watchAmount : 0;
-  const safeVatRate = typeof watchVatRate === "number" && Number.isFinite(watchVatRate) ? watchVatRate : 0;
-  const safeWhtRate = typeof watchWhtRate === "number" && Number.isFinite(watchWhtRate) ? watchWhtRate : 0;
+  const safeAmount = Number.isFinite(Number(watchAmount)) ? Number(watchAmount) : 0;
+  const safeVatRate = Number.isFinite(Number(watchVatRate)) ? Number(watchVatRate) : 0;
+  const safeWhtRate = Number.isFinite(Number(watchWhtRate)) ? Number(watchWhtRate) : 0;
 
   const calculateTotalsRef = useRef(config.calculateTotals);
   calculateTotalsRef.current = config.calculateTotals;

@@ -24,9 +24,7 @@ export function useDocumentTypeEffects({
   taxInvoiceRequestMethod,
   clearTaxInvoiceRequest,
 }: UseDocumentTypeEffectsParams) {
-  const safeVatRate = typeof watchVatRate === "number" && !Number.isNaN(watchVatRate)
-    ? watchVatRate
-    : 0;
+  const safeVatRate = Number.isFinite(Number(watchVatRate)) ? Number(watchVatRate) : 0;
   const prevVatRateRef = useRef(safeVatRate);
   const docTypeRef = useRef(watchDocumentType);
   docTypeRef.current = watchDocumentType;
