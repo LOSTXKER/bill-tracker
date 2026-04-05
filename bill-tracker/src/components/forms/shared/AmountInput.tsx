@@ -14,19 +14,17 @@ interface AmountInputProps {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const trunc2 = (n: number) => Math.trunc(n * 100) / 100;
 
 /**
  * Convert stored base amount → display value for the given input mode.
- * Uses truncation to avoid showing values larger than the actual amount.
  */
 function baseToDisplay(base: number, mode: AmountInputMode, vatRate: number, whtRate: number): number {
   if (mode === "includingVat" && vatRate > 0) {
-    return trunc2(base * (1 + vatRate / 100));
+    return round2(base * (1 + vatRate / 100));
   }
   if (mode === "afterWht" && whtRate > 0) {
     const factor = 1 + vatRate / 100 - whtRate / 100;
-    return trunc2(base * factor);
+    return round2(base * factor);
   }
   return base;
 }
@@ -116,10 +114,10 @@ export function AmountInput({ watch, setValue, vatRate, isWht, onModeChange }: A
     // (B) Default — compute display from the stored base
     if (formAmount !== undefined && formAmount !== null) {
       if (effectiveMode === "includingVat" && vatRate > 0) {
-        setDisplayAmount(String(trunc2(formAmount * (1 + vatRate / 100))));
+        setDisplayAmount(String(round2(formAmount * (1 + vatRate / 100))));
       } else if (effectiveMode === "afterWht" && isWht && whtRate > 0) {
         const factor = 1 + vatRate / 100 - whtRate / 100;
-        setDisplayAmount(String(trunc2(formAmount * factor)));
+        setDisplayAmount(String(round2(formAmount * factor)));
       } else {
         setDisplayAmount(String(formAmount));
       }

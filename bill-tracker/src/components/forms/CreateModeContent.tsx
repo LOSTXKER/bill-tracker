@@ -288,6 +288,10 @@ export function CreateModeContent({
                     exchangeRate: 0,
                     conversionNote: null,
                   });
+                  if (config.type === "expense") {
+                    setValue("vatRate", 0);
+                    setValue("documentType", "CASH_RECEIPT");
+                  }
                 } else {
                   setCurrencyConversion(null);
                   setValue("amount", 0);

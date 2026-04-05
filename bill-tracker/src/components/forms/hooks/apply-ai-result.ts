@@ -102,7 +102,16 @@ export function applyAiResultToForm(
     result.currencyConversion?.currency !== "THB";
 
   if (hasCurrencyConversion && result.currencyConversion?.convertedAmount) {
-    setValue("amount", result.currencyConversion.convertedAmount);
+    let convertedBase = result.currencyConversion.convertedAmount;
+    if (
+      !extendedCombined.amount &&
+      combined.totalAmount &&
+      extendedCombined.vatRate &&
+      extendedCombined.vatRate > 0
+    ) {
+      convertedBase = Math.round(convertedBase / (1 + extendedCombined.vatRate / 100) * 100) / 100;
+    }
+    setValue("amount", convertedBase);
   } else if (extendedCombined.amount) {
     setValue("amount", extendedCombined.amount);
   } else if (combined.totalAmount && extendedCombined.vatRate) {
@@ -113,8 +122,16 @@ export function applyAiResultToForm(
     setValue("amount", suggested.amount);
   }
 
-  const vatRate = suggested.vatRate ?? extendedCombined.vatRate;
-  if (vatRate !== null && vatRate !== undefined) setValue("vatRate", vatRate);
+  const aiVatRate = suggested.vatRate ?? extendedCombined.vatRate;
+  if (hasCurrencyConversion) {
+    const explicitAiVatRate = aiVatRate !== null && aiVatRate !== undefined && typeof aiVatRate === "number";
+    setValue("vatRate", explicitAiVatRate ? aiVatRate : 0);
+    if (config.type === "expense" && (!explicitAiVatRate || aiVatRate === 0)) {
+      setValue("documentType", "CASH_RECEIPT");
+    }
+  } else if (aiVatRate !== null && aiVatRate !== undefined) {
+    setValue("vatRate", aiVatRate);
+  }
 
   if (combined.date || suggested.date) {
     const dateStr = combined.date || (suggested.date as string);

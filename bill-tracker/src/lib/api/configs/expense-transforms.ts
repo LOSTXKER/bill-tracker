@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { Expense } from "@prisma/client";
 import { validateExpenseWhtChange } from "@/lib/validations/wht-validator";
+import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import type { TransactionRequestBody } from "../transaction-types";
 
 export function deduplicatePayers<T extends { paidByType: string; paidByUserId?: string | null; paidByPettyCashFundId?: string | null; amount: number }>(payers: T[]): T[] {
@@ -24,11 +25,17 @@ export function deduplicatePayers<T extends { paidByType: string; paidByUserId?:
 }
 
 export function transformExpenseCreateData(body: TransactionRequestBody) {
-  const { vatAmount, whtAmount, netPaid, ...data } = body;
+  const { vatAmount: _clientVat, whtAmount: _clientWht, netPaid: _clientNet, ...data } = body;
 
   const isWht = data.isWht || false;
   const hasTaxInvoice = (data.taxInvoiceUrls?.length || 0) > 0;
   const workflowStatus = "DRAFT";
+
+  const totals = calculateTransactionTotals(
+    Number(data.amount) || 0,
+    Number(data.vatRate) || 0,
+    isWht ? Number(data.whtRate) || 0 : 0,
+  );
 
   return {
     id: randomUUID(),
@@ -37,12 +44,12 @@ export function transformExpenseCreateData(body: TransactionRequestBody) {
     contactName: data.contactName || null,
     amount: data.amount,
     vatRate: data.vatRate || 0,
-    vatAmount: vatAmount || null,
+    vatAmount: totals.vatAmount || null,
     isWht: isWht,
     whtRate: data.whtRate || null,
-    whtAmount: whtAmount || null,
+    whtAmount: totals.whtAmount || null,
     whtType: data.whtType || null,
-    netPaid: netPaid,
+    netPaid: totals.netAmount,
     description: data.description,
     accountId: data.accountId || null,
     internalCompanyId: data.internalCompanyId || null,
@@ -85,19 +92,26 @@ interface ExpenseUpdateAccumulator {
 }
 
 export function transformExpenseUpdateData(body: TransactionRequestBody, existingData?: Expense) {
-  const { vatAmount, whtAmount, netPaid, ...data } = body;
+  const { vatAmount: _clientVat, whtAmount: _clientWht, netPaid: _clientNet, ...data } = body;
   const updateData: ExpenseUpdateAccumulator = {};
 
   if (data.contactId !== undefined) updateData.contactId = data.contactId || null;
   if (data.contactName !== undefined) updateData.contactName = data.contactName || null;
   if (data.amount !== undefined) updateData.amount = data.amount;
   if (data.vatRate !== undefined) updateData.vatRate = data.vatRate;
-  if (vatAmount !== undefined) updateData.vatAmount = vatAmount;
   if (data.isWht !== undefined) updateData.isWht = data.isWht;
   if (data.whtRate !== undefined) updateData.whtRate = data.whtRate;
-  if (whtAmount !== undefined) updateData.whtAmount = whtAmount;
   if (data.whtType !== undefined) updateData.whtType = data.whtType;
-  if (netPaid !== undefined) updateData.netPaid = netPaid;
+
+  const amount = Number(data.amount ?? existingData?.amount) || 0;
+  const vatRate = Number(data.vatRate ?? existingData?.vatRate) || 0;
+  const isWht = data.isWht ?? existingData?.isWht ?? false;
+  const whtRate = isWht ? Number(data.whtRate ?? existingData?.whtRate) || 0 : 0;
+  const totals = calculateTransactionTotals(amount, vatRate, whtRate);
+
+  updateData.vatAmount = totals.vatAmount || null;
+  updateData.whtAmount = totals.whtAmount || null;
+  updateData.netPaid = totals.netAmount;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
   if (data.internalCompanyId !== undefined) updateData.internalCompanyId = data.internalCompanyId || null;

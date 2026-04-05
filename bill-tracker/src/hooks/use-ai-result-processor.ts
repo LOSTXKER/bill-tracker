@@ -73,7 +73,18 @@ export function useAiResultProcessor({
         typeof v === "number" && Number.isFinite(v) ? v : null;
 
       if (hasCurrencyConversion && safeNum(result.currencyConversion?.convertedAmount)) {
-        setValue("amount", result.currencyConversion!.convertedAmount);
+        let convertedBase = result.currencyConversion!.convertedAmount!;
+        // If the AI converted totalAmount (gross) but also returned a vatRate,
+        // reverse-calculate the base so we don't treat the gross as pre-VAT.
+        if (
+          !safeNum(extendedCombined.amount) &&
+          safeNum(combined.totalAmount) &&
+          safeNum(extendedCombined.vatRate) &&
+          extendedCombined.vatRate! > 0
+        ) {
+          convertedBase = Math.round(convertedBase / (1 + extendedCombined.vatRate! / 100) * 100) / 100;
+        }
+        setValue("amount", convertedBase);
       } else if (safeNum(extendedCombined.amount)) {
         setValue("amount", extendedCombined.amount);
       } else if (safeNum(combined.totalAmount) && safeNum(extendedCombined.vatRate)) {
@@ -85,9 +96,17 @@ export function useAiResultProcessor({
         setValue("amount", suggested.amount);
       }
 
-      const vatRate = suggested.vatRate ?? extendedCombined.vatRate;
-      if (vatRate !== null && vatRate !== undefined && typeof vatRate === "number" && !Number.isNaN(vatRate)) {
-        setValue("vatRate", vatRate);
+      const aiVatRate = suggested.vatRate ?? extendedCombined.vatRate;
+      if (hasCurrencyConversion) {
+        // Foreign documents: default to VAT 0% (foreign vendors don't issue Thai tax invoices).
+        // Only keep a non-zero rate if the AI explicitly returned one.
+        const explicitAiVatRate = typeof aiVatRate === "number" && !Number.isNaN(aiVatRate);
+        setValue("vatRate", explicitAiVatRate ? aiVatRate : 0);
+        if (config.type === "expense" && (!explicitAiVatRate || aiVatRate === 0)) {
+          setValue("documentType", "CASH_RECEIPT");
+        }
+      } else if (aiVatRate !== null && aiVatRate !== undefined && typeof aiVatRate === "number" && !Number.isNaN(aiVatRate)) {
+        setValue("vatRate", aiVatRate);
       }
 
       if (combined.date || suggested.date) {
@@ -166,7 +185,10 @@ export function useAiResultProcessor({
           const aiAmount = extendedCombined.amount || (suggested.amount as number | null);
           if (aiAmount && aiAmount > 0) {
             const calculatedRate = Math.round((whtAmount / aiAmount) * 100);
-            if ([1, 2, 3, 5].includes(calculatedRate)) {
+            const validRates = hasCurrencyConversion
+              ? [1, 2, 3, 5, 10, 15]
+              : [1, 2, 3, 5];
+            if (validRates.includes(calculatedRate)) {
               setValue("whtRate", calculatedRate);
             }
           }

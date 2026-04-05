@@ -1,14 +1,21 @@
 import { randomUUID } from "crypto";
 import type { Income } from "@prisma/client";
 import { validateIncomeWhtChange } from "@/lib/validations/wht-validator";
+import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import type { TransactionRequestBody } from "../transaction-types";
 
 export function transformIncomeCreateData(body: TransactionRequestBody) {
-  const { vatAmount, whtAmount, netReceived, ...data } = body;
+  const { vatAmount: _clientVat, whtAmount: _clientWht, netReceived: _clientNet, ...data } = body;
 
   const isWhtDeducted = data.isWhtDeducted || false;
   const hasInvoice = (data.myBillCopyUrls?.length || 0) > 0;
   const workflowStatus = "DRAFT";
+
+  const totals = calculateTransactionTotals(
+    Number(data.amount) || 0,
+    Number(data.vatRate) || 0,
+    isWhtDeducted ? Number(data.whtRate) || 0 : 0,
+  );
 
   return {
     id: randomUUID(),
@@ -17,12 +24,12 @@ export function transformIncomeCreateData(body: TransactionRequestBody) {
     contactName: data.contactName || null,
     amount: data.amount,
     vatRate: data.vatRate || 0,
-    vatAmount: vatAmount || null,
+    vatAmount: totals.vatAmount || null,
     isWhtDeducted: isWhtDeducted,
     whtRate: data.whtRate || null,
-    whtAmount: whtAmount || null,
+    whtAmount: totals.whtAmount || null,
     whtType: data.whtType || null,
-    netReceived: netReceived,
+    netReceived: totals.netAmount,
     source: data.source,
     accountId: data.accountId || null,
     invoiceNumber: data.invoiceNumber,
@@ -56,19 +63,26 @@ interface IncomeUpdateAccumulator {
 }
 
 export function transformIncomeUpdateData(body: TransactionRequestBody, existingData?: Income) {
-  const { vatAmount, whtAmount, netReceived, ...data } = body;
+  const { vatAmount: _clientVat, whtAmount: _clientWht, netReceived: _clientNet, ...data } = body;
   const updateData: IncomeUpdateAccumulator = {};
 
   if (data.contactId !== undefined) updateData.contactId = data.contactId || null;
   if (data.contactName !== undefined) updateData.contactName = data.contactName || null;
   if (data.amount !== undefined) updateData.amount = data.amount;
   if (data.vatRate !== undefined) updateData.vatRate = data.vatRate;
-  if (vatAmount !== undefined) updateData.vatAmount = vatAmount;
   if (data.isWhtDeducted !== undefined) updateData.isWhtDeducted = data.isWhtDeducted;
   if (data.whtRate !== undefined) updateData.whtRate = data.whtRate;
-  if (whtAmount !== undefined) updateData.whtAmount = whtAmount;
   if (data.whtType !== undefined) updateData.whtType = data.whtType;
-  if (netReceived !== undefined) updateData.netReceived = netReceived;
+
+  const amount = Number(data.amount ?? existingData?.amount) || 0;
+  const vatRate = Number(data.vatRate ?? existingData?.vatRate) || 0;
+  const isWht = data.isWhtDeducted ?? existingData?.isWhtDeducted ?? false;
+  const whtRate = isWht ? Number(data.whtRate ?? existingData?.whtRate) || 0 : 0;
+  const totals = calculateTransactionTotals(amount, vatRate, whtRate);
+
+  updateData.vatAmount = totals.vatAmount || null;
+  updateData.whtAmount = totals.whtAmount || null;
+  updateData.netReceived = totals.netAmount;
   if (data.source !== undefined) updateData.source = data.source;
   if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
   if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
