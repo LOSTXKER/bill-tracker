@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Trash2, Send, FileDown, Loader2, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Building2, CheckCircle, XCircle } from "lucide-react";
+import { X, Trash2, Send, FileDown, Loader2, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Building2, CheckCircle, XCircle, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -49,6 +49,8 @@ interface BulkActionsBarProps {
   // Internal company bulk edit
   onInternalCompanyChange?: (companyId: string | null) => Promise<void>;
   companies?: CompanyOption[];
+  // Bulk edit
+  onBulkEdit?: () => void;
   // Batch approval props
   onBatchApprove?: () => Promise<void>;
   onBatchReject?: (reason: string) => Promise<void>;
@@ -70,6 +72,7 @@ export function BulkActionsBar({
   currentStatusLabel,
   onInternalCompanyChange,
   companies = [],
+  onBulkEdit,
   onBatchApprove,
   onBatchReject,
   canApprove = false,
@@ -268,6 +271,19 @@ export function BulkActionsBar({
                 </div>
               )}
             </>
+          )}
+
+          {onBulkEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBulkEdit}
+              disabled={isLoading}
+              className="h-8"
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              แก้ไข
+            </Button>
           )}
 
           {onSendNotification && (

@@ -17,6 +17,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { BulkActionsBar } from "@/components/transactions/BulkActionsBar";
 import { ExportButton } from "@/components/transactions/ExportButton";
 import { TransactionPreviewSheet } from "@/components/transactions/TransactionPreviewSheet";
+import { BulkEditDialog } from "@/components/transactions/BulkEditDialog";
 import { useTransactionFilters, usePagination, useSorting } from "@/hooks/use-transaction-filters";
 import { useSelection } from "@/hooks/use-selection";
 import { useBulkActions } from "@/hooks/use-bulk-actions";
@@ -134,6 +135,7 @@ export function TransactionListClient({
     handleBulkDelete,
     handleBulkStatusChange,
     handleBulkInternalCompanyChange,
+    handleBulkEdit,
     handleBulkApprove,
     handleBulkReject,
     isPending,
@@ -157,6 +159,9 @@ export function TransactionListClient({
     isOwner,
   });
   
+  // Bulk Edit Dialog state
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+
   // Preview Sheet state
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -395,6 +400,7 @@ export function TransactionListClient({
           previousStatus={previousStatus}
           isOwner={isOwner}
           currentStatusLabel={currentStatusLabel}
+          onBulkEdit={() => setBulkEditOpen(true)}
           onInternalCompanyChange={config.type === "expense" ? handleBulkInternalCompanyChange : undefined}
           companies={config.type === "expense" ? companies : undefined}
           onBatchApprove={canApprove ? handleBulkApprove : undefined}
@@ -403,6 +409,16 @@ export function TransactionListClient({
           hasPendingItems={hasPendingItems}
         />
       )}
+
+      {/* Bulk Edit Dialog */}
+      <BulkEditDialog
+        open={bulkEditOpen}
+        onOpenChange={setBulkEditOpen}
+        transactionType={config.type}
+        selectedCount={selectedIds.length}
+        companyCode={companyCode}
+        onSubmit={handleBulkEdit}
+      />
 
       {/* Transaction Preview Sheet */}
       <TransactionPreviewSheet

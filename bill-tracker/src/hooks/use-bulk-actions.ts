@@ -76,6 +76,27 @@ export function useBulkActions({
     });
   };
 
+  const handleBulkEdit = async (fields: Record<string, unknown>) => {
+    startTransition(async () => {
+      try {
+        await Promise.all(
+          selectedIds.map(id =>
+            fetch(`${apiEndpoint}/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(fields),
+            })
+          )
+        );
+        setSelectedIds([]);
+        router.refresh();
+      } catch (error) {
+        console.error("Bulk edit failed:", error);
+        throw error;
+      }
+    });
+  };
+
   const handleBulkApprove = async () => {
     startTransition(async () => {
       try {
@@ -122,6 +143,7 @@ export function useBulkActions({
     handleBulkDelete,
     handleBulkStatusChange,
     handleBulkInternalCompanyChange,
+    handleBulkEdit,
     handleBulkApprove,
     handleBulkReject,
     isPending,

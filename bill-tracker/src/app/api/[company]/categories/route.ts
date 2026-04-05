@@ -21,9 +21,12 @@ async function handleGet(
   if (type) where.type = type;
   if (activeOnly) where.isActive = true;
 
+  const countInclude = { _count: { select: { Expenses: true, Incomes: true } } };
+
   if (flat) {
     const categories = await prisma.transactionCategory.findMany({
       where,
+      include: countInclude,
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
     return apiResponse.success({ categories });
@@ -33,8 +36,10 @@ async function handleGet(
   const groups = await prisma.transactionCategory.findMany({
     where: { ...where, parentId: null },
     include: {
+      ...countInclude,
       Children: {
         where: activeOnly ? { isActive: true } : {},
+        include: countInclude,
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       },
     },

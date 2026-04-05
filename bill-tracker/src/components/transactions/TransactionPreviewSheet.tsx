@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Sheet,
   SheetContent,
@@ -55,7 +55,6 @@ export function TransactionPreviewSheet({
   transactionType,
   companyCode,
 }: TransactionPreviewSheetProps) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<TransactionPreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,12 +87,11 @@ export function TransactionPreviewSheet({
     }
   }, [open, transactionId, fetchData]);
 
-  const handleViewFull = () => {
+  const viewFullHref = (() => {
     const path = transactionType === "expense" ? "expenses" : "incomes";
     const code = typeof companyCode === "string" ? companyCode.toLowerCase() : String(companyCode || "").toLowerCase();
-    router.push(`/${code}/${path}/${transactionId}`);
-    onOpenChange(false);
-  };
+    return `/${code}/${path}/${transactionId}`;
+  })();
 
   const documents = data ? getDocuments(data, transactionType) : [];
 
@@ -171,13 +169,15 @@ export function TransactionPreviewSheet({
 
         <SheetFooter className="flex-shrink-0 p-3 border-t bg-muted/30">
           <Button
-            onClick={handleViewFull}
+            asChild
             className="w-full"
             size="sm"
             disabled={loading || !!error}
           >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            ดูรายละเอียดเต็ม / แก้ไข
+            <Link href={viewFullHref} onClick={() => onOpenChange(false)}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              ดูรายละเอียดเต็ม / แก้ไข
+            </Link>
           </Button>
         </SheetFooter>
       </SheetContent>
