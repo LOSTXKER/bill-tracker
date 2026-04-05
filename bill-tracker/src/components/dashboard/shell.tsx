@@ -40,6 +40,7 @@ import {
   Send,
   FileSearch,
   GitCompare,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -151,6 +152,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           name: "รายจ่าย",
           href: `/${companyCode}/expenses`,
           icon: ArrowUpCircle,
+          permission: "expenses:read",
+        },
+        {
+          name: "จัดหมวดค่าใช้จ่าย",
+          href: `/${companyCode}/expenses/categorize`,
+          icon: ListChecks,
           permission: "expenses:read",
         },
         {
