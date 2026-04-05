@@ -12,6 +12,7 @@ interface TransactionFieldsViewModeProps {
   selectedContact: ContactSummary | null;
   oneTimeContactName?: string;
   selectedAccount: string | null;
+  selectedCategory: string | null;
   referenceUrls: string[];
   renderAdditionalFields?: () => React.ReactNode;
   internalCompanyId?: string | null;
@@ -40,6 +41,7 @@ export function TransactionFieldsViewMode({
   selectedContact,
   oneTimeContactName,
   selectedAccount,
+  selectedCategory,
   referenceUrls,
   renderAdditionalFields,
   internalCompanyId,
@@ -56,6 +58,7 @@ export function TransactionFieldsViewMode({
   const watchDate = watch(config.dateField.name);
 
   const [accountDetails, setAccountDetails] = useState<{ code: string; name: string } | null>(null);
+  const [categoryDetails, setCategoryDetails] = useState<{ name: string; parentName?: string } | null>(null);
 
   useEffect(() => {
     if (selectedAccount) {
@@ -75,6 +78,37 @@ export function TransactionFieldsViewMode({
         .catch(() => setAccountDetails(null));
     }
   }, [selectedAccount, companyCode]);
+
+  useEffect(() => {
+    if (!selectedCategory) {
+      setCategoryDetails(null);
+      return;
+    }
+    fetch(`/api/${companyCode}/categories`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
+      })
+      .then((json) => {
+        const groups = json.success ? json.data?.categories : [];
+        if (!Array.isArray(groups)) return;
+        for (const group of groups) {
+          if (group.id === selectedCategory) {
+            setCategoryDetails({ name: group.name });
+            return;
+          }
+          if (Array.isArray(group.Children)) {
+            const child = group.Children.find((c: { id: string }) => c.id === selectedCategory);
+            if (child) {
+              setCategoryDetails({ name: child.name, parentName: group.name });
+              return;
+            }
+          }
+        }
+        setCategoryDetails(null);
+      })
+      .catch(() => setCategoryDetails(null));
+  }, [selectedCategory, companyCode]);
 
   const watchDocumentType = watch("documentType") as string | undefined;
 
@@ -125,6 +159,21 @@ export function TransactionFieldsViewMode({
           </p>
         </div>
       </div>
+
+      {selectedCategory && (
+        <div>
+          <p className="text-sm text-muted-foreground mb-1">หมวดหมู่</p>
+          <p className="text-base font-semibold text-foreground">
+            {categoryDetails ? (
+              categoryDetails.parentName
+                ? `${categoryDetails.parentName} › ${categoryDetails.name}`
+                : categoryDetails.name
+            ) : (
+              <span className="text-muted-foreground font-normal">-</span>
+            )}
+          </p>
+        </div>
+      )}
 
       {config.type === "expense" && internalCompanyId && (
         <div>

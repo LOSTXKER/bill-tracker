@@ -305,12 +305,10 @@ function TransactionTableRowInner({
         </TableCell>
       )}
 
-      {/* Category */}
+      {/* Category - show parent (main) category only */}
       <TableCell className="text-muted-foreground">
         {transaction.category
-          ? transaction.category.parent
-            ? `[${transaction.category.parent.name}] ${transaction.category.name}`
-            : transaction.category.name
+          ? transaction.category.parent?.name ?? transaction.category.name
           : "-"
         }
       </TableCell>

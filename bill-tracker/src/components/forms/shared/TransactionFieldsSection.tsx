@@ -187,6 +187,7 @@ export function TransactionFieldsSection({
         selectedContact={selectedContact}
         oneTimeContactName={oneTimeContactName}
         selectedAccount={selectedAccount}
+        selectedCategory={selectedCategory}
         referenceUrls={referenceUrls}
         renderAdditionalFields={renderAdditionalFields}
         internalCompanyId={internalCompanyId}
