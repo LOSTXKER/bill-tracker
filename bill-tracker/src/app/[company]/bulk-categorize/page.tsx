@@ -495,17 +495,25 @@ export default function BulkCategorizePage() {
         throw new Error(json.error || "AI วิเคราะห์ไม่สำเร็จ");
 
       const cat = json.data as {
-        categoryId: string;
+        categoryId: string | null;
         categoryName: string;
         groupName: string;
         isNew: boolean;
+        confidence: number;
+        suggestNewName?: string;
+        suggestNewParent?: string;
+        reason?: string;
       };
-      setBulkCategoryId(cat.categoryId);
-      toast.success(
-        cat.isNew
-          ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
-          : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
-      );
+
+      if (!cat.categoryId) {
+        const suggestLabel = cat.suggestNewName
+          ? `แนะนำสร้างหมวดใหม่: "${cat.suggestNewName}" ในกลุ่ม "${cat.suggestNewParent || cat.groupName}"`
+          : "ไม่พบหมวดที่เหมาะสม กรุณาสร้างหมวดใหม่";
+        toast.info(suggestLabel, { duration: 6000 });
+      } else {
+        setBulkCategoryId(cat.categoryId);
+        toast.success(`AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "ไม่สามารถวิเคราะห์ได้");
     } finally {

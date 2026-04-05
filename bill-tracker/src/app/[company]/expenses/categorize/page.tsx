@@ -253,7 +253,28 @@ export default function BulkCategorizePage() {
     if (!res.ok || !json.success) {
       throw new Error(json.error || "AI วิเคราะห์ไม่สำเร็จ");
     }
-    return json.data as { categoryId: string; categoryName: string; groupName: string; isNew: boolean; reason: string };
+    return json.data as {
+      categoryId: string | null;
+      categoryName: string;
+      groupName: string;
+      isNew: boolean;
+      confidence: number;
+      suggestNewName?: string;
+      suggestNewParent?: string;
+      reason?: string;
+    };
+  };
+
+  const showAiResult = (cat: Awaited<ReturnType<typeof callSuggestCategory>>) => {
+    if (!cat.categoryId) {
+      const label = cat.suggestNewName
+        ? `แนะนำสร้างหมวดใหม่: "${cat.suggestNewName}" ในกลุ่ม "${cat.suggestNewParent || cat.groupName}"`
+        : "ไม่พบหมวดที่เหมาะสม กรุณาสร้างหมวดใหม่";
+      toast.info(label, { duration: 6000 });
+      return false;
+    }
+    toast.success(`AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`);
+    return true;
   };
 
   const aiSuggestForGroup = async (contactKey: string) => {
@@ -263,12 +284,10 @@ export default function BulkCategorizePage() {
     setAiSuggestingGroup(contactKey);
     try {
       const cat = await callSuggestCategory(items);
-      setGroupCategorySuggestions((prev) => ({ ...prev, [contactKey]: cat.categoryId }));
-      toast.success(
-        cat.isNew
-          ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
-          : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
-      );
+      if (cat.categoryId) {
+        setGroupCategorySuggestions((prev) => ({ ...prev, [contactKey]: cat.categoryId! }));
+      }
+      showAiResult(cat);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "ไม่สามารถวิเคราะห์ได้");
     } finally {
@@ -284,12 +303,10 @@ export default function BulkCategorizePage() {
     setAiSuggestingBulk(true);
     try {
       const cat = await callSuggestCategory(selected);
-      setBulkCategoryId(cat.categoryId);
-      toast.success(
-        cat.isNew
-          ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
-          : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
-      );
+      if (cat.categoryId) {
+        setBulkCategoryId(cat.categoryId);
+      }
+      showAiResult(cat);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "ไม่สามารถวิเคราะห์ได้");
     } finally {

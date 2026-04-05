@@ -15,20 +15,26 @@ export interface SuggestCategoryInput {
   descriptions: string[];
   companyId: string;
   transactionType: "EXPENSE" | "INCOME";
+  companyName?: string;
+  businessDescription?: string;
 }
 
 export interface SuggestCategoryResult {
-  categoryId: string;
+  categoryId: string | null;
   categoryName: string;
   groupName: string;
   isNew: boolean;
   reason: string;
+  confidence: number;
+  suggestNewName?: string;
+  suggestNewParent?: string;
 }
 
 interface AIResponse {
   categoryId?: string | null;
   categoryName?: string;
   groupName?: string;
+  confidence?: number;
   isNew?: boolean;
   newCategoryName?: string | null;
   newCategoryParentName?: string | null;
@@ -73,27 +79,96 @@ function extractJson(raw: string): AIResponse | null {
   return null;
 }
 
+interface RecentPattern {
+  description: string;
+  categoryName: string;
+  groupName: string;
+}
+
+function buildBusinessContext(companyName?: string, businessDescription?: string): string {
+  if (!companyName && !businessDescription) return "";
+  const parts = ["## ข้อมูลธุรกิจ"];
+  if (companyName) parts.push(`ชื่อบริษัท: ${companyName}`);
+  if (businessDescription) parts.push(`ลักษณะธุรกิจ: ${businessDescription}`);
+  return "\n" + parts.join("\n") + "\n";
+}
+
+function buildHistoryContext(patterns: RecentPattern[]): string {
+  if (!patterns.length) return "";
+  const lines = patterns.map((p) => `- "${p.description}" → ${p.groupName} > ${p.categoryName}`);
+  return `\n## ตัวอย่างการจัดหมวดเดิมของบริษัทนี้ (ให้ใช้เป็นแนวทาง)\n${lines.join("\n")}\n`;
+}
+
+async function fetchRecentPatterns(
+  companyId: string,
+  transactionType: "EXPENSE" | "INCOME"
+): Promise<RecentPattern[]> {
+  try {
+    const where = { companyId, categoryId: { not: null } as const, deletedAt: null };
+    const catSelect = { select: { name: true, Parent: { select: { name: true } } } } as const;
+
+    type Row = { desc: string | null; Category: { name: string; Parent: { name: string } | null } | null };
+
+    let rows: Row[];
+    if (transactionType === "EXPENSE") {
+      const r = await prisma.expense.findMany({
+        where, orderBy: { billDate: "desc" }, take: 50,
+        select: { description: true, Category: catSelect },
+      });
+      rows = r.map((x) => ({ desc: x.description, Category: x.Category }));
+    } else {
+      const r = await prisma.income.findMany({
+        where, orderBy: { receiveDate: "desc" }, take: 50,
+        select: { source: true, Category: catSelect },
+      });
+      rows = r.map((x) => ({ desc: x.source, Category: x.Category }));
+    }
+
+    const seen = new Set<string>();
+    const patterns: RecentPattern[] = [];
+    for (const tx of rows) {
+      if (!tx.desc || !tx.Category) continue;
+      const key = tx.desc.toLowerCase().trim();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      patterns.push({
+        description: tx.desc,
+        categoryName: tx.Category.name,
+        groupName: tx.Category.Parent?.name || tx.Category.name,
+      });
+      if (patterns.length >= 20) break;
+    }
+    return patterns;
+  } catch (err) {
+    log.error("fetchRecentPatterns error", err);
+    return [];
+  }
+}
+
 export async function suggestCategory(
   input: SuggestCategoryInput
 ): Promise<SuggestCategoryResult | { error: string }> {
-  const { descriptions, companyId, transactionType } = input;
+  const { descriptions, companyId, transactionType, companyName, businessDescription } = input;
 
   if (!descriptions.length) {
     return { error: "ไม่มีรายการ" };
   }
 
   try {
-    const categories = await prisma.transactionCategory.findMany({
-      where: { companyId, type: transactionType, parentId: null, isActive: true },
-      include: {
-        Children: {
-          where: { isActive: true },
-          orderBy: [{ sortOrder: "asc" }],
-          select: { id: true, name: true },
+    const [categories, recentPatterns] = await Promise.all([
+      prisma.transactionCategory.findMany({
+        where: { companyId, type: transactionType, parentId: null, isActive: true },
+        include: {
+          Children: {
+            where: { isActive: true },
+            orderBy: [{ sortOrder: "asc" }],
+            select: { id: true, name: true },
+          },
         },
-      },
-      orderBy: [{ sortOrder: "asc" }],
-    });
+        orderBy: [{ sortOrder: "asc" }],
+      }),
+      fetchRecentPatterns(companyId, transactionType),
+    ]);
 
     const categoryList = categories
       .map(
@@ -104,32 +179,43 @@ export async function suggestCategory(
 
     const descList = descriptions.slice(0, 15).join("\n");
 
-    const prompt = `เลือกหมวดหมู่ที่เหมาะสมที่สุดสำหรับรายการค่าใช้จ่ายด้านล่าง ตอบเป็น JSON เท่านั้น
+    const businessContext = buildBusinessContext(companyName, businessDescription);
+    const historyContext = buildHistoryContext(recentPatterns);
 
-## รายการ
+    const txLabel = transactionType === "EXPENSE" ? "ค่าใช้จ่าย" : "รายรับ";
+
+    const prompt = `จัดหมวดหมู่รายการ${txLabel}ด้านล่าง ตอบเป็น JSON เท่านั้น
+${businessContext}
+## รายการที่ต้องจัดหมวด
 ${descList}
 
 ## หมวดหมู่ที่มี (กลุ่ม > หมวดย่อย)
 ${categoryList}
-
-## กฎ
-- เลือกหมวดย่อย (ไม่ใช่กลุ่ม) ที่เหมาะสมที่สุด 1 อัน
-- ใส่ categoryId ของหมวดย่อยที่เลือก
-- ถ้าไม่มีหมวดย่อยไหนเหมาะสมเลย → ใส่ categoryId = null และแนะนำชื่อหมวดใหม่ใน newCategoryName พร้อมระบุ newCategoryParentName (ต้องตรงกับชื่อกลุ่มที่มีอยู่)
+${historyContext}
+## กฎสำคัญ (ปฏิบัติตามอย่างเคร่งครัด)
+1. เลือกได้เฉพาะหมวดย่อย (ที่มี ID) เท่านั้น ห้ามเลือกกลุ่ม
+2. เลือกเฉพาะหมวดที่ตรงกับรายการจริงๆ -- ห้ามเดา ห้ามเลือกหมวดที่ "พอใกล้เคียง" หรือ "กว้างกว่า"
+3. ให้คะแนน confidence (0-100):
+   - 90-100 = ตรงแน่นอน (เช่น มีประวัติเดิมตรงเป๊ะ หรือชื่อรายการบ่งบอกชัดเจน)
+   - 70-89 = น่าจะตรง
+   - ต่ำกว่า 70 = ไม่มั่นใจ → ต้องใส่ categoryId = null และแนะนำหมวดใหม่แทน
+4. ถ้าไม่มีหมวดไหนตรงจริงๆ (confidence < 70) → ใส่ categoryId = null, isNew = true, แนะนำชื่อหมวดใหม่ที่เหมาะสมใน newCategoryName พร้อมระบุ newCategoryParentName (ต้องตรงกับชื่อกลุ่มที่มีอยู่)
+5. ถ้ามีประวัติการจัดหมวดเดิม ให้ยึดตามประวัติเป็นหลัก
 
 ## ตอบ JSON เท่านั้น
 {
-  "categoryId": "ID หรือ null",
-  "categoryName": "ชื่อหมวด",
+  "categoryId": "ID ของหมวดย่อยที่เลือก หรือ null ถ้าไม่มีหมวดตรง",
+  "categoryName": "ชื่อหมวดที่เลือก",
   "groupName": "ชื่อกลุ่ม",
+  "confidence": 0,
   "isNew": false,
-  "newCategoryName": null,
-  "newCategoryParentName": null,
+  "newCategoryName": "ชื่อหมวดใหม่ที่แนะนำ หรือ null",
+  "newCategoryParentName": "ชื่อกลุ่มที่ควรอยู่ หรือ null",
   "reason": "เหตุผลสั้นๆ"
 }`;
 
     const response = await generateText(prompt, {
-      temperature: 0.1,
+      temperature: 0,
       maxTokens: 16384,
       responseMimeType: "application/json",
     });
@@ -154,122 +240,55 @@ ${categoryList}
     }
     log.debug("AI category suggestion", parsed);
 
+    const confidence = typeof parsed.confidence === "number" ? parsed.confidence : 0;
+
     const allChildren = categories.flatMap((g) =>
       g.Children.map((c) => ({ ...c, groupName: g.name, groupId: g.id }))
     );
 
-    // 1) Match by ID
-    if (parsed.categoryId) {
-      const found = allChildren.find((c) => c.id === parsed.categoryId);
-      if (found) {
-        return {
-          categoryId: found.id,
-          categoryName: found.name,
-          groupName: found.groupName,
-          isNew: false,
-          reason: parsed.reason || "AI จำแนก",
-        };
-      }
-
-      // AI might have returned a parent group ID
-      const parentGroup = categories.find((g) => g.id === parsed.categoryId);
-      if (parentGroup && parentGroup.Children.length > 0) {
-        const child = parentGroup.Children[0];
-        return {
-          categoryId: child.id,
-          categoryName: child.name,
-          groupName: parentGroup.name,
-          isNew: false,
-          reason: parsed.reason || "AI จำแนก (กลุ่ม)",
-        };
-      }
+    // AI says no good match → suggest creating new
+    if (!parsed.categoryId || parsed.isNew || confidence < 70) {
+      log.debug("AI suggests new category", { confidence, parsed });
+      return {
+        categoryId: null,
+        categoryName: parsed.newCategoryName || parsed.categoryName || "",
+        groupName: parsed.newCategoryParentName || parsed.groupName || "",
+        isNew: true,
+        reason: parsed.reason || "ไม่มีหมวดที่ตรง",
+        confidence,
+        suggestNewName: parsed.newCategoryName || undefined,
+        suggestNewParent: parsed.newCategoryParentName || undefined,
+      };
     }
 
-    // 2) Match by name
-    if (parsed.categoryName) {
-      const norm = parsed.categoryName.toLowerCase().trim();
-      const found = allChildren.find(
-        (c) =>
-          c.name.toLowerCase().includes(norm) ||
-          norm.includes(c.name.toLowerCase())
-      );
-      if (found) {
-        return {
-          categoryId: found.id,
-          categoryName: found.name,
-          groupName: found.groupName,
-          isNew: false,
-          reason: parsed.reason || "AI จำแนก",
-        };
-      }
+    // Strict match by exact ID only
+    const found = allChildren.find((c) => c.id === parsed.categoryId);
+    if (found) {
+      return {
+        categoryId: found.id,
+        categoryName: found.name,
+        groupName: found.groupName,
+        isNew: false,
+        reason: parsed.reason || "AI จำแนก",
+        confidence,
+      };
     }
 
-    // 3) Match by groupName + categoryName against parent groups
-    if (parsed.groupName) {
-      const groupNorm = parsed.groupName.toLowerCase().trim();
-      const catNorm = (parsed.categoryName || "").toLowerCase().trim();
-      const parentGroup = categories.find(
-        (g) =>
-          g.name.toLowerCase().includes(groupNorm) ||
-          groupNorm.includes(g.name.toLowerCase())
-      );
-      if (parentGroup) {
-        const childMatch = catNorm
-          ? parentGroup.Children.find(
-              (c) =>
-                c.name.toLowerCase().includes(catNorm) ||
-                catNorm.includes(c.name.toLowerCase())
-            )
-          : null;
-        const child = childMatch || parentGroup.Children[0];
-        if (child) {
-          return {
-            categoryId: child.id,
-            categoryName: child.name,
-            groupName: parentGroup.name,
-            isNew: false,
-            reason: parsed.reason || "AI จำแนก",
-          };
-        }
-      }
-    }
-
-    // 4) Auto-create new subcategory
-    if (parsed.isNew && parsed.newCategoryName && parsed.newCategoryParentName) {
-      const parentGroup = categories.find(
-        (g) =>
-          g.name.toLowerCase().includes(parsed.newCategoryParentName!.toLowerCase()) ||
-          parsed.newCategoryParentName!.toLowerCase().includes(g.name.toLowerCase())
-      );
-      if (parentGroup) {
-        const newCat = await prisma.transactionCategory.create({
-          data: {
-            companyId,
-            name: parsed.newCategoryName,
-            type: transactionType,
-            parentId: parentGroup.id,
-            sortOrder: parentGroup.Children.length,
-          },
-        });
-        log.debug("Auto-created category", {
-          name: newCat.name,
-          group: parentGroup.name,
-        });
-        return {
-          categoryId: newCat.id,
-          categoryName: newCat.name,
-          groupName: parentGroup.name,
-          isNew: true,
-          reason: parsed.reason || "AI สร้างหมวดใหม่",
-        };
-      }
-    }
-
-    log.debug("Category resolution failed", {
-      parsed,
-      childrenCount: allChildren.length,
+    // ID didn't match any child — don't guess, treat as no match
+    log.debug("AI returned unknown categoryId, treating as no match", {
+      categoryId: parsed.categoryId,
+      confidence,
     });
-    return { error: "AI ไม่สามารถระบุหมวดหมู่ที่เหมาะสมได้" };
+    return {
+      categoryId: null,
+      categoryName: parsed.newCategoryName || parsed.categoryName || "",
+      groupName: parsed.newCategoryParentName || parsed.groupName || "",
+      isNew: true,
+      reason: parsed.reason || "ไม่พบหมวดที่ตรง",
+      confidence: 0,
+      suggestNewName: parsed.newCategoryName || undefined,
+      suggestNewParent: parsed.newCategoryParentName || undefined,
+    };
   } catch (error) {
     log.error("suggestCategory error", error);
     return { error: "เกิดข้อผิดพลาดในการวิเคราะห์หมวดหมู่" };
