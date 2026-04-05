@@ -131,7 +131,6 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
   // Grouped navigation
   const navigationGroups: NavGroup[] = [
     {
-      // Main (no label)
       items: [
         {
           name: "Dashboard",
@@ -155,17 +154,16 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           permission: "expenses:read",
         },
         {
-          name: "จัดหมวดค่าใช้จ่าย",
-          href: `/${companyCode}/expenses/categorize`,
-          icon: ListChecks,
-          permission: "expenses:read",
-        },
-        {
           name: "รายรับ",
           href: `/${companyCode}/incomes`,
           icon: ArrowDownCircle,
           permission: "incomes:read",
         },
+      ],
+    },
+    {
+      label: "ต้องจัดการ",
+      items: [
         {
           name: "รออนุมัติ",
           href: `/${companyCode}/approvals`,
@@ -173,11 +171,6 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           permission: "expenses:approve",
           badgeKey: "pendingApprovals",
         },
-      ],
-    },
-    {
-      label: "การเงิน",
-      items: [
         {
           name: "โอนคืนพนักงาน",
           href: `/${companyCode}/reimbursements`,
@@ -200,10 +193,27 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           badgeKey: "pendingWhtDeliveries",
         },
         {
+          name: "จัดหมวดค่าใช้จ่าย",
+          href: `/${companyCode}/expenses/categorize`,
+          icon: ListChecks,
+          permission: "expenses:read",
+        },
+      ],
+    },
+    {
+      label: "การเงิน",
+      items: [
+        {
           name: "เงินสดย่อย",
           href: `/${companyCode}/petty-cash`,
           icon: Coins,
           permission: "expenses:read",
+        },
+        {
+          name: "เทียบรายงานบัญชี",
+          href: `/${companyCode}/reconcile`,
+          icon: GitCompare,
+          permission: "reports:read",
         },
       ],
     },
@@ -234,16 +244,10 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: Users,
           permission: "expenses:read",
         },
-        {
-          name: "เทียบรายงานบัญชี",
-          href: `/${companyCode}/reconcile`,
-          icon: GitCompare,
-          permission: "reports:read",
-        },
       ],
     },
     {
-      label: "ข้อมูล",
+      label: "ข้อมูลและตั้งค่า",
       items: [
         {
           name: "ผู้ติดต่อ",
@@ -263,11 +267,6 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: Tags,
           permission: "settings:read",
         },
-      ],
-    },
-    {
-      label: "ระบบ",
-      items: [
         {
           name: "ส่งออกข้อมูล",
           href: `/${companyCode}/exports`,
