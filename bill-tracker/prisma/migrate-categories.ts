@@ -11,8 +11,18 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
-const prisma = new PrismaClient();
+function createPrismaClient() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is not defined");
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({ adapter });
+}
+
+const prisma = createPrismaClient();
 
 const BATCH_SIZE = 20;
 const AI_DELAY_MS = 1500;
@@ -102,28 +112,84 @@ function matchCategoryByKeywords(
   const text = `${description || ""} ${contactName || ""}`.toLowerCase();
   if (!text.trim()) return null;
 
-  const keywordMap: Record<string, string[]> = {
-    "ค่าน้ำมัน": ["น้ำมัน", "ปั๊ม", "ptt", "shell", "bangchak", "esso", "gas", "fuel", "bangchak", "caltex"],
-    "ค่าไฟฟ้า": ["ค่าไฟ", "กฟน", "กฟภ", "การไฟฟ้า", "electric"],
-    "ค่าน้ำประปา": ["ค่าน้ำ", "ประปา", "water"],
-    "ค่าอินเทอร์เน็ต": ["internet", "อินเทอร์เน็ต", "true", "ais", "3bb", "tot"],
-    "ค่าโทรศัพท์": ["โทรศัพท์", "phone", "dtac", "ais", "true"],
-    "เงินเดือนพนักงาน": ["เงินเดือน", "salary"],
-    "ค่าทางด่วน/ที่จอดรถ": ["ทางด่วน", "ที่จอดรถ", "expressway", "parking", "toll"],
-    "ค่าจัดส่งพัสดุ": ["ems", "kerry", "flash", "j&t", "dhl", "พัสดุ", "shipping", "ไปรษณีย์"],
-    "ค่าเช่าสำนักงาน": ["ค่าเช่า", "rent"],
-    "ค่าโฆษณาออนไลน์": ["facebook", "google ads", "meta", "tiktok", "line ads", "โฆษณา"],
-    "ค่าเครื่องเขียน/วัสดุ": ["เครื่องเขียน", "office", "stationery"],
-    "ค่าบัญชี/สอบบัญชี": ["บัญชี", "สอบบัญชี", "accounting", "audit"],
-    "ค่าธรรมเนียมโอนเงิน": ["ค่าธรรมเนียม", "bank fee", "transfer fee"],
-    "ค่าอาหาร/เลี้ยงรับรอง": ["อาหาร", "food", "restaurant", "เลี้ยง", "ร้านอาหาร"],
-    "ค่ากาแฟ/เครื่องดื่ม": ["กาแฟ", "coffee", "starbucks", "café"],
-    "ภาษีเงินได้": ["ภาษี", "สรรพากร", "tax", "ภ.ง.ด"],
-    "ค่า SaaS/ซอฟต์แวร์รายเดือน": ["saas", "software", "subscription", "license"],
-    "ค่าเบ็ดเตล็ด": ["เบ็ดเตล็ด", "miscellaneous"],
-  };
+  // Order matters: more specific patterns first, generic patterns last
+  const keywordMap: [string, string[]][] = [
+    // Salary & personnel
+    ["เงินเดือนพนักงาน", ["เงินเดือน", "salary"]],
+    ["ค่าจ้างฟรีแลนซ์", ["ฟรีแลนซ์", "freelance", "ค่าพนักงานฟรีแลนซ์"]],
+    ["ค่าตอบแทนพิเศษ/โบนัส", ["โบนัส", "bonus"]],
+    ["เงินสมทบประกันสังคม", ["ประกันสังคม"]],
 
-  for (const [catName, keywords] of Object.entries(keywordMap)) {
+    // Rent & utilities
+    ["ค่าเช่าสำนักงาน", ["ค่าเช่า", "rent", "ค่าเช่าตึก"]],
+    ["ค่าไฟฟ้า", ["ค่าไฟ", "กฟน", "กฟภ", "การไฟฟ้า", "electric"]],
+    ["ค่าน้ำประปา", ["ค่าน้ำ", "ประปา", "water"]],
+    ["ค่าอินเทอร์เน็ต", ["อินเทอร์เน็ต", "อินเตอร์เน็ต", "ค่าเน็ต", "3bb", "internet"]],
+    ["ค่าโทรศัพท์", ["โทรศัพท์", "phone"]],
+
+    // Transport
+    ["ค่าน้ำมัน", ["น้ำมัน", "ปั๊ม", "ptt", "shell", "bangchak", "esso", "fuel", "caltex"]],
+    ["ค่าทางด่วน/ที่จอดรถ", ["ทางด่วน", "ที่จอดรถ", "expressway", "parking", "toll"]],
+    ["ค่าจัดส่งพัสดุ", ["ems", "kerry", "flash", "j&t", "dhl", "พัสดุ", "shipping", "ไปรษณีย์"]],
+
+    // Marketing & ads
+    ["ค่าโฆษณาออนไลน์", ["facebook ads", "google ads", "meta ads", "tiktok", "line ads", "โฆษณา", "ads"]],
+
+    // Tech & SaaS (specific first)
+    ["ค่าโฮสติ้ง/เซิร์ฟเวอร์/คลาวด์", ["vercel", "digitalocean", "aws", "โฮสติ้ง", "hosting", "server", "infrastructure"]],
+    ["ค่าโดเมน/SSL", ["domain", "ssl", "positivessl", "โดเมน"]],
+    ["ค่าพัฒนาซอฟต์แวร์", ["พัฒนาระบบ", "web application", "development", "พัฒนาเว็บ"]],
+    ["ค่า SaaS/ซอฟต์แวร์รายเดือน", ["cursor", "canva", "adobe", "creative cloud", "mailersend", "movider", "barter connect", "line official", "saas", "software", "subscription", "license", "ซอฟต์แวร์", "pro plus", "ultra"]],
+
+    // Office supplies & equipment
+    ["ค่าอุปกรณ์คอมพิวเตอร์/IT", ["คอมพิวเตอร์", "computer", "keyboard", "การ์ดจอ", "power supply", "หูฟัง", "streamdeck", "magic keyboard", "gimball"]],
+    ["ค่าหมึกพิมพ์/กระดาษ", ["หมึกพิมพ์", "brother tn", "เครื่องพิมพ์"]],
+    ["ค่าอุปกรณ์สำนักงาน", ["ค่าอุปกรณ์สำนักงาน", "อุปกรณ์สำนักงาน"]],
+    ["ค่าเฟอร์นิเจอร์", ["ตู้เสื้อผ้า", "โต๊ะ", "เฟอร์นิเจอร์", "โคมไฟ"]],
+    ["ค่าเครื่องเขียน/วัสดุ", ["เครื่องเขียน", "stationery"]],
+
+    // Professional services
+    ["ค่าบัญชี/สอบบัญชี", ["สำนักบัญชี", "สอบบัญชี", "accounting", "audit"]],
+    ["ค่าที่ปรึกษา", ["ที่ปรึกษา", "consultant"]],
+
+    // Banking & finance
+    ["ค่าธรรมเนียมราชการ", ["กรมพัฒนาธุรกิจ", "หนังสือรับรอง", "จดทะเบียน", "ใบอนุญาต"]],
+    ["ค่าธรรมเนียมโอนเงิน", ["ค่าธรรมเนียม", "bank fee", "transfer fee"]],
+
+    // Tax
+    ["ภาษีเงินได้", ["ภาษี", "สรรพากร", "tax", "ภ.ง.ด"]],
+
+    // Food & drink
+    ["ค่าอาหาร/เลี้ยงรับรอง", ["อาหาร", "food", "restaurant", "เลี้ยง", "ร้านอาหาร", "bigc", "บิ๊กซี"]],
+    ["ค่ากาแฟ/เครื่องดื่ม", ["กาแฟ", "coffee", "starbucks"]],
+
+    // Repair & maintenance
+    ["ค่าซ่อมแซมอาคาร", ["ซ่อมแซมอาคาร", "ซ่อมไฟอาคาร"]],
+    ["ค่าบำรุงรักษาระบบ", ["maintenance", "บำรุงรักษา"]],
+
+    // Insurance
+    ["ค่าประกันภัยธุรกิจ", ["ประกัน", "insurance"]],
+
+    // Cost of goods
+    ["ต้นทุนสินค้า", ["เสื้อผ้า", "เสื้อ", "สินค้า", "สกรีน"]],
+
+    // Business-specific: platform services
+    ["ต้นทุนการให้บริการ", ["ทุนบริการ", "ต้นทุนบริการ", "ค่าเว็บรายเดือน", "ค่าเว็บ", "ค่าบริการรายเดือน"]],
+
+    // Refunds
+    ["คืนเงินลูกค้า", ["คืนเงิน", "โอนคืน", "คืนผู้เสียหาย"]],
+
+    // General transfers (fallback for โอนเงินให้)
+    ["ค่าใช้จ่ายอื่น", ["สลิปโอนเงินให้", "โอนเงินให้"]],
+
+    // Income categories
+    ["ค่าบริการ", ["รายได้จากการให้บริการ", "รายได้จากบริการ"]],
+    ["ขายสินค้า", ["ขายสินค้า", "รายได้จากการขาย"]],
+    ["ค่าพัฒนาซอฟต์แวร์", ["รายได้จากเว็บ", "ค่าเช่าเว็บ"]],
+    ["ดอกเบี้ยรับ", ["ดอกเบี้ย"]],
+  ];
+
+  for (const [catName, keywords] of keywordMap) {
     for (const kw of keywords) {
       if (text.includes(kw.toLowerCase())) {
         const found = categories.find((c) => c.name === catName);
@@ -156,11 +222,16 @@ async function migrateTransactions(
     : await prisma.income.count({ where });
 
   console.log(`\n--- ${type.toUpperCase()} without category: ${total} ---`);
-  if (total === 0) return { total: 0, matched: 0, aiMatched: 0, unmatched: 0 };
+  if (total === 0) return { total: 0, matched: 0, aiMatched: 0, fallbackUsed: 0, unmatched: 0 };
+
+  // Fallback category for truly unmatched items
+  const fallbackName = type === "expense" ? "ค่าใช้จ่ายอื่น" : "รายรับเบ็ดเตล็ด";
+  const fallbackCategory = categories.find((c) => c.name === fallbackName);
 
   let matched = 0;
   let aiMatched = 0;
   let unmatched = 0;
+  let fallbackUsed = 0;
   let offset = 0;
 
   while (offset < total) {
@@ -206,6 +277,10 @@ async function migrateTransactions(
           if (aiResult.isNew) {
             console.log(`  ✨ AI created new category for: "${(desc || "").substring(0, 40)}"`);
           }
+        } else if (fallbackCategory) {
+          // 3) Use fallback
+          categoryId = fallbackCategory.id;
+          fallbackUsed++;
         } else {
           unmatched++;
         }
@@ -232,7 +307,7 @@ async function migrateTransactions(
     console.log(`  Progress: ${Math.min(offset, total)}/${total}`);
   }
 
-  return { total, matched, aiMatched, unmatched };
+  return { total, matched, aiMatched, fallbackUsed, unmatched };
 }
 
 async function main() {
@@ -309,8 +384,8 @@ async function main() {
   // Summary
   console.log("\n" + "=".repeat(60));
   console.log("📊 SUMMARY");
-  console.log(`  Expenses: ${expenseResult.total} total → ${expenseResult.matched} keyword, ${expenseResult.aiMatched} AI, ${expenseResult.unmatched} unmatched`);
-  console.log(`  Incomes: ${incomeResult.total} total → ${incomeResult.matched} keyword, ${incomeResult.aiMatched} AI, ${incomeResult.unmatched} unmatched`);
+  console.log(`  Expenses: ${expenseResult.total} total → ${expenseResult.matched} keyword, ${expenseResult.aiMatched} AI, ${expenseResult.fallbackUsed} fallback, ${expenseResult.unmatched} unmatched`);
+  console.log(`  Incomes: ${incomeResult.total} total → ${incomeResult.matched} keyword, ${incomeResult.aiMatched} AI, ${incomeResult.fallbackUsed} fallback, ${incomeResult.unmatched} unmatched`);
   if (dryRun) console.log("\n  ⚠️  DRY RUN — no changes were made");
   console.log();
 
