@@ -93,9 +93,13 @@ export const POST = withCompanyAccess(
         defaultWhtRate: body.defaultWhtRate ?? null,
         defaultWhtType: body.defaultWhtType || null,
         descriptionTemplate: body.descriptionTemplate || null,
+        descriptionPresets: Array.isArray(body.descriptionPresets) ? body.descriptionPresets : [],
+        defaultAccountId: body.defaultAccountId || null,
         defaultsLastUpdatedAt: body.defaultVatRate !== undefined || 
                                body.defaultWhtEnabled !== undefined ||
-                               body.descriptionTemplate !== undefined
+                               body.descriptionTemplate !== undefined ||
+                               body.defaultAccountId !== undefined ||
+                               (Array.isArray(body.descriptionPresets) && body.descriptionPresets.length > 0)
           ? new Date()
           : null,
         // Delivery preferences
@@ -149,7 +153,9 @@ export const PATCH = withCompanyAccess(
       data.defaultWhtEnabled !== undefined ||
       data.defaultWhtRate !== undefined ||
       data.defaultWhtType !== undefined ||
-      data.descriptionTemplate !== undefined;
+      data.descriptionTemplate !== undefined ||
+      data.descriptionPresets !== undefined ||
+      data.defaultAccountId !== undefined;
 
     const contact = await prisma.contact.update({
       where: { id },
@@ -185,6 +191,8 @@ export const PATCH = withCompanyAccess(
         defaultWhtRate: data.defaultWhtRate !== undefined ? data.defaultWhtRate : existing.defaultWhtRate,
         defaultWhtType: data.defaultWhtType !== undefined ? data.defaultWhtType : existing.defaultWhtType,
         descriptionTemplate: data.descriptionTemplate !== undefined ? data.descriptionTemplate : existing.descriptionTemplate,
+        descriptionPresets: data.descriptionPresets !== undefined ? data.descriptionPresets : undefined,
+        defaultAccountId: data.defaultAccountId !== undefined ? data.defaultAccountId : existing.defaultAccountId,
         defaultsLastUpdatedAt: isUpdatingDefaults ? new Date() : existing.defaultsLastUpdatedAt,
         // Delivery preferences
         preferredDeliveryMethod: data.preferredDeliveryMethod !== undefined ? data.preferredDeliveryMethod : existing.preferredDeliveryMethod,

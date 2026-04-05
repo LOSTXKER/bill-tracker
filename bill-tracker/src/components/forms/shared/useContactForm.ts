@@ -62,6 +62,8 @@ export function useContactForm({
         defaultWhtRate: formData.defaultWhtRate ? parseFloat(formData.defaultWhtRate) : null,
         defaultWhtType: formData.defaultWhtType || null,
         descriptionTemplate: formData.descriptionTemplate || null,
+        descriptionPresets: formData.descriptionPresets.filter((p) => p.label.trim() || p.description.trim()),
+        defaultAccountId: formData.defaultAccountId || null,
         preferredDeliveryMethod: formData.preferredDeliveryMethod || null,
         deliveryEmail: formData.deliveryEmail || null,
         deliveryNotes: formData.deliveryNotes || null,

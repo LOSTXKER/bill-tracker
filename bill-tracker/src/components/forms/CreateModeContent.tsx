@@ -9,7 +9,15 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, ArrowLeft } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Sparkles, ArrowLeft, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContactSummary } from "@/types";
 
@@ -275,6 +283,14 @@ export function CreateModeContent({
               />
             )}
 
+            {contactDefaults && contactDefaults.descriptionPresets.length > 0 && (
+              <PresetDropdown
+                presets={contactDefaults.descriptionPresets}
+                descriptionFieldName={config.fields.descriptionField?.name}
+                setValue={setValue}
+              />
+            )}
+
             <CurrencyConversionNote
               currencyConversion={currencyConversion ?? undefined}
               manualMode={mode === "create"}
@@ -473,5 +489,56 @@ export function CreateModeContent({
         </div>
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Preset Dropdown (internal)
+// ---------------------------------------------------------------------------
+
+function PresetDropdown({
+  presets,
+  descriptionFieldName,
+  setValue,
+}: {
+  presets: { label: string; description: string; accountId?: string | null }[];
+  descriptionFieldName?: string;
+  setValue: UseFormSetValue<Record<string, unknown>>;
+}) {
+  const { onAccountChange } = useTransactionFormContext();
+
+  const handleSelect = (index: string) => {
+    const preset = presets[Number(index)];
+    if (!preset) return;
+
+    if (preset.description && descriptionFieldName) {
+      setValue(descriptionFieldName, preset.description);
+    }
+    if (preset.accountId) {
+      onAccountChange(preset.accountId);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
+      <div className="flex-1">
+        <Label className="text-xs text-muted-foreground mb-1 block">
+          เลือกรายการบันทึกที่ใช้บ่อย
+        </Label>
+        <Select onValueChange={handleSelect}>
+          <SelectTrigger className="h-9 text-sm">
+            <SelectValue placeholder="เลือกรายการที่ต้องการ..." />
+          </SelectTrigger>
+          <SelectContent>
+            {presets.map((preset, index) => (
+              <SelectItem key={index} value={String(index)}>
+                {preset.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
   );
 }

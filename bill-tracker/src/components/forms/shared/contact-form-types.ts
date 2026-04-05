@@ -1,3 +1,9 @@
+export interface DescriptionPreset {
+  label: string;
+  description: string;
+  accountId: string;
+}
+
 export interface ContactFormData {
   peakCode: string;
   contactCategory: string;
@@ -29,6 +35,8 @@ export interface ContactFormData {
   defaultWhtRate: string;
   defaultWhtType: string;
   descriptionTemplate: string;
+  descriptionPresets: DescriptionPreset[];
+  defaultAccountId: string;
   preferredDeliveryMethod: string;
   deliveryEmail: string;
   deliveryNotes: string;
@@ -70,6 +78,8 @@ export interface Contact {
   defaultWhtRate?: number | null;
   defaultWhtType?: string | null;
   descriptionTemplate?: string | null;
+  descriptionPresets?: DescriptionPreset[] | null;
+  defaultAccountId?: string | null;
   preferredDeliveryMethod?: string | null;
   deliveryEmail?: string | null;
   deliveryNotes?: string | null;
@@ -81,6 +91,7 @@ export interface Contact {
 export interface ContactFormSectionProps {
   formData: ContactFormData;
   setFormData: React.Dispatch<React.SetStateAction<ContactFormData>>;
+  companyCode?: string;
 }
 
 export const defaultFormData: ContactFormData = {
@@ -114,6 +125,8 @@ export const defaultFormData: ContactFormData = {
   defaultWhtRate: "",
   defaultWhtType: "",
   descriptionTemplate: "",
+  descriptionPresets: [],
+  defaultAccountId: "",
   preferredDeliveryMethod: "",
   deliveryEmail: "",
   deliveryNotes: "",
@@ -122,7 +135,29 @@ export const defaultFormData: ContactFormData = {
   taxInvoiceRequestNotes: "",
 };
 
+function parsePresets(raw: unknown): DescriptionPreset[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((p) => p && typeof p === "object" && typeof p.label === "string")
+    .map((p) => ({
+      label: p.label || "",
+      description: p.description || "",
+      accountId: p.accountId || "",
+    }));
+}
+
 export function contactToFormData(contact: Contact): ContactFormData {
+  const presets = parsePresets(contact.descriptionPresets);
+
+  // Auto-migrate legacy descriptionTemplate into presets if presets are empty
+  if (presets.length === 0 && contact.descriptionTemplate) {
+    presets.push({
+      label: contact.descriptionTemplate,
+      description: contact.descriptionTemplate,
+      accountId: "",
+    });
+  }
+
   return {
     peakCode: contact.peakCode || "",
     contactCategory: contact.contactCategory || "VENDOR",
@@ -154,6 +189,8 @@ export function contactToFormData(contact: Contact): ContactFormData {
     defaultWhtRate: contact.defaultWhtRate?.toString() || "",
     defaultWhtType: contact.defaultWhtType || "",
     descriptionTemplate: contact.descriptionTemplate || "",
+    descriptionPresets: presets,
+    defaultAccountId: contact.defaultAccountId || "",
     preferredDeliveryMethod: contact.preferredDeliveryMethod || "",
     deliveryEmail: contact.deliveryEmail || "",
     deliveryNotes: contact.deliveryNotes || "",

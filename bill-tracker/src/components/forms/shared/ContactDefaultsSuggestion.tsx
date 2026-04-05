@@ -5,7 +5,6 @@ import { Lightbulb, Check, X } from "lucide-react";
 import type { ContactDefaults } from "@/hooks/use-contact-defaults";
 import { getDeliveryMethodLabel, getTaxInvoiceRequestMethodLabel } from "@/lib/constants/delivery-methods";
 
-// WHT Type labels
 const WHT_TYPE_LABELS: Record<string, string> = {
   SERVICE: "ค่าบริการ",
   RENT: "ค่าเช่า",
@@ -21,17 +20,12 @@ interface ContactDefaultsSuggestionProps {
   onDismiss: () => void;
 }
 
-/**
- * Component to display contact defaults suggestion banner
- * Shows when a contact with saved defaults is selected
- */
 export function ContactDefaultsSuggestion({
   contactName,
   defaults,
   onApply,
   onDismiss,
 }: ContactDefaultsSuggestionProps) {
-  // Build suggestion items
   const suggestions: string[] = [];
 
   if (defaults.defaultVatRate !== null) {
@@ -39,13 +33,19 @@ export function ContactDefaultsSuggestion({
   }
 
   if (defaults.defaultWhtEnabled && defaults.defaultWhtRate !== null) {
-    const whtTypeLabel = defaults.defaultWhtType 
+    const whtTypeLabel = defaults.defaultWhtType
       ? WHT_TYPE_LABELS[defaults.defaultWhtType] || defaults.defaultWhtType
       : "";
     suggestions.push(`WHT ${defaults.defaultWhtRate}%${whtTypeLabel ? ` ${whtTypeLabel}` : ""}`);
   }
 
-  if (defaults.descriptionTemplate) {
+  if (defaults.defaultAccountCode && defaults.defaultAccountName) {
+    suggestions.push(`บัญชี: ${defaults.defaultAccountCode} ${defaults.defaultAccountName}`);
+  }
+
+  if (defaults.descriptionPresets.length > 0) {
+    suggestions.push(`${defaults.descriptionPresets.length} รายการบันทึก`);
+  } else if (defaults.descriptionTemplate) {
     const desc = defaults.descriptionTemplate.length > 30
       ? defaults.descriptionTemplate.substring(0, 30) + "..."
       : defaults.descriptionTemplate;
@@ -75,8 +75,7 @@ export function ContactDefaultsSuggestion({
           <p className="text-amber-700 dark:text-amber-300 mt-1 text-xs">
             ข้อมูลจากรายการล่าสุดของ <span className="font-medium">{contactName}</span>
           </p>
-          
-          {/* Suggestion chips */}
+
           <div className="flex flex-wrap gap-1.5 mt-2">
             {suggestions.map((suggestion, index) => (
               <span
@@ -88,7 +87,6 @@ export function ContactDefaultsSuggestion({
             ))}
           </div>
 
-          {/* Action buttons */}
           <div className="flex items-center gap-2 mt-3">
             <Button
               type="button"

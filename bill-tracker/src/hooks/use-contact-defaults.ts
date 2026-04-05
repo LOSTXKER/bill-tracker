@@ -3,29 +3,31 @@
 import useSWR from "swr";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
 
-/**
- * Contact defaults for transactions
- */
+export interface DescriptionPreset {
+  label: string;
+  description: string;
+  accountId?: string | null;
+}
+
 export interface ContactDefaults {
   defaultVatRate: number | null;
   defaultWhtEnabled: boolean | null;
   defaultWhtRate: number | null;
   defaultWhtType: string | null;
   descriptionTemplate: string | null;
+  descriptionPresets: DescriptionPreset[];
+  defaultAccountId: string | null;
+  defaultAccountCode: string | null;
+  defaultAccountName: string | null;
   defaultsLastUpdatedAt: string | null;
-  // Delivery preferences
   preferredDeliveryMethod: string | null;
   deliveryEmail: string | null;
   deliveryNotes: string | null;
-  // Tax invoice request preferences
   taxInvoiceRequestMethod: string | null;
   taxInvoiceRequestEmail: string | null;
   taxInvoiceRequestNotes: string | null;
 }
 
-/**
- * Contact data with defaults
- */
 export interface ContactWithDefaults {
   id: string;
   name: string;
@@ -35,6 +37,10 @@ export interface ContactWithDefaults {
   defaultWhtRate: number | null;
   defaultWhtType: string | null;
   descriptionTemplate: string | null;
+  descriptionPresets: DescriptionPreset[] | unknown;
+  defaultAccountId: string | null;
+  defaultAccountCode: string | null;
+  defaultAccountName: string | null;
   defaultsLastUpdatedAt: string | null;
   preferredDeliveryMethod: string | null;
   deliveryEmail: string | null;
@@ -61,39 +67,54 @@ interface UseContactDefaultsReturn {
   error: string | null;
 }
 
-/**
- * Custom hook to fetch contact defaults when a contact is selected
- * 
- * @param companyCode - The company code
- * @param contactId - The contact ID to fetch defaults for
- * @returns Object containing contact data, defaults, loading state, and error
- */
+function parsePresets(raw: unknown): DescriptionPreset[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((p) => p && typeof p === "object" && typeof p.label === "string")
+    .map((p) => ({
+      label: p.label || "",
+      description: p.description || "",
+      accountId: p.accountId || null,
+    }));
+}
+
 export function useContactDefaults(
   companyCode: string | null,
   contactId: string | null
 ): UseContactDefaultsReturn {
-  // Only fetch when both companyCode and contactId are provided
-  const key = companyCode && contactId 
-    ? `/api/${companyCode.toUpperCase()}/contacts/${contactId}` 
+  const key = companyCode && contactId
+    ? `/api/${companyCode.toUpperCase()}/contacts/${contactId}`
     : null;
 
   const { data, error, isLoading } = useSWR<ApiResponse>(key, {
-    // Keep defaults cached for 5 minutes
     dedupingInterval: 5 * 60 * 1000,
-    // Don't refetch on window focus
     revalidateOnFocus: false,
   });
 
   const contact = data?.success ? data.data?.contact || null : null;
   const hasDefaults = data?.success ? data.data?.hasDefaults || false : false;
 
-  // Extract defaults from contact
+  const presets = contact ? parsePresets(contact.descriptionPresets) : [];
+
+  // Auto-migrate legacy descriptionTemplate
+  if (presets.length === 0 && contact?.descriptionTemplate) {
+    presets.push({
+      label: contact.descriptionTemplate,
+      description: contact.descriptionTemplate,
+      accountId: null,
+    });
+  }
+
   const defaults: ContactDefaults | null = contact && hasDefaults ? {
     defaultVatRate: contact.defaultVatRate,
     defaultWhtEnabled: contact.defaultWhtEnabled,
     defaultWhtRate: contact.defaultWhtRate,
     defaultWhtType: contact.defaultWhtType,
     descriptionTemplate: contact.descriptionTemplate,
+    descriptionPresets: presets,
+    defaultAccountId: contact.defaultAccountId,
+    defaultAccountCode: contact.defaultAccountCode,
+    defaultAccountName: contact.defaultAccountName,
     defaultsLastUpdatedAt: contact.defaultsLastUpdatedAt,
     preferredDeliveryMethod: contact.preferredDeliveryMethod,
     deliveryEmail: contact.deliveryEmail,

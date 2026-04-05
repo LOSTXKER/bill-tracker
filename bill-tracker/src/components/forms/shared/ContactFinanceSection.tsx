@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -11,11 +12,43 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, Plus, Trash2 } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
-import type { ContactFormSectionProps } from "./contact-form-types";
+import { AccountSelector } from "@/components/forms/shared/account-selector";
+import type { ContactFormSectionProps, DescriptionPreset } from "./contact-form-types";
 
-export function ContactFinanceSection({ formData, setFormData }: ContactFormSectionProps) {
+function getFilterClass(category: string): string | undefined {
+  if (category === "VENDOR") return "EXPENSE";
+  if (category === "CUSTOMER") return "REVENUE";
+  return undefined;
+}
+
+export function ContactFinanceSection({ formData, setFormData, companyCode }: ContactFormSectionProps) {
+  const filterClass = getFilterClass(formData.contactCategory);
+
+  const updatePreset = (index: number, field: keyof DescriptionPreset, value: string) => {
+    const updated = [...formData.descriptionPresets];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, descriptionPresets: updated });
+  };
+
+  const addPreset = () => {
+    setFormData({
+      ...formData,
+      descriptionPresets: [
+        ...formData.descriptionPresets,
+        { label: "", description: "", accountId: "" },
+      ],
+    });
+  };
+
+  const removePreset = (index: number) => {
+    setFormData({
+      ...formData,
+      descriptionPresets: formData.descriptionPresets.filter((_, i) => i !== index),
+    });
+  };
+
   return (
     <>
       {/* Banking & Credit */}
@@ -99,14 +132,18 @@ export function ContactFinanceSection({ formData, setFormData }: ContactFormSect
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="contact-descriptionTemplate">คำอธิบาย/รายละเอียด</Label>
-            <Input
-              id="contact-descriptionTemplate"
-              value={formData.descriptionTemplate}
-              onChange={(e) => setFormData({ ...formData, descriptionTemplate: e.target.value })}
-              placeholder="เช่น ค่าบริการรายเดือน"
-              className="h-10"
-            />
+            <Label>บัญชีเริ่มต้น</Label>
+            {companyCode ? (
+              <AccountSelector
+                value={formData.defaultAccountId || null}
+                onValueChange={(val) => setFormData({ ...formData, defaultAccountId: val || "" })}
+                companyCode={companyCode}
+                placeholder="เลือกบัญชีเริ่มต้น..."
+                filterClass={filterClass}
+              />
+            ) : (
+              <Input disabled placeholder="บันทึกผู้ติดต่อก่อนจึงเลือกบัญชีได้" className="h-10" />
+            )}
           </div>
         </div>
 
@@ -172,6 +209,80 @@ export function ContactFinanceSection({ formData, setFormData }: ContactFormSect
             </div>
           )}
         </div>
+      </div>
+
+      <Separator />
+
+      {/* Description Presets */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-sm">รายการบันทึกที่ใช้บ่อย</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              สร้างรายการไว้ล่วงหน้า เวลาบันทึกธุรกรรมจะเลือกจาก dropdown ได้เลย
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" className="gap-1" onClick={addPreset}>
+            <Plus className="h-3 w-3" />
+            เพิ่มรายการ
+          </Button>
+        </div>
+
+        {formData.descriptionPresets.length === 0 ? (
+          <div className="text-center py-6 text-sm text-muted-foreground border border-dashed rounded-lg">
+            ยังไม่มีรายการบันทึก กด &ldquo;เพิ่มรายการ&rdquo; เพื่อสร้าง
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {formData.descriptionPresets.map((preset, index) => (
+              <div key={index} className="border rounded-lg p-3 space-y-3 relative">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => removePreset(index)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+                <div className="grid grid-cols-2 gap-3 pr-8">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">ชื่อย่อ</Label>
+                    <Input
+                      value={preset.label}
+                      onChange={(e) => updatePreset(index, "label", e.target.value)}
+                      placeholder="เช่น ค่าบริการรายเดือน"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">บัญชี (ถ้าต่างจากค่าเริ่มต้น)</Label>
+                    {companyCode ? (
+                      <AccountSelector
+                        value={preset.accountId || null}
+                        onValueChange={(val) => updatePreset(index, "accountId", val || "")}
+                        companyCode={companyCode}
+                        placeholder="ใช้บัญชีเริ่มต้น"
+                        filterClass={filterClass}
+                      />
+                    ) : (
+                      <Input disabled placeholder="—" className="h-9 text-sm" />
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">คำอธิบายเต็ม</Label>
+                  <Input
+                    value={preset.description}
+                    onChange={(e) => updatePreset(index, "description", e.target.value)}
+                    placeholder="เช่น ค่าบริการที่ปรึกษาประจำเดือน ม.ค. 2569"
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

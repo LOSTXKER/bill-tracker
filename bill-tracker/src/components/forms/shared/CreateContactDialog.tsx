@@ -53,7 +53,7 @@ export function CreateContactDialog({
 
           <Separator />
 
-          <ContactFinanceSection formData={formData} setFormData={setFormData} />
+          <ContactFinanceSection formData={formData} setFormData={setFormData} companyCode={companyCode} />
 
           <Separator />
 

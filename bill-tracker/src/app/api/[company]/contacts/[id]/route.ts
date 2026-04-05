@@ -2,10 +2,6 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 
-/**
- * GET /api/[company]/contacts/[id]
- * Get a specific contact with defaults
- */
 async function handleGet(
   req: Request,
   context: {
@@ -35,18 +31,18 @@ async function handleGet(
       contactCategory: true,
       entityType: true,
       source: true,
-      // Contact defaults for transactions
       defaultVatRate: true,
       defaultWhtEnabled: true,
       defaultWhtRate: true,
       defaultWhtType: true,
       descriptionTemplate: true,
+      descriptionPresets: true,
+      defaultAccountId: true,
+      DefaultAccount: { select: { id: true, code: true, name: true } },
       defaultsLastUpdatedAt: true,
-      // Delivery preferences
       preferredDeliveryMethod: true,
       deliveryEmail: true,
       deliveryNotes: true,
-      // Tax invoice request preferences
       taxInvoiceRequestMethod: true,
       taxInvoiceRequestEmail: true,
       taxInvoiceRequestNotes: true,
@@ -57,24 +53,25 @@ async function handleGet(
     return apiResponse.notFound("ไม่พบผู้ติดต่อนี้");
   }
 
-  // Check if contact has any defaults set
-  const hasDefaults = 
+  const hasDefaults =
     contact.defaultVatRate !== null ||
     contact.defaultWhtEnabled !== null ||
     contact.descriptionTemplate !== null ||
+    contact.defaultAccountId !== null ||
+    (Array.isArray(contact.descriptionPresets) && (contact.descriptionPresets as unknown[]).length > 0) ||
     contact.preferredDeliveryMethod !== null ||
     contact.taxInvoiceRequestMethod !== null;
 
-  return apiResponse.success({ 
-    contact,
+  return apiResponse.success({
+    contact: {
+      ...contact,
+      defaultAccountCode: contact.DefaultAccount?.code ?? null,
+      defaultAccountName: contact.DefaultAccount?.name ?? null,
+    },
     hasDefaults,
   });
 }
 
-/**
- * PATCH /api/[company]/contacts/[id]
- * Update contact defaults (quick update for defaults only)
- */
 async function handlePatch(
   req: Request,
   context: {
@@ -84,7 +81,6 @@ async function handlePatch(
 ) {
   const body = await req.json();
 
-  // Check if contact exists and belongs to company
   const existing = await prisma.contact.findFirst({
     where: {
       id: context.params.id,
@@ -96,7 +92,6 @@ async function handlePatch(
     return apiResponse.notFound("ไม่พบผู้ติดต่อนี้");
   }
 
-  // Update contact defaults
   const contact = await prisma.contact.update({
     where: { id: context.params.id },
     data: {
@@ -105,6 +100,8 @@ async function handlePatch(
       defaultWhtRate: body.defaultWhtRate !== undefined ? body.defaultWhtRate : existing.defaultWhtRate,
       defaultWhtType: body.defaultWhtType !== undefined ? body.defaultWhtType : existing.defaultWhtType,
       descriptionTemplate: body.descriptionTemplate !== undefined ? body.descriptionTemplate : existing.descriptionTemplate,
+      descriptionPresets: body.descriptionPresets !== undefined ? body.descriptionPresets : undefined,
+      defaultAccountId: body.defaultAccountId !== undefined ? body.defaultAccountId : existing.defaultAccountId,
       defaultsLastUpdatedAt: new Date(),
     },
   });

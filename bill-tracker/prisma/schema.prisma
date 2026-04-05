@@ -26,6 +26,7 @@ model Account {
   Company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Account       Account?        @relation("AccountToAccount", fields: [parentId], references: [id])
   other_Account Account[]       @relation("AccountToAccount")
+  ContactDefaults Contact[]      @relation("ContactDefaultAccount")
   Expense       Expense[]
   Income        Income[]
   VendorMapping VendorMapping[]
@@ -200,7 +201,9 @@ model Contact {
   defaultWhtEnabled     Boolean? // เปิด/ปิด หัก ณ ที่จ่าย
   defaultWhtRate        Decimal?  @db.Decimal(5, 2) // อัตราหัก ณ ที่จ่าย
   defaultWhtType        String? // ประเภท WHT (SERVICE, RENT, etc.)
-  descriptionTemplate   String? // template คำอธิบาย
+  descriptionTemplate   String? // template คำอธิบาย (legacy, ใช้ descriptionPresets แทน)
+  descriptionPresets    Json     @default("[]") // [{label, description, accountId?}]
+  defaultAccountId      String? // บัญชีเริ่มต้น
   defaultsLastUpdatedAt DateTime? // วันที่อัปเดตค่าเริ่มต้นล่าสุด
 
   // วิธีส่งเอกสาร (Document Delivery Preferences)
@@ -214,6 +217,7 @@ model Contact {
   taxInvoiceRequestNotes  String?
 
   Company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  DefaultAccount       Account?               @relation("ContactDefaultAccount", fields: [defaultAccountId], references: [id])
   Expense              Expense[]
   Income               Income[]
   ReimbursementRequest ReimbursementRequest[]
@@ -223,6 +227,7 @@ model Contact {
   @@index([companyId])
   @@index([name])
   @@index([taxId])
+  @@index([defaultAccountId])
 }
 
 model DocumentEvent {

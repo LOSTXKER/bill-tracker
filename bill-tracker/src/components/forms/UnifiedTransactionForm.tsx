@@ -805,6 +805,10 @@ export function UnifiedTransactionForm({
       setValue(config.fields.descriptionField.name, contactDefaults.descriptionTemplate);
     }
 
+    if (contactDefaults.defaultAccountId && !selectedAccount) {
+      setSelectedAccount(contactDefaults.defaultAccountId);
+    }
+
     const deliveryPatch: Partial<ContactFormState> = { defaultsSuggestionDismissed: true };
 
     if (config.type === "expense") {
