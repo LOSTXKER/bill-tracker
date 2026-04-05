@@ -74,4 +74,6 @@ export interface TransactionFieldsSectionProps {
       reason: string;
     }>;
   }) => void;
+
+  onAmountInputModeChange?: (mode: AmountInputMode) => void;
 }

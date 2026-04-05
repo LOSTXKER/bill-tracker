@@ -3,6 +3,7 @@
 import { Separator } from "@/components/ui/separator";
 import { Calculator } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import type { AmountInputMode } from "./transaction-fields-types";
 
 interface CalculationSummaryProps {
   baseAmount: number;
@@ -14,7 +15,14 @@ interface CalculationSummaryProps {
   netAmount: number;
   type?: "expense" | "income";
   showWhtNote?: boolean;
+  inputMode?: AmountInputMode;
 }
+
+const ENTERED_BADGE = (
+  <span className="ml-1.5 inline-flex items-center text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-full leading-none">
+    ยอดที่กรอก
+  </span>
+);
 
 export function CalculationSummary({
   baseAmount,
@@ -26,6 +34,7 @@ export function CalculationSummary({
   netAmount,
   type = "expense",
   showWhtNote = false,
+  inputMode,
 }: CalculationSummaryProps) {
   const hasWht = !!(whtRate && whtRate > 0 && whtAmount > 0);
 
@@ -37,8 +46,11 @@ export function CalculationSummary({
       </div>
 
       <div className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">{vatRate > 0 ? "ยอดก่อน VAT" : "ยอดเงิน"}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">
+            {vatRate > 0 ? "ยอดก่อน VAT" : "ยอดเงิน"}
+            {inputMode === "beforeVat" && ENTERED_BADGE}
+          </span>
           <span className="text-foreground">{formatCurrency(baseAmount)}</span>
         </div>
         {vatRate > 0 && (
@@ -47,8 +59,11 @@ export function CalculationSummary({
             <span>+{formatCurrency(vatAmount)}</span>
           </div>
         )}
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">{vatRate > 0 ? "ยอดรวม VAT" : "รวมเป็นเงิน"}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">
+            {vatRate > 0 ? "ยอดรวม VAT" : "รวมเป็นเงิน"}
+            {inputMode === "includingVat" && ENTERED_BADGE}
+          </span>
           <span className="text-foreground font-medium">{formatCurrency(totalWithVat)}</span>
         </div>
         {hasWht && (
@@ -67,12 +82,13 @@ export function CalculationSummary({
 
       <Separator />
 
-      <div className="flex justify-between text-lg font-semibold">
+      <div className="flex justify-between items-center text-lg font-semibold">
         <div>
           <span className="text-foreground">
             {type === "income" ? "ยอดรับจริง" : "ยอดโอนจริง"}
+            {inputMode === "afterWht" && ENTERED_BADGE}
           </span>
-          {hasWht && (
+          {hasWht && inputMode !== "afterWht" && (
             <span className="block text-xs font-normal text-muted-foreground">
               หลังหัก ณ ที่จ่าย
             </span>

@@ -10,6 +10,7 @@ interface AmountInputProps {
   setValue: FormSetValue;
   vatRate: number;
   isWht: boolean;
+  onModeChange?: (mode: AmountInputMode) => void;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -45,7 +46,7 @@ function displayToBase(display: number, mode: AmountInputMode, vatRate: number, 
   return display;
 }
 
-export function AmountInput({ watch, setValue, vatRate, isWht }: AmountInputProps) {
+export function AmountInput({ watch, setValue, vatRate, isWht, onModeChange }: AmountInputProps) {
   const [amountInputMode, setAmountInputMode] = useState<AmountInputMode>("beforeVat");
   const [displayAmount, setDisplayAmount] = useState<string>("");
 
@@ -70,6 +71,7 @@ export function AmountInput({ watch, setValue, vatRate, isWht }: AmountInputProp
 
   if (effectiveMode !== amountInputMode) {
     setAmountInputMode(effectiveMode);
+    onModeChange?.(effectiveMode);
   }
 
   // ---------------------------------------------------------------------------
@@ -158,6 +160,7 @@ export function AmountInput({ watch, setValue, vatRate, isWht }: AmountInputProp
     isUserInputRef.current = true;
     setAmountInputMode(newMode);
     setDisplayAmount(String(newDisplay));
+    onModeChange?.(newMode);
   };
 
   return (

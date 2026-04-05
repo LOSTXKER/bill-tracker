@@ -44,6 +44,7 @@ export function TransactionFieldsSection({
   renderAdditionalFields,
   isWht = false,
   onAiSuggestAccount,
+  onAmountInputModeChange,
 }: TransactionFieldsSectionProps) {
   const {
     contacts,
@@ -198,7 +199,7 @@ export function TransactionFieldsSection({
           onChange={(date) => setValue(config.dateField.name, date || new Date())}
           required
         />
-        <AmountInput watch={watch} setValue={setValue} vatRate={vatRate} isWht={isWht} />
+        <AmountInput watch={watch} setValue={setValue} vatRate={vatRate} isWht={isWht} onModeChange={onAmountInputModeChange} />
       </div>
 
       {/* Contact & Account */}

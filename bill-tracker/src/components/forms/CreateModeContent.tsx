@@ -1,6 +1,6 @@
 "use client";
 
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import {
   UseFormRegister,
   UseFormWatch,
@@ -24,6 +24,7 @@ import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { CalculationSummary } from "./shared/CalculationSummary";
+import type { AmountInputMode } from "./shared/transaction-fields-types";
 import { PayerSection, type PayerInfo } from "./shared/PayerSection";
 import {
   InputMethodSection,
@@ -181,6 +182,7 @@ export function CreateModeContent({
     onReferenceUrlsChange,
   } = useTransactionFormContext();
 
+  const [amountInputMode, setAmountInputMode] = useState<AmountInputMode>("beforeVat");
 
   const fieldsConfig = buildFieldsConfig(config);
 
@@ -251,6 +253,7 @@ export function CreateModeContent({
                 config.renderAdditionalFields?.({ register, watch, setValue, mode })
               }
               isWht={watchIsWht || false}
+              onAmountInputModeChange={setAmountInputMode}
               onAiSuggestAccount={(suggestion) => {
                 setAccountSuggestion({
                   accountId: suggestion.accountId,
@@ -377,6 +380,7 @@ export function CreateModeContent({
                     netAmount={calculation.netAmount}
                     type={config.type}
                     showWhtNote={(watchIsWht || false) && !!watchWhtRate}
+                    inputMode={amountInputMode}
                   />
                 </CardContent>
               </Card>
@@ -457,6 +461,7 @@ export function CreateModeContent({
                   netAmount={calculation.netAmount}
                   type={config.type}
                   showWhtNote={(watchIsWht || false) && !!watchWhtRate}
+                  inputMode={amountInputMode}
                 />
               </CardContent>
             </Card>
