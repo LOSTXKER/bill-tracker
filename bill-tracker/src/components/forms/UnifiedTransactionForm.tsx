@@ -409,6 +409,9 @@ export function UnifiedTransactionForm({
     if (id) setSkipAccountWarning(false);
   }, []);
 
+  // Category
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   // Reference URLs
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
 
@@ -555,6 +558,8 @@ export function UnifiedTransactionForm({
     setOneTimeContactName: setOneTimeContactNameForSubmission,
     selectedAccount,
     setSelectedAccount,
+    selectedCategory,
+    setSelectedCategory,
     calculation,
     categorizedFiles,
     referenceUrls,
@@ -578,8 +583,6 @@ export function UnifiedTransactionForm({
     setAuditRefreshKey,
     onModeChange,
     setSelectedContact: setSelectedContactForSubmission,
-    skipAccountWarning,
-    onAccountWarning: () => setShowAccountWarning(true),
   });
 
   // ---------------------------------------------------------------------------
@@ -670,6 +673,7 @@ export function UnifiedTransactionForm({
     }
 
     if (data.accountId) setSelectedAccount(data.accountId);
+    if (data.categoryId) setSelectedCategory(data.categoryId as string);
     if (data.internalCompanyId) setInternalCompanyId(data.internalCompanyId as string);
 
     setCategorizedFiles({
@@ -1048,6 +1052,8 @@ export function UnifiedTransactionForm({
     refetchContacts,
     selectedAccount,
     setSelectedAccount,
+    selectedCategory,
+    setSelectedCategory,
     internalCompanyId,
     setInternalCompanyId,
     accessibleCompanies: stableAccessibleCompanies,
@@ -1197,15 +1203,6 @@ export function UnifiedTransactionForm({
         onConflictResolve={handleConflictResolution}
       />
 
-      <AccountWarningDialog
-        open={showAccountWarning}
-        onOpenChange={setShowAccountWarning}
-        onConfirm={() => {
-          setSkipAccountWarning(true);
-          setShowAccountWarning(false);
-          setTimeout(() => handleSubmit(onSubmit)(), 0);
-        }}
-      />
     </TransactionFormProvider>
   );
 }

@@ -12,11 +12,11 @@ async function handleGet(
   }
 ) {
   const counts = await prisma.expense.groupBy({
-    by: ["contactName", "accountId"],
+    by: ["contactName", "categoryId"],
     where: {
       companyId: context.company.id,
       deletedAt: null,
-      accountId: { not: null },
+      categoryId: { not: null },
       contactName: { not: null },
     },
     _count: true,
@@ -24,20 +24,20 @@ async function handleGet(
 
   const contactMap = new Map<
     string,
-    { accountId: string; count: number }[]
+    { categoryId: string; count: number }[]
   >();
   for (const row of counts) {
     const name = row.contactName!;
     if (!contactMap.has(name)) contactMap.set(name, []);
-    contactMap.get(name)!.push({ accountId: row.accountId!, count: row._count });
+    contactMap.get(name)!.push({ categoryId: row.categoryId!, count: row._count });
   }
 
   interface OutlierGroup {
     contactName: string;
-    majorityAccountId: string;
+    majorityCategoryId: string;
     majorityCount: number;
     totalCount: number;
-    outlierAccounts: string[];
+    outlierCategories: string[];
   }
 
   const outlierGroups: OutlierGroup[] = [];
@@ -53,10 +53,10 @@ async function handleGet(
 
     outlierGroups.push({
       contactName,
-      majorityAccountId: majority.accountId,
+      majorityCategoryId: majority.categoryId,
       majorityCount: majority.count,
       totalCount,
-      outlierAccounts: buckets.slice(1).map((b) => b.accountId),
+      outlierCategories: buckets.slice(1).map((b) => b.categoryId),
     });
   }
 
@@ -65,9 +65,9 @@ async function handleGet(
   }
 
   const orConditions = outlierGroups.flatMap((g) =>
-    g.outlierAccounts.map((aid) => ({
+    g.outlierCategories.map((cid) => ({
       contactName: g.contactName,
-      accountId: aid,
+      categoryId: cid,
     }))
   );
 
@@ -85,26 +85,32 @@ async function handleGet(
       billDate: true,
       contactId: true,
       contactName: true,
-      accountId: true,
-      Account: { select: { id: true, code: true, name: true } },
+      categoryId: true,
+      Category: {
+        select: {
+          id: true,
+          name: true,
+          Parent: { select: { name: true } },
+        },
+      },
     },
     orderBy: { billDate: "desc" },
     take: 500,
   });
 
-  const allAccountIds = [
-    ...new Set(outlierGroups.map((g) => g.majorityAccountId)),
+  const allCategoryIds = [
+    ...new Set(outlierGroups.map((g) => g.majorityCategoryId)),
   ];
-  const accounts = await prisma.account.findMany({
-    where: { id: { in: allAccountIds } },
-    select: { id: true, code: true, name: true },
+  const categoriesData = await prisma.transactionCategory.findMany({
+    where: { id: { in: allCategoryIds } },
+    select: { id: true, name: true, Parent: { select: { name: true } } },
   });
-  const accountById = new Map(accounts.map((a) => [a.id, a]));
+  const categoryById = new Map(categoriesData.map((c) => [c.id, c]));
 
   const groups = outlierGroups
     .map((g) => {
-      const majorityAccount = accountById.get(g.majorityAccountId);
-      if (!majorityAccount) return null;
+      const majorityCategory = categoryById.get(g.majorityCategoryId);
+      if (!majorityCategory) return null;
 
       const anomalies = anomalyExpenses
         .filter((e) => e.contactName === g.contactName)
@@ -115,8 +121,12 @@ async function handleGet(
           netPaid: Number(e.netPaid),
           billDate: e.billDate.toISOString(),
           contactId: e.contactId,
-          currentAccount: e.Account
-            ? { id: e.Account.id, code: e.Account.code, name: e.Account.name }
+          currentCategory: e.Category
+            ? {
+                id: e.Category.id,
+                name: e.Category.name,
+                groupName: e.Category.Parent?.name || null,
+              }
             : null,
         }));
 
@@ -124,7 +134,11 @@ async function handleGet(
 
       return {
         contactName: g.contactName,
-        majorityAccount,
+        majorityCategory: {
+          id: majorityCategory.id,
+          name: majorityCategory.name,
+          groupName: majorityCategory.Parent?.name || null,
+        },
         majorityCount: g.majorityCount,
         totalCount: g.totalCount,
         anomalies,

@@ -52,6 +52,7 @@ export interface TransactionData {
   contact?: { name: string } | null;
   contactName?: string | null; // One-time contact name (not saved as Contact)
   account?: { id: string; code: string; name: string } | null;
+  category?: { id: string; name: string; parent?: { name: string } | null } | null;
   // Company that recorded this expense (payer)
   company?: { id: string; name: string; code: string } | null;
   companyId?: string | null;
@@ -304,10 +305,12 @@ function TransactionTableRowInner({
         </TableCell>
       )}
 
-      {/* Account */}
+      {/* Category */}
       <TableCell className="text-muted-foreground">
-        {transaction.account 
-          ? `${transaction.account.code} ${transaction.account.name}` 
+        {transaction.category
+          ? transaction.category.parent
+            ? `[${transaction.category.parent.name}] ${transaction.category.name}`
+            : transaction.category.name
           : "-"
         }
       </TableCell>

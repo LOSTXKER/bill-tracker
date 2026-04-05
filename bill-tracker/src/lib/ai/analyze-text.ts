@@ -12,6 +12,7 @@ import { generateText } from "./gemini";
 import { parseAIJsonResponse } from "./utils/parse-ai-json";
 import { findBestMatchingContact } from "@/lib/utils/string-similarity";
 import { createLogger } from "@/lib/utils/logger";
+import { autoCreateAccount } from "./receipt-matcher";
 import type {
   AccountAlternative,
   AnalyzedAccount,
@@ -31,6 +32,24 @@ interface TextAnalysisAIResponse {
     code?: string;
     name?: string;
     confidence?: number;
+    reason?: string;
+  } | null;
+  newAccount?: {
+    code?: string;
+    name?: string;
+    class?: string;
+    reason?: string;
+  } | null;
+  category?: {
+    id?: string;
+    name?: string;
+    groupName?: string;
+    confidence?: number;
+    reason?: string;
+  } | null;
+  newCategory?: {
+    name: string;
+    parentName: string;
     reason?: string;
   };
   accountAlternatives?: Array<{
@@ -82,21 +101,18 @@ export async function analyzeText(
 
   try {
     // 1. ดึงข้อมูลทั้งหมดที่ AI ต้องใช้
-    const [accounts, contacts, company] = await Promise.all([
+    const [accounts, contacts, categories, company] = await Promise.all([
       fetchAccounts(companyId, transactionType),
       fetchContacts(companyId),
+      fetchCategories(companyId, transactionType),
       prisma.company.findUnique({
         where: { id: companyId },
         select: { name: true, taxId: true },
       }),
     ]);
 
-    if (accounts.length === 0) {
-      return { error: "ไม่มีผังบัญชีในระบบ กรุณา Import จาก Peak ก่อน" };
-    }
-
     // 2. สร้าง Prompt
-    const prompt = buildTextAnalysisPrompt(accounts, contacts, transactionType, company, text);
+    const prompt = buildTextAnalysisPrompt(accounts, contacts, categories, transactionType, company, text);
 
     // 3. วิเคราะห์ข้อความ
     const response = await generateText(prompt, {
@@ -109,7 +125,7 @@ export async function analyzeText(
       return { error: "AI ไม่สามารถวิเคราะห์ได้: " + response.error };
     }
 
-    return parseAIResponse(response.data, accounts, contacts, company?.taxId);
+    return parseAIResponse(response.data, accounts, contacts, company?.taxId, companyId, categories);
 
   } catch (error) {
     log.error("analyzeText error", error);
@@ -142,6 +158,21 @@ async function fetchAccounts(companyId: string, transactionType: "EXPENSE" | "IN
   });
 }
 
+async function fetchCategories(companyId: string, transactionType: "EXPENSE" | "INCOME") {
+  const groups = await prisma.transactionCategory.findMany({
+    where: { companyId, type: transactionType, parentId: null, isActive: true },
+    include: {
+      Children: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }],
+        select: { id: true, name: true },
+      },
+    },
+    orderBy: [{ sortOrder: "asc" }],
+  });
+  return groups;
+}
+
 async function fetchContacts(companyId: string) {
   return prisma.contact.findMany({
     where: { companyId },
@@ -161,13 +192,17 @@ async function fetchContacts(companyId: string) {
 function buildTextAnalysisPrompt(
   accounts: { id: string; code: string; name: string; description: string | null }[],
   contacts: { id: string; name: string; taxId: string | null }[],
+  categories: { id: string; name: string; Children: { id: string; name: string }[] }[],
   transactionType: "EXPENSE" | "INCOME",
   company: { name: string; taxId: string | null } | null,
   inputText: string
 ): string {
-  // สร้างรายการบัญชี
   const accountList = accounts
     .map(a => `- ${a.code} | ${a.name} | ID: ${a.id}`)
+    .join("\n");
+
+  const categoryList = categories
+    .map(g => `[${g.name}]\n${g.Children.map(c => `  - ${c.name} | ID: ${c.id}`).join("\n")}`)
     .join("\n");
 
   // สร้างรายการผู้ติดต่อ
@@ -194,6 +229,9 @@ ${accountList}
 ## รายชื่อผู้ติดต่อที่มีในระบบ
 ${contactList}
 
+## หมวดหมู่ (กลุ่ม > หมวดย่อย)
+${categoryList}
+
 ## สิ่งที่ต้องทำ
 
 1. **หาผู้ขาย/ผู้ติดต่อ** 
@@ -209,12 +247,19 @@ ${contactList}
    - สกุลเงิน (currency) - default THB
    - วันที่ (date) - ถ้าไม่ระบุให้ใส่ null
 
-3. **เลือกบัญชี**
-   - เลือกบัญชีที่เหมาะสมที่สุดจากรายการข้างบน
+3. **เลือกหมวดหมู่ (category)**
+   - เลือกหมวดย่อยที่เหมาะสมที่สุดจากรายการหมวดหมู่ข้างบน
+   - ใส่ id และ name ของหมวดย่อยที่เลือก
+   - **⚠️ ถ้าไม่มีหมวดย่อยไหนเหมาะสม** → ใส่ category = null และใส่ newCategory แทน พร้อมชื่อกลุ่ม (parentName) ที่จะสร้างภายใต้
+
+4. **เลือกบัญชี (ถ้ามี)**
+   - เลือกบัญชีที่เหมาะสมที่สุดจากผังบัญชี (ไม่บังคับ)
    - ใส่ทั้ง id, code, name
    - เลือกทางเลือกอื่นอีก 2 บัญชี
+   - **⚠️ ถ้าไม่มีบัญชีไหนในรายการที่เหมาะสมเลย** → ใส่ account = null และใส่ newAccount แทน พร้อมแนะนำรหัสบัญชี ชื่อ และประเภท (class) ที่เหมาะสม
+   - class ที่ใช้ได้: ${transactionType === "EXPENSE" ? "EXPENSE, COST_OF_SALES, OTHER_EXPENSE" : "REVENUE, OTHER_INCOME"}
 
-4. **สรุปรายการ**
+5. **สรุปรายการ**
    - เขียน description สั้นๆ ว่าค่าอะไร
 
 ## ตอบ JSON เท่านั้น (ห้ามมี text อื่น)
@@ -236,6 +281,14 @@ ${contactList}
     "type": null
   },
   "netAmount": 1070.00,
+  "category": {
+    "id": "ID ของหมวดย่อยที่เลือก",
+    "name": "ชื่อหมวดย่อย",
+    "groupName": "ชื่อกลุ่ม",
+    "confidence": 85,
+    "reason": "เหตุผลที่เลือก"
+  },
+  "newCategory": null,
   "account": {
     "id": "ID ของบัญชีที่เลือก",
     "code": "รหัสบัญชี",
@@ -243,6 +296,7 @@ ${contactList}
     "confidence": 85,
     "reason": "เหตุผลที่เลือก"
   },
+  "newAccount": null,
   "accountAlternatives": [
     { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 70, "reason": "เหตุผล" }
   ],
@@ -258,7 +312,19 @@ ${contactList}
   }
 }
 
-## หมายเหตุ
+## หมายเหตุเรื่อง newCategory
+- ใส่ newCategory เฉพาะเมื่อไม่มีหมวดย่อยในรายการที่เหมาะสมเลย
+- ถ้าต้องสร้างหมวดใหม่ ให้ category = null และ:
+  "newCategory": { "name": "ชื่อหมวดย่อยใหม่", "parentName": "ชื่อกลุ่มที่จะสร้างภายใต้", "reason": "เหตุผล" }
+- parentName ต้องตรงกับชื่อกลุ่มที่มีอยู่แล้วในรายการหมวดหมู่
+
+## หมายเหตุเรื่อง newAccount
+- ใส่ newAccount เฉพาะเมื่อไม่มีบัญชีในรายการที่เหมาะสมเลย (ถ้ามีบัญชีที่ใกล้เคียง ให้เลือกบัญชีนั้นแทน)
+- ถ้าต้องสร้างบัญชีใหม่ ให้ account = null และ:
+  "newAccount": { "code": "5XXX-XX", "name": "ชื่อบัญชีใหม่", "class": "EXPENSE", "reason": "เหตุผล" }
+- รหัสบัญชี (code) ควรเป็นรูปแบบเดียวกับที่มีในระบบ (ดูจากรายการข้างบน)
+
+## หมายเหตุอื่นๆ
 - ถ้าข้อมูลไม่ครบ ให้ใส่ null แทน
 - ถ้าวันที่เป็น พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543)
 - VAT rate ในไทยคือ 0% หรือ 7%
@@ -269,12 +335,14 @@ ${contactList}
 // Response Parsing
 // =============================================================================
 
-function parseAIResponse(
+async function parseAIResponse(
   rawResponse: string,
   accounts: { id: string; code: string; name: string }[],
   contacts: { id: string; name: string; taxId: string | null }[],
-  companyTaxId: string | null = null
-): ReceiptAnalysisResult {
+  companyTaxId: string | null = null,
+  companyId: string | null = null,
+  categories: { id: string; name: string; Children: { id: string; name: string }[] }[] = []
+): Promise<ReceiptAnalysisResult> {
   try {
     const parsed = parseAIJsonResponse(rawResponse) as TextAnalysisAIResponse;
 
@@ -320,6 +388,22 @@ function parseAIResponse(
       };
     }
 
+    // If no existing account matched and AI suggested a new one, auto-create it
+    if (!account.id && parsed.newAccount?.code && parsed.newAccount?.name && companyId) {
+      const created = await autoCreateAccount(companyId, parsed.newAccount);
+      if (created) {
+        account = {
+          id: created.id,
+          code: created.code,
+          name: created.name,
+          confidence: parsed.account?.confidence || parsed.confidence?.account || 70,
+          reason: parsed.newAccount.reason || "AI สร้างบัญชีใหม่อัตโนมัติ",
+          isNewAccount: true,
+        };
+        log.debug("Auto-created new account", { code: created.code, name: created.name });
+      }
+    }
+
     // Parse account alternatives
     const accountAlternatives: AccountAlternative[] = [];
     if (parsed.accountAlternatives && Array.isArray(parsed.accountAlternatives)) {
@@ -333,6 +417,71 @@ function parseAIResponse(
             confidence: alt.confidence || 50,
             reason: alt.reason || "ทางเลือกอื่น",
           });
+        }
+      }
+    }
+
+    // Resolve category
+    let categoryResult: { categoryId: string | null; categoryName: string | null; groupName: string | null; confidence: number; reason: string; isNew?: boolean } = {
+      categoryId: null, categoryName: null, groupName: null, confidence: 0, reason: "",
+    };
+
+    const allCategoryChildren = categories.flatMap(g =>
+      g.Children.map(c => ({ ...c, groupName: g.name, groupId: g.id }))
+    );
+
+    if (parsed.category?.id) {
+      const found = allCategoryChildren.find(c => c.id === parsed.category!.id);
+      if (found) {
+        categoryResult = {
+          categoryId: found.id, categoryName: found.name, groupName: found.groupName,
+          confidence: parsed.category.confidence || 80, reason: parsed.category.reason || "AI จำแนก",
+        };
+      }
+    }
+    if (!categoryResult.categoryId && parsed.category?.name) {
+      const normalized = parsed.category!.name!.toLowerCase().trim();
+      const found = allCategoryChildren.find(c =>
+        c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())
+      );
+      if (found) {
+        categoryResult = {
+          categoryId: found.id, categoryName: found.name, groupName: found.groupName,
+          confidence: parsed.category.confidence || 75, reason: parsed.category.reason || "AI จำแนก",
+        };
+      }
+    }
+
+    // Auto-create category if AI suggested a new one
+    if (!categoryResult.categoryId && parsed.newCategory?.name && parsed.newCategory?.parentName && companyId) {
+      const newCatData = parsed.newCategory!;
+      const parentGroup = categories.find(g =>
+        g.name.toLowerCase().includes(newCatData.parentName.toLowerCase()) ||
+        newCatData.parentName.toLowerCase().includes(g.name.toLowerCase())
+      );
+      if (parentGroup) {
+        try {
+          const transactionType = categories.length > 0 ? await prisma.transactionCategory.findUnique({
+            where: { id: parentGroup.id },
+            select: { type: true },
+          }) : null;
+
+          const newCat = await prisma.transactionCategory.create({
+            data: {
+              companyId,
+              name: newCatData.name,
+              type: transactionType?.type || "EXPENSE",
+              parentId: parentGroup.id,
+              sortOrder: parentGroup.Children.length,
+            },
+          });
+          categoryResult = {
+            categoryId: newCat.id, categoryName: newCat.name, groupName: parentGroup.name,
+            confidence: 70, reason: newCatData.reason || "AI สร้างหมวดใหม่", isNew: true,
+          };
+          log.debug("Auto-created new category", { name: newCat.name, group: parentGroup.name });
+        } catch (err) {
+          log.warn("Failed to auto-create category", { error: err });
         }
       }
     }
@@ -422,6 +571,7 @@ function parseAIResponse(
       netAmount: typeof parsed.netAmount === "number" ? parsed.netAmount : null,
       account,
       accountAlternatives: accountAlternatives.slice(0, 2),
+      category: categoryResult.categoryId ? categoryResult : undefined,
       documentType: "TEXT_INPUT",
       invoiceNumber: parsed.invoiceNumber || null,
       items: Array.isArray(parsed.items)

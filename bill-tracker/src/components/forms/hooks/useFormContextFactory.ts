@@ -25,6 +25,9 @@ interface FormContextFactoryParams {
   // Account
   selectedAccount: string | null;
   setSelectedAccount: (id: string | null) => void;
+  // Category
+  selectedCategory: string | null;
+  setSelectedCategory: (id: string | null) => void;
   // Internal company
   internalCompanyId: string | null;
   setInternalCompanyId: (id: string | null) => void;
@@ -72,6 +75,11 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
       ai.aiResult?.aiAccountSuggestion?.accountId ||
       undefined,
     suggestedAccountAlternatives: ai.accountSuggestion?.alternatives,
+
+    selectedCategory: params.selectedCategory,
+    onCategoryChange: params.setSelectedCategory,
+    suggestedCategoryId: ai.categorySuggestion?.categoryId || undefined,
+    suggestedCategoryAlternatives: ai.categorySuggestion?.alternatives,
 
     whtDeliveryMethod: cs.whtDeliveryMethod,
     onWhtDeliveryMethodChange: isExpenseEditable
@@ -124,7 +132,8 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
     cs.whtDeliveryMethod, cs.whtDeliveryEmail, cs.whtDeliveryNotes, cs.updateContactDelivery,
     cs.taxInvoiceRequestMethod, cs.taxInvoiceRequestEmail, cs.taxInvoiceRequestNotes,
     cs.updateContactTaxInvoiceRequest, cs.hasDocument,
-    params.selectedAccount, ai.accountSuggestion, ai.aiResult,
+    params.selectedAccount, ai.accountSuggestion, ai.aiResult, ai.categorySuggestion,
+    params.selectedCategory,
     params.internalCompanyId, params.accessibleCompanies,
     params.referenceUrls,
     isEditable, isExpenseEditable,

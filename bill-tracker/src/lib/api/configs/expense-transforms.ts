@@ -52,6 +52,7 @@ export function transformExpenseCreateData(body: TransactionRequestBody) {
     netPaid: totals.netAmount,
     description: data.description,
     accountId: data.accountId || null,
+    categoryId: data.categoryId || null,
     internalCompanyId: data.internalCompanyId || null,
     invoiceNumber: data.invoiceNumber,
     referenceNo: data.referenceNo,
@@ -114,6 +115,7 @@ export function transformExpenseUpdateData(body: TransactionRequestBody, existin
   updateData.netPaid = totals.netAmount;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
+  if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
   if (data.internalCompanyId !== undefined) updateData.internalCompanyId = data.internalCompanyId || null;
   if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
   if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;

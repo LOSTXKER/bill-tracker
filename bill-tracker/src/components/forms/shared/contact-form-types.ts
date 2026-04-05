@@ -57,7 +57,7 @@ export interface Contact {
   creditLimit?: number | null;
   paymentTerms?: number | null;
   notes?: string | null;
-  source?: "PEAK" | "MANUAL" | null;
+  source?: "PEAK" | "MANUAL" | "AI" | null;
   peakCode?: string | null;
   contactCategory?: string | null;
   entityType?: string | null;

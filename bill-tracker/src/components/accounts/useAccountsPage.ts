@@ -124,6 +124,7 @@ export function useAccountsPage({ companyCode, initialAccounts, lastAccountImpor
     total: accounts.length,
     active: accounts.filter((a) => a.isActive).length,
     fromPeak: accounts.filter((a) => a.source === "PEAK").length,
+    fromAi: accounts.filter((a) => a.source === "AI").length,
     manual: accounts.filter((a) => a.source === "MANUAL" || !a.source).length,
   };
 

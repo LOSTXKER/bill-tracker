@@ -329,6 +329,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       include: {
         Contact: true,
         Account: true,
+        Category: { include: { Parent: { select: { id: true, name: true } } } },
         Company: true,
         InternalCompany: true,
         User_Expense_createdByToUser: {
@@ -370,11 +371,12 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
 
   // Map Prisma relation names to what the client expects
   const expenses = expensesRaw.map((expense) => {
-    const { Contact, Account, Company, InternalCompany, User_Expense_createdByToUser, ...rest } = expense;
+    const { Contact, Account, Category, Company, InternalCompany, User_Expense_createdByToUser, ...rest } = expense;
     return {
       ...rest,
       contact: Contact,
       account: Account,
+      category: Category ? { id: Category.id, name: Category.name, parent: Category.Parent } : null,
       company: Company,
       internalCompany: InternalCompany,
       creator: User_Expense_createdByToUser,

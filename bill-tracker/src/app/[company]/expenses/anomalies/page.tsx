@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AccountSelector } from "@/components/forms/shared/account-selector";
+import { CategorySelector } from "@/components/forms/shared/CategorySelector";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,10 +18,10 @@ import {
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 
-interface AnomalyAccount {
+interface AnomalyCategory {
   id: string;
-  code: string;
   name: string;
+  groupName: string | null;
 }
 
 interface AnomalyExpense {
@@ -31,15 +31,19 @@ interface AnomalyExpense {
   netPaid: number;
   billDate: string;
   contactId: string | null;
-  currentAccount: AnomalyAccount | null;
+  currentCategory: AnomalyCategory | null;
 }
 
 interface AnomalyGroup {
   contactName: string;
-  majorityAccount: AnomalyAccount;
+  majorityCategory: AnomalyCategory;
   majorityCount: number;
   totalCount: number;
   anomalies: AnomalyExpense[];
+}
+
+function formatCategoryLabel(cat: AnomalyCategory): string {
+  return cat.groupName ? `[${cat.groupName}] ${cat.name}` : cat.name;
 }
 
 export default function AnomalyDetectionPage() {
@@ -51,7 +55,7 @@ export default function AnomalyDetectionPage() {
   const [totalAnomalies, setTotalAnomalies] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkAccountId, setBulkAccountId] = useState<string | null>(null);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
   const fetchAnomalies = useCallback(async () => {
@@ -96,8 +100,8 @@ export default function AnomalyDetectionPage() {
     });
   };
 
-  const applyBulkAccount = async () => {
-    if (!bulkAccountId || selectedIds.size === 0) return;
+  const applyBulkCategory = async () => {
+    if (!bulkCategoryId || selectedIds.size === 0) return;
     setApplying(true);
     try {
       const res = await fetch(
@@ -107,7 +111,7 @@ export default function AnomalyDetectionPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             expenseIds: Array.from(selectedIds),
-            accountId: bulkAccountId,
+            categoryId: bulkCategoryId,
           }),
         }
       );
@@ -115,7 +119,7 @@ export default function AnomalyDetectionPage() {
       if (res.ok && json.success) {
         toast.success(`แก้หมวด ${json.data.updated} รายการสำเร็จ`);
         setSelectedIds(new Set());
-        setBulkAccountId(null);
+        setBulkCategoryId(null);
         fetchAnomalies();
       } else {
         throw new Error(json.error || "เกิดข้อผิดพลาด");
@@ -139,14 +143,14 @@ export default function AnomalyDetectionPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             expenseIds: ids,
-            accountId: group.majorityAccount.id,
+            categoryId: group.majorityCategory.id,
           }),
         }
       );
       const json = await res.json();
       if (res.ok && json.success) {
         toast.success(
-          `แก้หมวด ${json.data.updated} รายการจาก "${group.contactName}" เป็น ${group.majorityAccount.code} สำเร็จ`
+          `แก้หมวด ${json.data.updated} รายการจาก "${group.contactName}" เป็น ${formatCategoryLabel(group.majorityCategory)} สำเร็จ`
         );
         fetchAnomalies();
       } else {
@@ -191,7 +195,7 @@ export default function AnomalyDetectionPage() {
               ไม่พบหมวดหมู่ผิดปกติ
             </p>
             <p className="text-sm mt-1">
-              ค่าใช้จ่ายทุกผู้ติดต่อลงบัญชีสม่ำเสมอดีแล้ว
+              ค่าใช้จ่ายทุกผู้ติดต่อลงหมวดหมู่สม่ำเสมอดีแล้ว
             </p>
           </CardContent>
         </Card>
@@ -211,7 +215,7 @@ export default function AnomalyDetectionPage() {
             <h1 className="text-xl font-semibold">ตรวจสอบหมวดหมู่ผิดปกติ</h1>
             <p className="text-sm text-muted-foreground">
               พบ {totalAnomalies} รายการ จาก {groups.length} ผู้ติดต่อ
-              ที่ลงบัญชีต่างจากส่วนใหญ่
+              ที่ลงหมวดหมู่ต่างจากส่วนใหญ่
             </p>
           </div>
         </div>
@@ -223,17 +227,17 @@ export default function AnomalyDetectionPage() {
           <CardContent className="flex items-center gap-4 p-4">
             <Badge variant="secondary">{selectedIds.size} รายการ</Badge>
             <div className="flex-1 max-w-sm">
-              <AccountSelector
-                value={bulkAccountId}
-                onValueChange={setBulkAccountId}
+              <CategorySelector
+                value={bulkCategoryId}
+                onValueChange={setBulkCategoryId}
                 companyCode={companyCode}
-                placeholder="เลือกบัญชีที่ถูกต้อง..."
-                filterClass="EXPENSE"
+                type="EXPENSE"
+                placeholder="เลือกหมวดหมู่ที่ถูกต้อง..."
               />
             </div>
             <Button
-              onClick={applyBulkAccount}
-              disabled={!bulkAccountId || applying}
+              onClick={applyBulkCategory}
+              disabled={!bulkCategoryId || applying}
               size="sm"
             >
               {applying ? (
@@ -265,8 +269,7 @@ export default function AnomalyDetectionPage() {
                     />
                     <span>{group.contactName}</span>
                     <Badge variant="outline" className="font-normal">
-                      ส่วนใหญ่: {group.majorityAccount.code}{" "}
-                      {group.majorityAccount.name} ({group.majorityCount}/
+                      ส่วนใหญ่: {formatCategoryLabel(group.majorityCategory)} ({group.majorityCount}/
                       {group.totalCount})
                     </Badge>
                   </CardTitle>
@@ -278,7 +281,7 @@ export default function AnomalyDetectionPage() {
                     onClick={() => fixGroup(group)}
                   >
                     <ArrowRight className="h-3 w-3" />
-                    แก้ทั้งกลุ่มเป็น {group.majorityAccount.code}
+                    แก้ทั้งกลุ่มเป็น {formatCategoryLabel(group.majorityCategory)}
                   </Button>
                 </div>
               </CardHeader>
@@ -303,13 +306,12 @@ export default function AnomalyDetectionPage() {
                       <span className="flex-1 truncate">
                         {expense.description || "-"}
                       </span>
-                      {expense.currentAccount && (
+                      {expense.currentCategory && (
                         <Badge
                           variant="secondary"
                           className="shrink-0 text-xs font-normal"
                         >
-                          {expense.currentAccount.code}{" "}
-                          {expense.currentAccount.name}
+                          {formatCategoryLabel(expense.currentCategory)}
                         </Badge>
                       )}
                       <span className="tabular-nums font-medium shrink-0">

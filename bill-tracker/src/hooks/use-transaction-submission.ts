@@ -24,6 +24,8 @@ export interface UseTransactionSubmissionProps {
   setOneTimeContactName: (name: string) => void;
   selectedAccount: string | null;
   setSelectedAccount: (id: string | null) => void;
+  selectedCategory: string | null;
+  setSelectedCategory: (id: string | null) => void;
   skipAccountWarning?: boolean;
   onAccountWarning?: () => void;
   calculation: {
@@ -94,6 +96,8 @@ export function useTransactionSubmission({
   setOneTimeContactName,
   selectedAccount,
   setSelectedAccount,
+  selectedCategory,
+  setSelectedCategory,
   calculation,
   categorizedFiles,
   referenceUrls,
@@ -172,11 +176,6 @@ export function useTransactionSubmission({
       return;
     }
 
-    if (!selectedAccount && !skipAccountWarning) {
-      onAccountWarning?.();
-      return;
-    }
-
     setIsLoading(true);
     try {
       const fileData = {
@@ -195,7 +194,7 @@ export function useTransactionSubmission({
           contactId: selectedContact?.id || null,
           contactName: !selectedContact?.id && oneTimeContactName.trim() ? oneTimeContactName.trim() : null,
           accountId: selectedAccount,
-          category: undefined,
+          categoryId: selectedCategory,
           vatAmount: calculation.vatAmount,
           whtAmount: calculation.whtAmount,
           [config.fields.netAmountField]: calculation.netAmount,
@@ -283,6 +282,7 @@ export function useTransactionSubmission({
           contactId: selectedContact?.id || null,
           contactName: !selectedContact?.id && oneTimeContactName.trim() ? oneTimeContactName.trim() : null,
           accountId: selectedAccount || null,
+          categoryId: selectedCategory || null,
           amount: Number(formData.amount),
           vatRate: Number(formData.vatRate),
           vatAmount: calc.vatAmount,

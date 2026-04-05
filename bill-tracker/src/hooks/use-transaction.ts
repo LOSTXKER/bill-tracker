@@ -29,6 +29,7 @@ export interface TransactionData {
   notes: string | null;
   documentType: string | null;
   accountId: string | null;
+  categoryId: string | null;
   contactId: string | null;
   contactName: string | null;
   referenceUrls: string[] | null;

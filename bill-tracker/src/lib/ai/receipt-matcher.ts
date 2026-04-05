@@ -1,4 +1,5 @@
 import { findBestMatchingContact } from "@/lib/utils/string-similarity";
+import { prisma } from "@/lib/db";
 import { createLogger } from "@/lib/utils/logger";
 import type { AnalyzedAccount, AccountAlternative } from "./types";
 
@@ -6,6 +7,13 @@ const log = createLogger("ai-receipt");
 
 export type AccountRecord = { id: string; code: string; name: string };
 export type ContactRecord = { id: string; name: string; taxId: string | null };
+
+export interface NewAccountSuggestion {
+  code?: string;
+  name?: string;
+  class?: string;
+  reason?: string;
+}
 
 export function findAccountInList(
   aiAccount: { id?: string; code?: string; name?: string } | null,
@@ -59,6 +67,84 @@ export function resolveAccount(
   }
 
   return { id: null, code: null, name: null };
+}
+
+const VALID_ACCOUNT_CLASSES = [
+  "ASSET", "LIABILITY", "EQUITY", "REVENUE",
+  "COST_OF_SALES", "EXPENSE", "OTHER_INCOME", "OTHER_EXPENSE",
+] as const;
+
+export async function autoCreateAccount(
+  companyId: string,
+  newAccount: NewAccountSuggestion
+): Promise<{ id: string; code: string; name: string } | null> {
+  const code = newAccount.code?.trim();
+  const name = newAccount.name?.trim();
+  const accountClass = newAccount.class?.toUpperCase().trim();
+
+  if (!code || !name || !accountClass) return null;
+  if (!VALID_ACCOUNT_CLASSES.includes(accountClass as any)) {
+    log.debug("Invalid account class from AI", { accountClass });
+    return null;
+  }
+
+  let finalCode = code;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const account = await prisma.account.create({
+        data: {
+          id: crypto.randomUUID(),
+          companyId,
+          code: finalCode,
+          name,
+          class: accountClass as any,
+          keywords: [],
+          isSystem: false,
+          isActive: true,
+          source: "AI" as any,
+          updatedAt: new Date(),
+        },
+      });
+      return { id: account.id, code: account.code, name: account.name };
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        finalCode = `${code}-${attempt + 1}`;
+        log.debug("Account code collision, retrying", { finalCode });
+        continue;
+      }
+      log.error("autoCreateAccount error", err);
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function resolveAccountWithAutoCreate(
+  parsedAccount: any,
+  parsedNewAccount: NewAccountSuggestion | null | undefined,
+  parsedConfidence: any,
+  accounts: AccountRecord[],
+  companyId: string | null
+): Promise<AnalyzedAccount> {
+  const result = resolveAccount(parsedAccount, parsedConfidence, accounts);
+  if (result.id) return result;
+
+  if (parsedNewAccount?.code && parsedNewAccount?.name && companyId) {
+    const created = await autoCreateAccount(companyId, parsedNewAccount);
+    if (created) {
+      log.debug("Auto-created new account", { code: created.code, name: created.name });
+      return {
+        id: created.id,
+        code: created.code,
+        name: created.name,
+        confidence: parsedAccount?.confidence || parsedConfidence?.account || 70,
+        reason: parsedNewAccount.reason || "AI สร้างบัญชีใหม่อัตโนมัติ",
+        isNewAccount: true,
+      };
+    }
+  }
+
+  return result;
 }
 
 export function resolveAccountAlternatives(

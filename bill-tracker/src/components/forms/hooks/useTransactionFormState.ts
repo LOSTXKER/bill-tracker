@@ -58,10 +58,26 @@ export interface ContactFormState {
   defaultsSuggestionDismissed: boolean;
 }
 
+export interface CategorySuggestion {
+  categoryId: string | null;
+  categoryName: string | null;
+  groupName: string | null;
+  confidence: number;
+  reason: string;
+  alternatives?: Array<{
+    categoryId: string;
+    categoryName: string;
+    groupName: string;
+    confidence: number;
+    reason: string;
+  }>;
+}
+
 export interface AiFormState {
   aiResult: MultiDocAnalysisResult | null;
   aiApplied: boolean;
   accountSuggestion: AccountSuggestion | null;
+  categorySuggestion: CategorySuggestion | null;
   currencyConversion: CurrencyConversionValue | null;
 }
 
@@ -90,6 +106,7 @@ export const INITIAL_AI_STATE: AiFormState = {
   aiResult: null,
   aiApplied: false,
   accountSuggestion: null,
+  categorySuggestion: null,
   currencyConversion: null,
 };
 

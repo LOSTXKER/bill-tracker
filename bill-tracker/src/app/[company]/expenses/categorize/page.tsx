@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AccountSelector } from "@/components/forms/shared/account-selector";
-import { ArrowLeft, Check, Loader2, Sparkles, Tags } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CategorySelector } from "@/components/forms/shared/CategorySelector";
+import { ArrowLeft, Check, Loader2, Pencil, Sparkles, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 
@@ -21,6 +22,94 @@ interface UncategorizedExpense {
   contactName: string | null;
 }
 
+const PAGE_TITLE = "จัดหมวดหมู่ค่าใช้จ่าย";
+
+function InlineDescriptionEditor({
+  expense,
+  companyCode,
+  onSaved,
+}: {
+  expense: UncategorizedExpense;
+  companyCode: string;
+  onSaved: (id: string, newDesc: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(expense.description || "");
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const save = async () => {
+    const trimmed = value.trim();
+    if (trimmed === (expense.description || "")) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/${companyCode.toLowerCase()}/expenses/bulk-categorize`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update-description",
+          expenseId: expense.id,
+          description: trimmed,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        onSaved(expense.id, trimmed);
+        toast.success("บันทึกคำอธิบายแล้ว");
+      } else {
+        throw new Error(json.error || "เกิดข้อผิดพลาด");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+      setValue(expense.description || "");
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex-1 flex items-center gap-1">
+        <Input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") {
+              setValue(expense.description || "");
+              setEditing(false);
+            }
+          }}
+          disabled={saving}
+          className="h-7 text-sm"
+        />
+        {saving && <Loader2 className="h-3 w-3 animate-spin shrink-0 text-muted-foreground" />}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="flex-1 flex items-center gap-1 group text-left min-w-0"
+      onClick={() => setEditing(true)}
+    >
+      <span className="truncate">{expense.description || "-"}</span>
+      <Pencil className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" />
+    </button>
+  );
+}
+
 export default function BulkCategorizePage() {
   const params = useParams();
   const router = useRouter();
@@ -30,10 +119,11 @@ export default function BulkCategorizePage() {
   const [grouped, setGrouped] = useState<Record<string, UncategorizedExpense[]>>({});
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkAccountId, setBulkAccountId] = useState<string | null>(null);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [aiSuggestingGroup, setAiSuggestingGroup] = useState<string | null>(null);
-  const [groupAccountSuggestions, setGroupAccountSuggestions] = useState<Record<string, string>>({});
+  const [aiSuggestingBulk, setAiSuggestingBulk] = useState(false);
+  const [groupCategorySuggestions, setGroupCategorySuggestions] = useState<Record<string, string>>({});
 
   const fetchExpenses = useCallback(async () => {
     try {
@@ -57,6 +147,19 @@ export default function BulkCategorizePage() {
     fetchExpenses();
   }, [fetchExpenses]);
 
+  const updateExpenseDescription = (id: string, newDesc: string) => {
+    setExpenses((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, description: newDesc } : e))
+    );
+    setGrouped((prev) => {
+      const next: Record<string, UncategorizedExpense[]> = {};
+      for (const [key, items] of Object.entries(prev)) {
+        next[key] = items.map((e) => (e.id === id ? { ...e, description: newDesc } : e));
+      }
+      return next;
+    });
+  };
+
   const toggleSelectAll = (contactKey: string) => {
     const ids = (grouped[contactKey] || []).map((e) => e.id);
     const allSelected = ids.every((id) => selectedIds.has(id));
@@ -75,8 +178,8 @@ export default function BulkCategorizePage() {
     });
   };
 
-  const applyBulkAccount = async () => {
-    if (!bulkAccountId || selectedIds.size === 0) return;
+  const applyBulkCategory = async () => {
+    if (!bulkCategoryId || selectedIds.size === 0) return;
     setApplying(true);
     try {
       const res = await fetch(`/api/${companyCode.toLowerCase()}/expenses/bulk-categorize`, {
@@ -84,14 +187,14 @@ export default function BulkCategorizePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           expenseIds: Array.from(selectedIds),
-          accountId: bulkAccountId,
+          categoryId: bulkCategoryId,
         }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         toast.success(`จัดหมวด ${json.data.updated} รายการสำเร็จ`);
         setSelectedIds(new Set());
-        setBulkAccountId(null);
+        setBulkCategoryId(null);
         fetchExpenses();
       } else {
         throw new Error(json.error || "เกิดข้อผิดพลาด");
@@ -103,15 +206,15 @@ export default function BulkCategorizePage() {
     }
   };
 
-  const applyToGroup = async (contactKey: string, accountId: string) => {
+  const applyToGroup = async (contactKey: string, categoryId: string) => {
     const ids = (grouped[contactKey] || []).map((e) => e.id);
-    if (ids.length === 0 || !accountId) return;
+    if (ids.length === 0 || !categoryId) return;
     setApplying(true);
     try {
       const res = await fetch(`/api/${companyCode.toLowerCase()}/expenses/bulk-categorize`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expenseIds: ids, accountId }),
+        body: JSON.stringify({ expenseIds: ids, categoryId }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -127,13 +230,34 @@ export default function BulkCategorizePage() {
     }
   };
 
+  const buildAiText = (items: UncategorizedExpense[]) => {
+    const unique = new Map<string, { desc: string; contact: string | null; count: number }>();
+    for (const item of items) {
+      const key = `${item.description || ""}|${item.contactName || ""}`;
+      const existing = unique.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        unique.set(key, { desc: item.description, contact: item.contactName, count: 1 });
+      }
+    }
+    const lines = Array.from(unique.values())
+      .slice(0, 10)
+      .map((v) => {
+        const parts = [v.desc, v.contact].filter(Boolean);
+        const line = parts.join(" - ");
+        return v.count > 1 ? `${line} (x${v.count})` : line;
+      });
+    return lines.join("\n");
+  };
+
   const aiSuggestForGroup = async (contactKey: string) => {
-    const sample = (grouped[contactKey] || [])[0];
-    if (!sample) return;
+    const items = grouped[contactKey] || [];
+    if (items.length === 0) return;
 
     setAiSuggestingGroup(contactKey);
     try {
-      const text = [sample.description, sample.contactName].filter(Boolean).join(" - ");
+      const text = buildAiText(items);
       const res = await fetch("/api/ai/analyze-text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,17 +265,56 @@ export default function BulkCategorizePage() {
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.success && json.data?.account?.id) {
-          setGroupAccountSuggestions((prev) => ({ ...prev, [contactKey]: json.data.account.id }));
-          toast.success(`AI แนะนำ: ${json.data.account.code} ${json.data.account.name}`);
+        const cat = json.data?.category;
+        if (json.success && cat?.categoryId) {
+          setGroupCategorySuggestions((prev) => ({ ...prev, [contactKey]: cat.categoryId }));
+          toast.success(
+            cat.isNew
+              ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
+              : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
+          );
         } else {
-          toast.info("AI ไม่สามารถระบุบัญชีได้");
+          toast.info("AI ไม่สามารถระบุหมวดหมู่ได้");
         }
       }
     } catch {
       toast.error("ไม่สามารถวิเคราะห์ได้");
     } finally {
       setAiSuggestingGroup(null);
+    }
+  };
+
+  const aiSuggestForSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const selected = expenses.filter((e) => selectedIds.has(e.id));
+    if (selected.length === 0) return;
+
+    setAiSuggestingBulk(true);
+    try {
+      const text = buildAiText(selected);
+      const res = await fetch("/api/ai/analyze-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, companyCode, type: "expense" }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const cat = json.data?.category;
+        if (json.success && cat?.categoryId) {
+          setBulkCategoryId(cat.categoryId);
+          toast.success(
+            cat.isNew
+              ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
+              : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
+          );
+        } else {
+          toast.info("AI ไม่สามารถระบุหมวดหมู่ได้");
+        }
+      }
+    } catch {
+      toast.error("ไม่สามารถวิเคราะห์ได้");
+    } finally {
+      setAiSuggestingBulk(false);
     }
   };
 
@@ -164,7 +327,7 @@ export default function BulkCategorizePage() {
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-semibold">จัดหมวดค่าใช้จ่าย</h1>
+          <h1 className="text-xl font-semibold">{PAGE_TITLE}</h1>
         </div>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -180,12 +343,12 @@ export default function BulkCategorizePage() {
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-semibold">จัดหมวดค่าใช้จ่าย</h1>
+          <h1 className="text-xl font-semibold">{PAGE_TITLE}</h1>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <Check className="h-12 w-12 mb-4 text-green-500" />
-            <p className="text-lg font-medium text-foreground">ค่าใช้จ่ายทั้งหมดมีบัญชีแล้ว</p>
+            <p className="text-lg font-medium text-foreground">ค่าใช้จ่ายทั้งหมดมีหมวดหมู่แล้ว</p>
             <p className="text-sm mt-1">ไม่มีรายการที่ต้องจัดหมวด</p>
           </CardContent>
         </Card>
@@ -202,9 +365,9 @@ export default function BulkCategorizePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">จัดหมวดค่าใช้จ่าย</h1>
+            <h1 className="text-xl font-semibold">{PAGE_TITLE}</h1>
             <p className="text-sm text-muted-foreground">
-              {expenses.length} รายการยังไม่ระบุบัญชี
+              {expenses.length} รายการยังไม่ระบุหมวดหมู่ — คลิกคำอธิบายเพื่อแก้ไข
             </p>
           </div>
         </div>
@@ -215,18 +378,32 @@ export default function BulkCategorizePage() {
         <Card className="border-primary/50 bg-primary/5">
           <CardContent className="flex items-center gap-4 p-4">
             <Badge variant="secondary">{selectedIds.size} รายการ</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1"
+              onClick={aiSuggestForSelected}
+              disabled={aiSuggestingBulk}
+            >
+              {aiSuggestingBulk ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              AI วิเคราะห์
+            </Button>
             <div className="flex-1 max-w-sm">
-              <AccountSelector
-                value={bulkAccountId}
-                onValueChange={setBulkAccountId}
+              <CategorySelector
+                value={bulkCategoryId}
+                onValueChange={setBulkCategoryId}
                 companyCode={companyCode}
-                placeholder="เลือกบัญชีสำหรับรายการที่เลือก..."
-                filterClass="EXPENSE"
+                type="EXPENSE"
+                placeholder="เลือกหมวดหมู่สำหรับรายการที่เลือก..."
               />
             </div>
             <Button
-              onClick={applyBulkAccount}
-              disabled={!bulkAccountId || applying}
+              onClick={applyBulkCategory}
+              disabled={!bulkCategoryId || applying}
               size="sm"
             >
               {applying ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Tags className="h-4 w-4 mr-1" />}
@@ -241,7 +418,7 @@ export default function BulkCategorizePage() {
         {sortedGroups.map(([contactKey, items]) => {
           const displayName = contactKey === "__no_contact__" ? "ไม่ระบุผู้ติดต่อ" : contactKey;
           const allSelected = items.every((e) => selectedIds.has(e.id));
-          const groupAccountId = groupAccountSuggestions[contactKey] || null;
+          const groupCategoryId = groupCategorySuggestions[contactKey] || null;
           const totalAmount = items.reduce((sum, e) => sum + e.netPaid, 0);
 
           return (
@@ -276,26 +453,26 @@ export default function BulkCategorizePage() {
                       AI แนะนำ
                     </Button>
                     <div className="w-56">
-                      <AccountSelector
-                        value={groupAccountId}
+                      <CategorySelector
+                        value={groupCategoryId}
                         onValueChange={(val) => {
-                          setGroupAccountSuggestions((prev) => ({
+                          setGroupCategorySuggestions((prev) => ({
                             ...prev,
                             [contactKey]: val || "",
                           }));
                         }}
                         companyCode={companyCode}
-                        placeholder="เลือกบัญชี..."
-                        filterClass="EXPENSE"
-                        suggestedAccountId={groupAccountId || undefined}
+                        type="EXPENSE"
+                        placeholder="เลือกหมวดหมู่..."
+                        suggestedCategoryId={groupCategoryId || undefined}
                       />
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-8"
-                      disabled={!groupAccountId || applying}
-                      onClick={() => groupAccountId && applyToGroup(contactKey, groupAccountId)}
+                      disabled={!groupCategoryId || applying}
+                      onClick={() => groupCategoryId && applyToGroup(contactKey, groupCategoryId)}
                     >
                       <Check className="h-3 w-3 mr-1" />
                       ใช้กับทั้งกลุ่ม
@@ -321,7 +498,11 @@ export default function BulkCategorizePage() {
                           year: "2-digit",
                         })}
                       </span>
-                      <span className="flex-1 truncate">{expense.description || "-"}</span>
+                      <InlineDescriptionEditor
+                        expense={expense}
+                        companyCode={companyCode}
+                        onSaved={updateExpenseDescription}
+                      />
                       <span className="tabular-nums font-medium shrink-0">
                         {formatCurrency(expense.netPaid)}
                       </span>

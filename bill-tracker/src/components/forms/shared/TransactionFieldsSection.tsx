@@ -16,6 +16,7 @@ import { ContactSelector } from "./ContactSelector";
 
 const EMPTY_URLS: string[] = [];
 import { AccountSelector } from "./account-selector";
+import { CategorySelector } from "./CategorySelector";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AmountInput } from "./AmountInput";
@@ -59,6 +60,10 @@ export function TransactionFieldsSection({
     onAccountChange,
     suggestedAccountId,
     suggestedAccountAlternatives,
+    selectedCategory,
+    onCategoryChange,
+    suggestedCategoryId,
+    suggestedCategoryAlternatives,
     whtDeliveryMethod,
     onWhtDeliveryMethodChange,
     whtDeliveryEmail,
@@ -128,6 +133,17 @@ export function TransactionFieldsSection({
 
       const result = json.data;
 
+      // Handle category suggestion
+      if (result.category?.categoryId) {
+        if (!selectedCategory) {
+          onCategoryChange(result.category.categoryId);
+        }
+        toast.success("AI แนะนำหมวดหมู่สำเร็จ", {
+          description: `[${result.category.groupName}] ${result.category.categoryName}`,
+        });
+      }
+
+      // Handle account suggestion
       if (result.account?.id) {
         const alternatives = (result.accountAlternatives || []).map((alt: any) => ({
           accountId: alt.id,
@@ -145,12 +161,10 @@ export function TransactionFieldsSection({
         if (!selectedAccount) {
           onAccountChange(result.account.id);
         }
+      }
 
-        toast.success("AI แนะนำบัญชีสำเร็จ", {
-          description: `${result.account.code} ${result.account.name}`,
-        });
-      } else {
-        toast.info("AI ไม่สามารถระบุบัญชีได้", {
+      if (!result.category?.categoryId && !result.account?.id) {
+        toast.info("AI ไม่สามารถจำแนกหมวดหมู่ได้", {
           description: "ลองเพิ่มรายละเอียดเพิ่มเติม",
         });
       }
@@ -202,7 +216,7 @@ export function TransactionFieldsSection({
         <AmountInput watch={watch} setValue={setValue} vatRate={vatRate} isWht={isWht} onModeChange={onAmountInputModeChange} />
       </div>
 
-      {/* Contact & Account */}
+      {/* Contact & Category */}
       <div className="grid sm:grid-cols-2 gap-4">
         <ContactSelector
           contacts={contacts}
@@ -221,10 +235,7 @@ export function TransactionFieldsSection({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">
-              บัญชี
-              {!selectedAccount && (
-                <span className="ml-1 text-xs text-amber-500 font-normal">(แนะนำ)</span>
-              )}
+              หมวดหมู่ <span className="text-red-500">*</span>
             </Label>
             {onAiSuggestAccount && (
               <Button
@@ -244,16 +255,33 @@ export function TransactionFieldsSection({
               </Button>
             )}
           </div>
-          <AccountSelector
-            value={selectedAccount}
-            onValueChange={onAccountChange}
+          <CategorySelector
+            value={selectedCategory}
+            onValueChange={onCategoryChange}
             companyCode={companyCode}
-            placeholder="เลือกบัญชี"
-            suggestedAccountId={suggestedAccountId}
-            alternatives={suggestedAccountAlternatives}
-            filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
+            type={config.type === "expense" ? "EXPENSE" : "INCOME"}
+            placeholder="เลือกหมวดหมู่..."
+            suggestedCategoryId={suggestedCategoryId}
+            alternatives={suggestedCategoryAlternatives}
+            required
           />
         </div>
+      </div>
+
+      {/* Account (optional) */}
+      <div className="space-y-1.5">
+        <Label className="text-sm text-muted-foreground">
+          บัญชี (ไม่บังคับ)
+        </Label>
+        <AccountSelector
+          value={selectedAccount}
+          onValueChange={onAccountChange}
+          companyCode={companyCode}
+          placeholder="เลือกบัญชี"
+          suggestedAccountId={suggestedAccountId}
+          alternatives={suggestedAccountAlternatives}
+          filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
+        />
       </div>
 
       {/* Internal Company (expense only) */}

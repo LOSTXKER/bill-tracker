@@ -32,6 +32,7 @@ export function transformIncomeCreateData(body: TransactionRequestBody) {
     netReceived: totals.netAmount,
     source: data.source,
     accountId: data.accountId || null,
+    categoryId: data.categoryId || null,
     invoiceNumber: data.invoiceNumber,
     referenceNo: data.referenceNo,
     receiveDate: data.receiveDate ? new Date(data.receiveDate) : new Date(),
@@ -85,6 +86,7 @@ export function transformIncomeUpdateData(body: TransactionRequestBody, existing
   updateData.netReceived = totals.netAmount;
   if (data.source !== undefined) updateData.source = data.source;
   if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
+  if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
   if (data.invoiceNumber !== undefined) updateData.invoiceNumber = data.invoiceNumber;
   if (data.referenceNo !== undefined) updateData.referenceNo = data.referenceNo;
   if (data.receiveDate !== undefined) updateData.receiveDate = data.receiveDate ? new Date(data.receiveDate) : undefined;

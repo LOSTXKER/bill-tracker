@@ -11,6 +11,7 @@ import {
   XCircle,
   Cloud,
   PenTool,
+  Sparkles,
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
@@ -25,7 +26,7 @@ export interface Account {
   isActive: boolean;
   keywords?: string[];
   description?: string | null;
-  source?: "PEAK" | "MANUAL";
+  source?: "PEAK" | "MANUAL" | "AI";
 }
 
 export type SortField = "code" | "name";
@@ -108,6 +109,11 @@ export function getAccountColumns(
           <Badge variant="secondary" className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
             <Cloud className="h-3 w-3" />
             Peak
+          </Badge>
+        ) : account.source === "AI" ? (
+          <Badge variant="secondary" className="gap-1 bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+            <Sparkles className="h-3 w-3" />
+            AI
           </Badge>
         ) : (
           <Badge variant="outline" className="gap-1">

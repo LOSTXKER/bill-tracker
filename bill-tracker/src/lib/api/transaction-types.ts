@@ -24,6 +24,7 @@ export interface TransactionRequestBody {
   contactId?: string;
   contactName?: string;
   accountId?: string;
+  categoryId?: string;
   paymentMethod?: string;
   invoiceNumber?: string;
   notes?: string;

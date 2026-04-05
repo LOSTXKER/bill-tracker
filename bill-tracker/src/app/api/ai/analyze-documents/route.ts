@@ -168,7 +168,7 @@ function convertToLegacyFormat(
       accountName: result.account.name,
       confidence: result.account.confidence || result.confidence.account,
       reason: result.account.reason || result.description || "AI วิเคราะห์จากเอกสาร",
-      // Transform alternatives to match frontend format (accountId/accountCode/accountName)
+      isNewAccount: result.account.isNewAccount || false,
       alternatives: (result.accountAlternatives || []).map(alt => ({
         accountId: alt.id,
         accountCode: alt.code,

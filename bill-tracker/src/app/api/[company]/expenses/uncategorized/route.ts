@@ -11,7 +11,7 @@ async function handleGet(
   const expenses = await prisma.expense.findMany({
     where: {
       companyId: context.company.id,
-      accountId: null,
+      categoryId: null,
       deletedAt: null,
     },
     select: {

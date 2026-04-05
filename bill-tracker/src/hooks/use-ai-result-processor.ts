@@ -240,6 +240,28 @@ export function useAiResultProcessor({
           reason: result.aiAccountSuggestion.reason || "AI วิเคราะห์จากเอกสาร",
           alternatives: result.aiAccountSuggestion.alternatives || [],
         };
+        if (result.aiAccountSuggestion.isNewAccount) {
+          toast.info(
+            `AI สร้างบัญชีใหม่: ${result.aiAccountSuggestion.accountCode} ${result.aiAccountSuggestion.accountName}`,
+            { duration: 6000 }
+          );
+        }
+      }
+
+      if (result.aiCategorySuggestion?.categoryId) {
+        aiPatch.categorySuggestion = {
+          categoryId: result.aiCategorySuggestion.categoryId,
+          categoryName: result.aiCategorySuggestion.categoryName,
+          groupName: result.aiCategorySuggestion.groupName,
+          confidence: result.aiCategorySuggestion.confidence,
+          reason: result.aiCategorySuggestion.reason || "AI จำแนกหมวดหมู่",
+        };
+        if (result.aiCategorySuggestion.isNew) {
+          toast.info(
+            `AI สร้างหมวดใหม่: [${result.aiCategorySuggestion.groupName}] ${result.aiCategorySuggestion.categoryName}`,
+            { duration: 6000 }
+          );
+        }
       }
 
       patchAiState(aiPatch);

@@ -266,6 +266,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       include: {
         Contact: true,
         Account: true,
+        Category: { include: { Parent: { select: { id: true, name: true } } } },
         User: {
           select: {
             id: true,
@@ -301,11 +302,12 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
 
   // Map Prisma relation names to what the client expects
   const incomes = incomesRaw.map((income) => {
-    const { Contact, Account, User, ...rest } = income;
+    const { Contact, Account, Category, User, ...rest } = income;
     return {
       ...rest,
       contact: Contact,
       account: Account,
+      category: Category ? { id: Category.id, name: Category.name, parent: Category.Parent } : null,
       creator: User,
     };
   });

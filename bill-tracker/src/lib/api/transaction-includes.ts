@@ -22,6 +22,7 @@ export function getBaseIncludes(modelName: TransactionModelName, options?: { inc
   return {
     Contact: true,
     Account: true,
+    Category: { include: { Parent: { select: { id: true, name: true } } } },
     ...getCreatorInclude(modelName),
     ...(options?.includeSubmitter ? getSubmitterInclude(modelName) : {}),
     ...getInternalCompanyInclude(modelName),

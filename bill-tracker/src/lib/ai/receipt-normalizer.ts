@@ -4,7 +4,7 @@ import { parseAIJsonResponse } from "./utils/parse-ai-json";
 import {
   type AccountRecord,
   type ContactRecord,
-  resolveAccount,
+  resolveAccountWithAutoCreate,
   resolveAccountAlternatives,
   matchContact,
   validateVendorTaxId,
@@ -25,7 +25,8 @@ interface AIReceiptResponse {
   vatRate?: number;
   wht?: { rate?: number | null; amount?: number | null; type?: string | null };
   netAmount?: number;
-  account?: { id?: string; code?: string; name?: string };
+  account?: { id?: string; code?: string; name?: string } | null;
+  newAccount?: { code?: string; name?: string; class?: string; reason?: string } | null;
   accountAlternatives?: Array<{ id?: string; code?: string; name?: string }>;
   documentType?: string;
   invoiceNumber?: string;
@@ -179,16 +180,19 @@ export function createEmptyResult(rawText?: string): ReceiptAnalysisResult {
   };
 }
 
-export function parseAIResponse(
+export async function parseAIResponse(
   rawResponse: string,
   accounts: AccountRecord[],
   contacts: ContactRecord[],
-  companyTaxId: string | null = null
-): ReceiptAnalysisResult {
+  companyTaxId: string | null = null,
+  companyId: string | null = null
+): Promise<ReceiptAnalysisResult> {
   try {
     const parsed = parseAIJsonResponse<AIReceiptResponse>(rawResponse);
 
-    const account = resolveAccount(parsed.account, parsed.confidence, accounts);
+    const account = await resolveAccountWithAutoCreate(
+      parsed.account, parsed.newAccount, parsed.confidence, accounts, companyId
+    );
     const accountAlternatives = resolveAccountAlternatives(
       parsed.accountAlternatives, accounts, account.id
     );

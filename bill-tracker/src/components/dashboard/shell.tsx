@@ -30,6 +30,7 @@ import {
   History,
   Activity,
   Tags,
+  FolderOpen,
   Download,
   Wallet,
   User,
@@ -194,7 +195,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           badgeKey: "pendingWhtDeliveries",
         },
         {
-          name: "จัดหมวดค่าใช้จ่าย",
+          name: "จัดหมวดหมู่ค่าใช้จ่าย",
           href: `/${companyCode}/expenses/categorize`,
           icon: ListChecks,
           permission: "expenses:read",
@@ -267,6 +268,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           href: `/${companyCode}/employees`,
           icon: UserCircle,
           permission: "settings:manage-team",
+        },
+        {
+          name: "หมวดหมู่",
+          href: `/${companyCode}/categories`,
+          icon: FolderOpen,
+          permission: "settings:read",
         },
         {
           name: "ผังบัญชี",

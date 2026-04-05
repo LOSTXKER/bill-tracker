@@ -115,6 +115,7 @@ model Company {
   whtReminderEnabled         Boolean                @default(true)
   businessDescription        String?
   Account                    Account[]
+  Categories                 TransactionCategory[]
   CompanyAccess              CompanyAccess[]
   CompanyConfig              CompanyConfig[]
   Contact                    Contact[]
@@ -252,6 +253,35 @@ model DocumentEvent {
   @@index([incomeId])
 }
 
+model TransactionCategory {
+  id        String                  @id @default(uuid())
+  companyId String
+  name      String
+  type      TransactionCategoryType
+  parentId  String?
+  icon      String?
+  color     String?
+  sortOrder Int                     @default(0)
+  isActive  Boolean                 @default(true)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  Company  Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Parent   TransactionCategory?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  Children TransactionCategory[]  @relation("CategoryHierarchy")
+  Expenses Expense[]
+  Incomes  Income[]
+
+  @@unique([companyId, name, type, parentId])
+  @@index([companyId, type, isActive])
+  @@index([parentId])
+}
+
+enum TransactionCategoryType {
+  EXPENSE
+  INCOME
+}
+
 model Expense {
   id                                         String                 @id
   companyId                                  String
@@ -297,6 +327,7 @@ model Expense {
   requesterId                                String?
   contactName                                String?
   accountId                                  String?
+  categoryId                                 String?
   hasTaxInvoice                              Boolean                @default(false)
   hasWhtCert                                 Boolean                @default(false)
   documentType                               ExpenseDocumentType    @default(TAX_INVOICE)
@@ -329,6 +360,7 @@ model Expense {
   Comment                                    Comment[]
   DocumentEvent                              DocumentEvent[]
   Account                                    Account?               @relation(fields: [accountId], references: [id])
+  Category                                   TransactionCategory?   @relation(fields: [categoryId], references: [id])
   Company                                    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   InternalCompany                            Company?               @relation("ExpenseInternalCompany", fields: [internalCompanyId], references: [id])
   Contact                                    Contact?               @relation(fields: [contactId], references: [id])
@@ -343,6 +375,7 @@ model Expense {
   ReconcileMatches                           ReconcileMatch[]
 
   @@index([accountId])
+  @@index([categoryId])
   @@index([companyId, billDate])
   @@index([companyId, workflowStatus, billDate])
   @@index([companyId, workflowStatus, hasTaxInvoice, billDate])
@@ -390,6 +423,7 @@ model Income {
   deletedBy                     String?
   contactName                   String?
   accountId                     String?
+  categoryId                    String?
   hasInvoice                    Boolean              @default(false)
   hasWhtCert                    Boolean              @default(false)
   invoiceIssuedAt               DateTime?
@@ -414,6 +448,7 @@ model Income {
   Comment                       Comment[]
   DocumentEvent                 DocumentEvent[]
   Account                       Account?             @relation(fields: [accountId], references: [id])
+  Category                      TransactionCategory? @relation(fields: [categoryId], references: [id])
   Company                       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   Contact                       Contact?             @relation(fields: [contactId], references: [id])
   User                          User                 @relation("Income_createdByToUser", fields: [createdBy], references: [id])
@@ -422,6 +457,7 @@ model Income {
   ReconcileMatches              ReconcileMatch[]
 
   @@index([accountId])
+  @@index([categoryId])
   @@index([companyId, receiveDate])
   @@index([companyId, workflowStatus, receiveDate])
   @@index([companyId, approvalStatus, createdAt])
@@ -672,6 +708,7 @@ enum ContactType {
 enum DataSource {
   MANUAL
   PEAK
+  AI
 }
 
 enum DocumentEventType {

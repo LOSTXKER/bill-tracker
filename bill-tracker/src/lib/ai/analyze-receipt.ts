@@ -73,7 +73,7 @@ export async function analyzeReceipt(
         return null;
       }
       log.debug("AI raw response", { preview: response.data.substring(0, 300) });
-      return parseAIResponse(response.data, accounts, contacts, company?.taxId);
+      return parseAIResponse(response.data, accounts, contacts, company?.taxId, companyId);
     });
 
     const results = await Promise.all(analysisPromises);

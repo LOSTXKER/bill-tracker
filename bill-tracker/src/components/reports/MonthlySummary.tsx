@@ -47,7 +47,7 @@ export async function MonthlySummary({
         }
       : { companyId: company.id };
 
-  const [expenseSum, incomeSum, expenseByAccount, accounts, allExpenses, allIncomes] =
+  const [expenseSum, incomeSum, expenseByCategory, categories, allExpenses, allIncomes] =
     await Promise.all([
       prisma.expense.aggregate({
         where: {
@@ -68,7 +68,7 @@ export async function MonthlySummary({
         _count: true,
       }),
       prisma.expense.groupBy({
-        by: ["accountId"],
+        by: ["categoryId"],
         where: {
           ...expenseCompanyFilter,
           billDate: { gte: startDate, lte: endDate },
@@ -77,9 +77,9 @@ export async function MonthlySummary({
         _sum: { netPaid: true },
         _count: true,
       }),
-      prisma.account.findMany({
-        where: { companyId: company.id },
-        select: { id: true, code: true, name: true },
+      prisma.transactionCategory.findMany({
+        where: { companyId: company.id, parentId: { not: null } },
+        select: { id: true, name: true, Parent: { select: { name: true } } },
       }),
       prisma.expense.findMany({
         where: {
@@ -87,7 +87,7 @@ export async function MonthlySummary({
           billDate: { gte: startDate, lte: endDate },
           deletedAt: null,
         },
-        include: { Contact: true, Account: true },
+        include: { Contact: true, Category: { include: { Parent: { select: { name: true } } } } },
         orderBy: { billDate: "desc" },
       }),
       prisma.income.findMany({
@@ -101,15 +101,15 @@ export async function MonthlySummary({
       }),
     ]);
 
-  const accountMap = new Map(accounts.map((a) => [a.id, a]));
+  const categoryMap = new Map(categories.map((c) => [c.id, c]));
   const totalExpense = Number(expenseSum._sum.netPaid) || 0;
   const totalIncome = Number(incomeSum._sum.netReceived) || 0;
   const netCashFlow = totalIncome - totalExpense;
 
-  const getAccountName = (accountId: string | null) => {
-    if (!accountId) return "ไม่ระบุบัญชี";
-    const account = accountMap.get(accountId);
-    return account ? `${account.code} - ${account.name}` : "ไม่ระบุบัญชี";
+  const getCategoryName = (categoryId: string | null) => {
+    if (!categoryId) return "ไม่ระบุหมวดหมู่";
+    const cat = categoryMap.get(categoryId);
+    return cat ? (cat.Parent ? `[${cat.Parent.name}] ${cat.name}` : cat.name) : "ไม่ระบุหมวดหมู่";
   };
 
   return (
@@ -172,25 +172,25 @@ export async function MonthlySummary({
         </Button>
       </div>
 
-      {/* Expense by Account */}
+      {/* Expense by Category */}
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="px-4 py-3 border-b">
-          <h3 className="text-sm font-semibold text-foreground">รายจ่ายแยกตามบัญชี</h3>
+          <h3 className="text-sm font-semibold text-foreground">รายจ่ายแยกตามหมวดหมู่</h3>
         </div>
         <CardContent className="pt-4">
-          {expenseByAccount.length === 0 ? (
+          {expenseByCategory.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">ไม่มีรายการในเดือนนี้</p>
           ) : (
             <div className="space-y-4">
-              {expenseByAccount
+              {expenseByCategory
                 .sort((a, b) => (Number(b._sum?.netPaid) || 0) - (Number(a._sum?.netPaid) || 0))
                 .map((item) => {
                   const amount = Number(item._sum?.netPaid) || 0;
                   const percentage = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
                   return (
-                    <div key={item.accountId || "null"} className="space-y-2">
+                    <div key={item.categoryId || "null"} className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="font-medium">{getAccountName(item.accountId)}</span>
+                        <span className="font-medium">{getCategoryName(item.categoryId)}</span>
                         <span>{formatCurrency(amount)}</span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -230,7 +230,7 @@ export async function MonthlySummary({
                   <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
                   <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
                   <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">บัญชี</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">หมวดหมู่</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">ยอดเงิน</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
                   <TableHead className="text-muted-foreground font-medium text-right">สุทธิ</TableHead>
@@ -238,12 +238,16 @@ export async function MonthlySummary({
               </TableHeader>
               <TableBody>
                 {allExpenses.map((expense) => (
-                  <Link
+                  <TableRow
                     key={expense.id}
-                    href={`/${companyCode}/expenses/${expense.id}`}
-                    className="table-row hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
                   >
                     <TableCell className="whitespace-nowrap">
+                      <Link
+                        href={`/${companyCode}/expenses/${expense.id}`}
+                        className="absolute inset-0"
+                        tabIndex={-1}
+                      />
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate">
@@ -253,8 +257,10 @@ export async function MonthlySummary({
                       {expense.Contact?.name || "-"}
                     </TableCell>
                     <TableCell className="max-w-[150px] truncate">
-                      {expense.Account
-                        ? `${expense.Account.code} - ${expense.Account.name}`
+                      {expense.Category
+                        ? expense.Category.Parent
+                          ? `[${expense.Category.Parent.name}] ${expense.Category.name}`
+                          : expense.Category.name
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right">
@@ -268,7 +274,7 @@ export async function MonthlySummary({
                     <TableCell className="text-right font-medium text-red-600">
                       {formatCurrency(Number(expense.netPaid))}
                     </TableCell>
-                  </Link>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -302,12 +308,16 @@ export async function MonthlySummary({
               </TableHeader>
               <TableBody>
                 {allIncomes.map((income) => (
-                  <Link
+                  <TableRow
                     key={income.id}
-                    href={`/${companyCode}/incomes/${income.id}`}
-                    className="table-row hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
                   >
                     <TableCell className="whitespace-nowrap">
+                      <Link
+                        href={`/${companyCode}/incomes/${income.id}`}
+                        className="absolute inset-0"
+                        tabIndex={-1}
+                      />
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate">{income.source || "-"}</TableCell>
@@ -325,7 +335,7 @@ export async function MonthlySummary({
                     <TableCell className="text-right font-medium text-primary">
                       {formatCurrency(Number(income.netReceived))}
                     </TableCell>
-                  </Link>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>

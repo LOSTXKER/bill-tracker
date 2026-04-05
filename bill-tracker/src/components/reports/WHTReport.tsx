@@ -158,12 +158,12 @@ export async function WHTReport({
               </TableHeader>
               <TableBody>
                 {expenses.map((expense) => (
-                  <Link
+                  <TableRow
                     key={expense.id}
-                    href={`/${companyCode}/expenses/${expense.id}`}
-                    className="table-row hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
                   >
                     <TableCell className="whitespace-nowrap">
+                      <Link href={`/${companyCode}/expenses/${expense.id}`} className="absolute inset-0" tabIndex={-1} />
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>{expense.description || "-"}</TableCell>
@@ -175,7 +175,7 @@ export async function WHTReport({
                     <TableCell className="text-right text-red-600">
                       {formatCurrency(Number(expense.whtAmount) || 0)}
                     </TableCell>
-                  </Link>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -212,12 +212,12 @@ export async function WHTReport({
               </TableHeader>
               <TableBody>
                 {incomes.map((income) => (
-                  <Link
+                  <TableRow
                     key={income.id}
-                    href={`/${companyCode}/incomes/${income.id}`}
-                    className="table-row hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
                   >
                     <TableCell className="whitespace-nowrap">
+                      <Link href={`/${companyCode}/incomes/${income.id}`} className="absolute inset-0" tabIndex={-1} />
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
                     <TableCell>{income.source || "-"}</TableCell>
@@ -228,7 +228,7 @@ export async function WHTReport({
                     <TableCell className="text-right text-green-600">
                       {formatCurrency(Number(income.whtAmount) || 0)}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center relative">
                       {income.whtCertUrls && (income.whtCertUrls as string[]).length > 0 ? (
                         <Badge variant="outline" className="text-green-600 border-green-200">
                           ได้รับแล้ว
@@ -239,7 +239,7 @@ export async function WHTReport({
                         </Badge>
                       )}
                     </TableCell>
-                  </Link>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>

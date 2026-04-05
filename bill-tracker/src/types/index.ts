@@ -172,7 +172,7 @@ export interface ContactSummary {
   creditLimit?: number | null;
   paymentTerms?: number | null;
   peakCode?: string | null;
-  source?: "PEAK" | "MANUAL";
+  source?: "PEAK" | "MANUAL" | "AI";
   contactCategory?: string | null;
   // Delivery preferences
   preferredDeliveryMethod?: string | null;

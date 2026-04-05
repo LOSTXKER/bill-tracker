@@ -31,6 +31,7 @@ export interface AnalyzedAccount {
   name: string | null;
   confidence?: number;
   reason?: string;
+  isNewAccount?: boolean;
 }
 
 export interface AnalyzedWHT {
@@ -80,6 +81,15 @@ export interface AccountAlternativeResponse {
   reason: string;
 }
 
+export interface AnalyzedCategory {
+  categoryId: string | null;
+  categoryName: string | null;
+  groupName: string | null;
+  confidence: number;
+  reason: string;
+  isNew?: boolean;
+}
+
 export interface ReceiptAnalysisResult {
   vendor: AnalyzedVendor;
   date: string | null;
@@ -91,6 +101,7 @@ export interface ReceiptAnalysisResult {
   netAmount: number | null;
   account: AnalyzedAccount;
   accountAlternatives: AccountAlternative[];
+  category?: AnalyzedCategory;
   documentType: string | null;
   invoiceNumber: string | null;
   items: string[];
@@ -189,8 +200,12 @@ export interface MultiDocAnalysisResult {
     accountName: string | null;
     confidence: number;
     reason: string;
+    isNewAccount?: boolean;
     alternatives?: AccountAlternativeResponse[];
   } | null;
+
+  // AI category suggestion
+  aiCategorySuggestion?: AnalyzedCategory | null;
 
   // Detected transaction type
   detectedTransactionType?: "EXPENSE" | "INCOME" | null;

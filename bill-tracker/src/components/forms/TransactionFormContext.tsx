@@ -27,6 +27,18 @@ export interface TransactionFormContextValue {
     reason: string;
   }>;
 
+  // Category slice
+  selectedCategory: string | null;
+  onCategoryChange: (value: string | null) => void;
+  suggestedCategoryId?: string;
+  suggestedCategoryAlternatives?: Array<{
+    categoryId: string;
+    categoryName: string;
+    groupName: string;
+    confidence: number;
+    reason: string;
+  }>;
+
   // WHT delivery slice
   whtDeliveryMethod?: string | null;
   onWhtDeliveryMethodChange?: (method: string | null) => void;
