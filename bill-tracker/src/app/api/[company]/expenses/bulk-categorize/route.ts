@@ -52,7 +52,7 @@ async function handlePatch(
   const updateData: Record<string, string> = {};
   if (categoryId) {
     const category = await prisma.transactionCategory.findFirst({
-      where: { id: categoryId },
+      where: { id: categoryId, companyId: context.company.id },
       select: { id: true },
     });
     if (!category) return apiResponse.error(ApiErrors.notFound("หมวดหมู่"));
@@ -60,7 +60,7 @@ async function handlePatch(
   }
   if (accountId) {
     const account = await prisma.account.findFirst({
-      where: { id: accountId },
+      where: { id: accountId, companyId: context.company.id },
       select: { id: true },
     });
     if (!account) return apiResponse.error(ApiErrors.notFound("บัญชี"));

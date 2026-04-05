@@ -27,6 +27,29 @@ async function handleGet(request: Request, { company }: { company: { id: string 
     return apiResponse.badRequest("entityType and entityId are required");
   }
 
+  // Verify entity belongs to this company before loading comments
+  if (entityType === "expense") {
+    const exists = await prisma.expense.findFirst({
+      where: { id: entityId, companyId: company.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!exists) return apiResponse.notFound("Expense not found in this company");
+  } else if (entityType === "income") {
+    const exists = await prisma.income.findFirst({
+      where: { id: entityId, companyId: company.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!exists) return apiResponse.notFound("Income not found in this company");
+  } else if (entityType === "reimbursement") {
+    const exists = await prisma.reimbursementRequest.findFirst({
+      where: { id: entityId, companyId: company.id },
+      select: { id: true },
+    });
+    if (!exists) return apiResponse.notFound("Reimbursement not found in this company");
+  } else {
+    return apiResponse.badRequest("Invalid entityType");
+  }
+
   // Build where clause based on entity type
   const where: Record<string, string | null> = {
     expenseId: null,
@@ -39,10 +62,8 @@ async function handleGet(request: Request, { company }: { company: { id: string 
     where.expenseId = entityId;
   } else if (entityType === "income") {
     where.incomeId = entityId;
-  } else if (entityType === "reimbursement") {
-    where.reimbursementRequestId = entityId;
   } else {
-    return apiResponse.badRequest("Invalid entityType");
+    where.reimbursementRequestId = entityId;
   }
 
   // Only get top-level comments (no parentId), replies are included via relation
@@ -85,6 +106,29 @@ async function handlePost(request: Request, { session, company }: { session: { u
 
   if (!entityType || !entityId || !content?.trim()) {
     return apiResponse.badRequest("entityType, entityId, and content are required");
+  }
+
+  // Verify entity belongs to this company
+  if (entityType === "expense") {
+    const exists = await prisma.expense.findFirst({
+      where: { id: entityId, companyId: company.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!exists) return apiResponse.notFound("Expense not found in this company");
+  } else if (entityType === "income") {
+    const exists = await prisma.income.findFirst({
+      where: { id: entityId, companyId: company.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!exists) return apiResponse.notFound("Income not found in this company");
+  } else if (entityType === "reimbursement") {
+    const exists = await prisma.reimbursementRequest.findFirst({
+      where: { id: entityId, companyId: company.id },
+      select: { id: true },
+    });
+    if (!exists) return apiResponse.notFound("Reimbursement not found in this company");
+  } else {
+    return apiResponse.badRequest("Invalid entityType");
   }
 
   // Build data based on entity type

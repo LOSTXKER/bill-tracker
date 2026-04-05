@@ -72,23 +72,32 @@ async function _expenseStatsImpl(
   // Build filter based on viewMode
   // Official view: filter by companyId (what we recorded in our books)
   // Internal view: filter by actual ownership (internalCompanyId or default to companyId if null)
-  const companyFilter = viewMode === "internal"
+  const expenseFilter = viewMode === "internal"
     ? {
-        OR: [
-          { internalCompanyId: companyId },  // Explicitly belongs to us
-          { companyId: companyId, internalCompanyId: null },  // Recorded by us, no internal company = ours
-        ]
+        AND: [
+          {
+            OR: [
+              { internalCompanyId: companyId },
+              { companyId: companyId, internalCompanyId: null },
+            ],
+          },
+          {
+            OR: [
+              { isReimbursement: false },
+              { isReimbursement: true, reimbursementStatus: "PAID" as const },
+            ],
+          },
+        ],
+        deletedAt: null,
       }
-    : { companyId };  // Official view: filter by companyId
-
-  const expenseFilter = {
-    ...companyFilter,
-    deletedAt: null,
-    OR: [
-      { isReimbursement: false },
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
+    : {
+        companyId,
+        deletedAt: null,
+        OR: [
+          { isReimbursement: false },
+          { isReimbursement: true, reimbursementStatus: "PAID" as const },
+        ],
+      };
 
   // For filtered stats, also apply date filter to workflow status counts
   const filteredExpenseFilter = hasDateFilter 

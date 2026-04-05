@@ -22,7 +22,7 @@ interface RouteContext {
 }
 
 // PATCH: Update a comment (content or resolve status)
-async function handlePatch(request: Request, { session }: { session: { user: { id: string } } }, routeContext?: RouteContext) {
+async function handlePatch(request: Request, { session, company }: { session: { user: { id: string } }; company: { id: string } }, routeContext?: RouteContext) {
   if (!routeContext) {
     return apiResponse.badRequest("Missing route context");
   }
@@ -38,6 +38,18 @@ async function handlePatch(request: Request, { session }: { session: { user: { i
 
   if (!comment) {
     return apiResponse.notFound("Comment not found");
+  }
+
+  // Verify the comment's entity belongs to this company
+  if (comment.expenseId) {
+    const exists = await prisma.expense.findFirst({ where: { id: comment.expenseId, companyId: company.id }, select: { id: true } });
+    if (!exists) return apiResponse.notFound("Comment not found in this company");
+  } else if (comment.incomeId) {
+    const exists = await prisma.income.findFirst({ where: { id: comment.incomeId, companyId: company.id }, select: { id: true } });
+    if (!exists) return apiResponse.notFound("Comment not found in this company");
+  } else if (comment.reimbursementRequestId) {
+    const exists = await prisma.reimbursementRequest.findFirst({ where: { id: comment.reimbursementRequestId, companyId: company.id }, select: { id: true } });
+    if (!exists) return apiResponse.notFound("Comment not found in this company");
   }
 
   // Only author can edit content, anyone can resolve
@@ -91,6 +103,18 @@ async function handleDelete(request: Request, { session, company }: { session: {
 
   if (!comment) {
     return apiResponse.notFound("Comment not found");
+  }
+
+  // Verify the comment's entity belongs to this company
+  if (comment.expenseId) {
+    const exists = await prisma.expense.findFirst({ where: { id: comment.expenseId, companyId: company.id }, select: { id: true } });
+    if (!exists) return apiResponse.notFound("Comment not found in this company");
+  } else if (comment.incomeId) {
+    const exists = await prisma.income.findFirst({ where: { id: comment.incomeId, companyId: company.id }, select: { id: true } });
+    if (!exists) return apiResponse.notFound("Comment not found in this company");
+  } else if (comment.reimbursementRequestId) {
+    const exists = await prisma.reimbursementRequest.findFirst({ where: { id: comment.reimbursementRequestId, companyId: company.id }, select: { id: true } });
+    if (!exists) return apiResponse.notFound("Comment not found in this company");
   }
 
   // Check if user can delete this comment
