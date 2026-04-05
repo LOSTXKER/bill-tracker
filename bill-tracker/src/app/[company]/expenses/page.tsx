@@ -218,15 +218,15 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       };
 
   if (search) {
-    whereClause.AND = [
-      {
-        OR: [
-          { description: { contains: search, mode: "insensitive" } },
-          { invoiceNumber: { contains: search, mode: "insensitive" } },
-          { Contact: { name: { contains: search, mode: "insensitive" } } },
-        ],
-      },
-    ];
+    const searchCondition = {
+      OR: [
+        { description: { contains: search, mode: "insensitive" as const } },
+        { invoiceNumber: { contains: search, mode: "insensitive" as const } },
+        { Contact: { name: { contains: search, mode: "insensitive" as const } } },
+      ],
+    };
+    const existing = Array.isArray(whereClause.AND) ? whereClause.AND : [];
+    whereClause.AND = [...existing, searchCondition];
   }
 
   if (status) {
