@@ -22,6 +22,7 @@ import { useSafeCompany } from "@/hooks/use-company";
 import { useAiResultProcessor } from "@/hooks/use-ai-result-processor";
 import { useTransactionSubmission } from "@/hooks/use-transaction-submission";
 import { useMergeHandler } from "@/hooks/use-merge-handler";
+import { useAutoRecalculation } from "@/hooks/use-transaction-calculation";
 
 // Shared form components
 import { CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
@@ -279,17 +280,6 @@ export function UnifiedTransactionForm({
   );
 
   // ---------------------------------------------------------------------------
-  // Calculation
-  // ---------------------------------------------------------------------------
-  const [calculation, setCalculation] = useState({
-    baseAmount: 0,
-    vatAmount: 0,
-    whtAmount: 0,
-    totalWithVat: 0,
-    netAmount: 0,
-  });
-
-  // ---------------------------------------------------------------------------
   // Document files
   // ---------------------------------------------------------------------------
   const [categorizedFiles, setCategorizedFiles] = useState<CategorizedFiles>({
@@ -403,6 +393,16 @@ export function UnifiedTransactionForm({
   const watchWhtType = watch("whtType") as string;
   const watchDate = watch(config.fields.dateField.name);
   const watchDocumentType = watch("documentType") as string | undefined;
+
+  // ---------------------------------------------------------------------------
+  // Calculation (auto-recalculates when watched form values change)
+  // ---------------------------------------------------------------------------
+  const calculation = useAutoRecalculation(config.calculateTotals, {
+    amount: watchAmount,
+    vatRate: watchVatRate,
+    whtRate: watchWhtRate,
+    isWhtEnabled: watchIsWht,
+  });
 
   // ---------------------------------------------------------------------------
   // AI Result Processor (uses grouped state)
@@ -688,29 +688,6 @@ export function UnifiedTransactionForm({
     if (transaction && transactionId) fetchPayers();
   }, [config.type, mode, transactionId, transaction]);
 
-  // ---------------------------------------------------------------------------
-  // Calculation (safe numeric values prevent NaN propagation)
-  // ---------------------------------------------------------------------------
-  const safeAmount = Number.isFinite(Number(watchAmount)) ? Number(watchAmount) : 0;
-  const safeVatRate = Number.isFinite(Number(watchVatRate)) ? Number(watchVatRate) : 0;
-  const safeWhtRate = Number.isFinite(Number(watchWhtRate)) ? Number(watchWhtRate) : 0;
-
-  const calculateTotalsRef = useRef(config.calculateTotals);
-  calculateTotalsRef.current = config.calculateTotals;
-
-  useEffect(() => {
-    const calc = calculateTotalsRef.current(
-      safeAmount,
-      safeVatRate,
-      watchIsWht ? safeWhtRate : 0
-    );
-    setCalculation(prev => {
-      if (prev.baseAmount === calc.baseAmount && prev.vatAmount === calc.vatAmount &&
-          prev.whtAmount === calc.whtAmount && prev.totalWithVat === calc.totalWithVat &&
-          prev.netAmount === calc.netAmount) return prev;
-      return calc;
-    });
-  }, [safeAmount, safeVatRate, watchIsWht, safeWhtRate]);
 
   // ---------------------------------------------------------------------------
   // AI helpers

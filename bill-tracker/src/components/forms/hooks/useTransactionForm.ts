@@ -8,6 +8,7 @@ import type { BaseTransaction } from "./transaction-form-types";
 import { useWhtChangeState } from "./useWhtChangeState";
 import { useContactAccountState } from "./useContactAccountState";
 import { useAiMergeState } from "./useAiMergeState";
+import { useAutoRecalculation } from "@/hooks/use-transaction-calculation";
 
 export type { BaseTransaction, AccountSuggestion, AiVendorSuggestion } from "./transaction-form-types";
 
@@ -33,9 +34,6 @@ export function useTransactionForm({
   const [error, setError] = useState<string | null>(null);
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
-  const [calculation, setCalculation] = useState({
-    baseAmount: 0, vatAmount: 0, whtAmount: 0, totalWithVat: 0, netAmount: 0,
-  });
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -52,6 +50,13 @@ export function useTransactionForm({
   const watchWhtRate = watch("whtRate") as number;
   const watchWhtType = watch("whtType") as string;
   const watchDate = watch(config.fields.dateField.name);
+
+  const calculation = useAutoRecalculation(config.calculateTotals, {
+    amount: watchAmount,
+    vatRate: watchVatRate,
+    whtRate: watchWhtRate,
+    isWhtEnabled: watchIsWht,
+  });
 
   const contactAccount = useContactAccountState({ contacts });
   const {
@@ -137,14 +142,6 @@ export function useTransactionForm({
     if (mode !== "create") fetchTransaction();
   }, [fetchTransaction, mode]);
 
-  useEffect(() => {
-    const calc = config.calculateTotals(
-      watchAmount || 0,
-      watchVatRate || 0,
-      watchIsWht ? watchWhtRate || 0 : 0
-    );
-    setCalculation(calc);
-  }, [watchAmount, watchVatRate, watchIsWht, watchWhtRate, config]);
 
   return {
     register, handleSubmit, watch, setValue, reset, errors,
