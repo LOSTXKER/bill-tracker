@@ -38,7 +38,7 @@ export function Pagination({
         <span>แสดง</span>
         <Select value={limit.toString()} onValueChange={(value) => onLimitChange(parseInt(value))}>
           <SelectTrigger className="h-8 w-[70px]">
-            <SelectValue />
+            <SelectValue placeholder="10" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="10">10</SelectItem>

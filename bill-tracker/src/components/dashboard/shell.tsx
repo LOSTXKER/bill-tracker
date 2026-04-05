@@ -42,7 +42,6 @@ import {
   FileSearch,
   GitCompare,
   ListChecks,
-  SearchCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -201,9 +200,9 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           permission: "expenses:read",
         },
         {
-          name: "ตรวจหมวดผิดปกติ",
-          href: `/${companyCode}/expenses/anomalies`,
-          icon: SearchCheck,
+          name: "จัดการหมวดหมู่รายการ",
+          href: `/${companyCode}/bulk-categorize`,
+          icon: Tags,
           permission: "expenses:read",
         },
       ],

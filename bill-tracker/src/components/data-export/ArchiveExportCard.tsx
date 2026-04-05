@@ -90,7 +90,7 @@ export function ArchiveExportCard({
               onValueChange={(v) => setSelectedMonth(parseInt(v))}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="เลือกเดือน" />
               </SelectTrigger>
               <SelectContent>
                 {THAI_MONTHS.map((month, idx) => (
@@ -112,7 +112,7 @@ export function ArchiveExportCard({
               onValueChange={(v) => setSelectedYear(parseInt(v))}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="เลือกปี" />
               </SelectTrigger>
               <SelectContent>
                 {yearOptions.map((year) => (

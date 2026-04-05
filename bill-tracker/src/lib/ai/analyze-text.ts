@@ -344,7 +344,20 @@ async function parseAIResponse(
   categories: { id: string; name: string; Children: { id: string; name: string }[] }[] = []
 ): Promise<ReceiptAnalysisResult> {
   try {
-    const parsed = parseAIJsonResponse(rawResponse) as TextAnalysisAIResponse;
+    let parsed = parseAIJsonResponse(rawResponse) as TextAnalysisAIResponse | TextAnalysisAIResponse[];
+
+    // AI sometimes returns an array when given multiple items; use the first element
+    if (Array.isArray(parsed)) {
+      log.debug("AI returned array, using first element", { arrayLength: parsed.length });
+      parsed = parsed[0] ?? ({} as TextAnalysisAIResponse);
+    }
+
+    log.debug("Parsed AI response category", {
+      categoryId: parsed.category?.id,
+      categoryName: parsed.category?.name,
+      groupName: parsed.category?.groupName,
+      newCategory: parsed.newCategory,
+    });
 
     // Helper: Find account by ID, code, or name
     const findAccount = (
@@ -430,6 +443,7 @@ async function parseAIResponse(
       g.Children.map(c => ({ ...c, groupName: g.name, groupId: g.id }))
     );
 
+    // 1) Match by child ID
     if (parsed.category?.id) {
       const found = allCategoryChildren.find(c => c.id === parsed.category!.id);
       if (found) {
@@ -439,6 +453,21 @@ async function parseAIResponse(
         };
       }
     }
+
+    // 2) AI might return a parent group ID instead of a child ID
+    if (!categoryResult.categoryId && parsed.category?.id) {
+      const parentGroup = categories.find(g => g.id === parsed.category!.id);
+      if (parentGroup && parentGroup.Children.length > 0) {
+        const firstChild = parentGroup.Children[0];
+        categoryResult = {
+          categoryId: firstChild.id, categoryName: firstChild.name, groupName: parentGroup.name,
+          confidence: parsed.category.confidence || 70, reason: parsed.category.reason || "AI จำแนก (กลุ่ม)",
+        };
+        log.debug("Matched parent group ID, using first child", { group: parentGroup.name, child: firstChild.name });
+      }
+    }
+
+    // 3) Match by child name
     if (!categoryResult.categoryId && parsed.category?.name) {
       const normalized = parsed.category!.name!.toLowerCase().trim();
       const found = allCategoryChildren.find(c =>
@@ -450,6 +479,54 @@ async function parseAIResponse(
           confidence: parsed.category.confidence || 75, reason: parsed.category.reason || "AI จำแนก",
         };
       }
+    }
+
+    // 4) Match by group name (if AI put group name in category.name)
+    if (!categoryResult.categoryId && parsed.category?.name) {
+      const normalized = parsed.category!.name!.toLowerCase().trim();
+      const parentByName = categories.find(g =>
+        g.name.toLowerCase().includes(normalized) || normalized.includes(g.name.toLowerCase())
+      );
+      if (parentByName && parentByName.Children.length > 0) {
+        const firstChild = parentByName.Children[0];
+        categoryResult = {
+          categoryId: firstChild.id, categoryName: firstChild.name, groupName: parentByName.name,
+          confidence: parsed.category.confidence || 65, reason: parsed.category.reason || "AI จำแนก (จากกลุ่ม)",
+        };
+        log.debug("Matched parent group by name, using first child", { group: parentByName.name });
+      }
+    }
+
+    // 5) Match by groupName field
+    if (!categoryResult.categoryId && parsed.category?.groupName) {
+      const groupNorm = parsed.category.groupName.toLowerCase().trim();
+      const catName = (parsed.category.name || "").toLowerCase().trim();
+      const parentByGroupName = categories.find(g =>
+        g.name.toLowerCase().includes(groupNorm) || groupNorm.includes(g.name.toLowerCase())
+      );
+      if (parentByGroupName) {
+        const childMatch = catName
+          ? parentByGroupName.Children.find(c =>
+              c.name.toLowerCase().includes(catName) || catName.includes(c.name.toLowerCase())
+            )
+          : null;
+        const child = childMatch || parentByGroupName.Children[0];
+        if (child) {
+          categoryResult = {
+            categoryId: child.id, categoryName: child.name, groupName: parentByGroupName.name,
+            confidence: parsed.category.confidence || 60, reason: parsed.category.reason || "AI จำแนก",
+          };
+        }
+      }
+    }
+
+    if (!categoryResult.categoryId) {
+      log.debug("Category resolution failed", {
+        aiCategory: parsed.category ? { id: parsed.category.id, name: parsed.category.name, groupName: parsed.category.groupName } : null,
+        aiNewCategory: parsed.newCategory,
+        childrenCount: allCategoryChildren.length,
+        groupCount: categories.length,
+      });
     }
 
     // Auto-create category if AI suggested a new one

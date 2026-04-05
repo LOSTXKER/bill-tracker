@@ -282,7 +282,7 @@ export default function EmployeesPage() {
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[140px] h-8">
-                  <SelectValue />
+                  <SelectValue placeholder="สถานะทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">สถานะทั้งหมด</SelectItem>
@@ -293,7 +293,7 @@ export default function EmployeesPage() {
 
               <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger className="w-[140px] h-8">
-                  <SelectValue />
+                  <SelectValue placeholder="ตำแหน่งทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ตำแหน่งทั้งหมด</SelectItem>

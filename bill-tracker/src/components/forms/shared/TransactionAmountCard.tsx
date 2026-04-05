@@ -293,7 +293,7 @@ export function TransactionAmountCard({
               onValueChange={(v) => onVatRateChange?.(Number(v))}
             >
               <SelectTrigger className="w-20 h-8 bg-background">
-                <SelectValue />
+                <SelectValue placeholder="VAT" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="0">0%</SelectItem>

@@ -137,7 +137,7 @@ export function ReconcileDashboard({
           disabled={isPending}
         >
           <SelectTrigger className="h-9 w-28">
-            <SelectValue />
+            <SelectValue placeholder="เลือกปี" />
           </SelectTrigger>
           <SelectContent>
             {YEARS.map((y) => (

@@ -56,12 +56,11 @@ export function TextInputSection({
     setError(null);
 
     try {
-      const response = await fetch("/api/ai/analyze-text", {
+      const response = await fetch(`/api/${companyCode.toLowerCase()}/ai/analyze-text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: text.trim(),
-          companyCode: companyCode.toUpperCase(),
           type: transactionType,
         }),
       });

@@ -41,7 +41,7 @@ export function ReportDateSelector({
     <div className="flex items-center gap-2">
       <Select value={currentMonth.toString()} onValueChange={handleMonthChange}>
         <SelectTrigger className="w-32">
-          <SelectValue />
+          <SelectValue placeholder="เดือน" />
         </SelectTrigger>
         <SelectContent>
           {Array.from({ length: 12 }, (_, i) => (
@@ -53,7 +53,7 @@ export function ReportDateSelector({
       </Select>
       <Select value={currentYear.toString()} onValueChange={handleYearChange}>
         <SelectTrigger className="w-24">
-          <SelectValue />
+          <SelectValue placeholder="ปี" />
         </SelectTrigger>
         <SelectContent>
           {Array.from({ length: 5 }, (_, i) => (

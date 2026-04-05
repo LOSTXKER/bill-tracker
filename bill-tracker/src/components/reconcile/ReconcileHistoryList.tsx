@@ -115,7 +115,7 @@ export function ReconcileHistoryList({
 
         <Select value={String(year)} onValueChange={(v) => handleFilterChange("year", v)}>
           <SelectTrigger className="h-9 w-24">
-            <SelectValue />
+            <SelectValue placeholder="ปี" />
           </SelectTrigger>
           <SelectContent>
             {YEARS.map((y) => (
@@ -126,7 +126,7 @@ export function ReconcileHistoryList({
 
         <Select value={type || "all"} onValueChange={(v) => handleFilterChange("type", v)}>
           <SelectTrigger className="h-9 w-40">
-            <SelectValue />
+            <SelectValue placeholder="ประเภท" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">ทั้งหมด</SelectItem>
@@ -138,7 +138,7 @@ export function ReconcileHistoryList({
 
         <Select value={status || "all"} onValueChange={(v) => handleFilterChange("status", v)}>
           <SelectTrigger className="h-9 w-40">
-            <SelectValue />
+            <SelectValue placeholder="สถานะ" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">ทุกสถานะ</SelectItem>

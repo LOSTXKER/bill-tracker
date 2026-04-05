@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Lightbulb, Plus, Trash2 } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
 import { AccountSelector } from "@/components/forms/shared/account-selector";
+import { CategorySelector } from "@/components/forms/shared/CategorySelector";
 import type { ContactFormSectionProps, DescriptionPreset } from "./contact-form-types";
 
 function getFilterClass(category: string): string | undefined {
@@ -23,8 +24,14 @@ function getFilterClass(category: string): string | undefined {
   return undefined;
 }
 
+function getCategoryType(category: string): "EXPENSE" | "INCOME" {
+  if (category === "CUSTOMER") return "INCOME";
+  return "EXPENSE";
+}
+
 export function ContactFinanceSection({ formData, setFormData, companyCode }: ContactFormSectionProps) {
   const filterClass = getFilterClass(formData.contactCategory);
+  const categoryType = getCategoryType(formData.contactCategory);
 
   const updatePreset = (index: number, field: keyof DescriptionPreset, value: string) => {
     const updated = [...formData.descriptionPresets];
@@ -37,7 +44,7 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
       ...formData,
       descriptionPresets: [
         ...formData.descriptionPresets,
-        { label: "", description: "", accountId: "" },
+        { label: "", description: "", accountId: "", categoryId: "" },
       ],
     });
   };
@@ -270,14 +277,30 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
                     )}
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">คำอธิบายเต็ม</Label>
-                  <Input
-                    value={preset.description}
-                    onChange={(e) => updatePreset(index, "description", e.target.value)}
-                    placeholder="เช่น ค่าบริการที่ปรึกษาประจำเดือน ม.ค. 2569"
-                    className="h-9 text-sm"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">หมวดหมู่</Label>
+                    {companyCode ? (
+                      <CategorySelector
+                        value={preset.categoryId || null}
+                        onValueChange={(val) => updatePreset(index, "categoryId", val || "")}
+                        companyCode={companyCode}
+                        type={categoryType}
+                        placeholder="ไม่ระบุหมวดหมู่"
+                      />
+                    ) : (
+                      <Input disabled placeholder="—" className="h-9 text-sm" />
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">คำอธิบายเต็ม</Label>
+                    <Input
+                      value={preset.description}
+                      onChange={(e) => updatePreset(index, "description", e.target.value)}
+                      placeholder="เช่น ค่าบริการที่ปรึกษาประจำเดือน ม.ค. 2569"
+                      className="h-9 text-sm"
+                    />
+                  </div>
                 </div>
               </div>
             ))}

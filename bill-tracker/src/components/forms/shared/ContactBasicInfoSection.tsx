@@ -40,11 +40,11 @@ export function ContactBasicInfoSection({ formData, setFormData }: ContactFormSe
           <div className="space-y-2">
             <Label htmlFor="contact-category">ประเภทผู้ติดต่อ</Label>
             <Select
-              value={formData.contactCategory}
+              value={formData.contactCategory || undefined}
               onValueChange={(value) => setFormData({ ...formData, contactCategory: value })}
             >
               <SelectTrigger className="h-10">
-                <SelectValue />
+                <SelectValue placeholder="เลือกประเภท" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="CUSTOMER">ลูกค้า</SelectItem>
@@ -57,11 +57,11 @@ export function ContactBasicInfoSection({ formData, setFormData }: ContactFormSe
           <div className="space-y-2">
             <Label htmlFor="contact-entityType">ประเภทกิจการ</Label>
             <Select
-              value={formData.entityType}
+              value={formData.entityType || undefined}
               onValueChange={(value) => setFormData({ ...formData, entityType: value })}
             >
               <SelectTrigger className="h-10">
-                <SelectValue />
+                <SelectValue placeholder="เลือกประเภทกิจการ" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="INDIVIDUAL">บุคคลธรรมดา</SelectItem>

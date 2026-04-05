@@ -88,6 +88,7 @@ export async function generateText(
     temperature?: number;
     maxTokens?: number;
     retries?: number;
+    responseMimeType?: string;
   }
 ): Promise<GeminiResponse<string>> {
   const maxRetries = options?.retries ?? MAX_RETRIES;
@@ -97,10 +98,13 @@ export async function generateText(
     try {
       const model = getTextModel();
       
-      const generationConfig = {
+      const generationConfig: Record<string, unknown> = {
         temperature: options?.temperature ?? 0.7,
         maxOutputTokens: options?.maxTokens ?? 2048,
       };
+      if (options?.responseMimeType) {
+        generationConfig.responseMimeType = options.responseMimeType;
+      }
 
       const result: GenerateContentResult = await withTimeout(
         model.generateContent({

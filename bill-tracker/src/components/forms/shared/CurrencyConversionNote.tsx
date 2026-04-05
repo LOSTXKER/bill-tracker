@@ -149,7 +149,7 @@ export function CurrencyConversionNote({
             <Label className="text-xs text-muted-foreground">สกุลเงิน</Label>
             <Select value={currency} onValueChange={onCurrencyChange}>
               <SelectTrigger className="h-9">
-                <SelectValue />
+                <SelectValue placeholder="เลือกสกุลเงิน" />
               </SelectTrigger>
               <SelectContent>
                 {CURRENCIES.map((c) => (

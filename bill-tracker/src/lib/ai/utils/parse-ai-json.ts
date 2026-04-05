@@ -63,7 +63,6 @@ export function parseAIJsonResponse<T = unknown>(raw: string): T {
   }
 
   // Replace single-quoted keys/values with double-quoted
-  // This is a simplistic approach that handles the most common cases
   const singleToDouble = text.replace(
     /(?<=[:,\[\{]\s*)'([^']*?)'/g,
     '"$1"'
@@ -74,10 +73,68 @@ export function parseAIJsonResponse<T = unknown>(raw: string): T {
     // Fall through
   }
 
+  // Try to recover truncated JSON by finding the last complete object
+  const recovered = tryRecoverTruncatedJson(text);
+  if (recovered !== null) {
+    return recovered as T;
+  }
+
   // Last resort: throw with helpful context
   throw new SyntaxError(
     `Failed to parse AI JSON response. Preview: ${text.slice(0, 200)}...`
   );
+}
+
+/**
+ * Try to recover a truncated JSON response (e.g. from token limit).
+ * For arrays, extracts the first complete object.
+ * For objects, tries progressively shorter substrings.
+ */
+function tryRecoverTruncatedJson(text: string): unknown | null {
+  const trimmed = text.trim();
+
+  // If it's a truncated array, try to extract the first complete object
+  if (trimmed.startsWith("[")) {
+    const firstObjStart = trimmed.indexOf("{");
+    if (firstObjStart === -1) return null;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = firstObjStart; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          try {
+            return JSON.parse(trimmed.slice(firstObjStart, i + 1));
+          } catch {
+            return null;
+          }
+        }
+      }
+    }
+  }
+
+  // If it's a truncated object, try stripping from the end to find valid JSON
+  if (trimmed.startsWith("{")) {
+    for (let end = trimmed.length; end > 10; end--) {
+      if (trimmed[end - 1] !== "}") continue;
+      try {
+        return JSON.parse(trimmed.slice(0, end));
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**

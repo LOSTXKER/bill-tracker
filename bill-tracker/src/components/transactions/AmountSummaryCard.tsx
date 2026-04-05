@@ -107,7 +107,7 @@ export function AmountSummaryCard({
                 onValueChange={(v) => onUpdate({ vatRate: Number(v) })}
               >
                 <SelectTrigger className="w-20 h-8 bg-muted/30">
-                  <SelectValue />
+                  <SelectValue placeholder="VAT" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="0">0%</SelectItem>

@@ -230,25 +230,30 @@ export default function BulkCategorizePage() {
     }
   };
 
-  const buildAiText = (items: UncategorizedExpense[]) => {
-    const unique = new Map<string, { desc: string; contact: string | null; count: number }>();
+  const buildDescriptions = (items: UncategorizedExpense[]) => {
+    const unique = new Map<string, string>();
     for (const item of items) {
-      const key = `${item.description || ""}|${item.contactName || ""}`;
-      const existing = unique.get(key);
-      if (existing) {
-        existing.count++;
-      } else {
-        unique.set(key, { desc: item.description, contact: item.contactName, count: 1 });
-      }
+      const parts = [item.description, item.contactName].filter(Boolean);
+      const line = parts.join(" - ");
+      if (line) unique.set(line, line);
     }
-    const lines = Array.from(unique.values())
-      .slice(0, 10)
-      .map((v) => {
-        const parts = [v.desc, v.contact].filter(Boolean);
-        const line = parts.join(" - ");
-        return v.count > 1 ? `${line} (x${v.count})` : line;
-      });
-    return lines.join("\n");
+    return Array.from(unique.values()).slice(0, 15);
+  };
+
+  const callSuggestCategory = async (items: UncategorizedExpense[]) => {
+    const descriptions = buildDescriptions(items);
+    if (descriptions.length === 0) throw new Error("ไม่มีรายละเอียด");
+
+    const res = await fetch(`/api/${companyCode.toLowerCase()}/ai/suggest-category`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ descriptions, type: "expense" }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "AI วิเคราะห์ไม่สำเร็จ");
+    }
+    return json.data as { categoryId: string; categoryName: string; groupName: string; isNew: boolean; reason: string };
   };
 
   const aiSuggestForGroup = async (contactKey: string) => {
@@ -257,28 +262,15 @@ export default function BulkCategorizePage() {
 
     setAiSuggestingGroup(contactKey);
     try {
-      const text = buildAiText(items);
-      const res = await fetch("/api/ai/analyze-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, companyCode, type: "expense" }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const cat = json.data?.category;
-        if (json.success && cat?.categoryId) {
-          setGroupCategorySuggestions((prev) => ({ ...prev, [contactKey]: cat.categoryId }));
-          toast.success(
-            cat.isNew
-              ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
-              : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
-          );
-        } else {
-          toast.info("AI ไม่สามารถระบุหมวดหมู่ได้");
-        }
-      }
-    } catch {
-      toast.error("ไม่สามารถวิเคราะห์ได้");
+      const cat = await callSuggestCategory(items);
+      setGroupCategorySuggestions((prev) => ({ ...prev, [contactKey]: cat.categoryId }));
+      toast.success(
+        cat.isNew
+          ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
+          : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ไม่สามารถวิเคราะห์ได้");
     } finally {
       setAiSuggestingGroup(null);
     }
@@ -291,28 +283,15 @@ export default function BulkCategorizePage() {
 
     setAiSuggestingBulk(true);
     try {
-      const text = buildAiText(selected);
-      const res = await fetch("/api/ai/analyze-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, companyCode, type: "expense" }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const cat = json.data?.category;
-        if (json.success && cat?.categoryId) {
-          setBulkCategoryId(cat.categoryId);
-          toast.success(
-            cat.isNew
-              ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
-              : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
-          );
-        } else {
-          toast.info("AI ไม่สามารถระบุหมวดหมู่ได้");
-        }
-      }
-    } catch {
-      toast.error("ไม่สามารถวิเคราะห์ได้");
+      const cat = await callSuggestCategory(selected);
+      setBulkCategoryId(cat.categoryId);
+      toast.success(
+        cat.isNew
+          ? `AI สร้างหมวดใหม่: [${cat.groupName}] ${cat.categoryName}`
+          : `AI แนะนำ: [${cat.groupName}] ${cat.categoryName}`
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ไม่สามารถวิเคราะห์ได้");
     } finally {
       setAiSuggestingBulk(false);
     }

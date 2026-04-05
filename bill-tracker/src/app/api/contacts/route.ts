@@ -29,6 +29,7 @@ export const GET = withCompanyAccess(
     const [contacts, total] = await Promise.all([
       prisma.contact.findMany({
         where,
+        include: { _count: { select: { Expense: true, Income: true } } },
         orderBy: { name: "asc" },
         skip: (page - 1) * limit,
         take: limit,

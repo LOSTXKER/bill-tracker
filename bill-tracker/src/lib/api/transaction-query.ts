@@ -12,6 +12,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
       const approvalStatus = searchParams.get("approvalStatus");
       const tab = searchParams.get("tab");
       const category = searchParams.get("category");
+      const categoryId = searchParams.get("categoryId");
       const contact = searchParams.get("contact");
       const search = searchParams.get("search");
       const dateFrom = searchParams.get("dateFrom");
@@ -30,6 +31,7 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         ...(workflowStatus && { workflowStatus }),
         ...(approvalStatus && { approvalStatus }),
         ...(category && { accountId: category }),
+        ...(categoryId === "__uncategorized__" ? { categoryId: null } : categoryId ? { categoryId } : {}),
         ...(contact && { contactId: contact }),
         ...(!includeDeleted && { deletedAt: null }),
         ...(onlyMine && { createdBy: session.user.id }),

@@ -111,12 +111,11 @@ export function TransactionFieldsSection({
 
     setAiSuggestLoading(true);
     try {
-      const res = await fetch("/api/ai/analyze-text", {
+      const res = await fetch(`/api/${companyCode.toLowerCase()}/ai/analyze-text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: description,
-          companyCode,
           type: config.type,
         }),
       });

@@ -2,6 +2,7 @@ export interface DescriptionPreset {
   label: string;
   description: string;
   accountId: string;
+  categoryId: string;
 }
 
 export interface ContactFormData {
@@ -143,6 +144,7 @@ function parsePresets(raw: unknown): DescriptionPreset[] {
       label: p.label || "",
       description: p.description || "",
       accountId: p.accountId || "",
+      categoryId: p.categoryId || "",
     }));
 }
 
@@ -155,6 +157,7 @@ export function contactToFormData(contact: Contact): ContactFormData {
       label: contact.descriptionTemplate,
       description: contact.descriptionTemplate,
       accountId: "",
+      categoryId: "",
     });
   }
 

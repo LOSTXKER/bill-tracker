@@ -7,6 +7,7 @@ export interface DescriptionPreset {
   label: string;
   description: string;
   accountId?: string | null;
+  categoryId?: string | null;
 }
 
 export interface ContactDefaults {
@@ -75,6 +76,7 @@ function parsePresets(raw: unknown): DescriptionPreset[] {
       label: p.label || "",
       description: p.description || "",
       accountId: p.accountId || null,
+      categoryId: p.categoryId || null,
     }));
 }
 

@@ -501,11 +501,11 @@ function PresetDropdown({
   descriptionFieldName,
   setValue,
 }: {
-  presets: { label: string; description: string; accountId?: string | null }[];
+  presets: { label: string; description: string; accountId?: string | null; categoryId?: string | null }[];
   descriptionFieldName?: string;
   setValue: UseFormSetValue<Record<string, unknown>>;
 }) {
-  const { onAccountChange } = useTransactionFormContext();
+  const { onAccountChange, onCategoryChange } = useTransactionFormContext();
 
   const handleSelect = (index: string) => {
     const preset = presets[Number(index)];
@@ -516,6 +516,9 @@ function PresetDropdown({
     }
     if (preset.accountId) {
       onAccountChange(preset.accountId);
+    }
+    if (preset.categoryId) {
+      onCategoryChange(preset.categoryId);
     }
   };
 

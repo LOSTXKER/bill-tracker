@@ -328,7 +328,7 @@ export default function ActivityPage({ params }: PageProps) {
               <Select value={filter} onValueChange={setFilter}>
                 <SelectTrigger className="w-[140px]">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
+                  <SelectValue placeholder="ทั้งหมด" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
@@ -338,7 +338,7 @@ export default function ActivityPage({ params }: PageProps) {
               </Select>
               <Select value={entityFilter} onValueChange={setEntityFilter}>
                 <SelectTrigger className="w-[140px]">
-                  <SelectValue />
+                  <SelectValue placeholder="ทุกประเภท" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทุกประเภท</SelectItem>
