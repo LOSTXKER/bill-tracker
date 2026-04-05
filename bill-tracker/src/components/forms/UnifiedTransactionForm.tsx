@@ -9,7 +9,18 @@ import {
   LucideIcon,
   ArrowLeft,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 // Hooks
@@ -155,6 +166,37 @@ interface UnifiedTransactionFormProps {
   transactionId?: string;
   onModeChange?: (mode: "view" | "edit") => void;
   currentUserId?: string;
+}
+
+function AccountWarningDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            ยังไม่ได้ระบุบัญชี
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            การระบุบัญชีช่วยให้จำแนกค่าใช้จ่ายและวิเคราะห์ทางการเงินได้ดีขึ้น
+            ต้องการบันทึกโดยไม่ระบุบัญชีหรือไม่?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>กลับไปเลือกบัญชี</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>บันทึกโดยไม่ระบุ</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
 
 // =============================================================================
@@ -359,7 +401,13 @@ export function UnifiedTransactionForm({
   // ---------------------------------------------------------------------------
   // Account
   // ---------------------------------------------------------------------------
-  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [selectedAccount, setSelectedAccountRaw] = useState<string | null>(null);
+  const [skipAccountWarning, setSkipAccountWarning] = useState(false);
+  const [showAccountWarning, setShowAccountWarning] = useState(false);
+  const setSelectedAccount = useCallback((id: string | null) => {
+    setSelectedAccountRaw(id);
+    if (id) setSkipAccountWarning(false);
+  }, []);
 
   // Reference URLs
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
@@ -371,6 +419,42 @@ export function UnifiedTransactionForm({
     companyCode,
     contactState.selectedContact?.id || null
   );
+
+  // ---------------------------------------------------------------------------
+  // Auto-suggest account from contact history (create mode only)
+  // ---------------------------------------------------------------------------
+  const contactSuggestFetched = useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== "create") return;
+    const contactId = contactState.selectedContact?.id;
+    if (!contactId || selectedAccount || contactSuggestFetched.current === contactId) return;
+    contactSuggestFetched.current = contactId;
+
+    fetch(`/api/${companyCode.toLowerCase()}/contacts/${contactId}/suggested-account`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((json) => {
+        if (!json?.success || !json.data?.accountId) return;
+        const { accountId, account, alternatives } = json.data;
+        patchAiState({
+          accountSuggestion: {
+            accountId,
+            accountCode: account?.code || null,
+            accountName: account?.name || null,
+            confidence: 70,
+            reason: "แนะนำจากประวัติผู้ติดต่อ",
+            alternatives: (alternatives || []).map((a: { accountId: string; account: { code: string; name: string } | null; count: number }) => ({
+              accountId: a.accountId,
+              accountCode: a.account?.code || "",
+              accountName: a.account?.name || "",
+              confidence: 50,
+              reason: "ใช้บ่อย",
+            })),
+          },
+        });
+        setSelectedAccount(accountId);
+      })
+      .catch(() => {});
+  }, [mode, contactState.selectedContact?.id, selectedAccount, companyCode, patchAiState, setSelectedAccount]);
 
   // ---------------------------------------------------------------------------
   // React-Hook-Form
@@ -494,6 +578,8 @@ export function UnifiedTransactionForm({
     setAuditRefreshKey,
     onModeChange,
     setSelectedContact: setSelectedContactForSubmission,
+    skipAccountWarning,
+    onAccountWarning: () => setShowAccountWarning(true),
   });
 
   // ---------------------------------------------------------------------------
@@ -1105,6 +1191,16 @@ export function UnifiedTransactionForm({
         onConflictOpenChange={setShowConflictDialog}
         conflicts={pendingConflicts}
         onConflictResolve={handleConflictResolution}
+      />
+
+      <AccountWarningDialog
+        open={showAccountWarning}
+        onOpenChange={setShowAccountWarning}
+        onConfirm={() => {
+          setSkipAccountWarning(true);
+          setShowAccountWarning(false);
+          setTimeout(() => handleSubmit(onSubmit)(), 0);
+        }}
       />
     </TransactionFormProvider>
   );

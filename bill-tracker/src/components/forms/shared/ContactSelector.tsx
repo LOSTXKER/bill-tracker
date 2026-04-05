@@ -117,6 +117,12 @@ export function ContactSelector({
     setOpen(false);
   };
 
+  // Show matching contacts when typing free-text (encourages using saved contacts)
+  const typedName = (!selectedContact && contactName.trim().length >= 2) ? contactName.trim().toLowerCase() : "";
+  const matchingContacts = typedName
+    ? contacts.filter((c) => c.name.toLowerCase().includes(typedName)).slice(0, 3)
+    : [];
+
   // State for AI suggestion dialog
   const [showAiSuggestionDialog, setShowAiSuggestionDialog] = useState(false);
 
@@ -281,6 +287,24 @@ export function ContactSelector({
           </PopoverContent>
         </Popover>
       </div>
+
+      {/* Matching contacts suggestion when typing free-text */}
+      {matchingContacts.length > 0 && (
+        <div className="text-xs border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 rounded-md p-2 space-y-1">
+          <p className="text-amber-700 dark:text-amber-300">พบผู้ติดต่อที่คล้ายกัน:</p>
+          {matchingContacts.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="block w-full text-left px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/50 text-foreground"
+              onClick={() => handleSelectContact(c)}
+            >
+              {c.name}
+              {c.taxId && <span className="ml-1 text-muted-foreground font-mono">({c.taxId})</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Helper text */}
       {selectedContact && (

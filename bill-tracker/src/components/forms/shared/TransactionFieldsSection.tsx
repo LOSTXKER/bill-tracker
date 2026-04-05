@@ -220,7 +220,12 @@ export function TransactionFieldsSection({
         />
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">บัญชี</Label>
+            <Label className="text-sm font-medium">
+              บัญชี
+              {!selectedAccount && (
+                <span className="ml-1 text-xs text-amber-500 font-normal">(แนะนำ)</span>
+              )}
+            </Label>
             {onAiSuggestAccount && (
               <Button
                 type="button"
@@ -246,6 +251,7 @@ export function TransactionFieldsSection({
             placeholder="เลือกบัญชี"
             suggestedAccountId={suggestedAccountId}
             alternatives={suggestedAccountAlternatives}
+            filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
           />
         </div>
       </div>

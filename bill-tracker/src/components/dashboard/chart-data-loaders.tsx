@@ -42,18 +42,21 @@ export async function ExpenseCategoryChartData({ companyCode }: { companyCode: s
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const expenseByAccount = await prisma.expense.groupBy({
-    by: ["accountId"],
-    where: {
-      companyId: companyId,
-      billDate: { gte: startOfMonth, lte: endOfMonth },
-      accountId: { not: null },
-      deletedAt: null,
-    },
-    _sum: { netPaid: true },
-  });
+  const baseDateFilter = { companyId, billDate: { gte: startOfMonth, lte: endOfMonth }, deletedAt: null };
 
-  // Fetch account names
+  const [expenseByAccount, uncategorized] = await Promise.all([
+    prisma.expense.groupBy({
+      by: ["accountId"],
+      where: { ...baseDateFilter, accountId: { not: null } },
+      _sum: { netPaid: true },
+    }),
+    prisma.expense.aggregate({
+      where: { ...baseDateFilter, accountId: null },
+      _sum: { netPaid: true },
+      _count: true,
+    }),
+  ]);
+
   const accountIds = expenseByAccount.map((item) => item.accountId).filter(Boolean) as string[];
   const accounts = await prisma.account.findMany({
     where: { id: { in: accountIds } },
@@ -62,7 +65,8 @@ export async function ExpenseCategoryChartData({ companyCode }: { companyCode: s
 
   const accountMap = new Map(accounts.map((acc) => [acc.id, `${acc.code} ${acc.name}`]));
 
-  let total = 0;
+  const uncategorizedValue = Number(uncategorized._sum.netPaid || 0);
+  let total = uncategorizedValue;
   for (const item of expenseByAccount) {
     total += Number(item._sum.netPaid || 0);
   }
@@ -79,7 +83,44 @@ export async function ExpenseCategoryChartData({ companyCode }: { companyCode: s
     })
     .sort((a, b) => b.value - a.value);
 
+  if (uncategorizedValue > 0) {
+    chartData.push({
+      name: `ไม่ระบุบัญชี (${uncategorized._count} รายการ)`,
+      value: uncategorizedValue,
+      percentage: total > 0 ? (uncategorizedValue / total) * 100 : 0,
+    });
+  }
+
   return <ExpenseCategoryChart data={chartData} />;
+}
+
+export async function DataQualityStats({ companyCode }: { companyCode: string }) {
+  const companyId = await getCompanyId(companyCode);
+  if (!companyId) return null;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const baseDateFilter = { companyId, billDate: { gte: startOfMonth, lte: endOfMonth }, deletedAt: null };
+
+  const [total, noAccount, noContact] = await Promise.all([
+    prisma.expense.count({ where: baseDateFilter }),
+    prisma.expense.count({ where: { ...baseDateFilter, accountId: null } }),
+    prisma.expense.count({ where: { ...baseDateFilter, contactId: null } }),
+  ]);
+
+  if (total === 0) return null;
+
+  const { DataQualityCard } = await import("./data-quality-card");
+  return (
+    <DataQualityCard
+      companyCode={companyCode}
+      total={total}
+      noAccount={noAccount}
+      noContact={noContact}
+    />
+  );
 }
 
 export function ChartSkeleton() {

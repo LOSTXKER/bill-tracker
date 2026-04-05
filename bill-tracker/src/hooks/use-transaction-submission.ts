@@ -24,6 +24,8 @@ export interface UseTransactionSubmissionProps {
   setOneTimeContactName: (name: string) => void;
   selectedAccount: string | null;
   setSelectedAccount: (id: string | null) => void;
+  skipAccountWarning?: boolean;
+  onAccountWarning?: () => void;
   calculation: {
     baseAmount: number;
     vatAmount: number;
@@ -115,6 +117,8 @@ export function useTransactionSubmission({
   setAuditRefreshKey,
   onModeChange,
   setSelectedContact,
+  skipAccountWarning,
+  onAccountWarning,
 }: UseTransactionSubmissionProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -165,6 +169,11 @@ export function useTransactionSubmission({
 
     if (validationErrors.length > 0) {
       toast.error(validationErrors.join(", "));
+      return;
+    }
+
+    if (!selectedAccount && !skipAccountWarning) {
+      onAccountWarning?.();
       return;
     }
 

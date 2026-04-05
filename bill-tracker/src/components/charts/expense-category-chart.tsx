@@ -115,8 +115,9 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={COLORS[index % COLORS.length]}
+                  fill={entry.name.startsWith("ไม่ระบุบัญชี") ? "#9ca3af" : COLORS[index % COLORS.length]}
                   stroke="transparent"
+                  strokeDasharray={entry.name.startsWith("ไม่ระบุบัญชี") ? "4 2" : undefined}
                 />
               ))}
             </Pie>

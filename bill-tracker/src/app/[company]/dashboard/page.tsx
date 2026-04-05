@@ -13,6 +13,7 @@ import {
   CashFlowChartData,
   MonthlyTrendChartData,
   ExpenseCategoryChartData,
+  DataQualityStats,
   ChartSkeleton,
   SettlementAlert,
   SettlementAlertSkeleton,
@@ -81,6 +82,11 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
       {/* Settlement Alert - shows pending reimbursements for managers */}
       <Suspense fallback={<SettlementAlertSkeleton />}>
         <SettlementAlert companyCode={companyCode} />
+      </Suspense>
+
+      {/* Data Quality */}
+      <Suspense fallback={null}>
+        <DataQualityStats companyCode={companyCode} />
       </Suspense>
 
       {/* Charts */}

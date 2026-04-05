@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import type { Expense, Prisma, PaidByType, SettlementStatus } from "@prisma/client";
 import type { TransactionRequestBody, TransactionHookContext, TransactionUpdateHookContext } from "../transaction-types";
 import { deduplicatePayers } from "./expense-transforms";
+import { learnFromTransaction } from "../vendor-mapping";
 
 export async function handleExpenseAfterCreate(item: Expense, body: TransactionRequestBody, context: TransactionHookContext) {
   if (item.contactId) {
@@ -99,6 +100,21 @@ export async function handleExpenseAfterCreate(item: Expense, body: TransactionR
         });
       }
     }
+  }
+
+  // Learn vendor mapping from this transaction
+  if (item.accountId || item.contactId) {
+    learnFromTransaction({
+      companyId: context.company.id,
+      contactId: item.contactId,
+      contactName: item.contactName,
+      accountId: item.accountId,
+      transactionType: "expense",
+      txId: item.id,
+      vatRate: item.vatRate != null ? Number(item.vatRate) : null,
+      whtRate: item.whtRate != null ? Number(item.whtRate) : null,
+      whtType: item.whtType,
+    }).catch(() => {});
   }
 }
 
@@ -235,5 +251,20 @@ export async function handleExpenseAfterUpdate(item: Expense, body: TransactionR
     } catch (error) {
       console.error("Failed to update contact tax invoice request preferences:", error);
     }
+  }
+
+  // Learn vendor mapping from updated transaction
+  if (item.accountId || item.contactId) {
+    learnFromTransaction({
+      companyId: context.company.id,
+      contactId: item.contactId,
+      contactName: item.contactName,
+      accountId: item.accountId,
+      transactionType: "expense",
+      txId: item.id,
+      vatRate: item.vatRate != null ? Number(item.vatRate) : null,
+      whtRate: item.whtRate != null ? Number(item.whtRate) : null,
+      whtType: item.whtType,
+    }).catch(() => {});
   }
 }

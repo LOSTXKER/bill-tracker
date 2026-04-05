@@ -46,6 +46,7 @@ interface AccountSelectorProps {
   alternatives?: AlternativeAccount[]; // Alternative suggestions from AI
   disabled?: boolean;
   label?: string;
+  filterClass?: string; // e.g. "EXPENSE" or "REVENUE" to only show that class
 }
 
 const ACCOUNT_CLASS_LABELS: Record<string, string> = {
@@ -69,6 +70,7 @@ export function AccountSelector({
   alternatives = [],
   disabled = false,
   label,
+  filterClass,
 }: AccountSelectorProps) {
   const [open, setOpen] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -103,8 +105,12 @@ export function AccountSelector({
     setOpen(false);
   }, [onValueChange]);
 
+  const filteredAccounts = filterClass
+    ? accounts.filter((a) => a.class === filterClass || a.class === `OTHER_${filterClass}`)
+    : accounts;
+
   // Group accounts by class
-  const groupedAccounts = accounts.reduce((acc, account) => {
+  const groupedAccounts = filteredAccounts.reduce((acc, account) => {
     const classLabel = ACCOUNT_CLASS_LABELS[account.class] || account.class;
     if (!acc[classLabel]) {
       acc[classLabel] = [];
