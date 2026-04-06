@@ -1,17 +1,9 @@
 import { prisma } from "@/lib/db";
 import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, calculateVATSummary, calculateWHTSummary } from "@/lib/utils/tax-calculator";
-import {
-  TrendingUp,
-  TrendingDown,
-  Calculator,
-  FileText,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus,
-} from "lucide-react";
+import { getMonthlyChartData } from "@/lib/cache/chart-data";
+import { RevenueExpenseTrendChart } from "@/components/reports/charts/RevenueExpenseTrendChart";
+import { CategoryList } from "@/components/reports/CategoryList";
 
 type ViewMode = "official" | "internal";
 
@@ -26,7 +18,7 @@ export async function ReportDashboard({
   companyCode,
   year,
   month,
-  viewMode = "official",
+  viewMode = "internal",
 }: ReportDashboardProps) {
   const company = await prisma.company.findUnique({
     where: { code: companyCode.toUpperCase() },
@@ -35,240 +27,135 @@ export async function ReportDashboard({
   if (!company) return null;
 
   const { startDate, endDate } = getThaiMonthRange(year, month);
-
-  // Previous month for comparison
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const { startDate: prevStartDate, endDate: prevEndDate } = getThaiMonthRange(prevYear, prevMonth);
-
-  const baseWhere = buildExpenseWhereForMode(company.id, viewMode);
-  const expenseWhere = (dateGte: Date, dateLte: Date) => ({
-    ...baseWhere,
-    billDate: { gte: dateGte, lte: dateLte },
-  });
+  const expenseWhere = {
+    ...buildExpenseWhereForMode(company.id, viewMode),
+    billDate: { gte: startDate, lte: endDate },
+  };
+  const incomeWhere = {
+    ...buildIncomeBaseWhere(company.id),
+    receiveDate: { gte: startDate, lte: endDate },
+  };
 
   const [
-    expenseSum,
-    incomeSum,
-    prevExpenseSum,
-    prevIncomeSum,
-    vatExpenses,
-    vatIncomes,
-    whtExpenses,
-    whtIncomes,
+    trendData,
+    expenseByCategory,
+    incomeByCategory,
+    categories,
+    allExpenseRows,
   ] = await Promise.all([
-    prisma.expense.aggregate({
-      where: expenseWhere(startDate, endDate),
+    getMonthlyChartData(company.id, 6),
+    prisma.expense.groupBy({
+      by: ["categoryId"],
+      where: expenseWhere,
       _sum: { netPaid: true },
       _count: true,
+      orderBy: { _sum: { netPaid: "desc" } },
     }),
-    prisma.income.aggregate({
-      where: { ...buildIncomeBaseWhere(company.id), receiveDate: { gte: startDate, lte: endDate } },
+    prisma.income.groupBy({
+      by: ["categoryId"],
+      where: incomeWhere,
       _sum: { netReceived: true },
       _count: true,
+      orderBy: { _sum: { netReceived: "desc" } },
     }),
-    prisma.expense.aggregate({
-      where: expenseWhere(prevStartDate, prevEndDate),
-      _sum: { netPaid: true },
-    }),
-    prisma.income.aggregate({
-      where: { ...buildIncomeBaseWhere(company.id), receiveDate: { gte: prevStartDate, lte: prevEndDate } },
-      _sum: { netReceived: true },
+    prisma.transactionCategory.findMany({
+      where: { companyId: company.id },
+      select: { id: true, name: true, parentId: true, Parent: { select: { name: true } } },
     }),
     prisma.expense.findMany({
-      where: { ...expenseWhere(startDate, endDate), vatRate: { gt: 0 } },
-      select: { vatAmount: true },
-    }),
-    prisma.income.findMany({
-      where: { ...buildIncomeBaseWhere(company.id), receiveDate: { gte: startDate, lte: endDate }, vatRate: { gt: 0 } },
-      select: { vatAmount: true },
-    }),
-    prisma.expense.findMany({
-      where: { ...expenseWhere(startDate, endDate), isWht: true },
-      select: { whtAmount: true },
-    }),
-    prisma.income.findMany({
-      where: { ...buildIncomeBaseWhere(company.id), receiveDate: { gte: startDate, lte: endDate }, isWhtDeducted: true },
-      select: { whtAmount: true },
+      where: expenseWhere,
+      select: {
+        id: true,
+        billDate: true,
+        description: true,
+        amount: true,
+        vatAmount: true,
+        netPaid: true,
+        Contact: { select: { name: true } },
+        Category: { select: { id: true, name: true, Parent: { select: { name: true } } } },
+      },
+      orderBy: { billDate: "desc" },
     }),
   ]);
 
-  const totalExpense = Number(expenseSum._sum.netPaid) || 0;
-  const totalIncome = Number(incomeSum._sum.netReceived) || 0;
-  const netPL = totalIncome - totalExpense;
+  const getCategoryDisplayName = (categoryId: string | null) => {
+    if (!categoryId) return "ไม่ระบุหมวดหมู่";
+    const cat = categories.find((c) => c.id === categoryId);
+    return cat ? (cat.Parent ? `[${cat.Parent.name}] ${cat.name}` : cat.name) : "ไม่ระบุหมวดหมู่";
+  };
 
-  const prevExpense = Number(prevExpenseSum._sum.netPaid) || 0;
-  const prevIncome = Number(prevIncomeSum._sum.netReceived) || 0;
+  const expenseCategoryGroups = expenseByCategory
+    .sort((a, b) => (Number(b._sum?.netPaid) || 0) - (Number(a._sum?.netPaid) || 0))
+    .map((item) => ({
+      categoryId: item.categoryId,
+      categoryName: getCategoryDisplayName(item.categoryId),
+      total: Number(item._sum?.netPaid) || 0,
+      count: item._count,
+    }));
+  const totalExpense = expenseCategoryGroups.reduce((s, g) => s + g.total, 0);
 
-  const expenseChange = prevExpense > 0 ? ((totalExpense - prevExpense) / prevExpense) * 100 : 0;
-  const incomeChange = prevIncome > 0 ? ((totalIncome - prevIncome) / prevIncome) * 100 : 0;
+  const incomeCategoryGroups = incomeByCategory
+    .sort((a, b) => (Number(b._sum?.netReceived) || 0) - (Number(a._sum?.netReceived) || 0))
+    .map((item) => ({
+      categoryId: item.categoryId,
+      categoryName: getCategoryDisplayName(item.categoryId),
+      total: Number(item._sum?.netReceived) || 0,
+      count: item._count,
+    }));
+  const totalIncome = incomeCategoryGroups.reduce((s, g) => s + g.total, 0);
 
-  const vatSummary = calculateVATSummary(
-    vatExpenses.map((e) => ({ vatAmount: e.vatAmount ? Number(e.vatAmount) : null })),
-    vatIncomes.map((i) => ({ vatAmount: i.vatAmount ? Number(i.vatAmount) : null }))
-  );
+  const expenseRows = allExpenseRows.map((e) => ({
+    id: e.id,
+    billDate: e.billDate.toISOString(),
+    description: e.description,
+    amount: Number(e.amount),
+    vatAmount: Number(e.vatAmount) || 0,
+    netPaid: Number(e.netPaid),
+    contactName: e.Contact?.name ?? null,
+    categoryName: e.Category
+      ? e.Category.Parent
+        ? `[${e.Category.Parent.name}] ${e.Category.name}`
+        : e.Category.name
+      : null,
+  }));
 
-  const whtSummary = calculateWHTSummary(
-    whtExpenses.map((e) => ({ whtAmount: e.whtAmount ? Number(e.whtAmount) : null })),
-    whtIncomes.map((i) => ({ whtAmount: i.whtAmount ? Number(i.whtAmount) : null }))
-  );
-
-  const thaiMonth = new Date(year, month - 1).toLocaleDateString("th-TH", { month: "long" });
+  const chartTrendData = trendData.map(({ month: m, income, expense }) => ({
+    month: m,
+    income,
+    expense,
+  }));
 
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        ภาพรวมเดือน {thaiMonth} {year + 543} •{" "}
-        <span className="font-medium">
-          {viewMode === "internal" ? "มุมมองตามจริง" : "มุมมองตามบัญชี"}
-        </span>
-      </p>
-
-      {/* Main KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Income */}
-        <Card className="border-primary/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              รายรับรวม
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(totalIncome)}</div>
-            <div className="flex items-center gap-1 mt-1">
-              <span className="text-xs text-muted-foreground">{incomeSum._count} รายการ</span>
-              {prevIncome > 0 && (
-                <span
-                  className={`text-xs ml-2 flex items-center gap-0.5 ${
-                    incomeChange >= 0 ? "text-primary" : "text-red-500"
-                  }`}
-                >
-                  {incomeChange >= 0 ? (
-                    <ArrowUpRight className="h-3 w-3" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3" />
-                  )}
-                  {Math.abs(incomeChange).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Expense */}
-        <Card className="border-red-200/50 dark:border-red-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-500" />
-              รายจ่ายรวม
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(totalExpense)}
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-              <span className="text-xs text-muted-foreground">{expenseSum._count} รายการ</span>
-              {prevExpense > 0 && (
-                <span
-                  className={`text-xs ml-2 flex items-center gap-0.5 ${
-                    expenseChange <= 0 ? "text-primary" : "text-red-500"
-                  }`}
-                >
-                  {expenseChange >= 0 ? (
-                    <ArrowUpRight className="h-3 w-3" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3" />
-                  )}
-                  {Math.abs(expenseChange).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Net P&L */}
-        <Card
-          className={
-            netPL >= 0
-              ? "border-blue-200/50 dark:border-blue-800/50 sm:col-span-2 lg:col-span-1"
-              : "border-red-200/50 dark:border-red-800/50 sm:col-span-2 lg:col-span-1"
-          }
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Minus className="h-4 w-4" />
-              กำไร / ขาดทุนสุทธิ
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${
-                netPL >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"
-              }`}
-            >
-              {netPL >= 0 ? "+" : ""}
-              {formatCurrency(netPL)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              รายรับ - รายจ่าย
-            </p>
-          </CardContent>
-        </Card>
+    <div>
+      {/* Trend chart — full width */}
+      <div className="rounded-lg border bg-card p-5">
+        <h3 className="text-base font-semibold mb-3">แนวโน้มรายรับ-รายจ่าย (6 เดือน)</h3>
+        <div className="h-[240px]">
+          <RevenueExpenseTrendChart data={chartTrendData} />
+        </div>
       </div>
 
-      {/* Tax Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {/* VAT */}
-        <Card className={vatSummary.netVAT >= 0 ? "border-orange-200/50 dark:border-orange-800/50" : "border-primary/30"}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-orange-500" />
-              VAT สุทธิ (ภ.พ.30)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-xl font-bold ${
-                vatSummary.netVAT >= 0 ? "text-orange-600 dark:text-orange-400" : "text-primary"
-              }`}
-            >
-              {vatSummary.netVAT >= 0 ? "ต้องจ่าย " : "ขอคืน "}
-              {formatCurrency(Math.abs(vatSummary.netVAT))}
-            </div>
-            <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-              <span>ซื้อ {formatCurrency(vatSummary.inputVAT)}</span>
-              <span>•</span>
-              <span>ขาย {formatCurrency(vatSummary.outputVAT)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* WHT */}
-        <Card className="border-purple-200/50 dark:border-purple-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <FileText className="h-4 w-4 text-purple-500" />
-              WHT ต้องนำส่ง (ภ.ง.ด.53)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
-              {formatCurrency(whtSummary.whtPaid)}
-            </div>
-            <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-              <span>เครดิตภาษี {formatCurrency(whtSummary.whtReceived)}</span>
-              <span>•</span>
-              <span>สุทธิ {formatCurrency(whtSummary.netWHT)}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Hint for accountant */}
-      <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-        ดูรายละเอียดภาษีและรายการทั้งหมดได้ที่ tab ด้านบน
+      {/* Category breakdown — 2 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 border-t pt-6">
+        <CategoryList
+          type="expense"
+          title="รายจ่ายตามหมวดหมู่"
+          groups={expenseCategoryGroups}
+          total={totalExpense}
+          allExpenses={expenseRows}
+          companyCode={companyCode}
+          year={year}
+          month={month}
+        />
+        <CategoryList
+          type="income"
+          title="รายรับตามหมวดหมู่"
+          groups={incomeCategoryGroups}
+          total={totalIncome}
+          companyCode={companyCode}
+          year={year}
+          month={month}
+        />
       </div>
     </div>
   );

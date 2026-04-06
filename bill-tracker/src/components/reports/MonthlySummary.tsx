@@ -1,19 +1,7 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Download } from "lucide-react";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { MonthlySummaryContent } from "./MonthlySummaryContent";
 
 type ViewMode = "official" | "internal";
 
@@ -38,307 +26,76 @@ export async function MonthlySummary({
 
   const { startDate, endDate } = getThaiMonthRange(year, month);
 
-  const expenseBaseWhere = {
-    ...buildExpenseWhereForMode(company.id, viewMode),
-    billDate: { gte: startDate, lte: endDate },
-  };
-
-  const [expenseSum, incomeSum, expenseByCategory, categories, allExpenses, allIncomes] =
-    await Promise.all([
-      prisma.expense.aggregate({
-        where: expenseBaseWhere,
-        _sum: { netPaid: true },
-        _count: true,
-      }),
-      prisma.income.aggregate({
-        where: {
-          ...buildIncomeBaseWhere(company.id),
-          receiveDate: { gte: startDate, lte: endDate },
+  const [allExpenses, allIncomes] = await Promise.all([
+    prisma.expense.findMany({
+      where: {
+        ...buildExpenseWhereForMode(company.id, viewMode),
+        billDate: { gte: startDate, lte: endDate },
+      },
+      select: {
+        id: true,
+        billDate: true,
+        description: true,
+        amount: true,
+        vatAmount: true,
+        netPaid: true,
+        Contact: { select: { name: true } },
+        Category: {
+          select: { id: true, name: true, Parent: { select: { name: true } } },
         },
-        _sum: { netReceived: true },
-        _count: true,
-      }),
-      prisma.expense.groupBy({
-        by: ["categoryId"],
-        where: expenseBaseWhere,
-        _sum: { netPaid: true },
-        _count: true,
-      }),
-      prisma.transactionCategory.findMany({
-        where: { companyId: company.id, parentId: { not: null } },
-        select: { id: true, name: true, Parent: { select: { name: true } } },
-      }),
-      prisma.expense.findMany({
-        where: expenseBaseWhere,
-        include: { Contact: true, Category: { include: { Parent: { select: { name: true } } } } },
-        orderBy: { billDate: "desc" },
-      }),
-      prisma.income.findMany({
-        where: {
-          ...buildIncomeBaseWhere(company.id),
-          receiveDate: { gte: startDate, lte: endDate },
-        },
-        include: { Contact: true },
-        orderBy: { receiveDate: "desc" },
-      }),
-    ]);
+      },
+      orderBy: { billDate: "desc" },
+    }),
+    prisma.income.findMany({
+      where: {
+        ...buildIncomeBaseWhere(company.id),
+        receiveDate: { gte: startDate, lte: endDate },
+      },
+      select: {
+        id: true,
+        receiveDate: true,
+        source: true,
+        amount: true,
+        vatAmount: true,
+        netReceived: true,
+        Contact: { select: { name: true } },
+      },
+      orderBy: { receiveDate: "desc" },
+    }),
+  ]);
 
-  const categoryMap = new Map(categories.map((c) => [c.id, c]));
-  const totalExpense = Number(expenseSum._sum.netPaid) || 0;
-  const totalIncome = Number(incomeSum._sum.netReceived) || 0;
-  const netCashFlow = totalIncome - totalExpense;
+  const expenseRows = allExpenses.map((e) => ({
+    id: e.id,
+    billDate: e.billDate.toISOString(),
+    description: e.description,
+    amount: Number(e.amount),
+    vatAmount: Number(e.vatAmount) || 0,
+    netPaid: Number(e.netPaid),
+    contactName: e.Contact?.name ?? null,
+    categoryName: e.Category
+      ? e.Category.Parent
+        ? `[${e.Category.Parent.name}] ${e.Category.name}`
+        : e.Category.name
+      : null,
+  }));
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return "ไม่ระบุหมวดหมู่";
-    const cat = categoryMap.get(categoryId);
-    return cat ? (cat.Parent ? `[${cat.Parent.name}] ${cat.name}` : cat.name) : "ไม่ระบุหมวดหมู่";
-  };
+  const incomeRows = allIncomes.map((i) => ({
+    id: i.id,
+    receiveDate: i.receiveDate.toISOString(),
+    source: i.source,
+    amount: Number(i.amount),
+    vatAmount: Number(i.vatAmount) || 0,
+    netReceived: Number(i.netReceived),
+    contactName: i.Contact?.name ?? null,
+  }));
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-primary/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">รายรับรวม</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(totalIncome)}</div>
-            <p className="text-xs text-muted-foreground mt-1">{incomeSum._count} รายการ</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200/50 dark:border-red-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">รายจ่ายรวม</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(totalExpense)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{expenseSum._count} รายการ</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className={
-            netCashFlow >= 0
-              ? "border-blue-200/50 dark:border-blue-800/50"
-              : "border-red-200/50 dark:border-red-800/50"
-          }
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              กระแสเงินสดสุทธิ
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${
-                netCashFlow >= 0
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-red-600 dark:text-red-400"
-              }`}
-            >
-              {formatCurrency(netCashFlow)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Export Button */}
-      <div className="flex justify-end">
-        <Button variant="outline" className="gap-2" asChild>
-          <a href={`/api/reports/export?company=${companyCode.toUpperCase()}&type=monthly&month=${month}&year=${year}&viewMode=${viewMode}`}>
-            <Download className="h-4 w-4" />
-            Export Excel
-          </a>
-        </Button>
-      </div>
-
-      {/* Expense by Category */}
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="px-4 py-3 border-b">
-          <h3 className="text-sm font-semibold text-foreground">รายจ่ายแยกตามหมวดหมู่</h3>
-        </div>
-        <CardContent className="pt-4">
-          {expenseByCategory.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">ไม่มีรายการในเดือนนี้</p>
-          ) : (
-            <div className="space-y-4">
-              {expenseByCategory
-                .sort((a, b) => (Number(b._sum?.netPaid) || 0) - (Number(a._sum?.netPaid) || 0))
-                .map((item) => {
-                  const amount = Number(item._sum?.netPaid) || 0;
-                  const percentage = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
-                  const lastDay = new Date(year, month, 0).getDate();
-                  const dateFromStr = `${year}-${String(month).padStart(2, "0")}-01`;
-                  const dateToStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-                  const filterParams = new URLSearchParams({
-                    dateFrom: dateFromStr,
-                    dateTo: dateToStr,
-                    ...(item.categoryId ? { category: item.categoryId } : {}),
-                  });
-                  const href = `/${companyCode}/expenses?${filterParams.toString()}`;
-                  return (
-                    <Link
-                      key={item.categoryId || "null"}
-                      href={href}
-                      className="block space-y-2 rounded-lg px-3 py-2 -mx-3 transition-colors hover:bg-muted/50"
-                    >
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">{getCategoryName(item.categoryId)}</span>
-                        <span>{formatCurrency(amount)}</span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{item._count} รายการ</span>
-                        <span>{percentage.toFixed(1)}%</span>
-                      </div>
-                    </Link>
-                  );
-                })}
-            </div>
-          )}
-        </CardContent>
-      </div>
-
-      {/* All Expenses Table */}
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="flex items-center px-4 py-3 border-b gap-2">
-          <TrendingDown className="h-5 w-5 text-red-500" />
-          <h3 className="text-sm font-semibold text-foreground">รายจ่ายทั้งหมด</h3>
-          <span className="text-xs text-muted-foreground">({allExpenses.length} รายการ)</span>
-        </div>
-        {allExpenses.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-sm text-muted-foreground">ไม่มีรายการในเดือนนี้</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">หมวดหมู่</TableHead>
-                  <TableHead className="text-muted-foreground font-medium text-right">ยอดเงิน</TableHead>
-                  <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
-                  <TableHead className="text-muted-foreground font-medium text-right">สุทธิ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allExpenses.map((expense) => (
-                  <TableRow
-                    key={expense.id}
-                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
-                  >
-                    <TableCell className="whitespace-nowrap">
-                      <Link
-                        href={`/${companyCode}/expenses/${expense.id}`}
-                        className="absolute inset-0"
-                        tabIndex={-1}
-                      />
-                      {expense.billDate.toLocaleDateString("th-TH")}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {expense.description || "-"}
-                    </TableCell>
-                    <TableCell className="max-w-[150px] truncate">
-                      {expense.Contact?.name || "-"}
-                    </TableCell>
-                    <TableCell className="max-w-[150px] truncate">
-                      {expense.Category
-                        ? expense.Category.Parent
-                          ? `[${expense.Category.Parent.name}] ${expense.Category.name}`
-                          : expense.Category.name
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(Number(expense.amount))}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {Number(expense.vatAmount) > 0
-                        ? formatCurrency(Number(expense.vatAmount))
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-red-600">
-                      {formatCurrency(Number(expense.netPaid))}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-
-      {/* All Incomes Table */}
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="flex items-center px-4 py-3 border-b gap-2">
-          <TrendingUp className="h-5 w-5 text-green-500" />
-          <h3 className="text-sm font-semibold text-foreground">รายรับทั้งหมด</h3>
-          <span className="text-xs text-muted-foreground">({allIncomes.length} รายการ)</span>
-        </div>
-        {allIncomes.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-sm text-muted-foreground">ไม่มีรายการในเดือนนี้</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-muted-foreground font-medium">วันที่</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
-                  <TableHead className="text-muted-foreground font-medium text-right">ยอดเงิน</TableHead>
-                  <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
-                  <TableHead className="text-muted-foreground font-medium text-right">สุทธิ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allIncomes.map((income) => (
-                  <TableRow
-                    key={income.id}
-                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
-                  >
-                    <TableCell className="whitespace-nowrap">
-                      <Link
-                        href={`/${companyCode}/incomes/${income.id}`}
-                        className="absolute inset-0"
-                        tabIndex={-1}
-                      />
-                      {income.receiveDate.toLocaleDateString("th-TH")}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">{income.source || "-"}</TableCell>
-                    <TableCell className="max-w-[150px] truncate">
-                      {income.Contact?.name || "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(Number(income.amount))}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {Number(income.vatAmount) > 0
-                        ? formatCurrency(Number(income.vatAmount))
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-primary">
-                      {formatCurrency(Number(income.netReceived))}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-    </div>
+    <MonthlySummaryContent
+      companyCode={companyCode}
+      year={year}
+      month={month}
+      allExpenses={expenseRows}
+      allIncomes={incomeRows}
+    />
   );
 }

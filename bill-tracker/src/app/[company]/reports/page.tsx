@@ -1,13 +1,13 @@
 import { Suspense } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ReportDateSelector } from "@/components/reports/ReportDateSelector";
+import { TabsContent } from "@/components/ui/tabs";
+import { ReportControlsBar } from "@/components/reports/ReportControlsBar";
+import { ReportTabs } from "@/components/reports/ReportTabs";
+import { ReportKpiRibbon } from "@/components/reports/ReportKpiRibbon";
 import { ReportDashboard } from "@/components/reports/ReportDashboard";
 import { VATReport } from "@/components/reports/VATReport";
 import { WHTReport } from "@/components/reports/WHTReport";
 import { MonthlySummary } from "@/components/reports/MonthlySummary";
 import { ReportSkeleton } from "@/components/reports/ReportSkeleton";
-import { ViewModeToggle } from "@/components/dashboard";
-import { LayoutDashboard, FileSpreadsheet, Calculator, FileText } from "lucide-react";
 
 interface ReportsPageProps {
   params: Promise<{ company: string }>;
@@ -20,97 +20,85 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
   const { company: companyCode } = await params;
   const { month, year, viewMode: viewModeParam, tab } = await searchParams;
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
-
-  const selectedYear = year ? parseInt(year) : currentYear;
-  const selectedMonth = month ? parseInt(month) : currentMonth;
+  const now = new Date();
+  const selectedYear = year ? parseInt(year) : now.getFullYear();
+  const selectedMonth = month ? parseInt(month) : now.getMonth() + 1;
   const viewMode: ViewMode = (viewModeParam as ViewMode) || "internal";
-  const defaultTab = tab || "overview";
+  const currentTab = tab || "overview";
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">รายงาน</h1>
-          <p className="text-muted-foreground">รายงานภาษีและสรุปรายรับ-รายจ่าย</p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <ViewModeToggle companyCode={companyCode} currentMode={viewMode} />
-          <ReportDateSelector
-            companyCode={companyCode}
-            currentMonth={selectedMonth}
-            currentYear={selectedYear}
-          />
-        </div>
+    <div className="flex flex-col min-h-0">
+      {/* Page title */}
+      <div className="px-4 pt-4 pb-2">
+        <h1 className="text-xl font-bold text-foreground">รายงาน</h1>
       </div>
 
-      {/* Report Tabs */}
-      <Tabs defaultValue={defaultTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="overview" className="gap-2">
-            <LayoutDashboard className="h-4 w-4" />
-            <span className="hidden sm:inline">ภาพรวม</span>
-          </TabsTrigger>
-          <TabsTrigger value="summary" className="gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">สรุปรายเดือน</span>
-          </TabsTrigger>
-          <TabsTrigger value="vat" className="gap-2">
-            <Calculator className="h-4 w-4" />
-            <span className="hidden sm:inline">VAT</span>
-          </TabsTrigger>
-          <TabsTrigger value="wht" className="gap-2">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">หัก ณ ที่จ่าย</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Sticky controls bar */}
+      <ReportControlsBar
+        companyCode={companyCode}
+        currentMonth={selectedMonth}
+        currentYear={selectedYear}
+        currentMode={viewMode}
+      />
 
-        <TabsContent value="overview">
-          <Suspense fallback={<ReportSkeleton />}>
-            <ReportDashboard
-              companyCode={companyCode}
-              year={selectedYear}
-              month={selectedMonth}
-              viewMode={viewMode}
-            />
-          </Suspense>
-        </TabsContent>
+      {/* Always-visible KPI ribbon */}
+      <Suspense fallback={<div className="h-[88px] animate-pulse bg-muted/40 border-b" />}>
+        <ReportKpiRibbon
+          companyCode={companyCode}
+          year={selectedYear}
+          month={selectedMonth}
+          viewMode={viewMode}
+        />
+      </Suspense>
 
-        <TabsContent value="summary">
-          <Suspense fallback={<ReportSkeleton />}>
-            <MonthlySummary
-              companyCode={companyCode}
-              year={selectedYear}
-              month={selectedMonth}
-              viewMode={viewMode}
-            />
-          </Suspense>
-        </TabsContent>
+      {/* Tab navigation + content */}
+      <div className="px-4 pt-4 pb-8 space-y-0">
+        <ReportTabs currentTab={currentTab}>
+          {/* Overview = charts + full detail tables */}
+          <TabsContent value="overview" className="space-y-6 mt-0">
+            <Suspense fallback={<ReportSkeleton />}>
+              <ReportDashboard
+                companyCode={companyCode}
+                year={selectedYear}
+                month={selectedMonth}
+                viewMode={viewMode}
+              />
+            </Suspense>
+            <Suspense fallback={<ReportSkeleton />}>
+              <MonthlySummary
+                companyCode={companyCode}
+                year={selectedYear}
+                month={selectedMonth}
+                viewMode={viewMode}
+              />
+            </Suspense>
+          </TabsContent>
 
-        <TabsContent value="vat">
-          <Suspense fallback={<ReportSkeleton />}>
-            <VATReport
-              companyCode={companyCode}
-              year={selectedYear}
-              month={selectedMonth}
-              viewMode={viewMode}
-            />
-          </Suspense>
-        </TabsContent>
+          {/* VAT */}
+          <TabsContent value="vat" className="mt-0">
+            <Suspense fallback={<ReportSkeleton />}>
+              <VATReport
+                companyCode={companyCode}
+                year={selectedYear}
+                month={selectedMonth}
+                viewMode={viewMode}
+              />
+            </Suspense>
+          </TabsContent>
 
-        <TabsContent value="wht">
-          <Suspense fallback={<ReportSkeleton />}>
-            <WHTReport
-              companyCode={companyCode}
-              year={selectedYear}
-              month={selectedMonth}
-              viewMode={viewMode}
-            />
-          </Suspense>
-        </TabsContent>
-      </Tabs>
+          {/* WHT */}
+          <TabsContent value="wht" className="mt-0">
+            <Suspense fallback={<ReportSkeleton />}>
+              <WHTReport
+                companyCode={companyCode}
+                year={selectedYear}
+                month={selectedMonth}
+                viewMode={viewMode}
+              />
+            </Suspense>
+          </TabsContent>
+        </ReportTabs>
+      </div>
     </div>
   );
 }

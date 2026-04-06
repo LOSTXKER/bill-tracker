@@ -176,40 +176,40 @@ export function TransactionFilters({
 
       {/* Date Range */}
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-8 px-2 text-sm font-normal",
-              dateRange?.from ? "text-foreground" : "text-muted-foreground"
-            )}
-          >
-            <Calendar className="mr-1.5 h-3.5 w-3.5" />
-            {dateRange?.from ? (
-              dateRange.to ? (
-                <span>
-                  {format(dateRange.from, "d MMM", { locale: th })} - {format(dateRange.to, "d MMM yy", { locale: th })}
-                </span>
+        <div className="flex items-center">
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-2 text-sm font-normal",
+                dateRange?.from ? "text-foreground" : "text-muted-foreground"
+              )}
+            >
+              <Calendar className="mr-1.5 h-3.5 w-3.5" />
+              {dateRange?.from ? (
+                dateRange.to ? (
+                  <span>
+                    {format(dateRange.from, "d MMM", { locale: th })} - {format(dateRange.to, "d MMM yy", { locale: th })}
+                  </span>
+                ) : (
+                  <span>{format(dateRange.from, "d MMM yy", { locale: th })}</span>
+                )
               ) : (
-                <span>{format(dateRange.from, "d MMM yy", { locale: th })}</span>
-              )
-            ) : (
-              "ช่วงวันที่"
-            )}
-            {(dateRange?.from || dateRange?.to) && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearDateRange();
-                }}
-                className="ml-1.5 hover:bg-muted rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </Button>
-        </PopoverTrigger>
+                "ช่วงวันที่"
+              )}
+            </Button>
+          </PopoverTrigger>
+          {(dateRange?.from || dateRange?.to) && (
+            <button
+              onClick={clearDateRange}
+              className="h-5 w-5 flex items-center justify-center hover:bg-muted rounded-full -ml-1"
+              aria-label="ล้างวันที่"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
         <PopoverContent className="w-auto p-0" align="start">
           {/* Date Presets */}
           <div className="flex gap-1 p-2 border-b bg-muted/30">

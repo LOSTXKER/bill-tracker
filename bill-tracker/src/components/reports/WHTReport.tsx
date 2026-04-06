@@ -2,18 +2,17 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Download } from "lucide-react";
+import { FileText, Scale } from "lucide-react";
 import { formatCurrency, calculateWHTSummary } from "@/lib/utils/tax-calculator";
 
 type ViewMode = "official" | "internal";
@@ -46,7 +45,9 @@ export async function WHTReport({
         billDate: { gte: startDate, lte: endDate },
         isWht: true,
       },
-      include: { Company: true, InternalCompany: true },
+      include: {
+        Contact: { select: { name: true, taxId: true } },
+      },
       orderBy: { billDate: "asc" },
     }),
     prisma.income.findMany({
@@ -54,6 +55,9 @@ export async function WHTReport({
         ...buildIncomeBaseWhere(company.id),
         receiveDate: { gte: startDate, lte: endDate },
         isWhtDeducted: true,
+      },
+      include: {
+        Contact: { select: { name: true, taxId: true } },
       },
       orderBy: { receiveDate: "asc" },
     }),
@@ -65,67 +69,17 @@ export async function WHTReport({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-red-200/50 dark:border-red-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              หักจากผู้ขาย (ต้องนำส่ง)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(summary.whtPaid)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {expenses.length} รายการ - ยื่น ภ.ง.ด.53
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              โดนหักจากลูกค้า (เครดิตภาษี)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {formatCurrency(summary.whtReceived)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{incomes.length} รายการ</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-muted">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">สุทธิ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {formatCurrency(summary.netWHT)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Export Button */}
-      <div className="flex justify-end">
-        <Button variant="outline" className="gap-2" asChild>
-          <a href={`/api/reports/export?company=${companyCode.toUpperCase()}&type=wht&month=${month}&year=${year}&viewMode=${viewMode}`}>
-            <Download className="h-4 w-4" />
-            Export Excel
-          </a>
-        </Button>
-      </div>
-
+    <div className="space-y-4">
       {/* WHT Paid Table */}
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b gap-2">
-          <FileText className="h-5 w-5 text-red-500" />
+          <FileText className="h-4 w-4 text-red-500 shrink-0" />
           <h3 className="text-sm font-semibold text-foreground">หัก ณ ที่จ่ายจากผู้ขาย</h3>
           <span className="text-xs text-muted-foreground">({expenses.length} รายการ)</span>
+          <div className="flex-1" />
+          <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+            {formatCurrency(summary.whtPaid)}
+          </span>
         </div>
         <p className="px-4 py-2 text-xs text-muted-foreground border-b">
           รายการที่ต้องนำส่งสรรพากร (ภ.ง.ด.53)
@@ -157,8 +111,15 @@ export async function WHTReport({
                       <Link href={`/${companyCode}/expenses/${expense.id}`} className="absolute inset-0" tabIndex={-1} />
                       {expense.billDate.toLocaleDateString("th-TH")}
                     </TableCell>
-                    <TableCell>{expense.description || "-"}</TableCell>
-                    <TableCell>-</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{expense.Contact?.name || expense.description || "-"}</div>
+                      {expense.description && expense.Contact?.name && (
+                        <div className="text-xs text-muted-foreground truncate max-w-[160px]">{expense.description}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {expense.Contact?.taxId || "-"}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(expense.amount))}
                     </TableCell>
@@ -169,17 +130,47 @@ export async function WHTReport({
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-sm font-semibold">
+                    รวม {expenses.length} รายการ
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatCurrency(expenses.reduce((s, e) => s + Number(e.amount), 0))}
+                  </TableCell>
+                  <TableCell />
+                  <TableCell className="text-right font-semibold text-red-600">
+                    {formatCurrency(summary.whtPaid)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
             </Table>
           </div>
         )}
       </div>
 
+      {/* Net WHT banner */}
+      <div className="flex items-center gap-4 rounded-lg border px-4 py-3 bg-muted/30">
+        <Scale className="h-4 w-4 text-purple-500 shrink-0" />
+        <span className="text-sm font-medium text-foreground">สุทธิ WHT ที่ต้องนำส่ง</span>
+        <span className="text-base font-bold text-purple-600 dark:text-purple-400">
+          {formatCurrency(summary.netWHT)}
+        </span>
+        <span className="text-xs text-muted-foreground ml-auto">
+          หักจากผู้ขาย {formatCurrency(summary.whtPaid)} − เครดิตจากลูกค้า {formatCurrency(summary.whtReceived)}
+        </span>
+      </div>
+
       {/* WHT Received Table */}
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b gap-2">
-          <FileText className="h-5 w-5 text-green-500" />
+          <FileText className="h-4 w-4 text-emerald-500 shrink-0" />
           <h3 className="text-sm font-semibold text-foreground">โดนหัก ณ ที่จ่ายจากลูกค้า</h3>
           <span className="text-xs text-muted-foreground">({incomes.length} รายการ)</span>
+          <div className="flex-1" />
+          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+            {formatCurrency(summary.whtReceived)}
+          </span>
         </div>
         <p className="px-4 py-2 text-xs text-muted-foreground border-b">
           ใช้เป็นเครดิตภาษี (ต้องได้รับใบ 50 ทวิ)
@@ -211,12 +202,17 @@ export async function WHTReport({
                       <Link href={`/${companyCode}/incomes/${income.id}`} className="absolute inset-0" tabIndex={-1} />
                       {income.receiveDate.toLocaleDateString("th-TH")}
                     </TableCell>
-                    <TableCell>{income.source || "-"}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{income.Contact?.name || income.source || "-"}</div>
+                      {income.source && income.Contact?.name && (
+                        <div className="text-xs text-muted-foreground truncate max-w-[160px]">{income.source}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(Number(income.amount))}
                     </TableCell>
                     <TableCell className="text-center">{Number(income.whtRate)}%</TableCell>
-                    <TableCell className="text-right text-green-600">
+                    <TableCell className="text-right text-emerald-600">
                       {formatCurrency(Number(income.whtAmount) || 0)}
                     </TableCell>
                     <TableCell className="text-center relative">
@@ -233,6 +229,21 @@ export async function WHTReport({
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={2} className="text-sm font-semibold">
+                    รวม {incomes.length} รายการ
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatCurrency(incomes.reduce((s, i) => s + Number(i.amount), 0))}
+                  </TableCell>
+                  <TableCell />
+                  <TableCell className="text-right font-semibold text-emerald-600">
+                    {formatCurrency(summary.whtReceived)}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableFooter>
             </Table>
           </div>
         )}

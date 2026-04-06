@@ -2,17 +2,16 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Download } from "lucide-react";
+import { TrendingUp, TrendingDown, Receipt } from "lucide-react";
 import { formatCurrency, calculateVATSummary } from "@/lib/utils/tax-calculator";
 
 type ViewMode = "official" | "internal";
@@ -65,84 +64,17 @@ export async function VATReport({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-blue-200/50 dark:border-blue-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              ภาษีซื้อ (Input VAT)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {formatCurrency(summary.inputVAT)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              จากรายจ่าย {expenses.length} รายการ
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              ภาษีขาย (Output VAT)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {formatCurrency(summary.outputVAT)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              จากรายรับ {incomes.length} รายการ
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className={
-            summary.netVAT >= 0
-              ? "border-red-200/50 dark:border-red-800/50"
-              : "border-primary/50 bg-primary/10"
-          }
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {summary.netVAT >= 0 ? "ต้องชำระ" : "ขอคืน"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${
-                summary.netVAT >= 0
-                  ? "text-red-600 dark:text-red-400"
-                  : "text-primary"
-              }`}
-            >
-              {formatCurrency(Math.abs(summary.netVAT))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">สำหรับยื่น ภ.พ.30</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Export Button */}
-      <div className="flex justify-end">
-        <Button variant="outline" className="gap-2" asChild>
-          <a href={`/api/reports/export?company=${companyCode.toUpperCase()}&type=vat&month=${month}&year=${year}&viewMode=${viewMode}`}>
-            <Download className="h-4 w-4" />
-            Export Excel
-          </a>
-        </Button>
-      </div>
-
+    <div className="space-y-4">
       {/* Input VAT Table */}
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b gap-2">
-          <TrendingDown className="h-5 w-5 text-blue-500" />
+          <TrendingDown className="h-4 w-4 text-blue-500 shrink-0" />
           <h3 className="text-sm font-semibold text-foreground">รายการภาษีซื้อ</h3>
           <span className="text-xs text-muted-foreground">({expenses.length} รายการ)</span>
+          <div className="flex-1" />
+          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+            {formatCurrency(summary.inputVAT)}
+          </span>
         </div>
         {expenses.length === 0 ? (
           <div className="text-center py-12">
@@ -189,17 +121,64 @@ export async function VATReport({
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-sm font-semibold">
+                    รวม {expenses.length} รายการ
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatCurrency(expenses.reduce((s, e) => s + Number(e.amount), 0))}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-blue-600">
+                    {formatCurrency(summary.inputVAT)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
             </Table>
           </div>
         )}
       </div>
 
+      {/* Net VAT banner */}
+      <div
+        className={`flex items-center gap-4 rounded-lg border px-4 py-3 ${
+          summary.netVAT >= 0
+            ? "border-red-200/70 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/20"
+            : "border-emerald-200/70 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20"
+        }`}
+      >
+        <Receipt
+          className={`h-4 w-4 shrink-0 ${
+            summary.netVAT >= 0 ? "text-red-500" : "text-emerald-500"
+          }`}
+        />
+        <span className="text-sm font-medium text-foreground">
+          {summary.netVAT >= 0 ? "VAT ที่ต้องชำระ" : "VAT ที่ขอคืนได้"}
+        </span>
+        <span
+          className={`text-base font-bold ${
+            summary.netVAT >= 0
+              ? "text-red-600 dark:text-red-400"
+              : "text-emerald-600 dark:text-emerald-400"
+          }`}
+        >
+          {formatCurrency(Math.abs(summary.netVAT))}
+        </span>
+        <span className="text-xs text-muted-foreground ml-auto">
+          ภาษีซื้อ {formatCurrency(summary.inputVAT)} − ภาษีขาย {formatCurrency(summary.outputVAT)} · สำหรับยื่น ภ.พ.30
+        </span>
+      </div>
+
       {/* Output VAT Table */}
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
+          <TrendingUp className="h-4 w-4 text-primary shrink-0" />
           <h3 className="text-sm font-semibold text-foreground">รายการภาษีขาย</h3>
           <span className="text-xs text-muted-foreground">({incomes.length} รายการ)</span>
+          <div className="flex-1" />
+          <span className="text-sm font-semibold text-primary">
+            {formatCurrency(summary.outputVAT)}
+          </span>
         </div>
         {incomes.length === 0 ? (
           <div className="text-center py-12">
@@ -246,6 +225,19 @@ export async function VATReport({
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-sm font-semibold">
+                    รวม {incomes.length} รายการ
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatCurrency(incomes.reduce((s, i) => s + Number(i.amount), 0))}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-primary">
+                    {formatCurrency(summary.outputVAT)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
             </Table>
           </div>
         )}
