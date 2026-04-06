@@ -87,6 +87,8 @@ export interface TransactionData {
   submittedBy?: string | null;
   // Foreign currency
   originalCurrency?: string | null;
+  // Settlement transfer flag
+  isSettlementTransfer?: boolean;
 }
 
 interface TransactionTableRowProps {
@@ -315,13 +317,20 @@ function TransactionTableRowInner({
 
       {/* Description/Source */}
       <TableCell>
-        {description ? (
-          <p className="text-sm text-muted-foreground truncate max-w-xs">
-            {description}
-          </p>
-        ) : (
-          <span className="text-xs text-muted-foreground">-</span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {transaction.isSettlementTransfer && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+              โอนคืน
+            </Badge>
+          )}
+          {description ? (
+            <p className="text-sm text-muted-foreground truncate max-w-xs">
+              {description}
+            </p>
+          ) : (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+        </div>
       </TableCell>
 
       {/* Internal Company (cross-company expense indicator) */}

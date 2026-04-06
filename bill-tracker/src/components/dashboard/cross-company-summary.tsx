@@ -5,6 +5,8 @@ import { ArrowRightLeft, ArrowUpRight, ArrowDownLeft, Building2 } from "lucide-r
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { prisma } from "@/lib/db";
 import { getCompanyId } from "@/lib/cache/company";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 
 interface CrossCompanySummaryProps {
   companyCode: string;
@@ -14,17 +16,17 @@ export async function CrossCompanySummary({ companyCode }: CrossCompanySummaryPr
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const thaiNow = toThaiLocalDate(new Date());
+  const { startDate, endDate } = getThaiMonthRange(thaiNow.getFullYear(), thaiNow.getMonth() + 1);
 
   const [paidForOthers, paidByOthers] = await Promise.all([
     // Expenses we paid for other companies (our companyId, different internalCompanyId)
     prisma.expense.aggregate({
       where: {
+        ...reimbursementFilter,
         companyId: companyId,
         internalCompanyId: { not: companyId },
-        billDate: { gte: startOfMonth, lte: endOfMonth },
+        billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },
       _sum: { netPaid: true },
@@ -33,9 +35,10 @@ export async function CrossCompanySummary({ companyCode }: CrossCompanySummaryPr
     // Expenses other companies paid for us (different companyId, our internalCompanyId)
     prisma.expense.aggregate({
       where: {
+        ...reimbursementFilter,
         companyId: { not: companyId },
         internalCompanyId: companyId,
-        billDate: { gte: startOfMonth, lte: endOfMonth },
+        billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
       },
       _sum: { netPaid: true },

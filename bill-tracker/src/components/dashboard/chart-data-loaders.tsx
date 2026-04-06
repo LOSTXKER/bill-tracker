@@ -6,6 +6,8 @@ import { ExpenseCategoryChart } from "@/components/charts/expense-category-chart
 import { MonthlyTrendChart } from "@/components/charts/monthly-trend-chart";
 import { getCompanyId } from "@/lib/cache/company";
 import { getMonthlyChartData } from "@/lib/cache/chart-data";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 
 export async function CashFlowChartData({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
@@ -38,20 +40,19 @@ export async function ExpenseCategoryChartData({ companyCode }: { companyCode: s
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const thaiNow = toThaiLocalDate(new Date());
+  const { startDate, endDate } = getThaiMonthRange(thaiNow.getFullYear(), thaiNow.getMonth() + 1);
 
-  const baseDateFilter = { companyId, billDate: { gte: startOfMonth, lte: endOfMonth }, deletedAt: null };
+  const baseWhere = { ...buildExpenseBaseWhere(companyId), billDate: { gte: startDate, lte: endDate } };
 
   const [expenseByAccount, uncategorized] = await Promise.all([
     prisma.expense.groupBy({
       by: ["accountId"],
-      where: { ...baseDateFilter, accountId: { not: null } },
+      where: { ...baseWhere, accountId: { not: null } },
       _sum: { netPaid: true },
     }),
     prisma.expense.aggregate({
-      where: { ...baseDateFilter, accountId: null },
+      where: { ...baseWhere, accountId: null },
       _sum: { netPaid: true },
       _count: true,
     }),
@@ -98,16 +99,15 @@ export async function DataQualityStats({ companyCode }: { companyCode: string })
   const companyId = await getCompanyId(companyCode);
   if (!companyId) return null;
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const thaiNow = toThaiLocalDate(new Date());
+  const { startDate, endDate } = getThaiMonthRange(thaiNow.getFullYear(), thaiNow.getMonth() + 1);
 
-  const baseDateFilter = { companyId, billDate: { gte: startOfMonth, lte: endOfMonth }, deletedAt: null };
+  const baseWhere = { ...buildExpenseBaseWhere(companyId), billDate: { gte: startDate, lte: endDate } };
 
   const [total, noAccount, noContact] = await Promise.all([
-    prisma.expense.count({ where: baseDateFilter }),
-    prisma.expense.count({ where: { ...baseDateFilter, accountId: null } }),
-    prisma.expense.count({ where: { ...baseDateFilter, contactId: null } }),
+    prisma.expense.count({ where: baseWhere }),
+    prisma.expense.count({ where: { ...baseWhere, accountId: null } }),
+    prisma.expense.count({ where: { ...baseWhere, contactId: null } }),
   ]);
 
   if (total === 0) return null;

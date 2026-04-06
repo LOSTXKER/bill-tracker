@@ -8,6 +8,8 @@
 import { prisma } from "@/lib/db";
 import { sendTextMessage } from "./line-messaging";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 interface WhtReminderResult {
   success: boolean;
@@ -66,12 +68,12 @@ export async function sendWhtDeadlineReminders(): Promise<WhtReminderResult> {
 
         // Check if we should send reminder
         if (daysUntilDeadline <= company.whtReminderDays && daysUntilDeadline >= 0) {
-          // Get WHT summary for current month
-          const startOfMonth = new Date(currentYear, currentMonth, 1);
-          const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+          // Get WHT summary for current month (Thailand timezone)
+          const { startDate: startOfMonth, endDate: endOfMonth } = getThaiMonthRange(currentYear, currentMonth + 1);
 
           const expensesWithWht = await prisma.expense.aggregate({
             where: {
+              ...reimbursementFilter,
               companyId: company.id,
               deletedAt: null,
               isWht: true,
@@ -187,6 +189,7 @@ export async function sendPendingDocsReminders(): Promise<WhtReminderResult> {
 async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promise<PendingDocsSummary> {
   const pendingTaxInvoice = await prisma.expense.count({
     where: {
+      ...reimbursementFilter,
       companyId,
       deletedAt: null,
       workflowStatus: "ACTIVE",
@@ -197,6 +200,7 @@ async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promi
 
   const pendingWhtIssue = await prisma.expense.count({
     where: {
+      ...reimbursementFilter,
       companyId,
       deletedAt: null,
       workflowStatus: "ACTIVE",
@@ -208,8 +212,7 @@ async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promi
 
   const pendingWhtCert = await prisma.income.count({
     where: {
-      companyId,
-      deletedAt: null,
+      ...buildIncomeBaseWhere(companyId),
       workflowStatus: "ACTIVE",
       isWhtDeducted: true,
       hasWhtCert: false,
@@ -220,6 +223,7 @@ async function getPendingDocsSummary(companyId: string, cutoffDate: Date): Promi
   // Total WHT to pay
   const whtAgg = await prisma.expense.aggregate({
     where: {
+      ...reimbursementFilter,
       companyId,
       deletedAt: null,
       isWht: true,

@@ -25,7 +25,7 @@ export const getCompanyByCode = unstable_cache(
     });
   },
   ["company-by-code"],
-  { revalidate: 3600 } // Cache for 1 hour
+  { revalidate: 3600, tags: ["company"] }
 );
 
 /**
@@ -42,5 +42,5 @@ export const getCompanyId = unstable_cache(
     });
   },
   ["company-id"],
-  { revalidate: 3600 }
+  { revalidate: 3600, tags: ["company"] }
 );

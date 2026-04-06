@@ -1,167 +1,35 @@
+/**
+ * document-workflow-service.ts
+ *
+ * Core orchestrator for the document workflow module.
+ * - Exports `WorkflowError`, `WorkflowActionParams`, `executeWorkflowAction`
+ * - Re-exports query types and functions from document-workflow-queries.ts
+ *
+ * Action-resolution logic lives in document-workflow-actions.ts.
+ * Data-fetching for pending items lives in document-workflow-queries.ts.
+ */
+
 import { prisma } from "@/lib/db";
-import type { Expense, Income, Contact } from "@prisma/client";
-import {
-  DocumentEventType,
-  WorkflowStatus,
-  Prisma,
-} from "@prisma/client";
+import type { Expense, Income } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { REVERT_MAP } from "./status-rules";
 import { checkPermissionFromAccess } from "@/lib/permissions/checker";
+import { resolveExpenseAction, resolveIncomeAction, WorkflowError } from "./document-workflow-actions";
 
-type ExpenseWithContact = Expense & { Contact: Contact | null; contact: Contact | null };
-type IncomeWithContact = Income & { Contact: Contact | null; contact: Contact | null };
+// Re-export the error class so callers can import it from the canonical entry point
+export { WorkflowError };
 
-export type WorkflowExpenseItem = ExpenseWithContact & { pendingType: string };
-export type WorkflowIncomeItem = IncomeWithContact & { pendingType: string };
+// Re-export everything callers need from the split modules
+export type {
+  WorkflowExpenseItem,
+  WorkflowIncomeItem,
+  WorkflowPendingResults,
+} from "./document-workflow-queries";
+export { getWorkflowPendingItems } from "./document-workflow-queries";
 
-export class WorkflowError extends Error {
-  constructor(
-    message: string,
-    public code: "NOT_FOUND" | "FORBIDDEN" | "BAD_REQUEST"
-  ) {
-    super(message);
-  }
-}
-
-export interface WorkflowPendingResults {
-  expenses: WorkflowExpenseItem[];
-  incomes: WorkflowIncomeItem[];
-  summary: {
-    pendingTaxInvoice: number;
-    pendingWhtIssue: number;
-    pendingWhtCert: number;
-    pendingAccounting: number;
-    total: number;
-  };
-}
-
-export async function getWorkflowPendingItems(
-  companyId: string,
-  type: string
-): Promise<WorkflowPendingResults> {
-  const results: WorkflowPendingResults = {
-    expenses: [],
-    incomes: [],
-    summary: {
-      pendingTaxInvoice: 0,
-      pendingWhtIssue: 0,
-      pendingWhtCert: 0,
-      pendingAccounting: 0,
-      total: 0,
-    },
-  };
-
-  if (type === "all" || type === "expense") {
-    const pendingTaxInvoiceRaw = await prisma.expense.findMany({
-      where: {
-        companyId,
-        deletedAt: null,
-        workflowStatus: "ACTIVE",
-        hasTaxInvoice: false,
-        documentType: { not: "NO_DOCUMENT" },
-      },
-      include: { Contact: true },
-      orderBy: { billDate: "desc" },
-      take: 50,
-    });
-    const pendingTaxInvoice = pendingTaxInvoiceRaw.map((e) => ({
-      ...e,
-      contact: e.Contact,
-    }));
-
-    const pendingWhtIssueRaw = await prisma.expense.findMany({
-      where: {
-        companyId,
-        deletedAt: null,
-        isWht: true,
-        workflowStatus: "ACTIVE",
-        hasWhtCert: false,
-      },
-      include: { Contact: true },
-      orderBy: { billDate: "desc" },
-      take: 50,
-    });
-    const pendingWhtIssue = pendingWhtIssueRaw.map((e) => ({
-      ...e,
-      contact: e.Contact,
-    }));
-
-    const pendingAccountingRaw = await prisma.expense.findMany({
-      where: {
-        companyId,
-        deletedAt: null,
-        workflowStatus: "READY_FOR_ACCOUNTING",
-      },
-      include: { Contact: true },
-      orderBy: { billDate: "desc" },
-      take: 50,
-    });
-    const pendingAccounting = pendingAccountingRaw.map((e) => ({
-      ...e,
-      contact: e.Contact,
-    }));
-
-    results.expenses = [
-      ...pendingTaxInvoice.map((e) => ({ ...e, pendingType: "TAX_INVOICE" })),
-      ...pendingWhtIssue.map((e) => ({ ...e, pendingType: "WHT_ISSUE" })),
-      ...pendingAccounting.map((e) => ({ ...e, pendingType: "ACCOUNTING" })),
-    ];
-
-    results.summary.pendingTaxInvoice = pendingTaxInvoice.length;
-    results.summary.pendingWhtIssue = pendingWhtIssue.length;
-  }
-
-  if (type === "all" || type === "income") {
-    const pendingWhtCertRaw = await prisma.income.findMany({
-      where: {
-        companyId,
-        deletedAt: null,
-        isWhtDeducted: true,
-        workflowStatus: "ACTIVE",
-        hasWhtCert: false,
-      },
-      include: { Contact: true },
-      orderBy: { receiveDate: "desc" },
-      take: 50,
-    });
-    const pendingWhtCert = pendingWhtCertRaw.map((i) => ({
-      ...i,
-      contact: i.Contact,
-    }));
-
-    const pendingAccountingIncomeRaw = await prisma.income.findMany({
-      where: {
-        companyId,
-        deletedAt: null,
-        workflowStatus: "READY_FOR_ACCOUNTING",
-      },
-      include: { Contact: true },
-      orderBy: { receiveDate: "desc" },
-      take: 50,
-    });
-    const pendingAccountingIncome = pendingAccountingIncomeRaw.map((i) => ({
-      ...i,
-      contact: i.Contact,
-    }));
-
-    results.incomes = [
-      ...pendingWhtCert.map((i) => ({ ...i, pendingType: "WHT_CERT" })),
-      ...pendingAccountingIncome.map((i) => ({
-        ...i,
-        pendingType: "ACCOUNTING",
-      })),
-    ];
-
-    results.summary.pendingWhtCert = pendingWhtCert.length;
-  }
-
-  results.summary.pendingAccounting =
-    results.expenses.filter((e) => e.pendingType === "ACCOUNTING").length +
-    results.incomes.filter((i) => i.pendingType === "ACCOUNTING").length;
-  results.summary.total = results.expenses.length + results.incomes.length;
-
-  return results;
-}
+// =============================================================================
+// Action execution
+// =============================================================================
 
 export interface WorkflowActionParams {
   companyId: string;
@@ -177,7 +45,7 @@ export interface WorkflowActionParams {
 async function checkRevertPermission(
   userId: string,
   companyId: string,
-  transactionType: string,
+  transactionType: string
 ) {
   const access = await prisma.companyAccess.findUnique({
     where: { userId_companyId: { userId, companyId } },
@@ -186,188 +54,12 @@ async function checkRevertPermission(
     throw new WorkflowError("ไม่มีสิทธิ์เข้าถึง", "FORBIDDEN");
   }
 
-  const requiredPerm = transactionType === "expense"
-    ? "expenses:change-status"
-    : "incomes:change-status";
+  const requiredPerm =
+    transactionType === "expense" ? "expenses:change-status" : "incomes:change-status";
 
   if (checkPermissionFromAccess(access, requiredPerm)) return;
 
-  throw new WorkflowError(
-    "คุณไม่มีสิทธิ์ย้อนสถานะ",
-    "FORBIDDEN"
-  );
-}
-
-function resolveExpenseAction(
-  action: string,
-  expense: { isWht: boolean; workflowStatus: string; documentType: string; hasTaxInvoice: boolean; hasWhtCert: boolean; whtCertSentAt: Date | null },
-  targetStatus: string | undefined,
-  now: Date
-): {
-  updateData: Record<string, unknown>;
-  newStatus: WorkflowStatus | null;
-  eventType: DocumentEventType | null;
-} {
-  const updateData: Record<string, unknown> = {};
-  let newStatus: WorkflowStatus | null = null;
-  let eventType: DocumentEventType | null = null;
-
-  switch (action) {
-    case "mark_tax_invoice_requested": {
-      updateData.taxInvoiceRequestedAt = now;
-      eventType = "TAX_INVOICE_REQUESTED";
-      break;
-    }
-    case "cancel_tax_invoice_request": {
-      updateData.taxInvoiceRequestedAt = null;
-      eventType = "TAX_INVOICE_REQUESTED";
-      break;
-    }
-    case "receive_tax_invoice": {
-      updateData.hasTaxInvoice = true;
-      updateData.taxInvoiceAt = now;
-      eventType = "TAX_INVOICE_RECEIVED";
-      break;
-    }
-    case "skip_to_wht":
-    case "skip_to_accounting": {
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "issue_wht": {
-      updateData.hasWhtCert = true;
-      updateData.whtCertIssuedAt = now;
-      eventType = "WHT_CERT_ISSUED";
-      break;
-    }
-    case "send_wht": {
-      updateData.whtCertSentAt = now;
-      eventType = "WHT_CERT_SENT";
-      break;
-    }
-    case "undo_receive_tax_invoice": {
-      updateData.hasTaxInvoice = false;
-      updateData.taxInvoiceAt = null;
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "undo_issue_wht": {
-      updateData.hasWhtCert = false;
-      updateData.whtCertIssuedAt = null;
-      updateData.whtCertSentAt = null;
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "undo_send_wht": {
-      updateData.whtCertSentAt = null;
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "mark_ready_for_accounting":
-      newStatus = "READY_FOR_ACCOUNTING";
-      eventType = "STATUS_CHANGED";
-      break;
-    case "send_to_accounting":
-      updateData.sentToAccountAt = now;
-      newStatus = "SENT_TO_ACCOUNTANT";
-      eventType = "SENT_TO_ACCOUNTANT";
-      updateData.status = "SENT_TO_ACCOUNT";
-      break;
-    case "complete":
-      newStatus = "COMPLETED";
-      eventType = "STATUS_CHANGED";
-      break;
-    case "revert":
-      newStatus = targetStatus as WorkflowStatus;
-      eventType = "STATUS_CHANGED";
-      break;
-    default:
-      throw new WorkflowError(`Unknown action: ${action}`, "BAD_REQUEST");
-  }
-
-  if (newStatus) updateData.workflowStatus = newStatus;
-  return { updateData, newStatus, eventType };
-}
-
-function resolveIncomeAction(
-  action: string,
-  income: { isWhtDeducted: boolean; workflowStatus: string; hasInvoice: boolean; invoiceSentAt: Date | null; hasWhtCert: boolean },
-  targetStatus: string | undefined,
-  now: Date
-): {
-  updateData: Record<string, unknown>;
-  newStatus: WorkflowStatus | null;
-  eventType: DocumentEventType | null;
-} {
-  const updateData: Record<string, unknown> = {};
-  let newStatus: WorkflowStatus | null = null;
-  let eventType: DocumentEventType | null = null;
-
-  switch (action) {
-    case "issue_invoice": {
-      updateData.hasInvoice = true;
-      updateData.invoiceIssuedAt = now;
-      eventType = "INVOICE_ISSUED";
-      break;
-    }
-    case "send_invoice": {
-      updateData.invoiceSentAt = now;
-      eventType = "INVOICE_SENT";
-      break;
-    }
-    case "receive_wht": {
-      updateData.hasWhtCert = true;
-      updateData.whtCertReceivedAt = now;
-      eventType = "WHT_CERT_RECEIVED";
-      break;
-    }
-    case "remind_wht":
-      updateData.whtCertRemindedAt = now;
-      updateData.whtCertRemindCount = { increment: 1 };
-      eventType = "WHT_REMINDER_SENT";
-      break;
-    case "undo_issue_invoice": {
-      updateData.hasInvoice = false;
-      updateData.invoiceIssuedAt = null;
-      updateData.invoiceSentAt = null;
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "undo_send_invoice": {
-      updateData.invoiceSentAt = null;
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "undo_receive_wht": {
-      updateData.hasWhtCert = false;
-      updateData.whtCertReceivedAt = null;
-      eventType = "STATUS_CHANGED";
-      break;
-    }
-    case "mark_ready_for_accounting":
-      newStatus = "READY_FOR_ACCOUNTING";
-      eventType = "STATUS_CHANGED";
-      break;
-    case "send_to_accounting":
-      updateData.sentToAccountAt = now;
-      newStatus = "SENT_TO_ACCOUNTANT";
-      eventType = "SENT_TO_ACCOUNTANT";
-      updateData.status = "SENT_COPY";
-      break;
-    case "complete":
-      newStatus = "COMPLETED";
-      eventType = "STATUS_CHANGED";
-      break;
-    case "revert":
-      newStatus = targetStatus as WorkflowStatus;
-      eventType = "STATUS_CHANGED";
-      break;
-    default:
-      throw new WorkflowError(`Unknown action: ${action}`, "BAD_REQUEST");
-  }
-
-  if (newStatus) updateData.workflowStatus = newStatus;
-  return { updateData, newStatus, eventType };
+  throw new WorkflowError("คุณไม่มีสิทธิ์ย้อนสถานะ", "FORBIDDEN");
 }
 
 export async function executeWorkflowAction(
@@ -436,7 +128,7 @@ export async function executeWorkflowAction(
             fromStatus: expense.workflowStatus,
             toStatus: newStatus,
             notes: notes || null,
-            metadata: metadata as Prisma.InputJsonValue ?? undefined,
+            metadata: (metadata as Prisma.InputJsonValue) ?? undefined,
             createdBy: userId,
           },
         });
@@ -485,7 +177,7 @@ export async function executeWorkflowAction(
             fromStatus: income.workflowStatus,
             toStatus: newStatus,
             notes: notes || null,
-            metadata: metadata as Prisma.InputJsonValue ?? undefined,
+            metadata: (metadata as Prisma.InputJsonValue) ?? undefined,
             createdBy: userId,
           },
         });

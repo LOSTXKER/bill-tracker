@@ -1,5 +1,7 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
+import { buildExpenseBaseWhere, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export interface MonthlyDataPoint {
   month: string;
@@ -10,12 +12,11 @@ export interface MonthlyDataPoint {
 }
 
 /**
- * Fetches 6 months of income and expense aggregates using 2 queries instead of 12.
- * Groups results by month in JS after fetching.
+ * Inner implementation — not exported directly; call via the cached wrapper below.
  */
-export async function getMonthlyChartData(
+async function _getMonthlyChartDataImpl(
   companyId: string,
-  numMonths: number = 6
+  numMonths: number
 ): Promise<MonthlyDataPoint[]> {
   const now = toThaiLocalDate(new Date());
   const startMonth = now.getMonth() - (numMonths - 1) + 1; // 1-based
@@ -28,17 +29,15 @@ export async function getMonthlyChartData(
   const [incomes, expenses] = await Promise.all([
     prisma.income.findMany({
       where: {
-        companyId,
+        ...buildIncomeBaseWhere(companyId),
         receiveDate: { gte: startDate },
-        deletedAt: null,
       },
       select: { receiveDate: true, netReceived: true },
     }),
     prisma.expense.findMany({
       where: {
-        companyId,
+        ...buildExpenseBaseWhere(companyId),
         billDate: { gte: startDate },
-        deletedAt: null,
       },
       select: { billDate: true, netPaid: true },
     }),
@@ -80,6 +79,27 @@ export async function getMonthlyChartData(
       netFlow: income - expense,
     };
   });
+}
+
+/**
+ * Cached version: revalidates when expense-stats or income-stats change
+ * (same tags as stats.ts, so any transaction create/update busts this too).
+ * Revalidates every 60 s at most.
+ */
+const _cachedGetMonthlyChartData = unstable_cache(
+  _getMonthlyChartDataImpl,
+  ["chart-data"],
+  { revalidate: 60, tags: ["expense-stats", "income-stats"] }
+);
+
+/**
+ * Public API: fetches 6 months of income and expense aggregates.
+ */
+export async function getMonthlyChartData(
+  companyId: string,
+  numMonths: number = 6
+): Promise<MonthlyDataPoint[]> {
+  return _cachedGetMonthlyChartData(companyId, numMonths);
 }
 
 /**

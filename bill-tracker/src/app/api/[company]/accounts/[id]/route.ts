@@ -123,13 +123,13 @@ async function handleDelete(
       return apiResponse.error(ApiErrors.forbidden("ไม่สามารถลบบัญชีระบบได้"));
     }
 
-    // Check if account is in use
+    // Check if account is in use (scoped to company to prevent cross-tenant count)
     const [expenseCount, incomeCount] = await Promise.all([
       prisma.expense.count({
-        where: { accountId: context.params.id },
+        where: { accountId: context.params.id, companyId: context.company.id, deletedAt: null },
       }),
       prisma.income.count({
-        where: { accountId: context.params.id },
+        where: { accountId: context.params.id, companyId: context.company.id, deletedAt: null },
       }),
     ]);
 

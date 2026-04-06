@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,7 @@ export async function WHTReport({
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        ...buildExpenseBaseWhere(company.id),
+        ...buildExpenseWhereForMode(company.id, viewMode),
         billDate: { gte: startDate, lte: endDate },
         isWht: true,
       },
@@ -51,10 +51,9 @@ export async function WHTReport({
     }),
     prisma.income.findMany({
       where: {
-        companyId: company.id,
+        ...buildIncomeBaseWhere(company.id),
         receiveDate: { gte: startDate, lte: endDate },
         isWhtDeducted: true,
-        deletedAt: null,
       },
       orderBy: { receiveDate: "asc" },
     }),

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { apiResponse } from "@/lib/api/response";
+import { revalidateTag } from "next/cache";
 
 /**
  * PATCH /api/companies/[id]
@@ -49,6 +50,9 @@ export async function PATCH(
       where: { id },
       data: updateData,
     });
+
+    // Bust the company lookup caches so name/logo changes are reflected immediately
+    revalidateTag("company", {});
 
     return apiResponse.success(updated);
   } catch (error) {

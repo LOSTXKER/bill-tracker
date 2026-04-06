@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { getCompanyId } from "@/lib/cache/company";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export async function ActionRequired({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
@@ -14,25 +15,25 @@ export async function ActionRequired({ companyCode }: { companyCode: string }) {
   const [waitingDocs, waitingWht, waitingIssue, whtPendingIssue] = await Promise.all([
     // Expenses waiting for tax invoice
     prisma.expense.findMany({
-      where: { companyId, workflowStatus: "ACTIVE", hasTaxInvoice: false, documentType: { not: "NO_DOCUMENT" }, deletedAt: null },
+      where: { ...reimbursementFilter, companyId, workflowStatus: "ACTIVE", hasTaxInvoice: false, documentType: { not: "NO_DOCUMENT" }, deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),
     // Incomes waiting for WHT cert from customer
     prisma.income.findMany({
-      where: { companyId, workflowStatus: "ACTIVE", isWhtDeducted: true, hasWhtCert: false, deletedAt: null },
+      where: { ...buildIncomeBaseWhere(companyId), workflowStatus: "ACTIVE", isWhtDeducted: true, hasWhtCert: false },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
     // Incomes waiting to issue invoice
     prisma.income.findMany({
-      where: { companyId, workflowStatus: "ACTIVE", hasInvoice: false, deletedAt: null },
+      where: { ...buildIncomeBaseWhere(companyId), workflowStatus: "ACTIVE", hasInvoice: false },
       orderBy: { receiveDate: "asc" },
       take: 5,
     }),
     // Expenses needing to issue WHT cert to vendor
     prisma.expense.findMany({
-      where: { companyId, workflowStatus: "ACTIVE", isWht: true, hasWhtCert: false, deletedAt: null },
+      where: { ...reimbursementFilter, companyId, workflowStatus: "ACTIVE", isWht: true, hasWhtCert: false, deletedAt: null },
       orderBy: { billDate: "asc" },
       take: 5,
     }),

@@ -59,10 +59,10 @@ async function handleDelete(
     return apiResponse.notFound("ไม่พบหมวดหมู่");
   }
 
-  // Check if category is used by any transactions
+  // Check if category is used by any transactions (scoped to company to prevent cross-tenant count)
   const [expenseCount, incomeCount] = await Promise.all([
-    prisma.expense.count({ where: { categoryId } }),
-    prisma.income.count({ where: { categoryId } }),
+    prisma.expense.count({ where: { categoryId, companyId: context.company.id, deletedAt: null } }),
+    prisma.income.count({ where: { categoryId, companyId: context.company.id, deletedAt: null } }),
   ]);
 
   if (expenseCount > 0 || incomeCount > 0) {

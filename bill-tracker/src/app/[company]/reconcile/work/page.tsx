@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { ReconcileWorkspace } from "@/components/reconcile/ReconcileWorkspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReconcileSessionType, type ExpensePayment } from "@prisma/client";
-import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
 
 interface WorkPageProps {
   params: Promise<{ company: string }>;
@@ -27,8 +28,9 @@ export default async function ReconcileWorkPage({
   const { company: companyCode } = await params;
   const { month, year, type = "EXPENSE", companies } = await searchParams;
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  const thaiNow = toThaiLocalDate(new Date());
+  const currentYear = thaiNow.getFullYear();
+  const currentMonth = thaiNow.getMonth() + 1;
   const selectedYear = year ? parseInt(year) : currentYear;
   const selectedMonth = month ? parseInt(month) : currentMonth;
 
@@ -118,6 +120,7 @@ async function WorkspaceDataLoader({
     prisma.expense.findMany({
       where: {
         ...companyIdFilter,
+        ...reimbursementFilter,
         billDate: { gte: startDate, lte: endDate },
         deletedAt: null,
         ...(isForeignOnly
@@ -131,6 +134,7 @@ async function WorkspaceDataLoader({
       ? Promise.resolve([])
       : prisma.expense.findMany({
           where: {
+            ...reimbursementFilter,
             internalCompanyId: { in: selectedCompanyIds },
             companyId: { notIn: selectedCompanyIds },
             billDate: { gte: startDate, lte: endDate },
@@ -166,6 +170,7 @@ async function WorkspaceDataLoader({
     prisma.expense.findMany({
       where: {
         ...companyIdFilter,
+        ...reimbursementFilter,
         billDate: { gte: spilloverStart, lte: spilloverEnd },
         deletedAt: null,
         ReconcileMatches: { none: {} },
@@ -180,6 +185,7 @@ async function WorkspaceDataLoader({
       ? Promise.resolve([])
       : prisma.expense.findMany({
           where: {
+            ...reimbursementFilter,
             internalCompanyId: { in: selectedCompanyIds },
             companyId: { notIn: selectedCompanyIds },
             billDate: { gte: spilloverStart, lte: spilloverEnd },

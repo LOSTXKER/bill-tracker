@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
 
 const MIN_TOTAL_EXPENSES = 3;
 const MAJORITY_THRESHOLD = 0.6;
@@ -14,6 +15,7 @@ async function handleGet(
   const counts = await prisma.expense.groupBy({
     by: ["contactName", "categoryId"],
     where: {
+      ...reimbursementFilter,
       companyId: context.company.id,
       deletedAt: null,
       categoryId: { not: null },
@@ -73,6 +75,7 @@ async function handleGet(
 
   const anomalyExpenses = await prisma.expense.findMany({
     where: {
+      ...reimbursementFilter,
       companyId: context.company.id,
       deletedAt: null,
       OR: orConditions,

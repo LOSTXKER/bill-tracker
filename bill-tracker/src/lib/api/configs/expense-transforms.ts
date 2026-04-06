@@ -3,6 +3,7 @@ import type { Expense } from "@prisma/client";
 import { validateExpenseWhtChange } from "@/lib/validations/wht-validator";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import type { TransactionRequestBody } from "../transaction-types";
+import { ApiErrors } from "../errors";
 
 export function deduplicatePayers<T extends { paidByType: string; paidByUserId?: string | null; paidByPettyCashFundId?: string | null; amount: number }>(payers: T[]): T[] {
   const seen = new Map<string, T>();
@@ -36,6 +37,16 @@ export function transformExpenseCreateData(body: TransactionRequestBody) {
     Number(data.vatRate) || 0,
     isWht ? Number(data.whtRate) || 0 : 0,
   );
+
+  // Validate that payer amounts sum to netPaid (tolerance ±0.01 for rounding)
+  if (data.payers && Array.isArray(data.payers) && data.payers.length > 0) {
+    const payerSum = data.payers.reduce((sum: number, p: { amount?: number }) => sum + (Number(p.amount) || 0), 0);
+    if (Math.abs(payerSum - totals.netAmount) >= 0.01) {
+      throw ApiErrors.badRequest(
+        `ยอดผู้จ่าย (฿${payerSum.toFixed(2)}) ไม่ตรงกับยอดสุทธิ (฿${totals.netAmount.toFixed(2)})`
+      );
+    }
+  }
 
   return {
     id: randomUUID(),
@@ -113,6 +124,17 @@ export function transformExpenseUpdateData(body: TransactionRequestBody, existin
   updateData.vatAmount = totals.vatAmount || null;
   updateData.whtAmount = totals.whtAmount || null;
   updateData.netPaid = totals.netAmount;
+
+  // Validate that payer amounts sum to netPaid (tolerance ±0.01 for rounding)
+  if (data.payers && Array.isArray(data.payers) && data.payers.length > 0) {
+    const payerSum = data.payers.reduce((sum: number, p: { amount?: number }) => sum + (Number(p.amount) || 0), 0);
+    if (Math.abs(payerSum - totals.netAmount) >= 0.01) {
+      throw ApiErrors.badRequest(
+        `ยอดผู้จ่าย (฿${payerSum.toFixed(2)}) ไม่ตรงกับยอดสุทธิ (฿${totals.netAmount.toFixed(2)})`
+      );
+    }
+  }
+
   if (data.description !== undefined) updateData.description = data.description;
   if (data.accountId !== undefined) updateData.accountId = data.accountId || null;
   if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;

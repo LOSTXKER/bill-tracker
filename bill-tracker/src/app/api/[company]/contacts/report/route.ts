@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
 
 /**
  * GET /api/[company]/contacts/report
@@ -47,8 +48,7 @@ export const GET = withCompanyAccessFromParams(
     const expensesByContact = await prisma.expense.groupBy({
       by: ["contactId"],
       where: {
-        companyId: company.id,
-        deletedAt: null,
+        ...buildExpenseBaseWhere(company.id),
         contactId: { not: null },
         ...(Object.keys(dateFilter).length > 0 && { billDate: dateFilter }),
       },
@@ -72,8 +72,7 @@ export const GET = withCompanyAccessFromParams(
     // Get expenses without contact
     const expensesNoContact = await prisma.expense.aggregate({
       where: {
-        companyId: company.id,
-        deletedAt: null,
+        ...buildExpenseBaseWhere(company.id),
         contactId: null,
         ...(Object.keys(dateFilter).length > 0 && { billDate: dateFilter }),
       },
@@ -143,8 +142,7 @@ export const GET = withCompanyAccessFromParams(
     const expensesByMonth = await prisma.expense.groupBy({
       by: ["billDate"],
       where: {
-        companyId: company.id,
-        deletedAt: null,
+        ...buildExpenseBaseWhere(company.id),
         ...(Object.keys(dateFilter).length > 0 && { billDate: dateFilter }),
       },
       _sum: { netPaid: true },

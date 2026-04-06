@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { ApiErrors } from "@/lib/api/errors";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
 
 async function handleGet(
   req: Request,
@@ -56,10 +57,11 @@ async function handleGet(
     }
   }
 
-  // 2. Fallback: aggregate from expense history
+  // 2. Fallback: aggregate from expense history (exclude settlement transfers and unpaid reimbursements)
   const topAccounts = await prisma.expense.groupBy({
     by: ["accountId"],
     where: {
+      ...reimbursementFilter,
       companyId,
       contactId,
       accountId: { not: null },

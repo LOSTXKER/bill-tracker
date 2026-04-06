@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
 
 async function handleGet(
   req: Request,
@@ -10,6 +11,7 @@ async function handleGet(
 ) {
   const expenses = await prisma.expense.findMany({
     where: {
+      ...reimbursementFilter,
       companyId: context.company.id,
       categoryId: null,
       deletedAt: null,

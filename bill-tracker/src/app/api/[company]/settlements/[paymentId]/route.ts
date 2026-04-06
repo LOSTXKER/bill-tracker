@@ -89,35 +89,39 @@ export const POST = withCompanyAccessFromParams(
       return apiResponse.badRequest("ไม่สามารถโอนคืนได้ เนื่องจากรายจ่ายยังไม่ได้รับอนุมัติ");
     }
 
-    // Check if already settled
-    if (payment.settlementStatus === "SETTLED") {
-      return apiResponse.badRequest("รายการนี้โอนคืนแล้ว");
-    }
-
     // Check if settlement is required
     if (payment.settlementStatus === "NOT_REQUIRED") {
       return apiResponse.badRequest("รายการนี้ไม่ต้องโอนคืน");
     }
 
-    // Update payment
-    const updatedPayment = await prisma.expensePayment.update({
-      where: { id: params.paymentId },
-      data: {
-        settlementStatus: "SETTLED",
-        settledAt: new Date(),
-        settledBy: session.user.id,
-        settlementRef: settlementRef || null,
-        settlementSlipUrls: settlementSlipUrls || [],
-      },
-      include: {
-        PaidByUser: {
-          select: { id: true, name: true, email: true },
+    // Update payment — use settlementStatus: "PENDING" in DB where to prevent TOCTOU double-settle
+    let updatedPayment;
+    try {
+      updatedPayment = await prisma.expensePayment.update({
+        where: { id: params.paymentId, settlementStatus: "PENDING" },
+        data: {
+          settlementStatus: "SETTLED",
+          settledAt: new Date(),
+          settledBy: session.user.id,
+          settlementRef: settlementRef || null,
+          settlementSlipUrls: settlementSlipUrls || [],
         },
-        SettledByUser: {
-          select: { id: true, name: true },
+        include: {
+          PaidByUser: {
+            select: { id: true, name: true, email: true },
+          },
+          SettledByUser: {
+            select: { id: true, name: true },
+          },
         },
-      },
-    });
+      });
+    } catch (e: unknown) {
+      // Prisma throws P2025 (RecordNotFound) when settlementStatus is no longer PENDING
+      if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "P2025") {
+        return apiResponse.badRequest("รายการนี้โอนคืนแล้วหรือถูกเปลี่ยนสถานะโดยคำขออื่น");
+      }
+      throw e;
+    }
 
     // Create audit log
     const payerName = payment.PaidByUser?.name || payment.paidByName || "ไม่ระบุ";

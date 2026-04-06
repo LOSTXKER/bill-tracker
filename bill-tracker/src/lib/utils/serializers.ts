@@ -3,12 +3,15 @@ import type { Expense, Income, Prisma } from "@prisma/client";
 type Decimal = Prisma.Decimal;
 
 /**
- * Convert Prisma Decimal to number
- * @param value - The Decimal value to convert
- * @returns The number value or null
+ * Convert Prisma Decimal to number (or null).
+ * Prefer `toNumber()` for non-nullable conversions; this is kept for nullable fields.
  */
 export function serializeDecimal(value: Decimal | number | string | null | undefined): number | null {
   if (value === null || value === undefined) return null;
+  // Use toNumber path when the value has .toNumber() (Prisma Decimal)
+  if (typeof value === "object" && "toNumber" in value && typeof (value as { toNumber?: unknown }).toNumber === "function") {
+    return (value as { toNumber: () => number }).toNumber();
+  }
   return Number(value);
 }
 

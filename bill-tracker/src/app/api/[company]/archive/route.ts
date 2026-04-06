@@ -7,6 +7,7 @@ import {
 } from "@/lib/export/archive";
 import { apiResponse } from "@/lib/api/response";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { buildExpenseBaseWhere, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 // Helper to parse JSON array from Prisma (can be string or array)
 function parseJsonArray(value: unknown): string[] {
@@ -60,9 +61,8 @@ async function handleGetPreview(
   const [expensesRaw, incomesRaw] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        companyId: context.company.id,
+        ...buildExpenseBaseWhere(context.company.id),
         billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
       },
       include: {
         Contact: { select: { name: true, taxId: true } },
@@ -71,9 +71,8 @@ async function handleGetPreview(
     }),
     prisma.income.findMany({
       where: {
-        companyId: context.company.id,
+        ...buildIncomeBaseWhere(context.company.id),
         receiveDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
       },
       include: {
         Contact: { select: { name: true, taxId: true } },
@@ -144,9 +143,8 @@ async function handlePost(
     const [expensesRaw2, incomesRaw2] = await Promise.all([
       prisma.expense.findMany({
         where: {
-          companyId: context.company.id,
+          ...buildExpenseBaseWhere(context.company.id),
           billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
         },
         include: {
           Contact: { select: { name: true, taxId: true } },
@@ -155,9 +153,8 @@ async function handlePost(
       }),
       prisma.income.findMany({
         where: {
-          companyId: context.company.id,
+          ...buildIncomeBaseWhere(context.company.id),
           receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
         },
         include: {
           Contact: { select: { name: true, taxId: true } },

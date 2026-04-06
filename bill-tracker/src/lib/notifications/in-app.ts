@@ -157,27 +157,15 @@ export async function markAsRead(notificationId: string, userId: string): Promis
 }
 
 export async function markAllAsRead(companyId: string, userId: string): Promise<void> {
-  const notifications = await prisma.notification.findMany({
-    where: {
-      companyId,
-      targetUserIds: { array_contains: [userId] },
-    },
-    select: { id: true, readBy: true },
-  });
-
-  // Update each notification
-  await Promise.all(
-    notifications.map(async (n) => {
-      const readBy = (n.readBy as Record<string, boolean>) || {};
-      if (readBy[userId] !== true) {
-        readBy[userId] = true;
-        await prisma.notification.update({
-          where: { id: n.id },
-          data: { readBy },
-        });
-      }
-    })
-  );
+  // Single SQL statement: merge { [userId]: true } into readBy JSON for all unread notifications.
+  // This replaces N individual updates with one query.
+  await prisma.$executeRaw`
+    UPDATE "Notification"
+    SET "readBy" = COALESCE("readBy", '{}'::jsonb) || ${JSON.stringify({ [userId]: true })}::jsonb
+    WHERE "companyId" = ${companyId}
+    AND "targetUserIds" @> ${JSON.stringify([userId])}::jsonb
+    AND NOT (COALESCE("readBy", '{}'::jsonb) ? ${userId})
+  `;
 }
 
 // =============================================================================

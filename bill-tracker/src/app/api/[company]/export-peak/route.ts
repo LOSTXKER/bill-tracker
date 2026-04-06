@@ -4,6 +4,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { exportExpensesToPEAK } from "@/lib/export/peak-export";
 import { apiResponse } from "@/lib/api/response";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
 
 // POST /api/[company]/export-peak
 // Generate and download PEAK-format Excel file
@@ -22,20 +23,15 @@ async function handlePost(
     const { startDate, endDate } = getThaiMonthRange(year, month);
 
     // Build where clause
-    const where: any = {
-      companyId: context.company.id,
+    const baseWhere = {
+      ...buildExpenseBaseWhere(context.company.id),
       billDate: { gte: startDate, lte: endDate },
-      deletedAt: null,
+      ...(status && Array.isArray(status) && status.length > 0 && { status: { in: status } }),
     };
-
-    // Optional status filter
-    if (status && Array.isArray(status) && status.length > 0) {
-      where.status = { in: status };
-    }
 
     // Fetch expenses with account and contact info
     const expensesRaw = await prisma.expense.findMany({
-      where,
+      where: baseWhere,
       include: {
         Account: {
           select: {
@@ -137,38 +133,12 @@ async function handleGet(
   const { startDate, endDate } = getThaiMonthRange(year, month);
 
   // Count expenses
+  const baseCountWhere = { ...buildExpenseBaseWhere(context.company.id), billDate: { gte: startDate, lte: endDate } };
   const [total, withAccount, withoutAccount, withWHT] = await Promise.all([
-    prisma.expense.count({
-      where: {
-        companyId: context.company.id,
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-      },
-    }),
-    prisma.expense.count({
-      where: {
-        companyId: context.company.id,
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-        accountId: { not: null },
-      },
-    }),
-    prisma.expense.count({
-      where: {
-        companyId: context.company.id,
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-        accountId: null,
-      },
-    }),
-    prisma.expense.count({
-      where: {
-        companyId: context.company.id,
-        billDate: { gte: startDate, lte: endDate },
-        deletedAt: null,
-        isWht: true,
-      },
-    }),
+    prisma.expense.count({ where: baseCountWhere }),
+    prisma.expense.count({ where: { ...baseCountWhere, accountId: { not: null } } }),
+    prisma.expense.count({ where: { ...baseCountWhere, accountId: null } }),
+    prisma.expense.count({ where: { ...baseCountWhere, isWht: true } }),
   ]);
 
   return apiResponse.success({

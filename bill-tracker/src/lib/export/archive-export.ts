@@ -1,6 +1,8 @@
 import archiver from "archiver";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { buildExpenseBaseWhere, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import {
   formatThaiDate,
   getThaiMonthName,
@@ -87,9 +89,8 @@ export interface ExportArchiveResult {
 
 function computeDateRange(month: number, buddhistYear: number) {
   const gregorianYear = buddhistYear - 543;
-  const startDate = new Date(gregorianYear, month, 1);
-  const endDate = new Date(gregorianYear, month + 1, 0, 23, 59, 59);
-  return { startDate, endDate };
+  // month is 0-based coming from JS Date.getMonth(); convert to 1-based for getThaiMonthRange
+  return getThaiMonthRange(gregorianYear, month + 1);
 }
 
 // ============================================================================
@@ -99,9 +100,8 @@ function computeDateRange(month: number, buddhistYear: number) {
 async function fetchExpenses(companyId: string, startDate: Date, endDate: Date) {
   const raw = await prisma.expense.findMany({
     where: {
-      companyId,
+      ...buildExpenseBaseWhere(companyId),
       billDate: { gte: startDate, lte: endDate },
-      deletedAt: null,
     },
     include: { Contact: { select: { name: true } } },
     orderBy: { billDate: "asc" },
@@ -112,9 +112,8 @@ async function fetchExpenses(companyId: string, startDate: Date, endDate: Date) 
 async function fetchIncomes(companyId: string, startDate: Date, endDate: Date) {
   const raw = await prisma.income.findMany({
     where: {
-      companyId,
+      ...buildIncomeBaseWhere(companyId),
       receiveDate: { gte: startDate, lte: endDate },
-      deletedAt: null,
     },
     include: { Contact: { select: { name: true } } },
     orderBy: { receiveDate: "asc" },

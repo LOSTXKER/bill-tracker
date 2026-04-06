@@ -355,6 +355,40 @@ export function getExpenseWorkflowLabel(
   return WORKFLOW_STATUS_INFO[status]?.label || status;
 }
 
+// =============================================================================
+// Typed Status String Constants
+// Use these instead of bare string literals in code to prevent typos.
+// =============================================================================
+
+export const WorkflowStatus = {
+  DRAFT: "DRAFT",
+  PENDING_APPROVAL: "PENDING_APPROVAL",
+  ACTIVE: "ACTIVE",
+  READY_FOR_ACCOUNTING: "READY_FOR_ACCOUNTING",
+  SENT_TO_ACCOUNTANT: "SENT_TO_ACCOUNTANT",
+  COMPLETED: "COMPLETED",
+} as const;
+
+export type WorkflowStatusType = (typeof WorkflowStatus)[keyof typeof WorkflowStatus];
+
+export const ApprovalStatus = {
+  NOT_REQUIRED: "NOT_REQUIRED",
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type ApprovalStatusType = (typeof ApprovalStatus)[keyof typeof ApprovalStatus];
+
+export const SettlementStatus = {
+  PENDING: "PENDING",
+  SETTLED: "SETTLED",
+  NOT_REQUIRED: "NOT_REQUIRED",
+  REVERSED: "REVERSED",
+} as const;
+
+export type SettlementStatusType = (typeof SettlementStatus)[keyof typeof SettlementStatus];
+
 // All document-type specific flows now use the same macro statuses
 export const EXPENSE_WORKFLOW_FLOW_NO_DOC = WORKFLOW_STATUS_FLOW;
 export const EXPENSE_WORKFLOW_FLOW_CASH_RECEIPT = WORKFLOW_STATUS_FLOW;

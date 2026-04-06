@@ -6,6 +6,8 @@
 import { prisma } from "@/lib/db";
 import type { LineWebhookEvent, LineCompanyConfig } from "../types";
 import { replyToLine, formatCurrency } from "../api";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 /**
  * Handle text message commands
@@ -107,21 +109,17 @@ async function handleSummaryCommand(
 ): Promise<void> {
   const replyToken = event.replyToken!;
 
-  // Get today's date range
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Get today's date range (Thailand timezone)
+  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Bangkok" });
+  const today = toThaiStartOfDay(todayStr);
+  const tomorrow = toThaiEndOfDay(todayStr);
 
   // Fetch today's transactions
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        companyId: company.id,
-        billDate: {
-          gte: today,
-          lt: tomorrow,
-        },
+        ...buildExpenseBaseWhere(company.id),
+        billDate: { gte: today, lte: tomorrow },
       },
     }),
     prisma.income.findMany({

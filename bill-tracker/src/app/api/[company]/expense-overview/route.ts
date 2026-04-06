@@ -7,6 +7,8 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
 import { toNumber } from "@/lib/utils/serializers";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 
 export async function GET(
   request: Request,
@@ -17,35 +19,50 @@ export async function GET(
       const url = new URL(req.url);
       const period = url.searchParams.get("period") || "month"; // month, quarter, year
 
-      // Calculate date range
-      const now = new Date();
+      // Calculate date range (Thailand timezone)
+      const thaiNow = toThaiLocalDate(new Date());
+      const thaiYear = thaiNow.getFullYear();
+      const thaiMonth = thaiNow.getMonth() + 1; // 1-based
       let startDate: Date;
       let lastPeriodStart: Date;
       let lastPeriodEnd: Date;
 
       switch (period) {
-        case "quarter":
-          const currentQuarter = Math.floor(now.getMonth() / 3);
-          startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
-          lastPeriodStart = new Date(now.getFullYear(), (currentQuarter - 1) * 3, 1);
-          lastPeriodEnd = new Date(now.getFullYear(), currentQuarter * 3, 0);
+        case "quarter": {
+          const currentQuarter = Math.floor((thaiMonth - 1) / 3);
+          const { startDate: qs } = getThaiMonthRange(thaiYear, currentQuarter * 3 + 1);
+          const { startDate: lqs } = getThaiMonthRange(thaiYear, (currentQuarter - 1) * 3 + 1);
+          const { endDate: lqe } = getThaiMonthRange(thaiYear, currentQuarter * 3);
+          startDate = qs;
+          lastPeriodStart = lqs;
+          lastPeriodEnd = lqe;
           break;
-        case "year":
-          startDate = new Date(now.getFullYear(), 0, 1);
-          lastPeriodStart = new Date(now.getFullYear() - 1, 0, 1);
-          lastPeriodEnd = new Date(now.getFullYear() - 1, 11, 31);
+        }
+        case "year": {
+          const { startDate: ys } = getThaiMonthRange(thaiYear, 1);
+          const { startDate: lys } = getThaiMonthRange(thaiYear - 1, 1);
+          const { endDate: lye } = getThaiMonthRange(thaiYear - 1, 12);
+          startDate = ys;
+          lastPeriodStart = lys;
+          lastPeriodEnd = lye;
           break;
-        default: // month
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          lastPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          lastPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        }
+        default: { // month
+          const { startDate: ms } = getThaiMonthRange(thaiYear, thaiMonth);
+          const prevMonth = thaiMonth === 1 ? 12 : thaiMonth - 1;
+          const prevYear = thaiMonth === 1 ? thaiYear - 1 : thaiYear;
+          const { startDate: lms, endDate: lme } = getThaiMonthRange(prevYear, prevMonth);
+          startDate = ms;
+          lastPeriodStart = lms;
+          lastPeriodEnd = lme;
+          break;
+        }
       }
 
       // Get expenses with payments grouped by payer type
       const expenses = await prisma.expense.findMany({
         where: {
-          companyId: company.id,
-          deletedAt: null,
+          ...buildExpenseBaseWhere(company.id),
           billDate: { gte: startDate },
         },
         select: {

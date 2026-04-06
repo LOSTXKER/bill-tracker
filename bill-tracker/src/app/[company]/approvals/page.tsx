@@ -9,6 +9,7 @@ import { ApprovalsClient, type ApprovalItem } from "@/components/approvals/Appro
 import { getCompanyId } from "@/lib/cache/company";
 import { getSession } from "@/lib/auth";
 import { hasAnyPermission } from "@/lib/permissions/checker";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { redirect } from "next/navigation";
 import { serializeExpenses, serializeIncomes } from "@/lib/utils/serializers";
 
@@ -75,6 +76,7 @@ async function ApprovalStats({ companyCode }: { companyCode: string }) {
   const [pendingExpenses, pendingIncomes, oldestExpense, oldestIncome] = await Promise.all([
     prisma.expense.count({
       where: {
+        ...reimbursementFilter,
         companyId,
         workflowStatus: "PENDING_APPROVAL",
         deletedAt: null,
@@ -82,13 +84,13 @@ async function ApprovalStats({ companyCode }: { companyCode: string }) {
     }),
     prisma.income.count({
       where: {
-        companyId,
+        ...buildIncomeBaseWhere(companyId),
         workflowStatus: "PENDING_APPROVAL",
-        deletedAt: null,
       },
     }),
     prisma.expense.findFirst({
       where: {
+        ...reimbursementFilter,
         companyId,
         workflowStatus: "PENDING_APPROVAL",
         deletedAt: null,
@@ -98,9 +100,8 @@ async function ApprovalStats({ companyCode }: { companyCode: string }) {
     }),
     prisma.income.findFirst({
       where: {
-        companyId,
+        ...buildIncomeBaseWhere(companyId),
         workflowStatus: "PENDING_APPROVAL",
-        deletedAt: null,
       },
       orderBy: { submittedAt: "asc" },
       select: { submittedAt: true },
@@ -179,6 +180,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
     const [expensesRaw, count] = await Promise.all([
       prisma.expense.findMany({
         where: {
+          ...reimbursementFilter,
           companyId,
           workflowStatus: "PENDING_APPROVAL",
           deletedAt: null,
@@ -199,6 +201,7 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
       }),
       prisma.expense.count({
         where: {
+          ...reimbursementFilter,
           companyId,
           workflowStatus: "PENDING_APPROVAL",
           deletedAt: null,
@@ -224,9 +227,8 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
     const [incomesRaw, count] = await Promise.all([
       prisma.income.findMany({
         where: {
-          companyId,
+          ...buildIncomeBaseWhere(companyId),
           workflowStatus: "PENDING_APPROVAL",
-          deletedAt: null,
         },
         orderBy: { submittedAt: sortOrder as "asc" | "desc" },
         skip: type === "income" ? (page - 1) * limit : 0,
@@ -241,9 +243,8 @@ async function ApprovalsData({ companyCode, searchParams, currentUserId }: Appro
       }),
       prisma.income.count({
         where: {
-          companyId,
+          ...buildIncomeBaseWhere(companyId),
           workflowStatus: "PENDING_APPROVAL",
-          deletedAt: null,
         },
       }),
     ]);

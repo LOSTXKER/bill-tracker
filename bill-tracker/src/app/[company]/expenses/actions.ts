@@ -1,8 +1,14 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { serializeExpenses } from "@/lib/utils/serializers";
 import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import {
+  buildExpenseBaseWhere,
+  buildExpenseSelfWhere,
+  buildExpensePayOnBehalfWhere,
+} from "@/lib/queries/expense-filters";
 
 export interface FetchExpensesParams {
   companyCode: string;
@@ -17,6 +23,7 @@ export interface FetchExpensesParams {
   limit?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  ownership?: "self" | "payOnBehalf" | "all";
 }
 
 export async function fetchExpenses(params: FetchExpensesParams) {
@@ -33,6 +40,7 @@ export async function fetchExpenses(params: FetchExpensesParams) {
     limit = 20,
     sortBy = "billDate",
     sortOrder = "desc",
+    ownership,
   } = params;
 
   const company = await prisma.company.findUnique({
@@ -43,20 +51,16 @@ export async function fetchExpenses(params: FetchExpensesParams) {
     return { expenses: [], total: 0 };
   }
 
-  // Build where clause
-  // Exclude reimbursements that are not PAID
-  // REJECTED reimbursements should never appear as expenses
-  // PENDING/APPROVED reimbursements are not yet expenses
-  const where: any = {
-    companyId: company.id,
-    deletedAt: null,
-    OR: [
-      // Regular expenses (not reimbursements)
-      { isReimbursement: false },
-      // Reimbursements that have been paid (now part of normal expense flow)
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
+  // Build where clause using the same shared filter builders as the page SSR query
+  let baseWhere: Prisma.ExpenseWhereInput;
+  if (ownership === "self") {
+    baseWhere = buildExpenseSelfWhere(company.id);
+  } else if (ownership === "payOnBehalf") {
+    baseWhere = buildExpensePayOnBehalfWhere(company.id);
+  } else {
+    baseWhere = buildExpenseBaseWhere(company.id);
+  }
+  const where: Prisma.ExpenseWhereInput = { ...baseWhere };
 
   if (search) {
     // Need to combine with AND to preserve the reimbursement filter
@@ -74,9 +78,9 @@ export async function fetchExpenses(params: FetchExpensesParams) {
   if (status) {
     // Support multiple statuses (comma-separated)
     if (status.includes(",")) {
-      where.workflowStatus = { in: status.split(",") };
+      where.workflowStatus = { in: status.split(",") as Prisma.EnumWorkflowStatusFilter["in"] };
     } else {
-      where.workflowStatus = status;
+      where.workflowStatus = status as Prisma.EnumWorkflowStatusFilter["equals"];
     }
   }
 
@@ -103,7 +107,7 @@ export async function fetchExpenses(params: FetchExpensesParams) {
   }
 
   // Build orderBy
-  const orderBy: any = {};
+  const orderBy: Prisma.ExpenseOrderByWithRelationInput = {};
   if (sortBy === "billDate") {
     orderBy.billDate = sortOrder;
   } else if (sortBy === "amount") {

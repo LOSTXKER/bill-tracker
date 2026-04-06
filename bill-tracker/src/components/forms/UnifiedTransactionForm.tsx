@@ -9,18 +9,7 @@ import {
   LucideIcon,
   ArrowLeft,
   AlertCircle,
-  AlertTriangle,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 
 // Hooks
@@ -29,17 +18,20 @@ import { useContactDefaults } from "@/hooks/use-contact-defaults";
 import { useTransactionFileUpload } from "@/hooks/use-transaction-file-upload";
 import { useTransactionActions } from "@/hooks/use-transaction-actions";
 import { useTransaction } from "@/hooks/use-transaction";
-import { useSafeCompany } from "@/hooks/use-company";
 import { useAiResultProcessor } from "@/hooks/use-ai-result-processor";
 import { useTransactionSubmission } from "@/hooks/use-transaction-submission";
 import { useMergeHandler } from "@/hooks/use-merge-handler";
 import { useAutoRecalculation } from "@/hooks/use-transaction-calculation";
+import { useSafeCompany } from "@/hooks/use-company";
+// useTransactionFormData is available for adopting data-loading effects in a future refactor
+// import { useTransactionFormData } from "./hooks/useTransactionFormData";
 
 // Shared form components
 import { CategorizedFiles, MultiDocAnalysisResult, normalizeOtherDocs } from "./shared/InputMethodSection";
 import { MergeData, MergeDecision } from "./shared/MergeOptionsDialog";
 import { detectConflicts } from "./shared/ConflictDialog";
 import { TransactionDialogs } from "./shared/TransactionDialogs";
+import { AccountWarningDialog } from "./shared/AccountWarningDialog";
 import { TransactionFormProvider } from "./TransactionFormContext";
 import { PayerInfo } from "./shared/PayerSection";
 import { TransactionViewToolbar } from "./shared/TransactionViewToolbar";
@@ -168,37 +160,6 @@ interface UnifiedTransactionFormProps {
   currentUserId?: string;
 }
 
-function AccountWarningDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            ยังไม่ได้ระบุบัญชี
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            การระบุบัญชีช่วยให้จำแนกค่าใช้จ่ายและวิเคราะห์ทางการเงินได้ดีขึ้น
-            ต้องการบันทึกโดยไม่ระบุบัญชีหรือไม่?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>กลับไปเลือกบัญชี</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>บันทึกโดยไม่ระบุ</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
 // =============================================================================
 // Component
 // =============================================================================
@@ -239,10 +200,10 @@ export function UnifiedTransactionForm({
   });
 
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
   const loading = mode !== "create" && swrLoading && !transaction;
   const error = swrError?.message || null;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
   // ---------------------------------------------------------------------------
   // Contacts (list)
@@ -751,6 +712,7 @@ export function UnifiedTransactionForm({
             const mapped = payments.map((p: Record<string, unknown>) => ({
               paidByType: p.paidByType as PayerInfo["paidByType"],
               paidByUserId: p.paidByUserId as string | null,
+              paidByPettyCashFundId: p.paidByPettyCashFundId as string | null,
               paidByName: p.paidByName as string | null,
               paidByBankName: p.paidByBankName as string | null,
               paidByBankAccount: p.paidByBankAccount as string | null,

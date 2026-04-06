@@ -4,6 +4,7 @@ import { apiResponse } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
 import ExcelJS from "exceljs";
 import type { PaidByType } from "@prisma/client";
+import { getThaiMonthRange, toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 /**
  * GET /api/[company]/settlements/report/export
@@ -17,19 +18,19 @@ export const GET = withCompanyAccessFromParams(
     const year = searchParams.get("year");
     const month = searchParams.get("month");
 
-    // Build date filter
+    // Build date filter (Thailand timezone)
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (year && year !== "all") {
       if (month && month !== "all") {
-        // Specific month
-        const monthPadded = month.padStart(2, "0");
-        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-        dateFilter.gte = new Date(`${year}-${monthPadded}-01`);
-        dateFilter.lte = new Date(`${year}-${monthPadded}-${lastDay}T23:59:59.999Z`);
+        const { startDate, endDate } = getThaiMonthRange(parseInt(year), parseInt(month));
+        dateFilter.gte = startDate;
+        dateFilter.lte = endDate;
       } else {
-        // Whole year
-        dateFilter.gte = new Date(`${year}-01-01`);
-        dateFilter.lte = new Date(`${year}-12-31T23:59:59.999Z`);
+        // Whole year: Jan 1 start to Dec 31 end in Thai timezone
+        const { startDate } = getThaiMonthRange(parseInt(year), 1);
+        const { endDate } = getThaiMonthRange(parseInt(year), 12);
+        dateFilter.gte = startDate;
+        dateFilter.lte = endDate;
       }
     }
 

@@ -13,6 +13,7 @@ import { apiResponse } from "@/lib/api/response";
 import { withCompanyAccess, type CompanyAccessContext } from "@/lib/api/with-company-access";
 import { prisma } from "@/lib/db";
 import { getUnreadCount } from "@/lib/notifications/in-app";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 // Helper to extract company code from URL path
 const getCompanyFromPath = (req: Request) => {
@@ -92,8 +93,7 @@ async function handleGet(
           canApproveIncomes
             ? prisma.income.count({
                 where: {
-                  companyId: company.id,
-                  deletedAt: null,
+                  ...buildIncomeBaseWhere(company.id),
                   approvalStatus: "PENDING",
                 },
               })
@@ -178,6 +178,7 @@ async function handleGet(
       (async () => {
         badges.pendingWhtDeliveries = await prisma.expense.count({
           where: {
+            ...reimbursementFilter,
             companyId: company.id,
             deletedAt: null,
             workflowStatus: "ACTIVE",
@@ -194,6 +195,7 @@ async function handleGet(
       (async () => {
         badges.pendingTaxInvoices = await prisma.expense.count({
           where: {
+            ...reimbursementFilter,
             companyId: company.id,
             deletedAt: null,
             workflowStatus: "ACTIVE",

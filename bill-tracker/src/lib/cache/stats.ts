@@ -2,7 +2,7 @@
 
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
-import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { toThaiStartOfDay, toThaiEndOfDay, getThaiMonthRange } from "@/lib/queries/date-utils";
 
 export type ViewMode = "official" | "internal";
@@ -68,8 +68,8 @@ async function _expenseStatsImpl(
   const { startDate: startOfLastMonth, endDate: endOfLastMonth } =
     getThaiMonthRange(now.getFullYear(), now.getMonth());
 
-  // Always use internal view (real ownership) — shared filter builder
-  const expenseFilter = buildExpenseBaseWhere(companyId);
+  // Build expense filter based on viewMode
+  const expenseFilter = buildExpenseWhereForMode(companyId, viewMode);
 
   // For filtered stats, also apply date filter to workflow status counts
   const filteredExpenseFilter = hasDateFilter 
@@ -174,11 +174,8 @@ async function _incomeStatsImpl(companyId: string, dateFilter?: DateRangeFilter)
   const { startDate: startOfLastMonth, endDate: endOfLastMonth } =
     getThaiMonthRange(now.getFullYear(), now.getMonth());
 
-  const incomeFilter = {
-    companyId,
-    deletedAt: null,
-  };
-  
+  const incomeFilter = buildIncomeBaseWhere(companyId);
+
   // For filtered stats, also apply date filter to workflow status counts
   const filteredIncomeFilter = hasDateFilter 
     ? { ...incomeFilter, receiveDate: { gte: startDate, lte: endDate } }

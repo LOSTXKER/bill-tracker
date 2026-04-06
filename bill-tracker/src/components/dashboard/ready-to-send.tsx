@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileCheck } from "lucide-react";
 import { getCompanyId } from "@/lib/cache/company";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export async function ReadyToSend({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
@@ -13,6 +14,7 @@ export async function ReadyToSend({ companyCode }: { companyCode: string }) {
   const [pendingExpenses, pendingIncomes] = await Promise.all([
     prisma.expense.count({
       where: {
+        ...reimbursementFilter,
         companyId: companyId,
         workflowStatus: "READY_FOR_ACCOUNTING",
         deletedAt: null,
@@ -20,9 +22,8 @@ export async function ReadyToSend({ companyCode }: { companyCode: string }) {
     }),
     prisma.income.count({
       where: {
-        companyId: companyId,
+        ...buildIncomeBaseWhere(companyId),
         workflowStatus: "READY_FOR_ACCOUNTING",
-        deletedAt: null,
       },
     }),
   ]);

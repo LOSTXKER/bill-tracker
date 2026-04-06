@@ -14,6 +14,7 @@ import { getCompanyId } from "@/lib/cache/company";
 import { getIncomeStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
 import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import { buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
@@ -172,10 +173,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const dateTo = searchParams.dateTo as string | undefined;
 
   // Build where clause
-  const whereClause: Prisma.IncomeWhereInput = {
-    companyId,
-    deletedAt: null,
-  };
+  const whereClause: Prisma.IncomeWhereInput = { ...buildIncomeBaseWhere(companyId) };
 
   if (search) {
     whereClause.AND = [
@@ -253,10 +251,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   }
 
   // Base where clause for counting (without tab-specific filters)
-  const baseWhereClause = {
-    companyId,
-    deletedAt: null,
-  };
+  const baseWhereClause = buildIncomeBaseWhere(companyId);
 
   const [incomesRaw, total, tabCounts] = await Promise.all([
     prisma.income.findMany({

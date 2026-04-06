@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ export async function MonthlySummary({
   const { startDate, endDate } = getThaiMonthRange(year, month);
 
   const expenseBaseWhere = {
-    ...buildExpenseBaseWhere(company.id),
+    ...buildExpenseWhereForMode(company.id, viewMode),
     billDate: { gte: startDate, lte: endDate },
   };
 
@@ -52,9 +52,8 @@ export async function MonthlySummary({
       }),
       prisma.income.aggregate({
         where: {
-          companyId: company.id,
+          ...buildIncomeBaseWhere(company.id),
           receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
         },
         _sum: { netReceived: true },
         _count: true,
@@ -76,9 +75,8 @@ export async function MonthlySummary({
       }),
       prisma.income.findMany({
         where: {
-          companyId: company.id,
+          ...buildIncomeBaseWhere(company.id),
           receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
         },
         include: { Contact: true },
         orderBy: { receiveDate: "desc" },

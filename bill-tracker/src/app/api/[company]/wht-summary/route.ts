@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 // =============================================================================
 // GET: ดึงสรุป WHT
@@ -47,6 +48,7 @@ export const GET = withCompanyAccessFromParams(
     // WHT ที่เราหักเขา (Expense) - ต้องนำส่ง
     const expensesWithWhtRaw = await prisma.expense.findMany({
       where: {
+        ...reimbursementFilter,
         companyId: company.id,
         deletedAt: null,
         isWht: true,
@@ -62,8 +64,7 @@ export const GET = withCompanyAccessFromParams(
     // WHT ที่เขาหักเรา (Income) - เป็นเครดิตภาษี
     const incomesWithWhtRaw = await prisma.income.findMany({
       where: {
-        companyId: company.id,
-        deletedAt: null,
+        ...buildIncomeBaseWhere(company.id),
         isWhtDeducted: true,
         receiveDate: { gte: startOfMonth, lte: endOfMonth },
       },
@@ -99,8 +100,7 @@ export const GET = withCompanyAccessFromParams(
     // Pending WHT certs (Income - รอใบ 50 ทวิจากลูกค้า)
     const pendingWhtCerts = await prisma.income.count({
       where: {
-        companyId: company.id,
-        deletedAt: null,
+        ...buildIncomeBaseWhere(company.id),
         isWhtDeducted: true,
         hasWhtCert: false,
         receiveDate: { gte: startOfMonth, lte: endOfMonth },
@@ -110,6 +110,7 @@ export const GET = withCompanyAccessFromParams(
     // Pending WHT issue (Expense - รอออกใบ 50 ทวิให้ vendor)
     const pendingWhtIssue = await prisma.expense.count({
       where: {
+        ...reimbursementFilter,
         companyId: company.id,
         deletedAt: null,
         isWht: true,

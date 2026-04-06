@@ -64,103 +64,108 @@ export const POST = withCompanyAccessFromParams(
 
     const settledAt = new Date();
 
-    // Update all payments
-    const updatedPayments = await prisma.expensePayment.updateMany({
-      where: {
-        id: { in: pendingPayments.map((p) => p.id) },
-      },
-      data: {
-        settlementStatus: "SETTLED",
-        settledAt,
-        settledBy: session.user.id,
-        settlementRef: settlementRef || null,
-        settlementSlipUrls: settlementSlipUrls || [],
-      },
-    });
-
-    // Calculate total amount
-    const totalAmount = pendingPayments.reduce(
-      (sum, p) => sum + Number(p.amount),
-      0
-    );
-
-    // Get payer names for audit log
+    // Calculate totals before transaction (read-only, safe outside)
+    const totalAmount = pendingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
     const payerNames = [...new Set(
       pendingPayments.map((p) => p.PaidByUser?.name || p.paidByName || "ไม่ระบุ")
     )];
 
-    // Create expense record if requested
-    let createdExpenseId: string | null = null;
+    // Group by employee for optional expense creation
+    const paymentsByEmployee: Record<string, typeof pendingPayments> = {};
     if (createExpense && expensePayerType) {
-      // Group payments by employee to potentially create multiple expenses
-      const paymentsByEmployee: Record<string, typeof pendingPayments> = {};
-      
       pendingPayments.forEach((p) => {
-        const employeeId = p.paidByUserId || "unknown";
-        if (!paymentsByEmployee[employeeId]) {
-          paymentsByEmployee[employeeId] = [];
-        }
-        paymentsByEmployee[employeeId].push(p);
+        const key = p.paidByUserId || "unknown";
+        if (!paymentsByEmployee[key]) paymentsByEmployee[key] = [];
+        paymentsByEmployee[key].push(p);
+      });
+    }
+
+    // Pre-generate expense IDs so we can reference them in audit logs after the transaction
+    const expenseIdsForEmployees: Array<{ employeeId: string; expenseId: string; employeeName: string; amount: number; paymentIds: string[] }> = [];
+    if (createExpense && expensePayerType) {
+      for (const [employeeId, employeePayments] of Object.entries(paymentsByEmployee)) {
+        expenseIdsForEmployees.push({
+          employeeId,
+          expenseId: randomUUID(),
+          employeeName: employeePayments[0].PaidByUser?.name || "พนักงาน",
+          amount: employeePayments.reduce((sum, p) => sum + Number(p.amount), 0),
+          paymentIds: employeePayments.map((p) => p.id),
+        });
+      }
+    }
+
+    // Atomic: mark payments settled + optionally create expense records
+    const updatedPayments = await prisma.$transaction(async (tx) => {
+      // Mark all payments settled — add settlementStatus: "PENDING" to the DB where to prevent TOCTOU
+      const updated = await tx.expensePayment.updateMany({
+        where: {
+          id: { in: pendingPayments.map((p) => p.id) },
+          settlementStatus: "PENDING",
+        },
+        data: {
+          settlementStatus: "SETTLED",
+          settledAt,
+          settledBy: session.user.id,
+          settlementRef: settlementRef || null,
+          settlementSlipUrls: settlementSlipUrls || [],
+        },
       });
 
-      // Create one expense per employee
-      for (const [employeeId, employeePayments] of Object.entries(paymentsByEmployee)) {
-        const employeeName = employeePayments[0].PaidByUser?.name || "พนักงาน";
-        const employeeAmount = employeePayments.reduce((sum, p) => sum + Number(p.amount), 0);
-        
-        const expenseId = randomUUID();
-        createdExpenseId = expenseId;
+      // If concurrent request already settled some, abort to avoid partial state
+      if (updated.count !== pendingPayments.length) {
+        throw new Error(`CONCURRENT_SETTLE: expected ${pendingPayments.length} but updated ${updated.count}`);
+      }
 
-        // Create the expense
-        await prisma.expense.create({
+      // Create one expense + payment per employee (if requested)
+      for (const entry of expenseIdsForEmployees) {
+        await tx.expense.create({
           data: {
-            id: expenseId,
+            id: entry.expenseId,
             companyId: company.id,
-            amount: employeeAmount,
+            amount: entry.amount,
             vatRate: 0,
             vatAmount: 0,
-            netPaid: employeeAmount,
-            description: `โอนคืนค่าใช้จ่ายให้${employeeName} (${employeePayments.length} รายการ)`,
+            netPaid: entry.amount,
+            description: `โอนคืนค่าใช้จ่ายให้${entry.employeeName} (${entry.paymentIds.length} รายการ)`,
             billDate: settledAt,
             paymentMethod: "BANK_TRANSFER",
             workflowStatus: "COMPLETED",
             status: "PENDING_PHYSICAL",
+            isSettlementTransfer: true,
             createdBy: session.user.id,
             updatedAt: new Date(),
-            // Store the employee name as contact
-            contactName: employeeName,
-            // Attach settlement slips as receipts
+            contactName: entry.employeeName,
             slipUrls: settlementSlipUrls || [],
-            // Add settlement reference to notes
             notes: settlementRef ? `เลขอ้างอิงการโอน: ${settlementRef}` : undefined,
           },
         });
 
-        // Create ExpensePayment record for the new expense
-        await prisma.expensePayment.create({
+        await tx.expensePayment.create({
           data: {
-            expenseId,
-            amount: employeeAmount,
+            expenseId: entry.expenseId,
+            amount: entry.amount,
             paidByType: expensePayerType,
             paidByUserId: expensePayerType === "USER" ? expensePayerId : null,
-            settlementStatus: "NOT_REQUIRED", // Company/User paid, no need to reimburse
-          },
-        });
-
-        // Audit log for expense creation
-        await createAuditLog({
-          userId: session.user.id,
-          companyId: company.id,
-          action: "CREATE",
-          entityType: "Expense",
-          entityId: expenseId,
-          description: `สร้างรายจ่าย "โอนคืนค่าใช้จ่ายให้${employeeName}" ฿${employeeAmount.toLocaleString()}`,
-          changes: {
-            fromSettlement: true,
-            paymentIds: employeePayments.map((p) => p.id),
+            settlementStatus: "NOT_REQUIRED",
           },
         });
       }
+
+      return updated;
+    });
+
+    // Audit logs (outside transaction — non-critical, best-effort)
+    let createdExpenseId: string | null = expenseIdsForEmployees[0]?.expenseId ?? null;
+    for (const entry of expenseIdsForEmployees) {
+      await createAuditLog({
+        userId: session.user.id,
+        companyId: company.id,
+        action: "CREATE",
+        entityType: "Expense",
+        entityId: entry.expenseId,
+        description: `สร้างรายจ่าย "โอนคืนค่าใช้จ่ายให้${entry.employeeName}" ฿${entry.amount.toLocaleString()}`,
+        changes: { fromSettlement: true, paymentIds: entry.paymentIds },
+      });
     }
     
     // Create audit log for settlement

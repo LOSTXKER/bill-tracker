@@ -10,6 +10,7 @@ import {
   exportWHTReport,
 } from "@/lib/export/excel";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export const GET = withCompanyAccess(
   async (request, { company }) => {
@@ -17,7 +18,7 @@ export const GET = withCompanyAccess(
     const type = searchParams.get("type"); // 'expenses', 'incomes', 'monthly', 'vat', 'wht'
     const month = searchParams.get("month");
     const year = searchParams.get("year");
-    const viewMode = searchParams.get("viewMode") || "official"; // 'official' | 'internal'
+    const viewMode = (searchParams.get("viewMode") || "internal") as "official" | "internal";
 
     if (!type || !month || !year) {
       return apiResponse.badRequest("Missing required parameters");
@@ -26,22 +27,11 @@ export const GET = withCompanyAccess(
     const { startDate, endDate } = getThaiMonthRange(parseInt(year), parseInt(month));
     const period = `${month}/${year}`;
 
-    const expenseCompanyFilter =
-      viewMode === "internal"
-        ? {
-            OR: [
-              { internalCompanyId: company.id },
-              { companyId: company.id, internalCompanyId: null },
-            ],
-          }
-        : { companyId: company.id };
-
     const [expensesRaw, incomesRaw] = await Promise.all([
       prisma.expense.findMany({
         where: {
-          ...expenseCompanyFilter,
+          ...buildExpenseWhereForMode(company.id, viewMode),
           billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
         },
         include: {
           Contact: true,
@@ -50,9 +40,8 @@ export const GET = withCompanyAccess(
       }),
       prisma.income.findMany({
         where: {
-          companyId: company.id,
+          ...buildIncomeBaseWhere(company.id),
           receiveDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
         },
         include: {
           Contact: true,

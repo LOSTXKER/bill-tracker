@@ -317,6 +317,7 @@ model Expense {
   fraudFlags                                 Json?
   fraudScore                                 Int?
   isReimbursement                            Boolean                @default(false)
+  isSettlementTransfer                       Boolean                @default(false)
   reimbursementApprovedAt                    DateTime?
   reimbursementApprovedBy                    String?
   reimbursementPaidAt                        DateTime?

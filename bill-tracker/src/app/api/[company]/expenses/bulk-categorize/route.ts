@@ -72,12 +72,13 @@ async function handlePatch(
       id: { in: expenseIds },
       companyId: context.company.id,
       deletedAt: null,
+      isSettlementTransfer: false,
     },
     data: updateData,
   });
 
   const expenses = await prisma.expense.findMany({
-    where: { id: { in: expenseIds }, companyId: context.company.id },
+    where: { id: { in: expenseIds }, companyId: context.company.id, isSettlementTransfer: false, deletedAt: null },
     select: { id: true, contactId: true, contactName: true, vatRate: true, whtRate: true, whtType: true },
   });
 

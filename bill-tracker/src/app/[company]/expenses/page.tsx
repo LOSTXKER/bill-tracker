@@ -322,9 +322,9 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       ready,
       sent,
     })),
-    // Count cross-company expenses (paid by others for this company) — for warning banner in official mode
+    // Count cross-company expenses (paid by others for this company) — for warning banner
     prisma.expense.count({
-      where: { internalCompanyId: companyId, companyId: { not: companyId }, deletedAt: null },
+      where: buildExpensePayOnBehalfWhere(companyId),
     }),
   ]);
 

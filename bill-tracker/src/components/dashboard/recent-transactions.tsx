@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { getCompanyId } from "@/lib/cache/company";
+import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export async function RecentTransactions({ companyCode }: { companyCode: string }) {
   const companyId = await getCompanyId(companyCode);
@@ -11,12 +12,12 @@ export async function RecentTransactions({ companyCode }: { companyCode: string 
 
   const [recentExpenses, recentIncomes] = await Promise.all([
     prisma.expense.findMany({
-      where: { companyId: companyId, deletedAt: null },
+      where: { ...reimbursementFilter, companyId: companyId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
     prisma.income.findMany({
-      where: { companyId: companyId, deletedAt: null },
+      where: { ...buildIncomeBaseWhere(companyId) },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),

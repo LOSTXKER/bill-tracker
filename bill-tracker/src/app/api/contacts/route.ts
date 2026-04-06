@@ -227,10 +227,10 @@ export const DELETE = withCompanyAccess(
       return apiResponse.error(new Error("Contact ID is required"));
     }
 
-    // Check if used in transactions (only count non-deleted items)
+    // Check if used in transactions (scoped to company, non-deleted only)
     const [expenseCount, incomeCount] = await Promise.all([
-      prisma.expense.count({ where: { contactId: id, deletedAt: null } }),
-      prisma.income.count({ where: { contactId: id, deletedAt: null } }),
+      prisma.expense.count({ where: { contactId: id, companyId: company.id, deletedAt: null } }),
+      prisma.income.count({ where: { contactId: id, companyId: company.id, deletedAt: null } }),
     ]);
 
     if (expenseCount + incomeCount > 0) {

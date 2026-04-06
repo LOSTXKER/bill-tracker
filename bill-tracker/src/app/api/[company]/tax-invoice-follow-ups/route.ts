@@ -8,6 +8,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { DocumentEventType } from "@prisma/client";
 import { getTaxInvoiceRequestMethod } from "@/lib/constants/delivery-methods";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
 
 // =============================================================================
 // GET: ดึงรายการ expense ที่รอใบกำกับภาษี (จัดกลุ่มตาม Vendor)
@@ -21,6 +22,7 @@ export const GET = withCompanyAccessFromParams(
     // Get all expenses waiting for tax invoice
     const pendingExpenses = await prisma.expense.findMany({
       where: {
+        ...reimbursementFilter,
         companyId: company.id,
         deletedAt: null,
         documentType: "TAX_INVOICE",
@@ -251,31 +253,25 @@ export const POST = withCompanyAccessFromParams(
         };
       } else {
         // mark_received: Record tax invoice received (status stays ACTIVE)
-        const updatePromises = expenses.map(async (expense) => {
-          await tx.expense.update({
-            where: { id: expense.id },
-            data: {
-              hasTaxInvoice: true,
-              taxInvoiceAt: now,
-            },
-          });
-
-          await tx.documentEvent.create({
-            data: {
-              id: crypto.randomUUID(),
-              expenseId: expense.id,
-              eventType: "TAX_INVOICE_RECEIVED" as DocumentEventType,
-              eventDate: now,
-              fromStatus: expense.workflowStatus,
-              toStatus: expense.workflowStatus,
-              notes: notes || "ได้รับใบกำกับภาษีแล้ว",
-              metadata: { action: "mark_received" },
-              createdBy: session.user.id,
-            },
-          });
+        // Use updateMany + createMany to avoid N individual round-trips
+        await tx.expense.updateMany({
+          where: { id: { in: expenseIds } },
+          data: { hasTaxInvoice: true, taxInvoiceAt: now },
         });
 
-        await Promise.all(updatePromises);
+        await tx.documentEvent.createMany({
+          data: expenses.map((expense) => ({
+            id: crypto.randomUUID(),
+            expenseId: expense.id,
+            eventType: "TAX_INVOICE_RECEIVED" as DocumentEventType,
+            eventDate: now,
+            fromStatus: expense.workflowStatus,
+            toStatus: expense.workflowStatus,
+            notes: notes || "ได้รับใบกำกับภาษีแล้ว",
+            metadata: { action: "mark_received" },
+            createdBy: session.user.id,
+          })),
+        });
 
         return {
           action: "mark_received",

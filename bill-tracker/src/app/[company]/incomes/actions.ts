@@ -1,8 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { serializeIncomes } from "@/lib/utils/serializers";
 import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import { buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export interface FetchIncomesParams {
   companyCode: string;
@@ -44,9 +46,8 @@ export async function fetchIncomes(params: FetchIncomesParams) {
   }
 
   // Build where clause
-  const where: any = {
-    companyId: company.id,
-    deletedAt: null,
+  const where: Prisma.IncomeWhereInput = {
+    ...buildIncomeBaseWhere(company.id),
   };
 
   if (search) {
@@ -60,9 +61,9 @@ export async function fetchIncomes(params: FetchIncomesParams) {
   if (status) {
     // Support multiple statuses (comma-separated)
     if (status.includes(",")) {
-      where.workflowStatus = { in: status.split(",") };
+      where.workflowStatus = { in: status.split(",") as Prisma.EnumWorkflowStatusFilter["in"] };
     } else {
-      where.workflowStatus = status;
+      where.workflowStatus = status as Prisma.EnumWorkflowStatusFilter["equals"];
     }
   }
 
@@ -89,7 +90,7 @@ export async function fetchIncomes(params: FetchIncomesParams) {
   }
 
   // Build orderBy
-  const orderBy: any = {};
+  const orderBy: Prisma.IncomeOrderByWithRelationInput = {};
   if (sortBy === "receiveDate") {
     orderBy.receiveDate = sortOrder;
   } else if (sortBy === "amount") {

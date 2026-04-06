@@ -67,7 +67,7 @@ export function SettlePaymentDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Auto expense creation
-  const [createExpense, setCreateExpense] = useState(true);
+  const [createExpense, setCreateExpense] = useState(false);
   const [expensePayerType, setExpensePayerType] = useState<"USER" | "COMPANY">("USER");
   const [selectedPayerId, setSelectedPayerId] = useState<string>("");
 

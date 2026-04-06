@@ -8,6 +8,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { DocumentEventType } from "@prisma/client";
 import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
+import { reimbursementFilter } from "@/lib/queries/expense-filters";
 
 // =============================================================================
 // GET: ดึงรายการ WHT ที่รอส่ง
@@ -21,6 +22,7 @@ export const GET = withCompanyAccessFromParams(
     // Get all expenses with WHT that need to be sent
     const pendingExpenses = await prisma.expense.findMany({
       where: {
+        ...reimbursementFilter,
         companyId: company.id,
         deletedAt: null,
         isWht: true,
@@ -175,31 +177,26 @@ export const POST = withCompanyAccessFromParams(
         throw new Error("บางรายการไม่พบหรือไม่อยู่ในสถานะที่สามารถส่งได้");
       }
 
-      const updatePromises = expenses.map(async (expense) => {
-        await tx.expense.update({
-          where: { id: expense.id },
-          data: {
-            whtCertSentAt: now,
-          },
-        });
-
-        const methodInfo = getDeliveryMethod(deliveryMethod);
-        await tx.documentEvent.create({
-          data: {
-            id: crypto.randomUUID(),
-            expenseId: expense.id,
-            eventType,
-            eventDate: now,
-            fromStatus: expense.workflowStatus,
-            toStatus: expense.workflowStatus,
-            notes: notes || `ส่ง WHT ทาง ${methodInfo?.label || deliveryMethod}`,
-            metadata: { deliveryMethod },
-            createdBy: session.user.id,
-          },
-        });
+      // Use updateMany + createMany to avoid N individual round-trips
+      await tx.expense.updateMany({
+        where: { id: { in: expenseIds } },
+        data: { whtCertSentAt: now },
       });
 
-      await Promise.all(updatePromises);
+      const methodInfo = getDeliveryMethod(deliveryMethod);
+      await tx.documentEvent.createMany({
+        data: expenses.map((expense) => ({
+          id: crypto.randomUUID(),
+          expenseId: expense.id,
+          eventType,
+          eventDate: now,
+          fromStatus: expense.workflowStatus,
+          toStatus: expense.workflowStatus,
+          notes: notes || `ส่ง WHT ทาง ${methodInfo?.label || deliveryMethod}`,
+          metadata: { deliveryMethod },
+          createdBy: session.user.id,
+        })),
+      });
 
       return {
         updatedCount: expenses.length,

@@ -104,7 +104,6 @@ async function fetchRecentPatterns(
   transactionType: "EXPENSE" | "INCOME"
 ): Promise<RecentPattern[]> {
   try {
-    const where = { companyId, categoryId: { not: null } as const, deletedAt: null };
     const catSelect = { select: { name: true, Parent: { select: { name: true } } } } as const;
 
     type Row = { desc: string | null; Category: { name: string; Parent: { name: string } | null } | null };
@@ -112,13 +111,15 @@ async function fetchRecentPatterns(
     let rows: Row[];
     if (transactionType === "EXPENSE") {
       const r = await prisma.expense.findMany({
-        where, orderBy: { billDate: "desc" }, take: 50,
+        where: { companyId, categoryId: { not: null }, deletedAt: null, isSettlementTransfer: false },
+        orderBy: { billDate: "desc" }, take: 50,
         select: { description: true, Category: catSelect },
       });
       rows = r.map((x) => ({ desc: x.description, Category: x.Category }));
     } else {
       const r = await prisma.income.findMany({
-        where, orderBy: { receiveDate: "desc" }, take: 50,
+        where: { companyId, categoryId: { not: null }, deletedAt: null },
+        orderBy: { receiveDate: "desc" }, take: 50,
         select: { source: true, Category: catSelect },
       });
       rows = r.map((x) => ({ desc: x.source, Category: x.Category }));

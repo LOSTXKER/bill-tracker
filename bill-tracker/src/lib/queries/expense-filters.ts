@@ -1,10 +1,15 @@
 import { Prisma } from "@prisma/client";
 
-const reimbursementFilter = {
+/**
+ * Base filter that excludes unpaid reimbursements and settlement transfers.
+ * Exported so cross-company or other bespoke queries can include the same rules.
+ */
+export const reimbursementFilter: Prisma.ExpenseWhereInput = {
   OR: [
     { isReimbursement: false },
-    { isReimbursement: true, reimbursementStatus: "PAID" as const },
+    { isReimbursement: true, reimbursementStatus: "PAID" },
   ],
+  isSettlementTransfer: false,
 };
 
 /**
@@ -57,4 +62,42 @@ export function buildExpensePayOnBehalfWhere(companyId: string): Prisma.ExpenseW
     companyId: { not: companyId },
     deletedAt: null,
   };
+}
+
+/**
+ * Build the "official" (ตามบัญชี) where clause.
+ * Returns all expenses booked on this company (companyId = company), i.e. what appears
+ * in this company's general ledger, regardless of economic owner.
+ * Excludes unpaid reimbursements and settlement transfers.
+ */
+export function buildExpenseOfficialWhere(companyId: string): Prisma.ExpenseWhereInput {
+  return {
+    AND: [reimbursementFilter],
+    companyId,
+    deletedAt: null,
+  };
+}
+
+/**
+ * Helper: pick the right expense filter based on viewMode string.
+ */
+export function buildExpenseWhereForMode(
+  companyId: string,
+  viewMode: "official" | "internal" = "internal"
+): Prisma.ExpenseWhereInput {
+  return viewMode === "official"
+    ? buildExpenseOfficialWhere(companyId)
+    : buildExpenseBaseWhere(companyId);
+}
+
+// ============================================================================
+// Income filters
+// ============================================================================
+
+/**
+ * Build the base Prisma where clause for incomes.
+ * Centralizes soft-delete filtering so any future global income rules live here.
+ */
+export function buildIncomeBaseWhere(companyId: string): Prisma.IncomeWhereInput {
+  return { companyId, deletedAt: null };
 }

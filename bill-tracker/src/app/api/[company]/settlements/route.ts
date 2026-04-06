@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 interface RouteParams {
   params: Promise<{ company: string }>;
@@ -37,22 +38,15 @@ export const GET = withCompanyAccessFromParams(
       expenseWhere.approvalStatus = { in: ["APPROVED", "NOT_REQUIRED"] };
     }
 
-    // For PENDING with month/year filter, filter by billDate on Expense
+    // For PENDING with month/year filter, filter by billDate on Expense (Thailand timezone)
     if (status === "PENDING" && (month || year)) {
       if (month && year) {
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
-        expenseWhere.billDate = {
-          gte: startDate,
-          lte: endDate,
-        };
+        const { startDate, endDate } = getThaiMonthRange(parseInt(year), parseInt(month));
+        expenseWhere.billDate = { gte: startDate, lte: endDate };
       } else if (year) {
-        const startDate = new Date(parseInt(year), 0, 1);
-        const endDate = new Date(parseInt(year), 11, 31, 23, 59, 59);
-        expenseWhere.billDate = {
-          gte: startDate,
-          lte: endDate,
-        };
+        const { startDate } = getThaiMonthRange(parseInt(year), 1);
+        const { endDate } = getThaiMonthRange(parseInt(year), 12);
+        expenseWhere.billDate = { gte: startDate, lte: endDate };
       }
     }
 
@@ -65,22 +59,15 @@ export const GET = withCompanyAccessFromParams(
       where.paidByUserId = userId;
     }
 
-    // Date filter for SETTLED status - filter by settledAt
+    // Date filter for SETTLED status - filter by settledAt (Thailand timezone)
     if (status === "SETTLED") {
       if (month && year) {
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
-        where.settledAt = {
-          gte: startDate,
-          lte: endDate,
-        };
+        const { startDate, endDate } = getThaiMonthRange(parseInt(year), parseInt(month));
+        where.settledAt = { gte: startDate, lte: endDate };
       } else if (year) {
-        const startDate = new Date(parseInt(year), 0, 1);
-        const endDate = new Date(parseInt(year), 11, 31, 23, 59, 59);
-        where.settledAt = {
-          gte: startDate,
-          lte: endDate,
-        };
+        const { startDate } = getThaiMonthRange(parseInt(year), 1);
+        const { endDate } = getThaiMonthRange(parseInt(year), 12);
+        where.settledAt = { gte: startDate, lte: endDate };
       }
     }
 

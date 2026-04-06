@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 
 interface RouteParams {
   params: Promise<{ company: string }>;
@@ -12,9 +13,11 @@ interface RouteParams {
  */
 export const GET = withCompanyAccessFromParams(
   async (request, { company }) => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const thaiNow = toThaiLocalDate(new Date());
+    const { startDate: startOfMonth, endDate: endOfMonth } = getThaiMonthRange(
+      thaiNow.getFullYear(),
+      thaiNow.getMonth() + 1
+    );
 
     // Get all pending payments (only approved/not-required expenses)
     const pendingPayments = await prisma.expensePayment.findMany({
@@ -127,8 +130,8 @@ export const GET = withCompanyAccessFromParams(
           count: settledThisMonth._count,
           amount: Number(settledThisMonth._sum.amount) || 0,
         },
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
+        month: thaiNow.getMonth() + 1,
+        year: thaiNow.getFullYear(),
       },
       undefined,
       { maxAge: 5, staleWhileRevalidate: 30 }
