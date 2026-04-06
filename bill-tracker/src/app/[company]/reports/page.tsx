@@ -25,7 +25,7 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
 
   const selectedYear = year ? parseInt(year) : currentYear;
   const selectedMonth = month ? parseInt(month) : currentMonth;
-  const viewMode: ViewMode = (viewModeParam as ViewMode) || "official";
+  const viewMode: ViewMode = (viewModeParam as ViewMode) || "internal";
   const defaultTab = tab || "overview";
 
   return (

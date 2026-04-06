@@ -352,7 +352,7 @@ function TransactionTableRowInner({
               );
             })()
           ) : (
-            <span className="text-muted-foreground/50">-</span>
+            <span className="text-xs text-muted-foreground">{companyCode.toUpperCase()}</span>
           )}
         </TableCell>
       )}

@@ -182,6 +182,8 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const dateTo = searchParams.dateTo as string | undefined;
   // View mode: "internal" (default - show actual ownership), "official" (by companyId)
   const viewMode = (searchParams.viewMode as string) || "internal";
+  // Pay-on-behalf filter: only show cross-company expenses
+  const payOnBehalf = searchParams.payOnBehalf === "true";
 
   // Build where clause
   // Filter: Only show regular expenses OR reimbursements that have been PAID
@@ -216,6 +218,18 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
           { isReimbursement: true, reimbursementStatus: "PAID" as const },
         ],
       };
+
+  // When payOnBehalf filter is active, override to show only cross-company items
+  // (expenses owned by this company but recorded/paid by another company)
+  if (payOnBehalf) {
+    const keys = Object.keys(whereClause) as (keyof Prisma.ExpenseWhereInput)[];
+    keys.forEach((k) => delete whereClause[k]);
+    Object.assign(whereClause, {
+      internalCompanyId: companyId,
+      companyId: { not: companyId },
+      deletedAt: null,
+    });
+  }
 
   if (search) {
     const searchCondition = {

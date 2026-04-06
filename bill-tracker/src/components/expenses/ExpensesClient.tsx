@@ -67,9 +67,23 @@ export function ExpensesClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  const payOnBehalf = searchParams.get("payOnBehalf") === "true";
+
   const handleViewModeChange = (mode: "official" | "internal") => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("viewMode", mode);
+    params.delete("payOnBehalf");
+    router.push(`/${companyCode}/expenses?${params.toString()}`);
+  };
+
+  const handlePayOnBehalfToggle = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (payOnBehalf) {
+      params.delete("payOnBehalf");
+    } else {
+      params.set("payOnBehalf", "true");
+      params.set("viewMode", "internal");
+    }
     router.push(`/${companyCode}/expenses?${params.toString()}`);
   };
   
@@ -108,10 +122,21 @@ export function ExpensesClient({
             ตามจริง
           </Button>
         </div>
-        {viewMode === "internal" && (
+        {viewMode === "internal" && !payOnBehalf && (
           <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 px-2 py-1 rounded">
             แสดงรายจ่ายที่บริษัทนี้เป็นเจ้าของจริง รวมถึงที่บริษัทอื่นจ่ายแทน
           </span>
+        )}
+        {crossCompanyCount > 0 && (
+          <Button
+            variant={payOnBehalf ? "default" : "outline"}
+            size="sm"
+            onClick={handlePayOnBehalfToggle}
+            className="h-8"
+          >
+            <Building2 className="h-4 w-4 mr-1.5" />
+            จ่ายแทน ({crossCompanyCount})
+          </Button>
         )}
       </div>
 
