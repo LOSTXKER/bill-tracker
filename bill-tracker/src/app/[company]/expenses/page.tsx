@@ -46,7 +46,7 @@ export default async function ExpensesPage({ params, searchParams }: ExpensesPag
           companyCode={companyCode} 
           dateFrom={urlParams.dateFrom as string | undefined}
           dateTo={urlParams.dateTo as string | undefined}
-          viewMode={(urlParams.viewMode as string) || "internal"}
+          viewMode="internal"
         />
       </Suspense>
 
@@ -180,56 +180,24 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const creator = searchParams.creator as string | undefined;
   const dateFrom = searchParams.dateFrom as string | undefined;
   const dateTo = searchParams.dateTo as string | undefined;
-  // View mode: "internal" (default - show actual ownership), "official" (by companyId)
-  const viewMode = (searchParams.viewMode as string) || "internal";
-  // Pay-on-behalf filter: only show cross-company expenses
-  const payOnBehalf = searchParams.payOnBehalf === "true";
-
-  // Build where clause
-  // Filter: Only show regular expenses OR reimbursements that have been PAID
-  // Official view: what we recorded in our books (by companyId)
-  // Internal view: actual ownership (internalCompanyId or default to companyId if null)
-  const whereClause: Prisma.ExpenseWhereInput = viewMode === "internal"
-    ? {
-        // Internal view: Show expenses where this company is the "real" owner
-        // Either explicitly set as internalCompanyId, or recorded by us with no internal company
-        AND: [
-          {
-            OR: [
-              { internalCompanyId: companyId },
-              { companyId: companyId, internalCompanyId: null },
-            ],
-          },
-          {
-            OR: [
-              { isReimbursement: false },
-              { isReimbursement: true, reimbursementStatus: "PAID" as const },
-            ],
-          },
+  // Always use internal view: show all expenses where this company is the real owner
+  const whereClause: Prisma.ExpenseWhereInput = {
+    AND: [
+      {
+        OR: [
+          { internalCompanyId: companyId },
+          { companyId: companyId, internalCompanyId: null },
         ],
-        deletedAt: null,
-      }
-    : {
-        // Official view (default): Show expenses recorded under this company
-        companyId,
-        deletedAt: null,
+      },
+      {
         OR: [
           { isReimbursement: false },
           { isReimbursement: true, reimbursementStatus: "PAID" as const },
         ],
-      };
-
-  // When payOnBehalf filter is active, override to show only cross-company items
-  // (expenses owned by this company but recorded/paid by another company)
-  if (payOnBehalf) {
-    const keys = Object.keys(whereClause) as (keyof Prisma.ExpenseWhereInput)[];
-    keys.forEach((k) => delete whereClause[k]);
-    Object.assign(whereClause, {
-      internalCompanyId: companyId,
-      companyId: { not: companyId },
-      deletedAt: null,
-    });
-  }
+      },
+    ],
+    deletedAt: null,
+  };
 
   if (search) {
     const searchCondition = {
@@ -251,18 +219,25 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     }
   }
 
-  // Handle special tab filters (approval status)
+  // Handle special tab filters
   if (tab === "pending") {
     whereClause.workflowStatus = "PENDING_APPROVAL";
   } else if (tab === "rejected") {
-    // Show rejected items
     whereClause.approvalStatus = "REJECTED";
   } else if (tab === "draft") {
-    // Show draft items created by current user
     whereClause.workflowStatus = "DRAFT";
     if (currentUserId) {
       whereClause.createdBy = currentUserId;
     }
+  } else if (tab === "payOnBehalf") {
+    // Cross-company only: another company paid on behalf of this company
+    const keys = Object.keys(whereClause) as (keyof Prisma.ExpenseWhereInput)[];
+    keys.forEach((k) => delete whereClause[k]);
+    Object.assign(whereClause, {
+      internalCompanyId: companyId,
+      companyId: { not: companyId },
+      deletedAt: null,
+    });
   }
 
   if (contact) {
@@ -306,35 +281,26 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     orderBy.push({ createdAt: "desc" });
   }
 
-  // Base where clause for counting (without tab-specific filters)
-  const baseWhereClause = viewMode === "internal"
-    ? {
-        AND: [
-          {
-            OR: [
-              { internalCompanyId: companyId },
-              { companyId: companyId, internalCompanyId: null },
-            ],
-          },
-          {
-            OR: [
-              { isReimbursement: false },
-              { isReimbursement: true, reimbursementStatus: "PAID" as const },
-            ],
-          },
+  // Base where clause for tab counts (without tab-specific or search filters)
+  const baseWhereClause = {
+    AND: [
+      {
+        OR: [
+          { internalCompanyId: companyId },
+          { companyId: companyId, internalCompanyId: null },
         ],
-        deletedAt: null,
-      }
-    : {
-        companyId,
-        deletedAt: null,
+      },
+      {
         OR: [
           { isReimbursement: false },
           { isReimbursement: true, reimbursementStatus: "PAID" as const },
         ],
-      };
+      },
+    ],
+    deletedAt: null,
+  };
 
-  const [expensesRaw, total, tabCounts, crossCompanyCount] = await Promise.all([
+  const [expensesRaw, total, tabCounts] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
       orderBy,
@@ -368,7 +334,8 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "ACTIVE" } }), // active
       prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: "READY_FOR_ACCOUNTING" } }), // ready
       prisma.expense.count({ where: { ...baseWhereClause, workflowStatus: { in: ["SENT_TO_ACCOUNTANT", "COMPLETED"] } } }), // sent
-    ]).then(([all, draft, pending, rejected, active, ready, sent]) => ({
+      prisma.expense.count({ where: { internalCompanyId: companyId, companyId: { not: companyId }, deletedAt: null } }), // payOnBehalf
+    ]).then(([all, draft, pending, rejected, active, ready, sent, payOnBehalf]) => ({
       all,
       draft,
       pending,
@@ -376,11 +343,8 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       active,
       ready,
       sent,
+      payOnBehalf,
     })),
-    // Count cross-company expenses (paid by others for this company) — for warning banner in official mode
-    prisma.expense.count({
-      where: { internalCompanyId: companyId, companyId: { not: companyId }, deletedAt: null },
-    }),
   ]);
 
   // Map Prisma relation names to what the client expects
@@ -405,12 +369,10 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       companyCode={companyCode}
       initialExpenses={serializedExpenses}
       initialTotal={total}
-      viewMode={viewMode as "official" | "internal"}
       currentUserId={currentUserId}
       canApprove={canApprove}
       isOwner={isOwner}
       tabCounts={tabCounts}
-      crossCompanyCount={crossCompanyCount}
       companies={companies}
     />
   );

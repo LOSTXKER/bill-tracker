@@ -86,6 +86,7 @@ interface TabCounts {
   active: number;
   ready: number;
   sent: number;
+  payOnBehalf?: number;
 }
 
 interface TransactionListClientProps {
@@ -194,7 +195,7 @@ export function TransactionListClient({
   const handleTabChange = (tabKey: string) => {
     const tab = statusTabs.find(t => t.key === tabKey);
     
-    if (tabKey === "draft") {
+    if (tabKey === "draft" || tabKey === "payOnBehalf") {
       updateFilters({ status: "", tab: tabKey });
     } else if (tab && tab.statuses.length > 0) {
       updateFilters({ tab: "", status: tab.statuses.join(",") });

@@ -15,6 +15,7 @@ export const EXPENSE_STATUS_TABS: StatusTab[] = [
   { key: "active", label: "ดำเนินการ", statuses: ["ACTIVE"] },
   { key: "ready", label: "พร้อมส่งบัญชี", statuses: ["READY_FOR_ACCOUNTING"] },
   { key: "sent", label: "ส่งบัญชีแล้ว", statuses: ["SENT_TO_ACCOUNTANT", "COMPLETED"] },
+  { key: "payOnBehalf", label: "จ่ายแทน", statuses: [], isTabFilter: true },
 ];
 
 export const INCOME_STATUS_TABS: StatusTab[] = [
