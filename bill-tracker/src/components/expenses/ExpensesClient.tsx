@@ -1,5 +1,7 @@
 "use client";
 
+import { Building2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   TransactionListClient, 
   type CompanyOption,
@@ -7,6 +9,8 @@ import {
   expenseRowConfig,
 } from "@/components/transactions";
 import { createTransactionListConfig } from "@/lib/config/transaction-list-config";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface TabCounts {
   all: number;
@@ -15,7 +19,6 @@ interface TabCounts {
   active: number;
   ready: number;
   sent: number;
-  payOnBehalf?: number;
 }
 
 interface ExpensesClientProps {
@@ -26,6 +29,7 @@ interface ExpensesClientProps {
   canApprove?: boolean;
   isOwner?: boolean;
   tabCounts?: TabCounts;
+  crossCompanyCount?: number;
   companies?: CompanyOption[];
 }
 
@@ -55,19 +59,86 @@ export function ExpensesClient({
   canApprove = false,
   isOwner = false,
   tabCounts,
+  crossCompanyCount = 0,
   companies = [],
 }: ExpensesClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const ownership = searchParams.get("ownership"); // null | "self" | "payOnBehalf"
+
+  const handleOwnershipChange = (value: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set("ownership", value);
+    } else {
+      params.delete("ownership");
+    }
+    params.delete("page");
+    router.push(`/${companyCode}/expenses?${params.toString()}`);
+  };
+
   return (
-    <TransactionListClient
-      companyCode={companyCode}
-      data={initialExpenses}
-      total={initialTotal}
-      config={expenseListConfig}
-      companies={companies}
-      currentUserId={currentUserId}
-      canApprove={canApprove}
-      isOwner={isOwner}
-      tabCounts={tabCounts}
-    />
+    <div className="space-y-4">
+      {crossCompanyCount > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground mr-1">แสดง:</span>
+          <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOwnershipChange(null)}
+              className={cn(
+                "h-8 px-3 rounded-md transition-all",
+                !ownership
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              ทั้งหมด
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOwnershipChange("self")}
+              className={cn(
+                "h-8 px-3 rounded-md transition-all",
+                ownership === "self"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              จ่ายเอง
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOwnershipChange("payOnBehalf")}
+              className={cn(
+                "h-8 px-3 rounded-md transition-all",
+                ownership === "payOnBehalf"
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Building2 className="h-4 w-4 mr-1.5" />
+              จ่ายแทน ({crossCompanyCount})
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <TransactionListClient
+        companyCode={companyCode}
+        data={initialExpenses}
+        total={initialTotal}
+        config={expenseListConfig}
+        companies={companies}
+        currentUserId={currentUserId}
+        canApprove={canApprove}
+        isOwner={isOwner}
+        tabCounts={tabCounts}
+      />
+    </div>
   );
 }
