@@ -13,6 +13,11 @@ import { ExpensesClient } from "@/components/expenses/ExpensesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getExpenseStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
+import {
+  buildExpenseBaseWhere,
+  buildExpenseSelfWhere,
+  buildExpensePayOnBehalfWhere,
+} from "@/lib/queries/expense-filters";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
@@ -181,48 +186,14 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   // Ownership filter: null (all), "self" (paid by us), "payOnBehalf" (paid by another company)
   const ownership = searchParams.ownership as string | undefined;
 
-  // Build where clause — always use "internal" view (real ownership)
-  const reimbursementFilter = {
-    OR: [
-      { isReimbursement: false },
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
-
+  // Build where clause using shared filter builders
   let whereClause: Prisma.ExpenseWhereInput;
   if (ownership === "self") {
-    whereClause = {
-      AND: [
-        {
-          OR: [
-            { companyId, internalCompanyId: null },
-            { companyId, internalCompanyId: companyId },
-          ],
-        },
-        reimbursementFilter,
-      ],
-      deletedAt: null,
-    };
+    whereClause = buildExpenseSelfWhere(companyId);
   } else if (ownership === "payOnBehalf") {
-    whereClause = {
-      AND: [reimbursementFilter],
-      internalCompanyId: companyId,
-      companyId: { not: companyId },
-      deletedAt: null,
-    };
+    whereClause = buildExpensePayOnBehalfWhere(companyId);
   } else {
-    whereClause = {
-      AND: [
-        {
-          OR: [
-            { internalCompanyId: companyId },
-            { companyId, internalCompanyId: null },
-          ],
-        },
-        reimbursementFilter,
-      ],
-      deletedAt: null,
-    };
+    whereClause = buildExpenseBaseWhere(companyId);
   }
 
   if (search) {
@@ -277,7 +248,9 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       whereClause.billDate.gte = new Date(dateFrom);
     }
     if (dateTo) {
-      whereClause.billDate.lte = new Date(dateTo);
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      whereClause.billDate.lte = end;
     }
   }
 
@@ -305,23 +278,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   }
 
   // Base where clause for counting (always internal view — real ownership)
-  const baseWhereClause: Prisma.ExpenseWhereInput = {
-    AND: [
-      {
-        OR: [
-          { internalCompanyId: companyId },
-          { companyId, internalCompanyId: null },
-        ],
-      },
-      {
-        OR: [
-          { isReimbursement: false },
-          { isReimbursement: true, reimbursementStatus: "PAID" as const },
-        ],
-      },
-    ],
-    deletedAt: null,
-  };
+  const baseWhereClause = buildExpenseBaseWhere(companyId);
 
   const [expensesRaw, total, tabCounts, crossCompanyCount] = await Promise.all([
     prisma.expense.findMany({

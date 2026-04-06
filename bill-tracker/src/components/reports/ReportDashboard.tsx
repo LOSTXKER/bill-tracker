@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, calculateVATSummary, calculateWHTSummary } from "@/lib/utils/tax-calculator";
 import {
@@ -41,27 +42,10 @@ export async function ReportDashboard({
   const prevStartDate = new Date(prevYear, prevMonth - 1, 1);
   const prevEndDate = new Date(prevYear, prevMonth, 0);
 
-  const reimbursementFilter = {
-    OR: [
-      { isReimbursement: false },
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
-
-  const expenseCompanyFilter =
-    viewMode === "internal"
-      ? {
-          OR: [
-            { internalCompanyId: company.id },
-            { companyId: company.id, internalCompanyId: null },
-          ],
-        }
-      : { companyId: company.id };
-
-  const expenseBaseWhere = (dateGte: Date, dateLte: Date) => ({
-    AND: [expenseCompanyFilter, reimbursementFilter],
+  const baseWhere = buildExpenseBaseWhere(company.id);
+  const expenseWhere = (dateGte: Date, dateLte: Date) => ({
+    ...baseWhere,
     billDate: { gte: dateGte, lte: dateLte },
-    deletedAt: null,
   });
 
   const [
@@ -75,7 +59,7 @@ export async function ReportDashboard({
     whtIncomes,
   ] = await Promise.all([
     prisma.expense.aggregate({
-      where: expenseBaseWhere(startDate, endDate),
+      where: expenseWhere(startDate, endDate),
       _sum: { netPaid: true },
       _count: true,
     }),
@@ -89,7 +73,7 @@ export async function ReportDashboard({
       _count: true,
     }),
     prisma.expense.aggregate({
-      where: expenseBaseWhere(prevStartDate, prevEndDate),
+      where: expenseWhere(prevStartDate, prevEndDate),
       _sum: { netPaid: true },
     }),
     prisma.income.aggregate({
@@ -100,9 +84,8 @@ export async function ReportDashboard({
       },
       _sum: { netReceived: true },
     }),
-    // VAT data
     prisma.expense.findMany({
-      where: { ...expenseBaseWhere(startDate, endDate), vatRate: { gt: 0 } },
+      where: { ...expenseWhere(startDate, endDate), vatRate: { gt: 0 } },
       select: { vatAmount: true },
     }),
     prisma.income.findMany({
@@ -114,9 +97,8 @@ export async function ReportDashboard({
       },
       select: { vatAmount: true },
     }),
-    // WHT data
     prisma.expense.findMany({
-      where: { ...expenseBaseWhere(startDate, endDate), isWht: true },
+      where: { ...expenseWhere(startDate, endDate), isWht: true },
       select: { whtAmount: true },
     }),
     prisma.income.findMany({

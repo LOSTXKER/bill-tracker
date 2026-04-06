@@ -2,6 +2,7 @@
 
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
 
 export type ViewMode = "official" | "internal";
 
@@ -69,35 +70,8 @@ async function _expenseStatsImpl(
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  // Build filter based on viewMode
-  // Official view: filter by companyId (what we recorded in our books)
-  // Internal view: filter by actual ownership (internalCompanyId or default to companyId if null)
-  const expenseFilter = viewMode === "internal"
-    ? {
-        AND: [
-          {
-            OR: [
-              { internalCompanyId: companyId },
-              { companyId: companyId, internalCompanyId: null },
-            ],
-          },
-          {
-            OR: [
-              { isReimbursement: false },
-              { isReimbursement: true, reimbursementStatus: "PAID" as const },
-            ],
-          },
-        ],
-        deletedAt: null,
-      }
-    : {
-        companyId,
-        deletedAt: null,
-        OR: [
-          { isReimbursement: false },
-          { isReimbursement: true, reimbursementStatus: "PAID" as const },
-        ],
-      };
+  // Always use internal view (real ownership) — shared filter builder
+  const expenseFilter = buildExpenseBaseWhere(companyId);
 
   // For filtered stats, also apply date filter to workflow status counts
   const filteredExpenseFilter = hasDateFilter 

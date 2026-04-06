@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,30 +38,12 @@ export async function VATReport({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
-  const reimbursementFilter = {
-    OR: [
-      { isReimbursement: false },
-      { isReimbursement: true, reimbursementStatus: "PAID" as const },
-    ],
-  };
-
-  const expenseCompanyFilter =
-    viewMode === "internal"
-      ? {
-          OR: [
-            { internalCompanyId: company.id },
-            { companyId: company.id, internalCompanyId: null },
-          ],
-        }
-      : { companyId: company.id };
-
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        AND: [expenseCompanyFilter, reimbursementFilter],
+        ...buildExpenseBaseWhere(company.id),
         billDate: { gte: startDate, lte: endDate },
         vatRate: { gt: 0 },
-        deletedAt: null,
       },
       include: { Company: true, InternalCompany: true, Contact: true },
       orderBy: { billDate: "asc" },
