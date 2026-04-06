@@ -146,18 +146,18 @@ export function AmountInput({ watch, setValue, vatRate, isWht, onModeChange }: A
   };
 
   // ---------------------------------------------------------------------------
-  // User toggles input mode — stored base stays, only the display changes
+  // User toggles input mode — display stays, recalculate base from current display
   // ---------------------------------------------------------------------------
   const handleInputModeToggle = (newMode: AmountInputMode) => {
     if (newMode === amountInputMode) return;
     if (newMode === "afterWht" && !canUseAfterWht) return;
 
-    const base = formAmount || 0;
-    const newDisplay = baseToDisplay(base, newMode, vatRate, whtRate);
+    const currentDisplay = parseFloat(displayAmount) || 0;
+    const newBase = displayToBase(currentDisplay, newMode, vatRate, whtRate);
 
     isUserInputRef.current = true;
     setAmountInputMode(newMode);
-    setDisplayAmount(String(newDisplay));
+    setValue("amount", newBase);
     onModeChange?.(newMode);
   };
 
