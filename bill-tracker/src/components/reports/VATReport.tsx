@@ -37,6 +37,13 @@ export async function VATReport({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
+  const reimbursementFilter = {
+    OR: [
+      { isReimbursement: false },
+      { isReimbursement: true, reimbursementStatus: "PAID" as const },
+    ],
+  };
+
   const expenseCompanyFilter =
     viewMode === "internal"
       ? {
@@ -50,7 +57,7 @@ export async function VATReport({
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({
       where: {
-        ...expenseCompanyFilter,
+        AND: [expenseCompanyFilter, reimbursementFilter],
         billDate: { gte: startDate, lte: endDate },
         vatRate: { gt: 0 },
         deletedAt: null,

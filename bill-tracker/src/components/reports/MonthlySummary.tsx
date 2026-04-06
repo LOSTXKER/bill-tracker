@@ -37,6 +37,13 @@ export async function MonthlySummary({
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
 
+  const reimbursementFilter = {
+    OR: [
+      { isReimbursement: false },
+      { isReimbursement: true, reimbursementStatus: "PAID" as const },
+    ],
+  };
+
   const expenseCompanyFilter =
     viewMode === "internal"
       ? {
@@ -47,14 +54,16 @@ export async function MonthlySummary({
         }
       : { companyId: company.id };
 
+  const expenseBaseWhere = {
+    AND: [expenseCompanyFilter, reimbursementFilter],
+    billDate: { gte: startDate, lte: endDate },
+    deletedAt: null,
+  };
+
   const [expenseSum, incomeSum, expenseByCategory, categories, allExpenses, allIncomes] =
     await Promise.all([
       prisma.expense.aggregate({
-        where: {
-          ...expenseCompanyFilter,
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
+        where: expenseBaseWhere,
         _sum: { netPaid: true },
         _count: true,
       }),
@@ -69,11 +78,7 @@ export async function MonthlySummary({
       }),
       prisma.expense.groupBy({
         by: ["categoryId"],
-        where: {
-          ...expenseCompanyFilter,
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
+        where: expenseBaseWhere,
         _sum: { netPaid: true },
         _count: true,
       }),
@@ -82,11 +87,7 @@ export async function MonthlySummary({
         select: { id: true, name: true, Parent: { select: { name: true } } },
       }),
       prisma.expense.findMany({
-        where: {
-          ...expenseCompanyFilter,
-          billDate: { gte: startDate, lte: endDate },
-          deletedAt: null,
-        },
+        where: expenseBaseWhere,
         include: { Contact: true, Category: { include: { Parent: { select: { name: true } } } } },
         orderBy: { billDate: "desc" },
       }),
@@ -187,8 +188,20 @@ export async function MonthlySummary({
                 .map((item) => {
                   const amount = Number(item._sum?.netPaid) || 0;
                   const percentage = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+                  const dateFromStr = `${year}-${String(month).padStart(2, "0")}-01`;
+                  const dateToStr = `${year}-${String(month).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+                  const filterParams = new URLSearchParams({
+                    dateFrom: dateFromStr,
+                    dateTo: dateToStr,
+                    ...(item.categoryId ? { category: item.categoryId } : {}),
+                  });
+                  const href = `/${companyCode}/expenses?${filterParams.toString()}`;
                   return (
-                    <div key={item.categoryId || "null"} className="space-y-2">
+                    <Link
+                      key={item.categoryId || "null"}
+                      href={href}
+                      className="block space-y-2 rounded-lg px-3 py-2 -mx-3 transition-colors hover:bg-muted/50"
+                    >
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">{getCategoryName(item.categoryId)}</span>
                         <span>{formatCurrency(amount)}</span>
@@ -203,7 +216,7 @@ export async function MonthlySummary({
                         <span>{item._count} รายการ</span>
                         <span>{percentage.toFixed(1)}%</span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
             </div>

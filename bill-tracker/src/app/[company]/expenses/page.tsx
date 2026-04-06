@@ -259,6 +259,10 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     }
   }
 
+  if (category) {
+    whereClause.categoryId = category;
+  }
+
   if (contact) {
     whereClause.contactId = contact;
   }
