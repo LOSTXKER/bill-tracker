@@ -3,6 +3,7 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { toThaiStartOfDay, toThaiEndOfDay, getThaiMonthRange } from "@/lib/queries/date-utils";
 
 export type ViewMode = "official" | "internal";
 
@@ -55,20 +56,17 @@ async function _expenseStatsImpl(
   let endDate: Date;
   
   if (hasDateFilter) {
-    // Use custom date range
-    startDate = dateFilter?.dateFrom ? new Date(dateFilter.dateFrom) : new Date(0);
-    endDate = dateFilter?.dateTo ? new Date(dateFilter.dateTo) : new Date();
-    // Set end date to end of day
-    endDate.setHours(23, 59, 59, 999);
+    startDate = dateFilter?.dateFrom ? toThaiStartOfDay(dateFilter.dateFrom) : new Date(0);
+    endDate = dateFilter?.dateTo ? toThaiEndOfDay(dateFilter.dateTo) : new Date();
   } else {
-    // Default to current month
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const range = getThaiMonthRange(now.getFullYear(), now.getMonth() + 1);
+    startDate = range.startDate;
+    endDate = range.endDate;
   }
   
   // For trend calculation (only when not using custom filter)
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  const { startDate: startOfLastMonth, endDate: endOfLastMonth } =
+    getThaiMonthRange(now.getFullYear(), now.getMonth());
 
   // Always use internal view (real ownership) — shared filter builder
   const expenseFilter = buildExpenseBaseWhere(companyId);
@@ -164,20 +162,17 @@ async function _incomeStatsImpl(companyId: string, dateFilter?: DateRangeFilter)
   let endDate: Date;
   
   if (hasDateFilter) {
-    // Use custom date range
-    startDate = dateFilter?.dateFrom ? new Date(dateFilter.dateFrom) : new Date(0);
-    endDate = dateFilter?.dateTo ? new Date(dateFilter.dateTo) : new Date();
-    // Set end date to end of day
-    endDate.setHours(23, 59, 59, 999);
+    startDate = dateFilter?.dateFrom ? toThaiStartOfDay(dateFilter.dateFrom) : new Date(0);
+    endDate = dateFilter?.dateTo ? toThaiEndOfDay(dateFilter.dateTo) : new Date();
   } else {
-    // Default to current month
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const range = getThaiMonthRange(now.getFullYear(), now.getMonth() + 1);
+    startDate = range.startDate;
+    endDate = range.endDate;
   }
   
   // For trend calculation (only when not using custom filter)
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  const { startDate: startOfLastMonth, endDate: endOfLastMonth } =
+    getThaiMonthRange(now.getFullYear(), now.getMonth());
 
   const incomeFilter = {
     companyId,

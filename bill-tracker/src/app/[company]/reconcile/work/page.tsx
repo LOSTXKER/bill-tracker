@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ReconcileWorkspace } from "@/components/reconcile/ReconcileWorkspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReconcileSessionType, type ExpensePayment } from "@prisma/client";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 interface WorkPageProps {
   params: Promise<{ company: string }>;
@@ -89,12 +90,15 @@ async function WorkspaceDataLoader({
       ? { companyId: selectedCompanyIds[0] }
       : { companyId: { in: selectedCompanyIds } };
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  const { startDate, endDate } = getThaiMonthRange(year, month);
 
   // Spillover range: up to 6 months back for unmatched items (Thai VAT credit period)
-  const spilloverStart = new Date(year, month - 7, 1);
-  const spilloverEnd = new Date(year, month - 1, 0, 23, 59, 59);
+  const spilloverMonth = month - 6 <= 0 ? month - 6 + 12 : month - 6;
+  const spilloverYear = month - 6 <= 0 ? year - 1 : year;
+  const { startDate: spilloverStart } = getThaiMonthRange(spilloverYear, spilloverMonth);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const { endDate: spilloverEnd } = getThaiMonthRange(prevYear, prevMonth);
 
   const companyIdToCode = new Map(
     siblingCompanies.map((c) => [c.id, c.code])

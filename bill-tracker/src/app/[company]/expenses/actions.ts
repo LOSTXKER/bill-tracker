@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { serializeExpenses } from "@/lib/utils/serializers";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 export interface FetchExpensesParams {
   companyCode: string;
@@ -94,10 +95,10 @@ export async function fetchExpenses(params: FetchExpensesParams) {
   if (dateFrom || dateTo) {
     where.billDate = {};
     if (dateFrom) {
-      where.billDate.gte = new Date(dateFrom);
+      where.billDate.gte = toThaiStartOfDay(dateFrom);
     }
     if (dateTo) {
-      where.billDate.lte = new Date(dateTo);
+      where.billDate.lte = toThaiEndOfDay(dateTo);
     }
   }
 

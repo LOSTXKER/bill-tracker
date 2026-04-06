@@ -6,6 +6,7 @@ import {
   getArchiveStats,
 } from "@/lib/export/archive";
 import { apiResponse } from "@/lib/api/response";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 // Helper to parse JSON array from Prisma (can be string or array)
 function parseJsonArray(value: unknown): string[] {
@@ -53,8 +54,7 @@ async function handleGetPreview(
     return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
   }
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+  const { startDate, endDate } = getThaiMonthRange(year, month);
 
   // Fetch expenses and incomes
   const [expensesRaw, incomesRaw] = await Promise.all([
@@ -138,8 +138,7 @@ async function handlePost(
       return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
     }
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+    const { startDate, endDate } = getThaiMonthRange(year, month);
 
     // Fetch expenses and incomes with files
     const [expensesRaw2, incomesRaw2] = await Promise.all([

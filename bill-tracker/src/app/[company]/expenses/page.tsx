@@ -18,6 +18,7 @@ import {
   buildExpenseSelfWhere,
   buildExpensePayOnBehalfWhere,
 } from "@/lib/queries/expense-filters";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 interface ExpensesPageProps {
   params: Promise<{ company: string }>;
@@ -245,12 +246,10 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   if (dateFrom || dateTo) {
     whereClause.billDate = {};
     if (dateFrom) {
-      whereClause.billDate.gte = new Date(dateFrom);
+      whereClause.billDate.gte = toThaiStartOfDay(dateFrom);
     }
     if (dateTo) {
-      const end = new Date(dateTo);
-      end.setHours(23, 59, 59, 999);
-      whereClause.billDate.lte = end;
+      whereClause.billDate.lte = toThaiEndOfDay(dateTo);
     }
   }
 

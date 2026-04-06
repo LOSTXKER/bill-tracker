@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 /**
  * GET /api/[company]/contacts/report
@@ -18,15 +19,13 @@ export const GET = withCompanyAccessFromParams(
     const dateTo = searchParams.get("dateTo");
     const typeFilter = searchParams.get("type");
 
-    // Build date filter
+    // Build date filter (timezone-aware: Thailand UTC+7)
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (dateFrom) {
-      dateFilter.gte = new Date(dateFrom);
+      dateFilter.gte = toThaiStartOfDay(dateFrom);
     }
     if (dateTo) {
-      const endDate = new Date(dateTo);
-      endDate.setHours(23, 59, 59, 999);
-      dateFilter.lte = endDate;
+      dateFilter.lte = toThaiEndOfDay(dateTo);
     }
 
     // Get all contacts for this company

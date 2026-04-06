@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, calculateVATSummary, calculateWHTSummary } from "@/lib/utils/tax-calculator";
 import {
@@ -33,14 +34,12 @@ export async function ReportDashboard({
 
   if (!company) return null;
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
+  const { startDate, endDate } = getThaiMonthRange(year, month);
 
   // Previous month for comparison
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
-  const prevStartDate = new Date(prevYear, prevMonth - 1, 1);
-  const prevEndDate = new Date(prevYear, prevMonth, 0);
+  const { startDate: prevStartDate, endDate: prevEndDate } = getThaiMonthRange(prevYear, prevMonth);
 
   const baseWhere = buildExpenseBaseWhere(company.id);
   const expenseWhere = (dateGte: Date, dateLte: Date) => ({

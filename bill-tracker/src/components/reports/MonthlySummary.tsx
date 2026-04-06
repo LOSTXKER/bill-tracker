@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,8 +36,7 @@ export async function MonthlySummary({
 
   if (!company) return null;
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
+  const { startDate, endDate } = getThaiMonthRange(year, month);
 
   const expenseBaseWhere = {
     ...buildExpenseBaseWhere(company.id),
@@ -171,8 +171,9 @@ export async function MonthlySummary({
                 .map((item) => {
                   const amount = Number(item._sum?.netPaid) || 0;
                   const percentage = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+                  const lastDay = new Date(year, month, 0).getDate();
                   const dateFromStr = `${year}-${String(month).padStart(2, "0")}-01`;
-                  const dateToStr = `${year}-${String(month).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+                  const dateToStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
                   const filterParams = new URLSearchParams({
                     dateFrom: dateFromStr,
                     dateTo: dateToStr,

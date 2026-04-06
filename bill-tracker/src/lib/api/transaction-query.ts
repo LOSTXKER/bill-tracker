@@ -2,6 +2,7 @@ import { withCompanyAccess } from "./with-company-access";
 import { apiResponse } from "./response";
 import { getBaseIncludes } from "./transaction-includes";
 import type { TransactionRouteConfig } from "./transaction-types";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 export function createListHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
   return withCompanyAccess(
@@ -54,16 +55,14 @@ export function createListHandler<TModel>(config: TransactionRouteConfig<TModel,
         ];
       }
 
-      // Date range filter
+      // Date range filter (timezone-aware: Thailand UTC+7)
       if (dateFrom || dateTo) {
         const dateFilter: { gte?: Date; lte?: Date } = {};
         if (dateFrom) {
-          const d = new Date(dateFrom);
-          if (!isNaN(d.getTime())) dateFilter.gte = d;
+          dateFilter.gte = toThaiStartOfDay(dateFrom);
         }
         if (dateTo) {
-          const d = new Date(dateTo);
-          if (!isNaN(d.getTime())) dateFilter.lte = d;
+          dateFilter.lte = toThaiEndOfDay(dateTo);
         }
         if (Object.keys(dateFilter).length > 0) {
           where[config.fields.dateField] = dateFilter;

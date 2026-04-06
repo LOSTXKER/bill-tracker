@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,7 @@ export async function WHTReport({
 
   if (!company) return null;
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
+  const { startDate, endDate } = getThaiMonthRange(year, month);
 
   const [expenses, incomes] = await Promise.all([
     prisma.expense.findMany({

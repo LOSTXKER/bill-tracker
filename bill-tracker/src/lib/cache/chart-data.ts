@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 
 export interface MonthlyDataPoint {
   month: string;
@@ -16,8 +17,13 @@ export async function getMonthlyChartData(
   companyId: string,
   numMonths: number = 6
 ): Promise<MonthlyDataPoint[]> {
-  const now = new Date();
-  const startDate = new Date(now.getFullYear(), now.getMonth() - (numMonths - 1), 1);
+  const now = toThaiLocalDate(new Date());
+  const startMonth = now.getMonth() - (numMonths - 1) + 1; // 1-based
+  const startYear = now.getFullYear();
+  const { startDate } = getThaiMonthRange(
+    startMonth <= 0 ? startYear - 1 : startYear,
+    startMonth <= 0 ? startMonth + 12 : startMonth,
+  );
 
   const [incomes, expenses] = await Promise.all([
     prisma.income.findMany({
@@ -49,7 +55,7 @@ export async function getMonthlyChartData(
 
   for (const row of incomes) {
     if (!row.receiveDate) continue;
-    const d = new Date(row.receiveDate);
+    const d = toThaiLocalDate(new Date(row.receiveDate));
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.income += Number(row.netReceived) || 0;
@@ -57,7 +63,7 @@ export async function getMonthlyChartData(
 
   for (const row of expenses) {
     if (!row.billDate) continue;
-    const d = new Date(row.billDate);
+    const d = toThaiLocalDate(new Date(row.billDate));
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.expense += Number(row.netPaid) || 0;

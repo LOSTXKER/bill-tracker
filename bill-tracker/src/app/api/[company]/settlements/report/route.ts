@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import type { PaidByType, SettlementStatus } from "@prisma/client";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 /**
  * GET /api/[company]/settlements/report
@@ -21,15 +22,13 @@ export const GET = withCompanyAccessFromParams(
     const dateTo = searchParams.get("dateTo");
     const statusFilter = searchParams.get("status");
 
-    // Build date filter
+    // Build date filter (timezone-aware: Thailand UTC+7)
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (dateFrom) {
-      dateFilter.gte = new Date(dateFrom);
+      dateFilter.gte = toThaiStartOfDay(dateFrom);
     }
     if (dateTo) {
-      const endDate = new Date(dateTo);
-      endDate.setHours(23, 59, 59, 999);
-      dateFilter.lte = endDate;
+      dateFilter.lte = toThaiEndOfDay(dateTo);
     }
 
     // Base where clause - only USER type needs settlement

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { exportExpensesToPEAK } from "@/lib/export/peak-export";
 import { apiResponse } from "@/lib/api/response";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 // POST /api/[company]/export-peak
 // Generate and download PEAK-format Excel file
@@ -18,8 +19,7 @@ async function handlePost(
       return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
     }
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+    const { startDate, endDate } = getThaiMonthRange(year, month);
 
     // Build where clause
     const where: any = {
@@ -134,8 +134,7 @@ async function handleGet(
     return apiResponse.badRequest("กรุณาระบุเดือนและปีให้ถูกต้อง");
   }
 
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+  const { startDate, endDate } = getThaiMonthRange(year, month);
 
   // Count expenses
   const [total, withAccount, withoutAccount, withWHT] = await Promise.all([

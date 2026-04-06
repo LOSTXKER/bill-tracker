@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/db";
 import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 // =============================================================================
 // GET: ดึงสรุป WHT
@@ -17,9 +18,8 @@ export const GET = withCompanyAccessFromParams(
     const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
     const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
 
-    // Calculate date range for the month
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+    // Calculate date range for the month (Thailand timezone)
+    const { startDate: startOfMonth, endDate: endOfMonth } = getThaiMonthRange(year, month);
 
     // Get company settings
     const companySettings = await prisma.company.findUnique({

@@ -13,6 +13,7 @@ import { IncomesClient } from "@/components/incomes/IncomesClient";
 import { getCompanyId } from "@/lib/cache/company";
 import { getIncomeStats } from "@/lib/cache/stats";
 import { getSession } from "@/lib/auth";
+import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
 
 interface IncomesPageProps {
   params: Promise<{ company: string }>;
@@ -221,10 +222,10 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   if (dateFrom || dateTo) {
     whereClause.receiveDate = {};
     if (dateFrom) {
-      whereClause.receiveDate.gte = new Date(dateFrom);
+      whereClause.receiveDate.gte = toThaiStartOfDay(dateFrom);
     }
     if (dateTo) {
-      whereClause.receiveDate.lte = new Date(dateTo);
+      whereClause.receiveDate.lte = toThaiEndOfDay(dateTo);
     }
   }
 
