@@ -9,6 +9,7 @@ import {
   exportVATReport,
   exportWHTReport,
 } from "@/lib/export/excel";
+import { getThaiMonthRange } from "@/lib/queries/date-utils";
 
 export const GET = withCompanyAccess(
   async (request, { company }) => {
@@ -22,8 +23,7 @@ export const GET = withCompanyAccess(
       return apiResponse.badRequest("Missing required parameters");
     }
 
-    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(month), 0);
+    const { startDate, endDate } = getThaiMonthRange(parseInt(year), parseInt(month));
     const period = `${month}/${year}`;
 
     const expenseCompanyFilter =

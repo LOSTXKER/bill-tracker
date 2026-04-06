@@ -150,9 +150,11 @@ export async function MonthlySummary({
 
       {/* Export Button */}
       <div className="flex justify-end">
-        <Button variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
-          Export Excel
+        <Button variant="outline" className="gap-2" asChild>
+          <a href={`/api/reports/export?company=${companyCode.toUpperCase()}&type=monthly&month=${month}&year=${year}&viewMode=${viewMode}`}>
+            <Download className="h-4 w-4" />
+            Export Excel
+          </a>
         </Button>
       </div>
 
