@@ -68,11 +68,13 @@ export function styleHeaderRow(sheet: ExcelJS.Worksheet): void {
 }
 
 export function styleNumericColumns(sheet: ExcelJS.Worksheet, keys: string[]): void {
+  const validKeys = new Set(
+    (sheet.columns || []).map((c) => c.key).filter(Boolean),
+  );
   keys.forEach((key) => {
+    if (!validKeys.has(key)) return;
     const col = sheet.getColumn(key);
-    if (col) {
-      col.numFmt = "#,##0.00";
-      col.alignment = { horizontal: "right" };
-    }
+    col.numFmt = "#,##0.00";
+    col.alignment = { horizontal: "right" };
   });
 }
