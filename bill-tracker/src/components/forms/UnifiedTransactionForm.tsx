@@ -385,42 +385,6 @@ export function UnifiedTransactionForm({
   );
 
   // ---------------------------------------------------------------------------
-  // Auto-suggest account from contact history (create mode only)
-  // ---------------------------------------------------------------------------
-  const contactSuggestFetched = useRef<string | null>(null);
-  useEffect(() => {
-    if (mode !== "create") return;
-    const contactId = contactState.selectedContact?.id;
-    if (!contactId || selectedAccount || contactSuggestFetched.current === contactId) return;
-    contactSuggestFetched.current = contactId;
-
-    fetch(`/api/${companyCode.toLowerCase()}/contacts/${contactId}/suggested-account`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((json) => {
-        if (!json?.success || !json.data?.accountId) return;
-        const { accountId, account, alternatives } = json.data;
-        patchAiState({
-          accountSuggestion: {
-            accountId,
-            accountCode: account?.code || null,
-            accountName: account?.name || null,
-            confidence: 70,
-            reason: "แนะนำจากประวัติผู้ติดต่อ",
-            alternatives: (alternatives || []).map((a: { accountId: string; account: { code: string; name: string } | null; count: number }) => ({
-              accountId: a.accountId,
-              accountCode: a.account?.code || "",
-              accountName: a.account?.name || "",
-              confidence: 50,
-              reason: "ใช้บ่อย",
-            })),
-          },
-        });
-        setSelectedAccount(accountId);
-      })
-      .catch(() => {});
-  }, [mode, contactState.selectedContact?.id, selectedAccount, companyCode, patchAiState, setSelectedAccount]);
-
-  // ---------------------------------------------------------------------------
   // React-Hook-Form
   // ---------------------------------------------------------------------------
   const {
