@@ -348,7 +348,7 @@ function TransactionTableRowInner({
                   <div className="flex flex-col gap-0.5">
                     <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 gap-1">
                       <ArrowRightLeft className="h-3 w-3" />
-                      {transaction.company.code} จ่ายให้ {transaction.internalCompany.code}
+                      {transaction.company.code} จ่ายแทน
                     </Badge>
                   </div>
                 );
@@ -357,13 +357,13 @@ function TransactionTableRowInner({
                 <div className="flex flex-col gap-0.5">
                   <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 gap-1">
                     <ArrowRightLeft className="h-3 w-3" />
-                    {companyCode.toUpperCase()} จ่ายให้ {transaction.internalCompany.code}
+                    จ่ายให้ {transaction.internalCompany.code}
                   </Badge>
                 </div>
               );
             })()
           ) : (
-            <span className="text-xs text-muted-foreground">{companyCode.toUpperCase()}</span>
+            <span className="text-xs text-muted-foreground">จ่ายเอง</span>
           )}
         </TableCell>
       )}

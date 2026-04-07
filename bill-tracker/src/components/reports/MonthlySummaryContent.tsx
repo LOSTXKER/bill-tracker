@@ -10,7 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRightLeft, TrendingDown, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import type { ExpenseRow } from "./CategoryDrillDownSheet";
 
@@ -73,6 +74,7 @@ export function MonthlySummaryContent({
                       <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
                       <TableHead className="text-muted-foreground font-medium">ผู้ขาย</TableHead>
                       <TableHead className="text-muted-foreground font-medium">หมวดหมู่</TableHead>
+                      <TableHead className="text-muted-foreground font-medium">บริษัทที่จ่าย</TableHead>
                       <TableHead className="text-muted-foreground font-medium text-right">ยอดเงิน</TableHead>
                       <TableHead className="text-muted-foreground font-medium text-right">VAT</TableHead>
                       <TableHead className="text-muted-foreground font-medium text-right">สุทธิ</TableHead>
@@ -100,6 +102,16 @@ export function MonthlySummaryContent({
                         </TableCell>
                         <TableCell className="max-w-[150px] truncate">
                           {expense.categoryName || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {expense.payerCompanyCode ? (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 gap-0.5">
+                              <ArrowRightLeft className="h-2.5 w-2.5" />
+                              {expense.payerCompanyCode} จ่ายแทน
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">จ่ายเอง</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(expense.amount)}

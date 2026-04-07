@@ -35,6 +35,8 @@ export const GET = withCompanyAccess(
         },
         include: {
           Contact: true,
+          Company: { select: { name: true, code: true } },
+          Category: { select: { name: true, Parent: { select: { name: true } } } },
         },
         orderBy: { billDate: "asc" },
       }),
@@ -51,7 +53,12 @@ export const GET = withCompanyAccess(
     ]);
 
     // Map Prisma relation names
-    const expenses = expensesRaw.map((e) => ({ ...e, contact: e.Contact }));
+    const expenses = expensesRaw.map((e) => ({
+      ...e,
+      contact: e.Contact,
+      company: e.Company,
+      category: e.Category,
+    }));
     const incomes = incomesRaw.map((i) => ({ ...i, contact: i.Contact }));
 
     // Transform data to match export format
@@ -60,7 +67,14 @@ export const GET = withCompanyAccess(
       vendorName: e.contact?.name || null,
       vendorTaxId: e.contact?.taxId || null,
       description: e.description,
-      accountId: e.accountId,
+      category: e.category
+        ? e.category.Parent
+          ? `[${e.category.Parent.name}] ${e.category.name}`
+          : e.category.name
+        : null,
+      payerCompanyName: e.company?.code !== company.code
+        ? e.company?.name ?? null
+        : null,
       amount: e.amount,
       vatRate: e.vatRate,
       vatAmount: e.vatAmount,

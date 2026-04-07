@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ArrowRightLeft, ExternalLink } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { formatThaiDateShort } from "@/lib/utils/formatters";
 
@@ -29,6 +30,7 @@ export interface ExpenseRow {
   netPaid: number;
   contactName: string | null;
   categoryName: string | null;
+  payerCompanyCode: string | null;
 }
 
 interface CategoryDrillDownSheetProps {
@@ -110,11 +112,19 @@ export function CategoryDrillDownSheet({
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       <div className="truncate">{expense.description || "-"}</div>
-                      {expense.vatAmount > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          VAT {formatCurrency(expense.vatAmount)}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-0.5 empty:hidden">
+                        {expense.vatAmount > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            VAT {formatCurrency(expense.vatAmount)}
+                          </span>
+                        )}
+                        {expense.payerCompanyCode && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 gap-0.5">
+                            <ArrowRightLeft className="h-2.5 w-2.5" />
+                            {expense.payerCompanyCode} จ่ายแทน
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-[140px] truncate text-muted-foreground text-sm">
                       {expense.contactName || "-"}

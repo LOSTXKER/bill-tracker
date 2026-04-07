@@ -43,6 +43,7 @@ export async function MonthlySummary({
         Category: {
           select: { id: true, name: true, Parent: { select: { name: true } } },
         },
+        Company: { select: { code: true } },
       },
       orderBy: { billDate: "desc" },
     }),
@@ -77,6 +78,7 @@ export async function MonthlySummary({
         ? `[${e.Category.Parent.name}] ${e.Category.name}`
         : e.Category.name
       : null,
+    payerCompanyCode: e.Company?.code !== companyCode.toUpperCase() ? e.Company?.code ?? null : null,
   }));
 
   const incomeRows = allIncomes.map((i) => ({

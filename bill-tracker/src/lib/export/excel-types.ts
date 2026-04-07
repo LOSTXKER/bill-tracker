@@ -6,6 +6,7 @@ export interface ExpenseData {
   vendorTaxId?: string | null;
   description?: string | null;
   category?: string | null;
+  payerCompanyName?: string | null;
   amount: number;
   vatRate: number;
   vatAmount: number | null;

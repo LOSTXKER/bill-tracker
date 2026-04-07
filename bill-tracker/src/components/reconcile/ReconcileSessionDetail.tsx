@@ -330,11 +330,9 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                     {m.isPayOnBehalf && (
                       <Badge variant="outline" className="text-[10px] px-1 h-4 text-purple-600 border-purple-300">
                         <Building2 className="h-2.5 w-2.5 mr-0.5" />
-                        {m.payOnBehalfFrom && m.payOnBehalfTo
-                          ? `${m.payOnBehalfFrom} จ่ายให้ ${m.payOnBehalfTo}`
-                          : m.payOnBehalfFrom
-                            ? `${m.payOnBehalfFrom} จ่ายแทน`
-                            : "จ่ายแทน"}
+                        {m.payOnBehalfFrom
+                          ? `${m.payOnBehalfFrom} จ่ายแทน`
+                          : "จ่ายแทน"}
                       </Badge>
                     )}
                     {hasDocs && (

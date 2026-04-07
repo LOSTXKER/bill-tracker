@@ -60,7 +60,13 @@ export async function ReportDashboard({
       orderBy: { _sum: { netReceived: "desc" } },
     }),
     prisma.transactionCategory.findMany({
-      where: { companyId: company.id },
+      where: {
+        OR: [
+          { companyId: company.id },
+          { Expenses: { some: expenseWhere } },
+          { Incomes: { some: incomeWhere } },
+        ],
+      },
       select: { id: true, name: true, parentId: true, Parent: { select: { name: true } } },
     }),
     prisma.expense.findMany({
@@ -74,6 +80,7 @@ export async function ReportDashboard({
         netPaid: true,
         Contact: { select: { name: true } },
         Category: { select: { id: true, name: true, Parent: { select: { name: true } } } },
+        Company: { select: { code: true } },
       },
       orderBy: { billDate: "desc" },
     }),
@@ -118,6 +125,7 @@ export async function ReportDashboard({
         ? `[${e.Category.Parent.name}] ${e.Category.name}`
         : e.Category.name
       : null,
+    payerCompanyCode: e.Company?.code !== companyCode.toUpperCase() ? e.Company?.code ?? null : null,
   }));
 
   const chartTrendData = trendData.map(({ month: m, income, expense }) => ({

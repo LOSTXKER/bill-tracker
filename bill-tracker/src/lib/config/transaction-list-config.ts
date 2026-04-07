@@ -33,7 +33,7 @@ const EXPENSE_LIST_CONFIG: TransactionListConfigDef = {
     { key: "contact", label: "ผู้ติดต่อ", sortable: true },
     { key: "category", label: "หมวดหมู่" },
     { key: "description", label: "รายละเอียด" },
-    { key: "internalCompany", label: "บริษัทจริง" },
+    { key: "internalCompany", label: "บริษัทที่จ่าย" },
     { key: "creator", label: "ผู้สร้าง", sortable: true },
     { key: "amount", label: "จำนวนเงิน", sortable: true, align: "right" as const },
     { key: "updatedAt", label: "แก้ไขล่าสุด", sortable: true },
