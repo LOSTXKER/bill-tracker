@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles, ArrowLeft, ListChecks, MessageSquareText, Settings2, Calculator, Wallet, Plus, Bookmark } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, ListChecks, MessageSquareText, Settings2, Calculator, Wallet, Plus, Bookmark, Replace } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -662,6 +662,8 @@ function SavePresetDialog({
   configType: string;
   onSaved: () => void;
 }) {
+  const [saveMode, setSaveMode] = useState<"new" | "overwrite">("new");
+  const [overwriteIndex, setOverwriteIndex] = useState<number | null>(null);
   const [label, setLabel] = useState("");
   const [description, setDescription] = useState(initialDescription);
   const [accountId, setAccountId] = useState<string | null>(initialAccountId);
@@ -670,12 +672,38 @@ function SavePresetDialog({
 
   useEffect(() => {
     if (open) {
+      setSaveMode("new");
+      setOverwriteIndex(null);
       setLabel("");
       setDescription(initialDescription);
       setAccountId(initialAccountId);
       setCategoryId(initialCategoryId);
     }
   }, [open, initialDescription, initialAccountId, initialCategoryId]);
+
+  const handleSelectOverwriteTarget = (index: number) => {
+    setOverwriteIndex(index);
+    const preset = existingPresets[index];
+    if (preset) {
+      setLabel(preset.label);
+      setDescription(preset.description);
+      setAccountId(preset.accountId ?? null);
+      setCategoryId(preset.categoryId ?? null);
+    }
+  };
+
+  const handleSaveModeChange = (mode: "new" | "overwrite") => {
+    setSaveMode(mode);
+    if (mode === "new") {
+      setOverwriteIndex(null);
+      setLabel("");
+      setDescription(initialDescription);
+      setAccountId(initialAccountId);
+      setCategoryId(initialCategoryId);
+    } else if (mode === "overwrite" && existingPresets.length > 0) {
+      handleSelectOverwriteTarget(0);
+    }
+  };
 
   const handleSave = async () => {
     const trimmedLabel = label.trim();
@@ -688,6 +716,10 @@ function SavePresetDialog({
       toast.error("กรุณาระบุคำอธิบาย");
       return;
     }
+    if (saveMode === "overwrite" && overwriteIndex === null) {
+      toast.error("กรุณาเลือกรายการที่ต้องการบันทึกทับ");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -698,13 +730,18 @@ function SavePresetDialog({
         categoryId,
       };
 
+      const updatedPresets =
+        saveMode === "overwrite" && overwriteIndex !== null
+          ? existingPresets.map((p, i) => (i === overwriteIndex ? newPreset : p))
+          : [...existingPresets, newPreset];
+
       const res = await fetch(
         `/api/${companyCode.toUpperCase()}/contacts/${contactId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            descriptionPresets: [...existingPresets, newPreset],
+            descriptionPresets: updatedPresets,
           }),
         }
       );
@@ -714,7 +751,11 @@ function SavePresetDialog({
         throw new Error(data.error || "บันทึกไม่สำเร็จ");
       }
 
-      toast.success("บันทึกรายการที่ใช้บ่อยแล้ว");
+      toast.success(
+        saveMode === "overwrite"
+          ? "บันทึกทับรายการที่ใช้บ่อยแล้ว"
+          : "บันทึกรายการที่ใช้บ่อยแล้ว"
+      );
       onSaved();
       onOpenChange(false);
     } catch (err) {
@@ -724,6 +765,8 @@ function SavePresetDialog({
     }
   };
 
+  const hasExisting = existingPresets.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -731,6 +774,52 @@ function SavePresetDialog({
           <DialogTitle>บันทึกเป็นรายการที่ใช้บ่อย</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {hasExisting && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={saveMode === "new" ? "default" : "outline"}
+                size="sm"
+                className="flex-1 gap-1.5"
+                onClick={() => handleSaveModeChange("new")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                สร้างใหม่
+              </Button>
+              <Button
+                type="button"
+                variant={saveMode === "overwrite" ? "default" : "outline"}
+                size="sm"
+                className="flex-1 gap-1.5"
+                onClick={() => handleSaveModeChange("overwrite")}
+              >
+                <Replace className="h-3.5 w-3.5" />
+                บันทึกทับอันเดิม
+              </Button>
+            </div>
+          )}
+
+          {saveMode === "overwrite" && hasExisting && (
+            <div className="space-y-1.5">
+              <Label className="text-sm">เลือกรายการที่ต้องการบันทึกทับ</Label>
+              <Select
+                value={overwriteIndex !== null ? String(overwriteIndex) : undefined}
+                onValueChange={(val) => handleSelectOverwriteTarget(Number(val))}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="เลือกรายการ..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {existingPresets.map((preset, index) => (
+                    <SelectItem key={index} value={String(index)}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-sm">ชื่อย่อ <span className="text-red-500">*</span></Label>
             <Input
@@ -774,7 +863,7 @@ function SavePresetDialog({
           </Button>
           <Button type="button" onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-            บันทึก
+            {saveMode === "overwrite" ? "บันทึกทับ" : "บันทึก"}
           </Button>
         </DialogFooter>
       </DialogContent>

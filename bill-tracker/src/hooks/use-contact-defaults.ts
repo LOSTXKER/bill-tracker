@@ -99,15 +99,6 @@ export function useContactDefaults(
 
   const presets = contact ? parsePresets(contact.descriptionPresets) : [];
 
-  // Auto-migrate legacy descriptionTemplate
-  if (presets.length === 0 && contact?.descriptionTemplate) {
-    presets.push({
-      label: contact.descriptionTemplate,
-      description: contact.descriptionTemplate,
-      accountId: null,
-    });
-  }
-
   const defaults: ContactDefaults | null = contact && hasDefaults ? {
     defaultVatRate: contact.defaultVatRate,
     defaultWhtEnabled: contact.defaultWhtEnabled,
