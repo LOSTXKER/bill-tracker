@@ -43,6 +43,7 @@ export async function ReportDashboard({
     incomeByCategory,
     categories,
     allExpenseRows,
+    allIncomeRows,
   ] = await Promise.all([
     getMonthlyChartData(company.id, 6),
     prisma.expense.groupBy({
@@ -83,6 +84,20 @@ export async function ReportDashboard({
         Company: { select: { code: true } },
       },
       orderBy: { billDate: "desc" },
+    }),
+    prisma.income.findMany({
+      where: incomeWhere,
+      select: {
+        id: true,
+        receiveDate: true,
+        source: true,
+        amount: true,
+        vatAmount: true,
+        netReceived: true,
+        Contact: { select: { name: true } },
+        Category: { select: { id: true, name: true, Parent: { select: { name: true } } } },
+      },
+      orderBy: { receiveDate: "desc" },
     }),
   ]);
 
@@ -128,6 +143,21 @@ export async function ReportDashboard({
     payerCompanyCode: e.Company?.code !== companyCode.toUpperCase() ? e.Company?.code ?? null : null,
   }));
 
+  const incomeRows = allIncomeRows.map((i) => ({
+    id: i.id,
+    receiveDate: i.receiveDate.toISOString(),
+    source: i.source,
+    amount: Number(i.amount),
+    vatAmount: Number(i.vatAmount) || 0,
+    netReceived: Number(i.netReceived),
+    contactName: i.Contact?.name ?? null,
+    categoryName: i.Category
+      ? i.Category.Parent
+        ? `[${i.Category.Parent.name}] ${i.Category.name}`
+        : i.Category.name
+      : null,
+  }));
+
   const chartTrendData = trendData.map(({ month: m, income, expense }) => ({
     month: m,
     income,
@@ -165,6 +195,7 @@ export async function ReportDashboard({
           title="รายรับตามหมวดหมู่"
           groups={incomeCategoryGroups}
           total={totalIncome}
+          allIncomes={incomeRows}
           companyCode={companyCode}
           year={year}
           month={month}

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { UseFormWatch, UseFormReset } from "react-hook-form";
 import { toast } from "sonner";
 import type { TransactionFetcherData } from "@/hooks/use-transaction";
-import { revalidateSidebarBadges } from "@/lib/utils/revalidate";
+import { revalidateSidebarBadges, revalidateCompanyData } from "@/lib/utils/revalidate";
 import type { BaseTransaction } from "@/components/forms/hooks/useTransactionForm";
 import type { ContactSummary } from "@/types";
 import type { UnifiedTransactionConfig } from "@/components/forms/UnifiedTransactionForm";
@@ -234,6 +234,7 @@ export function useTransactionSubmission({
 
       toast.success(`บันทึก${config.title}สำเร็จ`);
       revalidateSidebarBadges(companyCode);
+      revalidateCompanyData(companyCode);
       
       // Redirect to the created item's detail page
       const createdItem = result.data?.expense || result.data?.income;
@@ -357,6 +358,7 @@ export function useTransactionSubmission({
       onModeChange?.("view");
       setAuditRefreshKey((prev) => prev + 1);
       revalidateSidebarBadges(companyCode);
+      revalidateCompanyData(companyCode);
       toast.success("บันทึกการแก้ไขสำเร็จ");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");

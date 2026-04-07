@@ -141,29 +141,7 @@ export function TransactionFieldsSection({
         toast.success("AI แนะนำหมวดหมู่สำเร็จ", {
           description: `[${result.category.groupName}] ${result.category.categoryName}`,
         });
-      }
-
-      // Handle account suggestion
-      if (result.account?.id) {
-        const alternatives = (result.accountAlternatives || []).map((alt: any) => ({
-          accountId: alt.id,
-          accountCode: alt.code,
-          accountName: alt.name,
-          confidence: alt.confidence || 50,
-          reason: alt.reason || "ทางเลือกอื่น",
-        }));
-
-        onAiSuggestAccount({
-          accountId: result.account.id,
-          alternatives,
-        });
-
-        if (!selectedAccount) {
-          onAccountChange(result.account.id);
-        }
-      }
-
-      if (!result.category?.categoryId && !result.account?.id) {
+      } else {
         toast.info("AI ไม่สามารถจำแนกหมวดหมู่ได้", {
           description: "ลองเพิ่มรายละเอียดเพิ่มเติม",
         });

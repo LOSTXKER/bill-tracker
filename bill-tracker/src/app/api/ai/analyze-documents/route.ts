@@ -67,7 +67,6 @@ export async function POST(request: Request) {
         processingTime,
         vendor: aiResult.vendor.name,
         matchedContact: aiResult.vendor.matchedContactName,
-        account: aiResult.account.name,
         confidence: aiResult.confidence.overall,
         isNewVendor: !aiResult.vendor.matchedContactId,
       });
@@ -119,9 +118,9 @@ function convertToLegacyFormat(
       currency: result.currency,
     },
     suggested: {
-      accountId: result.account.id,
-      accountCode: result.account.code,
-      accountName: result.account.name,
+      accountId: null,
+      accountCode: null,
+      accountName: null,
       contactId: result.vendor.matchedContactId,
       contactName: result.vendor.matchedContactName,
       vatRate: result.vatRate,
@@ -152,7 +151,7 @@ function convertToLegacyFormat(
       matchConfidence: result.confidence.vendor,
       isNewVendor: !result.vendor.matchedContactId,
       suggested: {
-        accountId: result.account.id,
+        accountId: null,
         contactId: result.vendor.matchedContactId,
         vatRate: result.vatRate,
         whtRate: result.wht.rate,
@@ -162,21 +161,7 @@ function convertToLegacyFormat(
         name: result.vendor.matchedContactName,
       } : null,
     },
-    aiAccountSuggestion: result.account.id ? {
-      accountId: result.account.id,
-      accountCode: result.account.code,
-      accountName: result.account.name,
-      confidence: result.account.confidence || result.confidence.account,
-      reason: result.account.reason || result.description || "AI วิเคราะห์จากเอกสาร",
-      isNewAccount: result.account.isNewAccount || false,
-      alternatives: (result.accountAlternatives || []).map(alt => ({
-        accountId: alt.id,
-        accountCode: alt.code,
-        accountName: alt.name,
-        confidence: alt.confidence,
-        reason: alt.reason,
-      })),
-    } : null,
+    aiAccountSuggestion: null,
     detectedTransactionType: null,
     // Currency conversion info
     currencyConversion: currencyConversion ? {

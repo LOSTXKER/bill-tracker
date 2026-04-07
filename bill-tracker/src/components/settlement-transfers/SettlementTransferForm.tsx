@@ -39,6 +39,7 @@ import { fetcher } from "@/lib/utils/fetcher";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { formatThaiDateTime } from "@/lib/utils/formatters";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -567,31 +568,309 @@ export function SettlementTransferForm({
   }
 
   // -------------------------------------------------------------------
-  // View / Edit mode: render as a card (for the detail page)
+  // View / Edit mode: render as a two-column layout (for the detail page)
   // -------------------------------------------------------------------
   return (
-    <div className="rounded-xl border bg-card p-6">
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className="bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800"
-          >
-            โอนคืน
-          </Badge>
-          <h2 className="text-lg font-semibold">
-            {data?.contactName || "รายการโอนเงินคืน"}
-          </h2>
-        </div>
-        {isView && (
-          <Button variant="outline" size="sm" onClick={() => onModeChange?.("edit")}>
-            <Pencil className="mr-1.5 h-4 w-4" />
-            แก้ไข
-          </Button>
+    <div className="grid lg:grid-cols-5 gap-6">
+      {/* Left Column: Main fields */}
+      <Card className="lg:col-span-3 shadow-sm border-border">
+        <CardContent className="p-6 lg:p-8 space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800"
+              >
+                โอนคืน
+              </Badge>
+              <h2 className="text-lg font-semibold">
+                {data?.contactName || "รายการโอนเงินคืน"}
+              </h2>
+            </div>
+            {isView && (
+              <Button variant="outline" size="sm" onClick={() => onModeChange?.("edit")}>
+                <Pencil className="mr-1.5 h-4 w-4" />
+                แก้ไข
+              </Button>
+            )}
+          </div>
+
+          {/* Employee name */}
+          <div className="space-y-2">
+            <Label>ชื่อพนักงาน <span className="text-destructive">*</span></Label>
+            {isView ? (
+              <p className="text-sm font-medium">{data?.contactName || "-"}</p>
+            ) : (
+              <Input
+                placeholder="ชื่อพนักงานที่ต้องโอนคืน"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                disabled={isSubmitting}
+              />
+            )}
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label>จำนวนเงิน (บาท) <span className="text-destructive">*</span></Label>
+            {isView ? (
+              <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                {formatCurrency(data?.netPaid || 0)}
+              </p>
+            ) : (
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                disabled={isSubmitting}
+              />
+            )}
+          </div>
+
+          {/* Date */}
+          <div className="space-y-2">
+            <Label>วันที่โอน</Label>
+            {isView ? (
+              <p className="text-sm">
+                {data?.billDate
+                  ? new Date(data.billDate).toLocaleDateString(APP_LOCALE, {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      timeZone: APP_TIMEZONE,
+                    })
+                  : "-"}
+              </p>
+            ) : (
+              <Input
+                type="date"
+                value={billDate}
+                onChange={(e) => setBillDate(e.target.value)}
+                disabled={isSubmitting}
+              />
+            )}
+          </div>
+
+          {/* Payer */}
+          <div className="space-y-2">
+            <Label>ผู้จ่ายเงิน</Label>
+            {isView ? (
+              <p className="text-sm">
+                {data?.payments[0]?.paidByType === "COMPANY"
+                  ? "บัญชีบริษัท"
+                  : data?.payments[0]?.paidByUser?.name || "-"}
+              </p>
+            ) : (
+              <Select
+                value={payerType === "COMPANY" ? "COMPANY" : payerUserId}
+                onValueChange={(v) => {
+                  if (v === "COMPANY") {
+                    setPayerType("COMPANY");
+                    setPayerUserId("");
+                  } else {
+                    setPayerType("USER");
+                    setPayerUserId(v);
+                  }
+                }}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกผู้จ่ายเงิน" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="COMPANY">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      <span>บัญชีบริษัท</span>
+                    </div>
+                  </SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span>{m.name}</span>
+                        {m.id === session?.user?.id && (
+                          <span className="text-xs text-muted-foreground">(ตัวเอง)</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label>หมายเหตุ</Label>
+            {isView ? (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {data?.notes || "-"}
+              </p>
+            ) : (
+              <Textarea
+                placeholder="เลขอ้างอิงการโอน หรือหมายเหตุเพิ่มเติม"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                disabled={isSubmitting}
+                rows={3}
+              />
+            )}
+          </div>
+
+          {/* Category & Account */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>หมวดหมู่</Label>
+              {isView ? (
+                <p className="text-sm">{data?.category?.name || "-"}</p>
+              ) : (
+                <Select value={categoryId || "__none__"} onValueChange={(v) => setCategoryId(v === "__none__" ? "" : v)} disabled={isSubmitting}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกหมวดหมู่" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">ไม่ระบุ</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>ผังบัญชี</Label>
+              {isView ? (
+                <p className="text-sm">
+                  {data?.account ? `${data.account.code} - ${data.account.name}` : "-"}
+                </p>
+              ) : (
+                <Select value={accountId || "__none__"} onValueChange={(v) => setAccountId(v === "__none__" ? "" : v)} disabled={isSubmitting}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกผังบัญชี" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">ไม่ระบุ</SelectItem>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.code} - {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Right Column: Slips + Metadata + Actions */}
+      <div className="lg:col-span-2 space-y-3">
+        <Card className="shadow-sm border-border">
+          <CardContent className="p-6 space-y-4">
+            {/* Slips */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                สลิปการโอน
+              </Label>
+              {isView ? (
+                slipUrls.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {slipUrls.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="aspect-square rounded-lg border overflow-hidden hover:ring-2 ring-primary transition-all"
+                      >
+                        <img src={url} alt={`Slip ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">ไม่มีสลิป</p>
+                )
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {slipUrls.map((url, i) => (
+                    <div key={i} className="relative aspect-square rounded-lg border overflow-hidden">
+                      <img src={url} alt={`Slip ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setSlipUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"
+                        disabled={isSubmitting}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <label className="aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={isUploading || isSubmitting}
+                    />
+                    {isUploading ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground mt-1">เพิ่ม</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Metadata */}
+            {data && (
+              <div className="pt-4 border-t space-y-2 text-xs text-muted-foreground">
+                <p>สร้างโดย: {data.creator?.name || "-"}</p>
+                <p>สร้างเมื่อ: {formatThaiDateTime(data.createdAt)}</p>
+                <p>อัปเดตล่าสุด: {formatThaiDateTime(data.updatedAt)}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Actions (edit mode) */}
+        {!isView && (
+          <div className="flex gap-2">
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  กำลังบันทึก...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  บันทึกการแก้ไข
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onModeChange?.("view")}
+              disabled={isSubmitting}
+            >
+              ยกเลิก
+            </Button>
+          </div>
         )}
       </div>
-      {formContent}
     </div>
   );
 }

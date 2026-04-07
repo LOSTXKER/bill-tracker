@@ -52,6 +52,8 @@ import {
 } from "./shared/InputMethodSection";
 import { DocumentSettingsBlock } from "./shared/DocumentSettingsBlock";
 import { useTransactionFormContext } from "./TransactionFormContext";
+import { AccountSelector } from "./shared/account-selector";
+import { CategorySelector } from "./shared/CategorySelector";
 
 // ---------------------------------------------------------------------------
 // Shared local types
@@ -341,6 +343,7 @@ export function CreateModeContent({
                 }
                 initialAccountId={selectedAccount}
                 initialCategoryId={selectedCategory}
+                configType={config.type}
                 onSaved={mutateContactDefaults}
               />
             )}
@@ -645,6 +648,7 @@ function SavePresetDialog({
   initialDescription,
   initialAccountId,
   initialCategoryId,
+  configType,
   onSaved,
 }: {
   open: boolean;
@@ -655,18 +659,23 @@ function SavePresetDialog({
   initialDescription: string;
   initialAccountId: string | null;
   initialCategoryId: string | null;
+  configType: string;
   onSaved: () => void;
 }) {
   const [label, setLabel] = useState("");
   const [description, setDescription] = useState(initialDescription);
+  const [accountId, setAccountId] = useState<string | null>(initialAccountId);
+  const [categoryId, setCategoryId] = useState<string | null>(initialCategoryId);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setLabel("");
       setDescription(initialDescription);
+      setAccountId(initialAccountId);
+      setCategoryId(initialCategoryId);
     }
-  }, [open, initialDescription]);
+  }, [open, initialDescription, initialAccountId, initialCategoryId]);
 
   const handleSave = async () => {
     const trimmedLabel = label.trim();
@@ -685,8 +694,8 @@ function SavePresetDialog({
       const newPreset: DescriptionPreset = {
         label: trimmedLabel,
         description: trimmedDesc,
-        accountId: initialAccountId,
-        categoryId: initialCategoryId,
+        accountId,
+        categoryId,
       };
 
       const res = await fetch(
@@ -741,11 +750,23 @@ function SavePresetDialog({
               className="h-10"
             />
           </div>
-          {(initialAccountId || initialCategoryId) && (
-            <p className="text-xs text-muted-foreground">
-              บัญชีและหมวดหมู่ที่เลือกอยู่จะถูกบันทึกไปด้วย
-            </p>
-          )}
+          <div className="space-y-1.5">
+            <Label className="text-sm">บัญชี</Label>
+            <AccountSelector
+              value={accountId}
+              onValueChange={setAccountId}
+              companyCode={companyCode}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">หมวดหมู่</Label>
+            <CategorySelector
+              value={categoryId}
+              onValueChange={setCategoryId}
+              companyCode={companyCode}
+              type={configType === "expense" ? "EXPENSE" : "INCOME"}
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>

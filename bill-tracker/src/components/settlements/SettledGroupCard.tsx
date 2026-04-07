@@ -107,15 +107,7 @@ export function SettledGroupCard({
     const paymentId = selectedPaymentId;
     const reason = reverseReason.trim();
 
-    // OPTIMIZED: Optimistic update - close dialog immediately for better UX
-    toast.success("ยกเลิกการโอนคืนสำเร็จ");
-    setShowReverseDialog(false);
-    setReverseReason("");
-    setSelectedPaymentId(null);
-    setIsReversing(false);
-    onSuccess(); // Trigger batch revalidation
-
-    // Fire API request in background
+    setIsReversing(true);
     try {
       const response = await fetch(
         `/api/${companyCode}/settlements/${paymentId}`,
@@ -129,11 +121,18 @@ export function SettledGroupCard({
       if (!response.ok) {
         const data = await response.json();
         toast.error(data.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-        onSuccess(); // Re-fetch to get actual state
+        return;
       }
-    } catch (error) {
+
+      toast.success("ยกเลิกการโอนคืนสำเร็จ");
+      setShowReverseDialog(false);
+      setReverseReason("");
+      setSelectedPaymentId(null);
+      onSuccess();
+    } catch {
       toast.error("ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง");
-      onSuccess(); // Re-fetch to get actual state
+    } finally {
+      setIsReversing(false);
     }
   };
 

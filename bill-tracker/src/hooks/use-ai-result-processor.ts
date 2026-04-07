@@ -231,23 +231,6 @@ export function useAiResultProcessor({
 
       const aiPatch: Partial<AiFormState> = { aiApplied: true };
 
-      if (result.aiAccountSuggestion?.accountId) {
-        aiPatch.accountSuggestion = {
-          accountId: result.aiAccountSuggestion.accountId,
-          accountCode: result.aiAccountSuggestion.accountCode,
-          accountName: result.aiAccountSuggestion.accountName,
-          confidence: result.aiAccountSuggestion.confidence,
-          reason: result.aiAccountSuggestion.reason || "AI วิเคราะห์จากเอกสาร",
-          alternatives: result.aiAccountSuggestion.alternatives || [],
-        };
-        if (result.aiAccountSuggestion.isNewAccount) {
-          toast.info(
-            `AI สร้างบัญชีใหม่: ${result.aiAccountSuggestion.accountCode} ${result.aiAccountSuggestion.accountName}`,
-            { duration: 6000 }
-          );
-        }
-      }
-
       if (result.aiCategorySuggestion?.categoryId) {
         aiPatch.categorySuggestion = {
           categoryId: result.aiCategorySuggestion.categoryId,

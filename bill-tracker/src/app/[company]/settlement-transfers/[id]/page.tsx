@@ -65,29 +65,40 @@ export default function SettlementTransferDetailPage({ params }: Props) {
     : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto px-4 space-y-6">
       <PageHeader
         icon={ArrowLeftRight}
         title={transfer?.contactName || "รายการโอนเงินคืน"}
         description="รายละเอียดรายการโอนเงินคืนพนักงาน"
         breadcrumb={{
           label: "รายการโอนเงินคืน",
-          href: `/${companyCode}/settlement-transfers`,
+          href: `/${companyCode}/reimbursements?tab=transfers`,
         }}
       />
 
       {isLoading ? (
-        <div className="rounded-xl border bg-card p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="h-6 w-48" />
-          </div>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-9 w-full" />
+        <div className="grid lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 rounded-xl border bg-card p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="h-6 w-48" />
             </div>
-          ))}
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))}
+          </div>
+          <div className="lg:col-span-2 rounded-xl border bg-card p-6 space-y-4">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <div className="pt-4 border-t space-y-2">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-40" />
+              <Skeleton className="h-3 w-36" />
+            </div>
+          </div>
         </div>
       ) : transfer ? (
         <SettlementTransferForm

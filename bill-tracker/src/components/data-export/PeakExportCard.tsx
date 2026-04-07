@@ -47,7 +47,7 @@ export function PeakExportCard({
   handleDownloadPEAK,
 }: PeakExportCardProps) {
   return (
-    <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent">
+    <Card className="shadow-card border-border/50 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

@@ -1,21 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  User,
   ChevronDown,
   ChevronUp,
   CreditCard,
   CheckCircle2,
   ExternalLink,
+  Landmark,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 import { SettlePaymentDialog } from "./SettlePaymentDialog";
@@ -63,15 +65,16 @@ interface SettlementGroupCardProps {
   companyCode: string;
   onSuccess: () => void;
   compact?: boolean;
+  monthLabel?: string;
 }
 
 export function SettlementGroupCard({
   group,
   companyCode,
   onSuccess,
-  compact = false,
+  monthLabel,
 }: SettlementGroupCardProps) {
-  const [isExpanded, setIsExpanded] = useState(!compact);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
 
@@ -85,53 +88,65 @@ export function SettlementGroupCard({
     setShowSettleDialog(true);
   };
 
+  const initials = (group.payerName || "?").charAt(0).toUpperCase();
+  const hasBankInfo = group.payerBankName || group.payerBankAccount;
+
   return (
     <>
-      <Card className={compact ? "border-0 shadow-none bg-muted/30" : ""}>
+      <Card className="border-border/50 shadow-card transition-all duration-200 hover:shadow-md">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <CardHeader className={compact ? "pb-2 pt-3 px-3" : "pb-3"}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`rounded-full bg-blue-100 dark:bg-blue-900/30 ${compact ? "p-1.5" : "p-2"}`}>
-                  <User className={`text-blue-600 dark:text-blue-400 ${compact ? "h-4 w-4" : "h-5 w-5"}`} />
-                </div>
-                <div>
-                  <CardTitle className={`flex items-center gap-2 ${compact ? "text-sm" : "text-base"}`}>
-                    {group.payerName}
-                    {!compact && (
-                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        พนักงาน
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarFallback className="text-sm bg-primary/10 text-primary font-medium">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm truncate">
+                      {group.payerName}
+                    </span>
+                    {monthLabel && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 font-normal text-muted-foreground shrink-0">
+                        <Calendar className="h-2.5 w-2.5" />
+                        {monthLabel}
                       </Badge>
                     )}
-                  </CardTitle>
-                  {compact && (
-                    <p className="text-xs text-muted-foreground">
-                      {group.payments.length} รายการ
-                    </p>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                    <span>{group.payments.length} รายการ</span>
+                    {hasBankInfo && (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-1 truncate">
+                          <Landmark className="h-3 w-3 shrink-0" />
+                          {group.payerBankName}
+                          {group.payerBankAccount && ` ${group.payerBankAccount}`}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className={`font-semibold text-orange-600 ${compact ? "text-base" : "text-lg"}`}>
-                    {formatCurrency(group.totalAmount)}
-                  </p>
-                  {!compact && (
-                    <p className="text-xs text-muted-foreground">
-                      {group.payments.length} รายการ
-                    </p>
-                  )}
-                </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <p className="font-semibold text-base tabular-nums text-amber-600 dark:text-amber-400">
+                  {formatCurrency(group.totalAmount)}
+                </p>
                 <Button
                   size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handleSettleAll}
+                  className="bg-primary hover:bg-primary/90 h-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSettleAll();
+                  }}
                 >
-                  <CreditCard className="h-4 w-4 mr-1" />
+                  <CreditCard className="h-3.5 w-3.5 mr-1.5" />
                   โอนคืนทั้งหมด
                 </Button>
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
                     {isExpanded ? (
                       <ChevronUp className="h-4 w-4" />
                     ) : (
@@ -144,47 +159,47 @@ export function SettlementGroupCard({
           </CardHeader>
 
           <CollapsibleContent>
-            <CardContent className={compact ? "pt-0 px-3 pb-3" : "pt-0"}>
-              <div className="border rounded-lg divide-y bg-background">
+            <CardContent className="pt-0">
+              <div className="border rounded-lg divide-y">
                 {group.payments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="flex items-center justify-between p-3 hover:bg-muted/50"
+                    className="flex items-center justify-between p-3 hover:bg-muted/40 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <Link
                           href={`/${companyCode}/expenses/${payment.Expense.id}`}
                           className="font-medium text-sm hover:underline truncate"
                         >
                           {payment.Expense.description || "ไม่ระบุรายละเอียด"}
                         </Link>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
                         {payment.Expense.Contact && (
                           <span>{payment.Expense.Contact.name}</span>
                         )}
                         {payment.Expense.invoiceNumber && (
                           <>
-                            <span>•</span>
+                            <span>·</span>
                             <span>{payment.Expense.invoiceNumber}</span>
                           </>
                         )}
-                        <span>•</span>
+                        <span>·</span>
                         <span>
                           {formatThaiDate(new Date(payment.Expense.billDate))}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 ml-4">
-                      <span className="font-medium">
+                    <div className="flex items-center gap-2.5 ml-4">
+                      <span className="font-medium text-sm tabular-nums">
                         {formatCurrency(Number(payment.amount))}
                       </span>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8"
+                        className="h-7 text-xs"
                         onClick={() => handleSettleSingle(payment.id)}
                       >
                         <CheckCircle2 className="h-3 w-3 mr-1" />

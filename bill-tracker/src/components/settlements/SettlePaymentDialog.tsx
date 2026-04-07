@@ -125,31 +125,16 @@ export function SettlePaymentDialog({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     
-    // Always use batch endpoint (single item is just a batch of 1)
     const endpoint = `/api/${companyCode}/settlements/batch`;
 
     const body = {
       paymentIds,
       settlementRef,
       settlementSlipUrls: slipUrls,
-      // Auto expense creation fields
       createExpense,
       expensePayerType,
       expensePayerId: expensePayerType === "USER" ? selectedPayerId : null,
     };
-
-    // Optimistic: close dialog and show initial toast right away
-    toast.success("บันทึกการโอนคืนสำเร็จ");
-    onClose();
-    onSuccess();
-    
-    // Reset form state
-    setSettlementRef("");
-    setSlipUrls([]);
-    setCreateExpense(true);
-    setExpensePayerType("USER");
-    setSelectedPayerId(session?.user?.id || "");
-    setIsSubmitting(false);
 
     try {
       const res = await fetch(endpoint, {
@@ -161,24 +146,38 @@ export function SettlePaymentDialog({
       if (!res.ok) {
         const error = await res.json();
         toast.error(error.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-        onSuccess();
-      } else if (createExpense) {
-        const result = await res.json();
+        return;
+      }
+
+      const result = await res.json();
+      toast.success("บันทึกการโอนคืนสำเร็จ");
+
+      if (createExpense) {
         const expenseId = result?.data?.createdExpenseId;
         if (expenseId) {
           toast.success("สร้างรายการโอนเงินคืนแล้ว", {
             action: {
               label: "ดูรายการ",
               onClick: () => {
-                window.location.href = `/${companyCode}/settlement-transfers/${expenseId}`;
+                window.location.href = `/${companyCode}/reimbursements?tab=transfers`;
               },
             },
           });
         }
       }
+
+      // Reset form state and close after success
+      setSettlementRef("");
+      setSlipUrls([]);
+      setCreateExpense(true);
+      setExpensePayerType("USER");
+      setSelectedPayerId(session?.user?.id || "");
+      onClose();
+      onSuccess();
     } catch {
       toast.error("ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง");
-      onSuccess();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
-import { formatThaiDateTime } from "@/lib/utils/formatters";
 import { fetcher } from "@/lib/utils/fetcher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DateRangeFilter } from "./DateRangeFilter";
@@ -137,7 +136,7 @@ export function SettlementTransferList({ companyCode }: Props) {
       render: (item) => (
         <div className="flex items-center gap-2">
           <Avatar className="h-7 w-7">
-            <AvatarFallback className="text-xs bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+            <AvatarFallback className="text-xs bg-primary/10 text-primary">
               {(item.contactName || "?")[0]}
             </AvatarFallback>
           </Avatar>
@@ -187,40 +186,6 @@ export function SettlementTransferList({ companyCode }: Props) {
         ) : (
           <span className="text-xs text-muted-foreground">-</span>
         ),
-    },
-    {
-      key: "payer",
-      label: "ผู้จ่ายเงิน",
-      render: (item) => {
-        const payer = item.payments[0];
-        if (!payer) return <span className="text-xs text-muted-foreground">-</span>;
-        return (
-          <span className="text-sm">
-            {payer.paidByType === "COMPANY"
-              ? "บัญชีบริษัท"
-              : payer.paidByUser?.name || "-"}
-          </span>
-        );
-      },
-    },
-    {
-      key: "creator",
-      label: "สร้างโดย",
-      render: (item) => (
-        <span className="text-xs text-muted-foreground">
-          {item.creator?.name || "-"}
-        </span>
-      ),
-    },
-    {
-      key: "createdAt",
-      label: "สร้างเมื่อ",
-      sortable: true,
-      render: (item) => (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {formatThaiDateTime(item.createdAt)}
-        </span>
-      ),
     },
   ];
 

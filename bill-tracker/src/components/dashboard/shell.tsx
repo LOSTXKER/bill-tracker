@@ -42,7 +42,6 @@ import {
   FileSearch,
   GitCompare,
   ListChecks,
-  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -164,7 +163,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       ],
     },
     {
-      label: "ต้องจัดการ",
+      label: "งานค้าง",
       items: [
         {
           name: "รออนุมัติ",
@@ -181,13 +180,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           badgeKey: "pendingReimbursements",
         },
         {
-          name: "รายการโอนเงินคืน",
-          href: `/${companyCode}/settlement-transfers`,
-          icon: ArrowLeftRight,
-          permission: "settlements:read",
-        },
-        {
-          name: "ตามใบกำกับ",
+          name: "ตามใบกำกับภาษี",
           href: `/${companyCode}/tax-invoice-follow-ups`,
           icon: FileSearch,
           permission: "expenses:read",
@@ -200,23 +193,23 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           permission: "expenses:read",
           badgeKey: "pendingWhtDeliveries",
         },
+      ],
+    },
+    {
+      label: "จัดการข้อมูล",
+      items: [
         {
-          name: "จัดหมวดหมู่ค่าใช้จ่าย",
+          name: "จัดหมวดหมู่",
           href: `/${companyCode}/expenses/categorize`,
           icon: ListChecks,
           permission: "expenses:read",
         },
         {
-          name: "จัดการหมวดหมู่รายการ",
+          name: "จัดประเภทรายการ",
           href: `/${companyCode}/bulk-categorize`,
           icon: Tags,
           permission: "expenses:read",
         },
-      ],
-    },
-    {
-      label: "การเงิน",
-      items: [
         {
           name: "เงินสดย่อย",
           href: `/${companyCode}/petty-cash`,
@@ -224,7 +217,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           permission: "expenses:read",
         },
         {
-          name: "เทียบรายงานบัญชี",
+          name: "เทียบยอดบัญชี",
           href: `/${companyCode}/reconcile`,
           icon: GitCompare,
           permission: "reports:read",
@@ -261,7 +254,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
       ],
     },
     {
-      label: "ข้อมูลและตั้งค่า",
+      label: "ตั้งค่า",
       items: [
         {
           name: "ผู้ติดต่อ",

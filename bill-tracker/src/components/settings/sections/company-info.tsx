@@ -121,6 +121,7 @@ export function CompanyInfoSection({ company }: CompanyInfoSectionProps) {
 
       toast.success("บันทึกข้อมูลธุรกิจเรียบร้อย");
       setHasDescriptionChanges(false);
+      router.refresh();
     } catch {
       toast.error("ไม่สามารถบันทึกได้");
     } finally {

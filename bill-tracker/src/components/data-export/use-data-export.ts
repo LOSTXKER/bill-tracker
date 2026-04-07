@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ArchiveStats, BackupStats, downloadBlob } from "./types";
 
 interface UseDataExportOptions {
   companyCode: string;
   isOwner: boolean;
 }
+
+export type DownloadingDataType = "expenses" | "incomes" | "contacts" | null;
 
 export function useDataExport({ companyCode, isOwner }: UseDataExportOptions) {
   const currentDate = new Date();
@@ -21,9 +23,11 @@ export function useDataExport({ companyCode, isOwner }: UseDataExportOptions) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
   const [isDownloadingPEAK, setIsDownloadingPEAK] = useState(false);
+  const [downloadingDataType, setDownloadingDataType] = useState<DownloadingDataType>(null);
   const [error, setError] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [peakError, setPeakError] = useState<string | null>(null);
+  const [dataExportError, setDataExportError] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [peakStats, setPeakStats] = useState<any | null>(null);
   const [isLoadingPeakStats, setIsLoadingPeakStats] = useState(false);
@@ -193,6 +197,38 @@ export function useDataExport({ companyCode, isOwner }: UseDataExportOptions) {
     }
   };
 
+  const handleDownloadData = useCallback(async (type: "expenses" | "incomes" | "contacts") => {
+    setDownloadingDataType(type);
+    setDataExportError(null);
+    try {
+      const monthStr = String(selectedMonth).padStart(2, "0");
+      let url: string;
+      let filename: string;
+
+      if (type === "contacts") {
+        url = `/api/contacts/export?company=${companyCode}&format=peak`;
+        filename = `Contacts_${companyCode}_${selectedYear}-${monthStr}.xlsx`;
+      } else {
+        url = `/api/reports/export?company=${companyCode}&type=${type}&month=${selectedMonth}&year=${selectedYear}`;
+        const label = type === "expenses" ? "รายจ่าย" : "รายรับ";
+        filename = `${label}_${companyCode}_${selectedYear}-${monthStr}.xlsx`;
+      }
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "ไม่สามารถสร้างไฟล์ได้");
+      }
+
+      const blob = await res.blob();
+      downloadBlob(blob, filename);
+    } catch (err) {
+      setDataExportError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setDownloadingDataType(null);
+    }
+  }, [companyCode, selectedMonth, selectedYear]);
+
   const totalFiles = archiveStats
     ? archiveStats.totalExpenseFiles + archiveStats.totalIncomeFiles
     : 0;
@@ -226,5 +262,9 @@ export function useDataExport({ companyCode, isOwner }: UseDataExportOptions) {
     backupError,
     isDownloadingBackup,
     handleDownloadBackup,
+
+    downloadingDataType,
+    dataExportError,
+    handleDownloadData,
   };
 }

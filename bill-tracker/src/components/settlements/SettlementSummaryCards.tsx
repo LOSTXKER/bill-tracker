@@ -1,7 +1,8 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, CheckCircle2, Users, TrendingUp } from "lucide-react";
+import { StatsGrid } from "@/components/shared/StatsGrid";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface SummaryData {
@@ -31,14 +32,16 @@ interface SettlementSummaryCardsProps {
 export function SettlementSummaryCards({ data, isLoading }: SettlementSummaryCardsProps) {
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="pb-2">
-              <div className="h-4 bg-muted rounded w-24" />
+          <Card key={i} className="border-border/50 shadow-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-8 w-8 rounded-full" />
             </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-muted rounded w-32" />
+            <CardContent className="space-y-2">
+              <Skeleton className="h-7 w-36" />
+              <Skeleton className="h-3 w-20" />
             </CardContent>
           </Card>
         ))}
@@ -52,55 +55,30 @@ export function SettlementSummaryCards({ data, isLoading }: SettlementSummaryCar
   const settledAmount = data?.settledThisMonth.amount || 0;
   const topUsersCount = data?.pending.topUsers?.length || 0;
 
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {/* Pending Total */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">รอโอนคืนพนักงาน</CardTitle>
-          <Clock className="h-4 w-4 text-orange-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-orange-600">
-            {formatCurrency(pendingAmount)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {pendingCount} รายการ
-          </p>
-        </CardContent>
-      </Card>
+  const stats = [
+    {
+      title: "รอโอนคืนพนักงาน",
+      value: formatCurrency(pendingAmount),
+      subtitle: `${pendingCount} รายการ`,
+      icon: "clock",
+      iconColor: "text-amber-500",
+      featured: true,
+    },
+    {
+      title: "พนักงานที่รอรับเงิน",
+      value: `${topUsersCount} คน`,
+      subtitle: "รอการโอนคืน",
+      icon: "wallet",
+      iconColor: "text-primary",
+    },
+    {
+      title: "โอนคืนเดือนนี้",
+      value: formatCurrency(settledAmount),
+      subtitle: `${settledCount} รายการ`,
+      icon: "check-circle",
+      iconColor: "text-primary",
+    },
+  ];
 
-      {/* People with Pending */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">พนักงานที่รอรับเงิน</CardTitle>
-          <Users className="h-4 w-4 text-blue-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-blue-600">
-            {topUsersCount} คน
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            รอการโอนคืน
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Settled This Month */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">โอนคืนเดือนนี้</CardTitle>
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(settledAmount)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {settledCount} รายการ
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <StatsGrid stats={stats} />;
 }

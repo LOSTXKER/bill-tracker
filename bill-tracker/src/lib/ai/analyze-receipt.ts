@@ -42,8 +42,7 @@ export async function analyzeReceipt(
   }
 
   try {
-    const [accounts, contacts, company] = await Promise.all([
-      fetchAccounts(companyId, transactionType),
+    const [contacts, company] = await Promise.all([
       fetchContacts(companyId),
       prisma.company.findUnique({
         where: { id: companyId },
@@ -51,17 +50,12 @@ export async function analyzeReceipt(
       }),
     ]);
 
-    if (accounts.length === 0) {
-      return { error: "ไม่มีผังบัญชีในระบบ กรุณา Import จาก Peak ก่อน" };
-    }
-
     log.debug("AI Context", {
-      accountsCount: accounts.length,
       contactsCount: contacts.length,
       transactionType,
       company: company?.name,
     });
-    const prompt = buildSmartPrompt(accounts, contacts, transactionType, company);
+    const prompt = buildSmartPrompt(contacts, transactionType, company);
 
     const analysisPromises = imageUrls.map(async (url) => {
       const response = await analyzeImage(url, prompt, {
@@ -73,7 +67,7 @@ export async function analyzeReceipt(
         return null;
       }
       log.debug("AI raw response", { preview: response.data.substring(0, 300) });
-      return parseAIResponse(response.data, accounts, contacts, company?.taxId, companyId);
+      return parseAIResponse(response.data, [], contacts, company?.taxId, companyId);
     });
 
     const results = await Promise.all(analysisPromises);
@@ -98,27 +92,6 @@ export async function analyzeReceipt(
 // =============================================================================
 // Data Fetching
 // =============================================================================
-
-async function fetchAccounts(companyId: string, transactionType: "EXPENSE" | "INCOME") {
-  const accountClasses = transactionType === "EXPENSE"
-    ? ["COST_OF_SALES", "EXPENSE", "OTHER_EXPENSE"]
-    : ["REVENUE", "OTHER_INCOME"];
-
-  return prisma.account.findMany({
-    where: {
-      companyId,
-      class: { in: accountClasses as any },
-      isActive: true,
-    },
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      description: true,
-    },
-    orderBy: { code: "asc" },
-  });
-}
 
 async function fetchContacts(companyId: string) {
   return prisma.contact.findMany({
@@ -185,17 +158,6 @@ function combineResults(results: ReceiptAnalysisResult[]): ReceiptAnalysisResult
   if (!result.amount && slips.length > 0 && slips[0].amount) {
     result.amount = slips[0].amount;
     result.netAmount = slips[0].netAmount;
-  }
-
-  const bestAccountDoc = results.reduce((best, current) => {
-    if (!current.account.id) return best;
-    if (!best) return current;
-    return (current.account.confidence || 0) > (best.account.confidence || 0) ? current : best;
-  }, null as ReceiptAnalysisResult | null);
-
-  if (bestAccountDoc && bestAccountDoc.account.id) {
-    result.account = bestAccountDoc.account;
-    result.accountAlternatives = bestAccountDoc.accountAlternatives;
   }
 
   result.confidence = {

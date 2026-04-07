@@ -1,13 +1,8 @@
 export function buildSmartPrompt(
-  accounts: { id: string; code: string; name: string; description: string | null }[],
   contacts: { id: string; name: string; taxId: string | null }[],
   transactionType: "EXPENSE" | "INCOME",
   company: { name: string; legalName: string | null; taxId: string | null } | null
 ): string {
-  const accountList = accounts
-    .map(a => `- ${a.code} | ${a.name} | ID: ${a.id}`)
-    .join("\n");
-
   const contactList = contacts.length > 0
     ? contacts.map(c => `- ${c.name}${c.taxId ? ` (${c.taxId})` : ""} | ID: ${c.id}`).join("\n")
     : "(ไม่มีผู้ติดต่อในระบบ)";
@@ -22,9 +17,6 @@ export function buildSmartPrompt(
 - เลขภาษี: ${company?.taxId || "ไม่ระบุ"}
 
 ## ประเภทรายการ: ${transactionType === "EXPENSE" ? "รายจ่าย (เราเป็นผู้ซื้อ)" : "รายรับ (เราเป็นผู้ขาย)"}
-
-## ผังบัญชีที่มี
-${accountList}
 
 ## รายชื่อผู้ติดต่อที่มีในระบบ
 ${contactList}
@@ -89,14 +81,8 @@ ${contactList}
    
    - ยอดสุทธิที่ต้องจ่าย/รับจริง (netAmount) = "จำนวนเงินที่ชำระ" หรือ ยอดรวม VAT - หัก ณ ที่จ่าย
 
-4. **เลือกบัญชี** (สำคัญมาก!)
-   - **ต้องเลือกบัญชีเสมอ** - แม้ไม่แน่ใจ 100% ก็ต้องเลือกที่เหมาะสมที่สุด
-   - เลือกจากผังบัญชีที่ให้ไว้ข้างบน
-   - ใส่ทั้ง id, code, name ของบัญชีที่เลือก
-   - ถ้าเป็นสลิปโอนเงิน: ดูจากหมายเหตุ/รายละเอียดว่าค่าอะไร แล้วเลือกบัญชีที่เกี่ยวข้อง
-   - เลือกทางเลือกอื่นอีก 2 บัญชี พร้อมเหตุผล
-   - **⚠️ ถ้าไม่มีบัญชีไหนในรายการที่เหมาะสมเลย** → ใส่ account = null และใส่ newAccount แทน
-   - class ที่ใช้ได้: ${transactionType === "EXPENSE" ? "EXPENSE, COST_OF_SALES, OTHER_EXPENSE" : "REVENUE, OTHER_INCOME"}
+4. **สรุปรายการ**
+   - เขียน description สั้นๆ ว่าค่าใช้จ่าย/รายรับนี้คืออะไร
 
 ## ตอบ JSON เท่านั้น (ห้ามมี text อื่น)
 {
@@ -120,18 +106,6 @@ ${contactList}
     "type": "ค่าบริการ"
   },
   "netAmount": 8320.00,
-  "account": {
-    "id": "ID ของบัญชีที่เลือก",
-    "code": "รหัสบัญชี",
-    "name": "ชื่อบัญชี",
-    "confidence": 90,
-    "reason": "เหตุผลสั้นๆ ที่เลือกบัญชีนี้"
-  },
-  "newAccount": null,
-  "accountAlternatives": [
-    { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 75, "reason": "เหตุผล" },
-    { "id": "ID", "code": "รหัส", "name": "ชื่อ", "confidence": 60, "reason": "เหตุผล" }
-  ],
   "documentType": "TAX_INVOICE | RECEIPT | BANK_SLIP | WHT_CERT | QUOTATION | INVOICE | CONTRACT | PURCHASE_ORDER | DELIVERY_NOTE | OTHER",
   "invoiceNumber": "เลขที่เอกสาร หรือ null",
   "items": ["รายการที่ 1", "รายการที่ 2"],
@@ -140,16 +114,9 @@ ${contactList}
     "overall": 90,
     "vendor": 95,
     "amount": 100,
-    "date": 95,
-    "account": 85
+    "date": 95
   }
 }
-
-## หมายเหตุเรื่อง newAccount
-- ใส่ newAccount เฉพาะเมื่อไม่มีบัญชีในรายการที่เหมาะสมเลย (ถ้ามีบัญชีที่ใกล้เคียง ให้เลือกบัญชีนั้นแทน)
-- ถ้าต้องสร้างบัญชีใหม่ ให้ account = null และ:
-  "newAccount": { "code": "5XXX-XX", "name": "ชื่อบัญชีใหม่", "class": "EXPENSE", "reason": "เหตุผล" }
-- รหัสบัญชี (code) ควรเป็นรูปแบบเดียวกับที่มีในระบบ (ดูจากรายการข้างบน)
 
 ## หมายเหตุสำคัญ
 - ⚠️ ถ้าเอกสารมีชื่อบริษัทเรา (${companyNames || "ไม่ระบุ"}) ให้ข้ามไป มองหาชื่ออีกฝั่ง

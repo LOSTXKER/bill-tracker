@@ -149,6 +149,7 @@ export function TransactionListClient({
     isPending,
   } = useBulkActions({
     apiEndpoint: config.apiEndpoint,
+    companyCode,
     selectedIds,
     setSelectedIds,
   });

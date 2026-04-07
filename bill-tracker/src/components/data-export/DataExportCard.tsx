@@ -13,19 +13,57 @@ import {
   TrendingUp,
   FileSpreadsheet,
   Database,
-  Info,
+  Loader2,
 } from "lucide-react";
+import type { DownloadingDataType } from "./use-data-export";
+import { THAI_MONTHS } from "./types";
 
-export function DataExportCard() {
+interface DataExportCardProps {
+  companyCode: string;
+  selectedMonth: number;
+  selectedYear: number;
+  downloadingDataType: DownloadingDataType;
+  dataExportError: string | null;
+  handleDownloadData: (type: "expenses" | "incomes" | "contacts") => void;
+}
+
+export function DataExportCard({
+  selectedMonth,
+  selectedYear,
+  downloadingDataType,
+  dataExportError,
+  handleDownloadData,
+}: DataExportCardProps) {
+  const buttons = [
+    {
+      type: "expenses" as const,
+      icon: TrendingDown,
+      label: "รายจ่าย",
+      iconColor: "text-destructive",
+    },
+    {
+      type: "incomes" as const,
+      icon: TrendingUp,
+      label: "รายรับ",
+      iconColor: "text-primary",
+    },
+    {
+      type: "contacts" as const,
+      icon: Database,
+      label: "ผู้ติดต่อ",
+      iconColor: "text-muted-foreground",
+    },
+  ];
+
   return (
-    <Card>
+    <Card className="shadow-card border-border/50 bg-gradient-to-br from-green-500/5 via-transparent to-transparent">
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-950 text-green-600 flex items-center justify-center">
             <FileSpreadsheet className="h-6 w-6" />
           </div>
           <div>
-            <CardTitle className="text-lg">ส่งออกข้อมูล Excel/CSV</CardTitle>
+            <CardTitle className="text-lg">ส่งออกข้อมูล Excel</CardTitle>
             <CardDescription>
               ส่งออกเฉพาะข้อมูล (ไม่รวมไฟล์แนบ)
             </CardDescription>
@@ -33,42 +71,42 @@ export function DataExportCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          {THAI_MONTHS[selectedMonth - 1]} {selectedYear} (ผู้ติดต่อไม่ขึ้นกับเดือน/ปี)
+        </p>
+
         <div className="grid gap-3 sm:grid-cols-3">
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex-col gap-2"
-            disabled
-          >
-            <TrendingDown className="h-5 w-5 text-destructive" />
-            <span className="font-medium">รายจ่าย</span>
-            <span className="text-xs text-muted-foreground">Excel / CSV</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex-col gap-2"
-            disabled
-          >
-            <TrendingUp className="h-5 w-5 text-primary" />
-            <span className="font-medium">รายรับ</span>
-            <span className="text-xs text-muted-foreground">Excel / CSV</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex-col gap-2"
-            disabled
-          >
-            <Database className="h-5 w-5 text-muted-foreground" />
-            <span className="font-medium">ผู้ติดต่อ</span>
-            <span className="text-xs text-muted-foreground">Excel / CSV</span>
-          </Button>
+          {buttons.map(({ type, icon: Icon, label, iconColor }) => {
+            const isLoading = downloadingDataType === type;
+            const isDisabled = downloadingDataType !== null;
+
+            return (
+              <Button
+                key={type}
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                disabled={isDisabled}
+                onClick={() => handleDownloadData(type)}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Icon className={`h-5 w-5 ${iconColor}`} />
+                )}
+                <span className="font-medium">{label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {isLoading ? "กำลังดาวน์โหลด..." : "Excel (.xlsx)"}
+                </span>
+              </Button>
+            );
+          })}
         </div>
-        <div className="rounded-lg bg-muted/30 border p-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Info className="h-4 w-4" />
-            ฟีเจอร์กำลังพัฒนา - ใช้ &quot;ส่งออกเอกสารบัญชี&quot;
-            ด้านบนแทนได้
+
+        {dataExportError && (
+          <div className="rounded-lg bg-destructive/10 p-3 text-destructive text-sm">
+            {dataExportError}
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

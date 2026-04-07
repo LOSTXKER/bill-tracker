@@ -8,19 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Download,
-  Calendar,
   TrendingDown,
   TrendingUp,
   Package,
@@ -35,9 +25,6 @@ import { formatCurrency } from "@/lib/utils/tax-calculator";
 interface ArchiveExportCardProps {
   selectedMonth: number;
   selectedYear: number;
-  setSelectedMonth: (month: number) => void;
-  setSelectedYear: (year: number) => void;
-  yearOptions: number[];
   archiveStats: ArchiveStats | null;
   isLoadingStats: boolean;
   error: string | null;
@@ -50,9 +37,6 @@ interface ArchiveExportCardProps {
 export function ArchiveExportCard({
   selectedMonth,
   selectedYear,
-  setSelectedMonth,
-  setSelectedYear,
-  yearOptions,
   archiveStats,
   isLoadingStats,
   error,
@@ -62,7 +46,7 @@ export function ArchiveExportCard({
   totalRecords,
 }: ArchiveExportCardProps) {
   return (
-    <Card className="border-primary/50 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
+    <Card className="shadow-card border-border/50 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -80,54 +64,6 @@ export function ArchiveExportCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              เดือน
-            </Label>
-            <Select
-              value={String(selectedMonth)}
-              onValueChange={(v) => setSelectedMonth(parseInt(v))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกเดือน" />
-              </SelectTrigger>
-              <SelectContent>
-                {THAI_MONTHS.map((month, idx) => (
-                  <SelectItem key={idx + 1} value={String(idx + 1)}>
-                    {month}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              ปี
-            </Label>
-            <Select
-              value={String(selectedYear)}
-              onValueChange={(v) => setSelectedYear(parseInt(v))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกปี" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={String(year)}>
-                    {year} (พ.ศ. {year + 543})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <Separator />
-
         {isLoadingStats ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

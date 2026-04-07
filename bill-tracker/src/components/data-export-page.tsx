@@ -5,10 +5,16 @@ import { ArchiveExportCard } from "./data-export/ArchiveExportCard";
 import { PeakExportCard } from "./data-export/PeakExportCard";
 import { DataExportCard } from "./data-export/DataExportCard";
 import { BackupCard } from "./data-export/BackupCard";
-import { CloudStatusCard } from "./data-export/CloudStatusCard";
-import { DataExportPageProps } from "./data-export/types";
+import { DataExportPageProps, THAI_MONTHS } from "./data-export/types";
 import { PageHeader } from "./shared/PageHeader";
-import { Download } from "lucide-react";
+import { Download, Calendar } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type { DataExportPageProps };
 
@@ -43,6 +49,10 @@ export function DataExportPage({
     backupError,
     isDownloadingBackup,
     handleDownloadBackup,
+
+    downloadingDataType,
+    dataExportError,
+    handleDownloadData,
   } = useDataExport({ companyCode, isOwner });
 
   return (
@@ -53,12 +63,46 @@ export function DataExportPage({
         description={`ส่งออกเอกสารและข้อมูลสำหรับ ${companyName}`}
       />
 
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Calendar className="h-4 w-4" />
+          ช่วงเวลา
+        </div>
+        <Select
+          value={String(selectedMonth)}
+          onValueChange={(v) => setSelectedMonth(parseInt(v))}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="เลือกเดือน" />
+          </SelectTrigger>
+          <SelectContent>
+            {THAI_MONTHS.map((month, idx) => (
+              <SelectItem key={idx + 1} value={String(idx + 1)}>
+                {month}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={String(selectedYear)}
+          onValueChange={(v) => setSelectedYear(parseInt(v))}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="เลือกปี" />
+          </SelectTrigger>
+          <SelectContent>
+            {yearOptions.map((year) => (
+              <SelectItem key={year} value={String(year)}>
+                {year} (พ.ศ. {year + 543})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <ArchiveExportCard
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
-        setSelectedMonth={setSelectedMonth}
-        setSelectedYear={setSelectedYear}
-        yearOptions={yearOptions}
         archiveStats={archiveStats}
         isLoadingStats={isLoadingStats}
         error={error}
@@ -68,17 +112,26 @@ export function DataExportPage({
         totalRecords={totalRecords}
       />
 
-      <PeakExportCard
-        selectedMonth={selectedMonth}
-        selectedYear={selectedYear}
-        peakStats={peakStats}
-        isLoadingPeakStats={isLoadingPeakStats}
-        peakError={peakError}
-        isDownloadingPEAK={isDownloadingPEAK}
-        handleDownloadPEAK={handleDownloadPEAK}
-      />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PeakExportCard
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          peakStats={peakStats}
+          isLoadingPeakStats={isLoadingPeakStats}
+          peakError={peakError}
+          isDownloadingPEAK={isDownloadingPEAK}
+          handleDownloadPEAK={handleDownloadPEAK}
+        />
 
-      <DataExportCard />
+        <DataExportCard
+          companyCode={companyCode}
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          downloadingDataType={downloadingDataType}
+          dataExportError={dataExportError}
+          handleDownloadData={handleDownloadData}
+        />
+      </div>
 
       {isOwner && (
         <BackupCard
@@ -89,8 +142,6 @@ export function DataExportPage({
           handleDownloadBackup={handleDownloadBackup}
         />
       )}
-
-      <CloudStatusCard />
     </div>
   );
 }

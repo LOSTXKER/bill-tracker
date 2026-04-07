@@ -4,8 +4,6 @@ import { parseAIJsonResponse } from "./utils/parse-ai-json";
 import {
   type AccountRecord,
   type ContactRecord,
-  resolveAccountWithAutoCreate,
-  resolveAccountAlternatives,
   matchContact,
   validateVendorTaxId,
 } from "./receipt-matcher";
@@ -190,17 +188,6 @@ export async function parseAIResponse(
   try {
     const parsed = parseAIJsonResponse<AIReceiptResponse>(rawResponse);
 
-    const account = await resolveAccountWithAutoCreate(
-      parsed.account, parsed.newAccount, parsed.confidence, accounts, companyId
-    );
-    const accountAlternatives = resolveAccountAlternatives(
-      parsed.accountAlternatives, accounts, account.id
-    );
-    log.debug("Account result", {
-      account: account.code || "NONE",
-      alternatives: accountAlternatives.map(a => a.code),
-    });
-
     const { matchedContactId, matchedContactName } = matchContact(parsed.vendor ?? null, contacts);
     const vendorTaxId = validateVendorTaxId(parsed.vendor?.taxId || null, companyTaxId);
 
@@ -221,8 +208,8 @@ export async function parseAIResponse(
       vatRate: normalizeVatRate(parsed.vatRate, parsed.vatAmount),
       wht: normalizeWht(parsed.wht, parsed.amount, rawResponse),
       netAmount: typeof parsed.netAmount === "number" ? parsed.netAmount : null,
-      account,
-      accountAlternatives: accountAlternatives.slice(0, 2),
+      account: { id: null, code: null, name: null },
+      accountAlternatives: [],
       documentType: parsed.documentType || null,
       invoiceNumber: parsed.invoiceNumber || null,
       items: Array.isArray(parsed.items)

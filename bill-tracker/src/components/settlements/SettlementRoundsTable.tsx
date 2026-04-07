@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { Fragment, memo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -26,8 +26,11 @@ import {
   ChevronUp,
   ExternalLink,
   Image as ImageIcon,
+  Inbox,
   Undo2,
   Trash2,
+  User,
+  Hash,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -127,14 +130,7 @@ function SettlementRoundsTableInner({
     const paymentId = selectedPaymentId;
     const reason = reverseReason.trim();
 
-    // OPTIMIZED: Optimistic update
-    toast.success("ยกเลิกการโอนคืนสำเร็จ");
-    setShowReverseDialog(false);
-    setReverseReason("");
-    setSelectedPaymentId(null);
-    setIsReversing(false);
-    onSuccess();
-
+    setIsReversing(true);
     try {
       const response = await fetch(
         `/api/${companyCode}/settlements/${paymentId}`,
@@ -148,11 +144,18 @@ function SettlementRoundsTableInner({
       if (!response.ok) {
         const data = await response.json();
         toast.error(data.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-        onSuccess();
+        return;
       }
-    } catch (error) {
-      toast.error("ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง");
+
+      toast.success("ยกเลิกการโอนคืนสำเร็จ");
+      setShowReverseDialog(false);
+      setReverseReason("");
+      setSelectedPaymentId(null);
       onSuccess();
+    } catch {
+      toast.error("ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setIsReversing(false);
     }
   };
 
@@ -161,46 +164,42 @@ function SettlementRoundsTableInner({
     setShowSlipDialog(true);
   };
 
-
-
   if (rounds.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        ไม่มีรายการโอนคืน
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <Inbox className="h-12 w-12 mb-4" />
+        <p className="text-lg font-medium">ไม่มีรายการโอนคืน</p>
+        <p className="text-sm mt-1">รายการที่โอนคืนแล้วจะแสดงที่นี่</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="rounded-lg border">
+      <div className="rounded-lg border border-border/50 shadow-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px] text-muted-foreground"></TableHead>
-              <TableHead className="text-muted-foreground">วันที่โอน</TableHead>
-              <TableHead className="text-muted-foreground">พนักงาน</TableHead>
-              <TableHead className="text-center text-muted-foreground">รายการ</TableHead>
-              <TableHead className="text-right text-muted-foreground">ยอดเงิน</TableHead>
-              <TableHead className="text-muted-foreground">เลขอ้างอิง</TableHead>
-              <TableHead className="text-center text-muted-foreground">สลิป</TableHead>
-              <TableHead className="text-muted-foreground">ผู้ทำรายการ</TableHead>
+              <TableHead className="w-[40px]"></TableHead>
+              <TableHead>วันที่โอน</TableHead>
+              <TableHead>พนักงาน</TableHead>
+              <TableHead className="text-center">รายการ</TableHead>
+              <TableHead className="text-right">ยอดเงิน</TableHead>
+              <TableHead className="text-center">สลิป</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rounds.map((round) => {
               const isExpanded = expandedRounds.has(round.roundKey);
-              
+
               return (
-                <>
-                  {/* Main Row */}
+                <Fragment key={round.roundKey}>
                   <TableRow
-                    key={round.roundKey}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => toggleExpand(round.roundKey)}
                   >
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
                         {isExpanded ? (
                           <ChevronUp className="h-4 w-4" />
                         ) : (
@@ -208,74 +207,76 @@ function SettlementRoundsTableInner({
                         )}
                       </Button>
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-sm whitespace-nowrap">
                       {formatThaiDateTime(round.settledAt)}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">{round.payerSummary}</span>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         {round.payments.length} รายการ
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-semibold text-green-600">
+                    <TableCell className="text-right font-semibold tabular-nums text-primary">
                       {formatCurrency(round.totalAmount)}
-                    </TableCell>
-                    <TableCell>
-                      {round.settlementRef || (
-                        <span className="text-muted-foreground">-</span>
-                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {round.settlementSlipUrls.length > 0 ? (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8"
+                          className="h-7 text-xs"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleShowSlips(round.settlementSlipUrls);
                           }}
                         >
-                          <ImageIcon className="h-4 w-4 mr-1" />
+                          <ImageIcon className="h-3.5 w-3.5 mr-1" />
                           {round.settlementSlipUrls.length}
                         </Button>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-xs text-muted-foreground">-</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {round.settledBy?.name || "-"}
                     </TableCell>
                   </TableRow>
 
-                  {/* Expanded Details */}
                   {isExpanded && (
-                    <TableRow className="bg-muted/30">
-                      <TableCell colSpan={8} className="p-0">
-                        <div className="p-4 border-t">
-                          <div className="text-sm font-medium mb-2">
-                            รายการในรอบนี้
+                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                      <TableCell colSpan={6} className="p-0">
+                        <div className="px-4 py-3 border-t">
+                          {/* Round meta info */}
+                          <div className="flex items-center gap-4 mb-3 text-xs text-muted-foreground">
+                            {round.settledBy && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                ผู้ทำรายการ: {round.settledBy.name}
+                              </span>
+                            )}
+                            {round.settlementRef && (
+                              <span className="flex items-center gap-1">
+                                <Hash className="h-3 w-3" />
+                                อ้างอิง: {round.settlementRef}
+                              </span>
+                            )}
                           </div>
                           <div className="rounded-lg border bg-background divide-y">
                             {round.payments.map((payment) => {
                               const isDeleted = !!payment.Expense.deletedAt;
-                              
+
                               return (
                                 <div
                                   key={payment.id}
                                   className={`flex items-center justify-between p-3 ${
-                                    isDeleted ? "bg-red-50 dark:bg-red-900/10" : ""
+                                    isDeleted ? "bg-destructive/5" : ""
                                   }`}
                                 >
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5">
                                       {isDeleted ? (
                                         <span className="font-medium text-sm text-muted-foreground line-through flex items-center gap-1">
-                                          <Trash2 className="h-3 w-3 text-red-500" />
-                                          {payment.Expense.description ||
-                                            "ไม่ระบุรายละเอียด"}
+                                          <Trash2 className="h-3 w-3 text-destructive" />
+                                          {payment.Expense.description || "ไม่ระบุรายละเอียด"}
                                         </span>
                                       ) : (
                                         <Link
@@ -283,47 +284,39 @@ function SettlementRoundsTableInner({
                                           className="font-medium text-sm hover:underline truncate"
                                           onClick={(e) => e.stopPropagation()}
                                         >
-                                          {payment.Expense.description ||
-                                            "ไม่ระบุรายละเอียด"}
+                                          {payment.Expense.description || "ไม่ระบุรายละเอียด"}
                                         </Link>
                                       )}
                                       {!isDeleted && (
-                                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                        <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
                                       )}
                                       {isDeleted && (
-                                        <Badge
-                                          variant="destructive"
-                                          className="text-xs"
-                                        >
-                                          รายจ่ายถูกลบ
+                                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                          ถูกลบ
                                         </Badge>
                                       )}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                      <span>
-                                        {payment.PaidByUser?.name || "ไม่ระบุ"}
-                                      </span>
+                                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                                      <span>{payment.PaidByUser?.name || "ไม่ระบุ"}</span>
                                       {payment.Expense.Contact && (
                                         <>
-                                          <span>•</span>
+                                          <span>·</span>
                                           <span>{payment.Expense.Contact.name}</span>
                                         </>
                                       )}
-                                      <span>•</span>
-                                      <span>
-                                        {formatThaiDate(new Date(payment.Expense.billDate))}
-                                      </span>
+                                      <span>·</span>
+                                      <span>{formatThaiDate(new Date(payment.Expense.billDate))}</span>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-3 ml-4">
-                                    <span className="font-medium">
+                                  <div className="flex items-center gap-2.5 ml-4">
+                                    <span className="font-medium text-sm tabular-nums">
                                       {formatCurrency(Number(payment.amount))}
                                     </span>
                                     {!isDeleted && (
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                        className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50 dark:border-orange-800 dark:hover:bg-orange-950/30"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleReverseClick(payment.id);
@@ -342,7 +335,7 @@ function SettlementRoundsTableInner({
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </TableBody>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CategoryDrillDownSheet } from "@/components/reports/CategoryDrillDownSheet";
-import type { ExpenseRow } from "@/components/reports/CategoryDrillDownSheet";
+import { CategoryDrillDownSheet, IncomeDrillDownSheet } from "@/components/reports/CategoryDrillDownSheet";
+import type { ExpenseRow, IncomeRow } from "@/components/reports/CategoryDrillDownSheet";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 const EXPENSE_COLORS = [
@@ -27,6 +27,7 @@ interface CategoryListProps {
   groups: CategoryGroup[];
   total: number;
   allExpenses?: ExpenseRow[];
+  allIncomes?: IncomeRow[];
   companyCode: string;
   year: number;
   month: number;
@@ -38,6 +39,7 @@ export function CategoryList({
   groups,
   total,
   allExpenses,
+  allIncomes,
   companyCode,
   year,
   month,
@@ -56,8 +58,15 @@ export function CategoryList({
       )
     : [];
 
+  const filteredIncomes = drillDown && allIncomes
+    ? allIncomes.filter((i) =>
+        drillDown.categoryId === null
+          ? i.categoryName === null
+          : i.categoryName === drillDown.categoryName
+      )
+    : [];
+
   function handleBarClick(group: CategoryGroup) {
-    if (!isExpense) return;
     setDrillDown(group);
   }
 
@@ -87,15 +96,13 @@ export function CategoryList({
             return (
               <button
                 key={group.categoryId ?? "null"}
-                className={`w-full text-left group ${isExpense ? "cursor-pointer" : "cursor-default"}`}
+                className="w-full text-left group cursor-pointer"
                 onClick={() => handleBarClick(group)}
                 type="button"
               >
                 <div className="flex items-center gap-2 text-sm mb-1">
                   <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span className={`flex-1 min-w-0 truncate text-foreground ${
-                    isExpense ? "group-hover:text-foreground" : ""
-                  }`}>
+                  <span className="flex-1 min-w-0 truncate text-foreground group-hover:text-foreground">
                     {group.categoryName}
                   </span>
                   <span className="text-muted-foreground shrink-0">{pct.toFixed(0)}%</span>
@@ -117,7 +124,7 @@ export function CategoryList({
         </div>
       </div>
 
-      {/* Drill-down (expense only) */}
+      {/* Expense drill-down */}
       {drillDown && isExpense && (
         <CategoryDrillDownSheet
           open={!!drillDown}
@@ -125,6 +132,21 @@ export function CategoryList({
           total={drillDown.total}
           categoryId={drillDown.categoryId}
           filteredExpenses={filteredExpenses}
+          companyCode={companyCode}
+          year={year}
+          month={month}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
+
+      {/* Income drill-down */}
+      {drillDown && !isExpense && (
+        <IncomeDrillDownSheet
+          open={!!drillDown}
+          categoryName={drillDown.categoryName}
+          total={drillDown.total}
+          categoryId={drillDown.categoryId}
+          filteredIncomes={filteredIncomes}
           companyCode={companyCode}
           year={year}
           month={month}

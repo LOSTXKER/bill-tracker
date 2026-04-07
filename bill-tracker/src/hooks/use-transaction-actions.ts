@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { revalidateSidebarBadges } from "@/lib/utils/revalidate";
+import { revalidateSidebarBadges, revalidateCompanyData } from "@/lib/utils/revalidate";
 
 interface UseTransactionActionsOptions {
   transactionType: "expense" | "income";
@@ -40,6 +40,7 @@ export function useTransactionActions({
 
       toast.success("ลบรายการสำเร็จ");
       revalidateSidebarBadges(companyCode);
+      revalidateCompanyData(companyCode);
       router.refresh();
       router.push(`/${companyCode}/${transactionType}s`);
     } catch (err) {
@@ -69,6 +70,7 @@ export function useTransactionActions({
       );
       
       revalidateSidebarBadges(companyCode);
+      revalidateCompanyData(companyCode);
       router.refresh();
       onSuccess?.();
     } catch (err) {

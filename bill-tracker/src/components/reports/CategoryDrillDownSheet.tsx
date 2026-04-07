@@ -33,6 +33,17 @@ export interface ExpenseRow {
   payerCompanyCode: string | null;
 }
 
+export interface IncomeRow {
+  id: string;
+  receiveDate: string;
+  source: string | null;
+  amount: number;
+  vatAmount: number;
+  netReceived: number;
+  contactName: string | null;
+  categoryName: string | null;
+}
+
 interface CategoryDrillDownSheetProps {
   open: boolean;
   categoryName: string;
@@ -144,6 +155,117 @@ export function CategoryDrillDownSheet({
             <span className="text-xs text-muted-foreground">รวม {filteredExpenses.length} รายการ</span>
             <span className="text-sm font-semibold text-red-600">
               {formatCurrency(filteredExpenses.reduce((s, e) => s + e.netPaid, 0))}
+            </span>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+interface IncomeDrillDownSheetProps {
+  open: boolean;
+  categoryName: string;
+  total: number;
+  categoryId: string | null;
+  filteredIncomes: IncomeRow[];
+  companyCode: string;
+  year: number;
+  month: number;
+  onClose: () => void;
+}
+
+export function IncomeDrillDownSheet({
+  open,
+  categoryName,
+  total,
+  categoryId,
+  filteredIncomes,
+  companyCode,
+  year,
+  month,
+  onClose,
+}: IncomeDrillDownSheetProps) {
+  const lastDay = new Date(year, month, 0).getDate();
+  const dateFromStr = `${year}-${String(month).padStart(2, "0")}-01`;
+  const dateToStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-base">{categoryName}</SheetTitle>
+          <SheetDescription className="flex items-center gap-3">
+            <span>{filteredIncomes.length} รายการ</span>
+            <span>·</span>
+            <span className="font-medium text-emerald-600">{formatCurrency(total)}</span>
+            <Link
+              href={`/${companyCode}/incomes?dateFrom=${dateFromStr}&dateTo=${dateToStr}${categoryId ? `&category=${categoryId}` : ""}`}
+              className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={onClose}
+            >
+              ดูในหน้ารายการ
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto">
+          {filteredIncomes.length === 0 ? (
+            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+              ไม่มีรายการ
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-medium pl-6">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">รายละเอียด</TableHead>
+                  <TableHead className="text-muted-foreground font-medium">ลูกค้า</TableHead>
+                  <TableHead className="text-muted-foreground font-medium text-right pr-6">สุทธิ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredIncomes.map((income) => (
+                  <TableRow
+                    key={income.id}
+                    className="group relative hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    <TableCell className="whitespace-nowrap pl-6">
+                      <Link
+                        href={`/${companyCode}/incomes/${income.id}`}
+                        className="absolute inset-0"
+                        tabIndex={-1}
+                        onClick={onClose}
+                      />
+                      {formatThaiDateShort(new Date(income.receiveDate))}
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      <div className="truncate">{income.source || "-"}</div>
+                      {income.vatAmount > 0 && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          VAT {formatCurrency(income.vatAmount)}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-muted-foreground text-sm">
+                      {income.contactName || "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-emerald-600 pr-6">
+                      {formatCurrency(income.netReceived)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {filteredIncomes.length > 0 && (
+          <div className="shrink-0 border-t px-6 py-3 flex justify-between items-center bg-muted/30">
+            <span className="text-xs text-muted-foreground">รวม {filteredIncomes.length} รายการ</span>
+            <span className="text-sm font-semibold text-emerald-600">
+              {formatCurrency(filteredIncomes.reduce((s, i) => s + i.netReceived, 0))}
             </span>
           </div>
         )}
