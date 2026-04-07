@@ -138,15 +138,10 @@ export function SettlePaymentDialog({
       expensePayerId: expensePayerType === "USER" ? selectedPayerId : null,
     };
 
-    // OPTIMIZED: Optimistic update - close dialog immediately for better UX
-    // Show success toast and trigger revalidation right away
-    // This gives instant feedback while the API call happens in background
-    const successMessage = createExpense 
-      ? "บันทึกการโอนคืนและสร้างรายจ่ายสำเร็จ"
-      : "บันทึกการโอนคืนสำเร็จ";
-    toast.success(successMessage);
+    // Optimistic: close dialog and show initial toast right away
+    toast.success("บันทึกการโอนคืนสำเร็จ");
     onClose();
-    onSuccess(); // Trigger batch revalidation
+    onSuccess();
     
     // Reset form state
     setSettlementRef("");
@@ -156,7 +151,6 @@ export function SettlePaymentDialog({
     setSelectedPayerId(session?.user?.id || "");
     setIsSubmitting(false);
 
-    // Fire API request in background - if it fails, show error toast
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -166,14 +160,25 @@ export function SettlePaymentDialog({
 
       if (!res.ok) {
         const error = await res.json();
-        // Show error and trigger revalidation to revert optimistic update
         toast.error(error.error || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
-        onSuccess(); // Re-fetch to get actual state
+        onSuccess();
+      } else if (createExpense) {
+        const result = await res.json();
+        const expenseId = result?.data?.createdExpenseId;
+        if (expenseId) {
+          toast.success("สร้างรายการโอนเงินคืนแล้ว", {
+            action: {
+              label: "ดูรายการ",
+              onClick: () => {
+                window.location.href = `/${companyCode}/settlement-transfers/${expenseId}`;
+              },
+            },
+          });
+        }
       }
-    } catch (error) {
-      // Network error or other failure
+    } catch {
       toast.error("ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง");
-      onSuccess(); // Re-fetch to get actual state
+      onSuccess();
     }
   };
 

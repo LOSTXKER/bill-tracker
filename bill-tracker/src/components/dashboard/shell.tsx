@@ -42,6 +42,7 @@ import {
   FileSearch,
   GitCompare,
   ListChecks,
+  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 import type { Company, UserRole } from "@prisma/client";
@@ -178,6 +179,12 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           icon: Wallet,
           permission: "reimbursements:read",
           badgeKey: "pendingReimbursements",
+        },
+        {
+          name: "รายการโอนเงินคืน",
+          href: `/${companyCode}/settlement-transfers`,
+          icon: ArrowLeftRight,
+          permission: "settlements:read",
         },
         {
           name: "ตามใบกำกับ",
