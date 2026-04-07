@@ -12,7 +12,38 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp } from "lucide-react";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/utils/tax-calculator";
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string }>;
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-card p-3 rounded-lg border border-border shadow-lg">
+        <p className="font-medium text-card-foreground mb-2">{label}</p>
+        <div className="space-y-1">
+          {payload.map((entry, index) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-muted-foreground">{entry.name}:</span>
+              <span className="font-medium text-card-foreground">
+                {formatCurrency(entry.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 interface CashFlowData {
   month: string;
@@ -48,32 +79,23 @@ export function CashFlowChart({ data }: CashFlowChartProps) {
           <LineChart data={data}>
             <CartesianGrid 
               strokeDasharray="3 3" 
-              stroke="#374151"
-              strokeOpacity={0.3}
+              stroke="var(--border)"
+              strokeOpacity={0.5}
               vertical={false}
             />
             <XAxis
               dataKey="month"
-              tick={{ fill: "#9ca3af", fontSize: 12 }}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
-              tick={{ fill: "#9ca3af", fontSize: 12 }}
-              tickFormatter={(value) => `฿${(value / 1000).toFixed(0)}k`}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+              tickFormatter={formatCurrencyCompact}
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "var(--card)",
-                border: "1px solid var(--border)",
-                borderRadius: "12px",
-                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-              }}
-              labelStyle={{ color: "var(--foreground)" }}
-              formatter={(value: number | undefined) => formatCurrency(value || 0)}
-            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--muted-foreground)", opacity: 0.08 }} />
             <Legend 
               wrapperStyle={{ paddingTop: "20px" }}
               iconType="circle"

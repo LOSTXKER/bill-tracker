@@ -46,12 +46,17 @@ interface CustomTooltipProps {
 
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
-    const percentage = payload[0].payload.percentage;
+    const data = payload[0];
+    const percentage = data.payload.percentage;
+    const color = data.payload.fill as string;
     return (
-      <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
-        <p className="font-medium text-foreground">{payload[0].name}</p>
-        <p className="text-sm text-primary font-medium">
-          {formatCurrency(payload[0].value)}
+      <div className="bg-card p-3 rounded-lg border border-border shadow-lg">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+          <p className="font-medium text-card-foreground">{data.name}</p>
+        </div>
+        <p className="text-sm text-card-foreground font-medium">
+          {formatCurrency(data.value)}
         </p>
         <p className="text-xs text-muted-foreground">
           {typeof percentage === "number" ? percentage.toFixed(1) : "0.0"}%
@@ -75,7 +80,7 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
             ยังไม่มีข้อมูล
           </div>
         </CardContent>
@@ -94,7 +99,7 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={220}>
           <PieChart>
             <Pie
               data={data}
@@ -106,8 +111,8 @@ export function ExpenseCategoryChart({ data }: ExpenseCategoryChartProps) {
                   typeof props.percent === "number" ? props.percent : 0;
                 return pct > 0.05 ? `${(pct * 100).toFixed(0)}%` : "";
               }}
-              outerRadius={90}
-              innerRadius={50}
+              outerRadius={70}
+              innerRadius={40}
               fill="#8884d8"
               dataKey="value"
               paddingAngle={2}

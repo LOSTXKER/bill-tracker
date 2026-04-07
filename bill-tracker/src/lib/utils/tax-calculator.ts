@@ -67,6 +67,17 @@ export function formatCurrency(
 }
 
 /**
+ * Format currency in compact form for chart axes (e.g., "฿123k", "฿1.2M")
+ */
+export function formatCurrencyCompact(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}฿${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}฿${(abs / 1_000).toFixed(0)}k`;
+  return `${sign}฿${abs}`;
+}
+
+/**
  * Format date in Thai short format (e.g., "5 ม.ค. 68")
  */
 export function formatThaiDate(date: Date | string): string {

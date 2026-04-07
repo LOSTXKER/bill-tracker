@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { Prisma, WorkflowStatus } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { serializeIncomes } from "@/lib/utils/serializers";
 import Link from "next/link";
@@ -28,6 +28,7 @@ export default async function IncomesPage({ params, searchParams }: IncomesPageP
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={Wallet}
         title="รายรับ"
         description="จัดการรายรับและติดตามสถานะเอกสาร"
         actions={
@@ -209,6 +210,10 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
     }
   }
 
+  if (category) {
+    whereClause.categoryId = category;
+  }
+
   if (contact) {
     whereClause.contactId = contact;
   }
@@ -253,7 +258,7 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   // Base where clause for counting (without tab-specific filters)
   const baseWhereClause = buildIncomeBaseWhere(companyId);
 
-  const [incomesRaw, total, tabCounts] = await Promise.all([
+  const [incomesRaw, total, tabCounts, distinctCategories, distinctContacts] = await Promise.all([
     prisma.income.findMany({
       where: whereClause,
       orderBy,
@@ -294,6 +299,18 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       ready,
       sent,
     })),
+    // Distinct categories for filter dropdown
+    prisma.transactionCategory.findMany({
+      where: { Incomes: { some: { ...baseWhereClause } } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    // Distinct contacts for filter dropdown
+    prisma.contact.findMany({
+      where: { Income: { some: { ...baseWhereClause } } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   // Map Prisma relation names to what the client expects
@@ -320,6 +337,10 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
       canApprove={canApprove}
       isOwner={isOwner}
       tabCounts={tabCounts}
+      filterOptions={{
+        categories: distinctCategories.map(c => ({ value: c.id, label: c.name })),
+        contacts: distinctContacts.map(c => ({ id: c.id, name: c.name })),
+      }}
     />
   );
 }

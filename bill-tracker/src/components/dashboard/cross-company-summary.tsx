@@ -1,12 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRightLeft, ArrowUpRight, ArrowDownLeft, Building2 } from "lucide-react";
+import { ArrowRightLeft } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { prisma } from "@/lib/db";
 import { getCompanyId } from "@/lib/cache/company";
 import { reimbursementFilter } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
+import Link from "next/link";
 
 interface CrossCompanySummaryProps {
   companyCode: string;
@@ -20,7 +18,6 @@ export async function CrossCompanySummary({ companyCode }: CrossCompanySummaryPr
   const { startDate, endDate } = getThaiMonthRange(thaiNow.getFullYear(), thaiNow.getMonth() + 1);
 
   const [paidForOthers, paidByOthers] = await Promise.all([
-    // Expenses we paid for other companies (our companyId, different internalCompanyId)
     prisma.expense.aggregate({
       where: {
         ...reimbursementFilter,
@@ -32,7 +29,6 @@ export async function CrossCompanySummary({ companyCode }: CrossCompanySummaryPr
       _sum: { netPaid: true },
       _count: true,
     }),
-    // Expenses other companies paid for us (different companyId, our internalCompanyId)
     prisma.expense.aggregate({
       where: {
         ...reimbursementFilter,
@@ -48,101 +44,36 @@ export async function CrossCompanySummary({ companyCode }: CrossCompanySummaryPr
 
   const paidForOthersAmount = Number(paidForOthers._sum.netPaid) || 0;
   const paidByOthersAmount = Number(paidByOthers._sum.netPaid) || 0;
-  const netSettlement = paidForOthersAmount - paidByOthersAmount;
 
-  // If no cross-company transactions, don't show the card
   if (paidForOthers._count === 0 && paidByOthers._count === 0) {
     return null;
   }
 
+  const parts: string[] = [];
+  if (paidForOthers._count > 0) {
+    parts.push(`จ่ายแทนบริษัทอื่น ${formatCurrency(paidForOthersAmount)}`);
+  }
+  if (paidByOthers._count > 0) {
+    parts.push(`บริษัทอื่นจ่ายแทน ${formatCurrency(paidByOthersAmount)}`);
+  }
+
   return (
-    <Card className="border-amber-200/50 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
-            <ArrowRightLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div>
-            <CardTitle className="text-base font-medium">การจ่ายข้ามบริษัท</CardTitle>
-            <CardDescription className="text-xs">เดือนนี้</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* Paid for others */}
-          <div className="rounded-lg bg-background/80 p-3 space-y-1">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ArrowUpRight className="h-4 w-4 text-red-500" />
-              <span>เราจ่ายแทนบริษัทอื่น</span>
-            </div>
-            <p className="text-lg font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(paidForOthersAmount)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {paidForOthers._count} รายการ
-            </p>
-          </div>
-
-          {/* Paid by others */}
-          <div className="rounded-lg bg-background/80 p-3 space-y-1">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ArrowDownLeft className="h-4 w-4 text-green-500" />
-              <span>บริษัทอื่นจ่ายแทนเรา</span>
-            </div>
-            <p className="text-lg font-bold text-green-600 dark:text-green-400">
-              {formatCurrency(paidByOthersAmount)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {paidByOthers._count} รายการ
-            </p>
-          </div>
-        </div>
-
-        {/* Net Settlement */}
-        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-background p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-medium">
-                {netSettlement >= 0 ? "ต้องเรียกเก็บจากบริษัทอื่น" : "ต้องจ่ายคืนบริษัทอื่น"}
-              </span>
-            </div>
-            <Badge 
-              variant="outline" 
-              className={netSettlement >= 0 
-                ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-400" 
-                : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400"
-              }
-            >
-              {formatCurrency(Math.abs(netSettlement))}
-            </Badge>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-3 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-2.5">
+      <ArrowRightLeft className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+      <p className="flex-1 text-sm text-foreground">
+        <span className="font-medium">ข้ามบริษัทเดือนนี้:</span>{" "}
+        {parts.join(" · ")}
+      </p>
+      <Link
+        href={`/${companyCode}/reports/expense-overview`}
+        className="text-sm font-medium text-amber-600 dark:text-amber-400 hover:underline shrink-0"
+      >
+        ดู
+      </Link>
+    </div>
   );
 }
 
 export function CrossCompanySummarySkeleton() {
-  return (
-    <Card className="border-amber-200/50">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-8 rounded-lg" />
-          <div>
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-3 w-16 mt-1" />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-20 rounded-lg" />
-          <Skeleton className="h-20 rounded-lg" />
-        </div>
-        <Skeleton className="h-12 rounded-lg" />
-      </CardContent>
-    </Card>
-  );
+  return null;
 }

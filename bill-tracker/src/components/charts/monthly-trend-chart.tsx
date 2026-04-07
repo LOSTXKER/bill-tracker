@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { BarChart3 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/utils/tax-calculator";
 
 interface MonthlyData {
   month: string;
@@ -39,8 +39,8 @@ interface CustomTooltipProps {
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card p-3 rounded-xl border border-border shadow-elevated">
-        <p className="font-medium text-foreground mb-2">{label}</p>
+      <div className="bg-card p-3 rounded-lg border border-border shadow-lg">
+        <p className="font-medium text-card-foreground mb-2">{label}</p>
         <div className="space-y-1">
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-sm">
@@ -51,7 +51,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
               <span className="text-muted-foreground">
                 {entry.name}:
               </span>
-              <span className="font-medium text-foreground">{formatCurrency(entry.value)}</span>
+              <span className="font-medium text-card-foreground">{formatCurrency(entry.value)}</span>
             </div>
           ))}
           {payload.length >= 2 && (
@@ -93,23 +93,23 @@ export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
           <BarChart data={data} barGap={4}>
             <CartesianGrid 
               strokeDasharray="3 3" 
-              stroke="#374151"
-              strokeOpacity={0.3}
+              stroke="var(--border)"
+              strokeOpacity={0.5}
               vertical={false}
             />
             <XAxis
               dataKey="month"
-              tick={{ fill: "#9ca3af", fontSize: 12 }}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
-              tick={{ fill: "#9ca3af", fontSize: 12 }}
-              tickFormatter={(value) => `฿${(value / 1000).toFixed(0)}k`}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+              tickFormatter={formatCurrencyCompact}
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#374151", fillOpacity: 0.2 }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--muted-foreground)", opacity: 0.08 }} />
             <Legend 
               wrapperStyle={{ paddingTop: "20px" }}
               iconType="circle"

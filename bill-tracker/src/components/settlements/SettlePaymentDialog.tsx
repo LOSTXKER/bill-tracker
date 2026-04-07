@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { useSession } from "next-auth/react";
 import { fetcher } from "@/lib/utils/fetcher";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 type MembersSWRResponse = {
   data: {
@@ -198,7 +199,7 @@ export function SettlePaymentDialog({
           <DialogDescription>
             โอนคืนให้ {payerName}{" "}
             <span className="font-semibold text-green-600">
-              ฿{totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalAmount)}
             </span>
             {isBatch && ` (${paymentIds.length} รายการ)`}
           </DialogDescription>

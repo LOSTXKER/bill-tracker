@@ -46,13 +46,6 @@ export const THAI_MONTHS = [
   "ธันวาคม",
 ];
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("th-TH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export function downloadBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");

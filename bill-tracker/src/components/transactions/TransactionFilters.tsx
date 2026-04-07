@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X, Filter, Calendar } from "lucide-react";
+import { Search, X, Filter, Calendar, Loader2 } from "lucide-react";
 import { useTransactionFilters } from "@/hooks/use-transaction-filters";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -57,18 +57,34 @@ export function TransactionFilters({
   } = useTransactionFilters();
 
   const [searchValue, setSearchValue] = useState(filters.search);
+  const [isSearching, setIsSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: filters.dateFrom ? new Date(filters.dateFrom) : undefined,
     to: filters.dateTo ? new Date(filters.dateTo) : undefined,
   });
 
-  const handleSearchSubmit = () => {
-    updateFilter("search", searchValue);
-  };
+  useEffect(() => {
+    if (searchValue === filters.search) {
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateFilter("search", searchValue);
+      setIsSearching(false);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearchClear = () => {
     setSearchValue("");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     updateFilter("search", "");
+    setIsSearching(false);
   };
 
   // Format date as YYYY-MM-DD in local timezone (not UTC)
@@ -153,12 +169,15 @@ export function TransactionFilters({
     <div className="flex flex-wrap items-center gap-2">
       {/* Search */}
       <div className="relative w-64">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {isSearching ? (
+          <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+        ) : (
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        )}
         <Input
-          placeholder="ค้นหา..."
+          placeholder="ค้นหาชื่อ, เลขบิล, ผู้ติดต่อ..."
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
           className="pl-9 h-8 text-sm"
         />
         {searchValue && (
@@ -278,22 +297,45 @@ export function TransactionFilters({
         </>
       )}
 
-      {/* Category Filter (for expenses only) */}
-      {type === "expense" && categories.length > 0 && (
+      {/* Category Filter */}
+      {categories.length > 0 && (
         <>
           <div className="h-6 w-px bg-border" />
           <Select 
             value={filters.category || "__all__"} 
             onValueChange={(value) => updateFilter("category", value === "__all__" ? "" : value)}
           >
-            <SelectTrigger className="w-[130px] h-8 text-sm">
-              <SelectValue placeholder="บัญชี" />
+            <SelectTrigger className="w-[150px] h-8 text-sm">
+              <SelectValue placeholder="หมวดหมู่" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">ทุกบัญชี</SelectItem>
+              <SelectItem value="__all__">ทุกหมวดหมู่</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.value} value={category.value}>
                   {category.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </>
+      )}
+
+      {/* Contact Filter */}
+      {contacts.length > 0 && (
+        <>
+          <div className="h-6 w-px bg-border" />
+          <Select
+            value={filters.contact || "__all__"}
+            onValueChange={(value) => updateFilter("contact", value === "__all__" ? "" : value)}
+          >
+            <SelectTrigger className="w-[150px] h-8 text-sm">
+              <SelectValue placeholder="ผู้ติดต่อ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">ทุกผู้ติดต่อ</SelectItem>
+              {contacts.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>

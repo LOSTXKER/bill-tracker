@@ -17,7 +17,7 @@ import { ContactSelector } from "./ContactSelector";
 const EMPTY_URLS: string[] = [];
 import { AccountSelector } from "./account-selector";
 import { CategorySelector } from "./CategorySelector";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, ClipboardList, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { AmountInput } from "./AmountInput";
 import { TransactionFieldsViewMode } from "./TransactionFieldsViewMode";
@@ -46,6 +46,7 @@ export function TransactionFieldsSection({
   isWht = false,
   onAiSuggestAccount,
   onAmountInputModeChange,
+  layout = "default",
 }: TransactionFieldsSectionProps) {
   const {
     contacts,
@@ -199,9 +200,258 @@ export function TransactionFieldsSection({
         taxInvoiceRequestEmail={taxInvoiceRequestEmail}
         taxInvoiceRequestNotes={taxInvoiceRequestNotes}
         hasDocument={hasDocument}
+        layout={layout}
       />
     );
   }
+
+  // -----------------------------------------------------------------------
+  // Shared field blocks (used by both layouts)
+  // -----------------------------------------------------------------------
+
+  const contactField = (
+    <ContactSelector
+      contacts={contacts}
+      isLoading={contactsLoading}
+      selectedContact={selectedContact}
+      onSelect={onContactSelect}
+      label={config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
+      placeholder="พิมพ์ชื่อหรือเลือกจากรายชื่อ..."
+      companyCode={companyCode}
+      onContactCreated={onContactCreated}
+      required
+      contactName={oneTimeContactName}
+      onContactNameChange={onOneTimeContactNameChange}
+      aiVendorSuggestion={aiVendorSuggestion}
+    />
+  );
+
+  const categoryField = (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">
+          หมวดหมู่ <span className="text-red-500">*</span>
+        </Label>
+        {onAiSuggestAccount && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
+            onClick={handleAiSuggestAccount}
+            disabled={aiSuggestLoading}
+          >
+            {aiSuggestLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            AI จำแนก
+          </Button>
+        )}
+      </div>
+      <CategorySelector
+        value={selectedCategory}
+        onValueChange={onCategoryChange}
+        companyCode={companyCode}
+        type={config.type === "expense" ? "EXPENSE" : "INCOME"}
+        placeholder="เลือกหมวดหมู่..."
+        suggestedCategoryId={suggestedCategoryId}
+        alternatives={suggestedCategoryAlternatives}
+        required
+      />
+    </div>
+  );
+
+  const accountAndCompanyFields = (() => {
+    const showInternalCompany = config.type === "expense" && onInternalCompanyChange && accessibleCompanies.length > 1;
+    return (
+      <div className={showInternalCompany ? "grid sm:grid-cols-2 gap-4" : ""}>
+        <div className="space-y-1.5">
+          <Label className="text-sm text-muted-foreground">
+            บัญชี (ไม่บังคับ)
+          </Label>
+          <AccountSelector
+            value={selectedAccount}
+            onValueChange={onAccountChange}
+            companyCode={companyCode}
+            placeholder="เลือกบัญชี"
+            suggestedAccountId={suggestedAccountId}
+            alternatives={suggestedAccountAlternatives}
+            filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
+          />
+        </div>
+        {showInternalCompany && (
+          <div className="space-y-1.5">
+            <Label className="text-sm text-muted-foreground">
+              บริษัทภายใน (เป็นค่าใช้จ่ายจริงของ)
+            </Label>
+            <Select
+              value={internalCompanyId || "__none__"}
+              onValueChange={(value) => onInternalCompanyChange(value === "__none__" ? null : value)}
+            >
+              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
+                <SelectValue placeholder="ไม่ระบุ (ใช้บริษัทที่บันทึก)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  <span className="text-muted-foreground">ไม่ระบุ (ใช้บริษัทที่บันทึก)</span>
+                </SelectItem>
+                {accessibleCompanies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name} ({company.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+    );
+  })();
+
+  const descriptionField = config.descriptionField && (
+    <div className="space-y-2">
+      <Label htmlFor={config.descriptionField.name} className="text-sm text-muted-foreground">
+        {config.descriptionField.label} <span className="text-red-500">*</span>
+      </Label>
+      <Input
+        id={config.descriptionField.name}
+        placeholder={config.descriptionField.placeholder}
+        className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
+        {...register(config.descriptionField.name)}
+        required
+      />
+    </div>
+  );
+
+  const additionalAndStatusFields = (
+    <div className="grid sm:grid-cols-2 gap-4">
+      {renderAdditionalFields?.()}
+      {mode === "create" && config.statusOptions.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">สถานะเริ่มต้น</Label>
+          <Select
+            value={watchStatus || ""}
+            onValueChange={(value) => setValue("status", value)}
+          >
+            <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
+              <SelectValue placeholder="อัตโนมัติ" />
+            </SelectTrigger>
+            <SelectContent>
+              {config.statusOptions.map((option) => {
+                if (option.condition && !option.condition(formData)) {
+                  return null;
+                }
+                return (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            ปกติระบบจะเลือกให้อัตโนมัติตามเอกสารที่แนบ
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  const editModeDocSettings = mode === "edit" && (
+    <DocumentSettingsBlock
+      mode="edit"
+      configType={config.type}
+      documentType={watchDocumentType}
+      isWht={isWht}
+      selectedContact={selectedContact}
+      whtDeliveryMethod={whtDeliveryMethod ?? null}
+      onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
+      whtDeliveryEmail={whtDeliveryEmail}
+      onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
+      whtDeliveryNotes={whtDeliveryNotes}
+      onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
+      updateContactDelivery={updateContactDelivery}
+      onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
+      taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
+      onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
+      taxInvoiceRequestEmail={taxInvoiceRequestEmail}
+      onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
+      taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+      onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
+      updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
+      onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
+      hasDocument={hasDocument}
+      onHasDocumentChange={onHasDocumentChange}
+      referenceUrls={referenceUrls}
+      onReferenceUrlsChange={onReferenceUrlsChange}
+    />
+  );
+
+  // -----------------------------------------------------------------------
+  // Sectioned layout: grouped by accounting sections, no AmountInput
+  // -----------------------------------------------------------------------
+
+  if (layout === "sectioned") {
+    return (
+      <div className="space-y-5">
+        {/* Section 1: ข้อมูลรายการ */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">ข้อมูลรายการ</span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <DatePicker
+              label={config.dateField.label}
+              value={watchDate as Date | undefined}
+              onChange={(date) => setValue(config.dateField.name, date || new Date())}
+              required
+            />
+            {contactField}
+          </div>
+
+          {descriptionField}
+        </div>
+
+        {/* Section 2: การจำแนกทางบัญชี */}
+        <div className="space-y-4">
+          <div className="border-t border-border pt-5 flex items-center gap-2">
+            <Tags className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">การจำแนกทางบัญชี</span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {categoryField}
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">
+                บัญชี (ไม่บังคับ)
+              </Label>
+              <AccountSelector
+                value={selectedAccount}
+                onValueChange={onAccountChange}
+                companyCode={companyCode}
+                placeholder="เลือกบัญชี"
+                suggestedAccountId={suggestedAccountId}
+                alternatives={suggestedAccountAlternatives}
+                filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
+              />
+            </div>
+          </div>
+
+          {additionalAndStatusFields}
+        </div>
+
+        {editModeDocSettings}
+      </div>
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Default layout (backwards compatible)
+  // -----------------------------------------------------------------------
 
   return (
     <div className="space-y-4">
@@ -218,180 +468,14 @@ export function TransactionFieldsSection({
 
       {/* Contact & Category */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ContactSelector
-          contacts={contacts}
-          isLoading={contactsLoading}
-          selectedContact={selectedContact}
-          onSelect={onContactSelect}
-          label={config.type === "expense" ? "ผู้ติดต่อ / ร้านค้า" : "ลูกค้า / ผู้ติดต่อ"}
-          placeholder="พิมพ์ชื่อหรือเลือกจากรายชื่อ..."
-          companyCode={companyCode}
-          onContactCreated={onContactCreated}
-          required
-          contactName={oneTimeContactName}
-          onContactNameChange={onOneTimeContactNameChange}
-          aiVendorSuggestion={aiVendorSuggestion}
-        />
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">
-              หมวดหมู่ <span className="text-red-500">*</span>
-            </Label>
-            {onAiSuggestAccount && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
-                onClick={handleAiSuggestAccount}
-                disabled={aiSuggestLoading}
-              >
-                {aiSuggestLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3 w-3" />
-                )}
-                AI จำแนก
-              </Button>
-            )}
-          </div>
-          <CategorySelector
-            value={selectedCategory}
-            onValueChange={onCategoryChange}
-            companyCode={companyCode}
-            type={config.type === "expense" ? "EXPENSE" : "INCOME"}
-            placeholder="เลือกหมวดหมู่..."
-            suggestedCategoryId={suggestedCategoryId}
-            alternatives={suggestedCategoryAlternatives}
-            required
-          />
-        </div>
+        {contactField}
+        {categoryField}
       </div>
 
-      {/* Account (optional) */}
-      <div className="space-y-1.5">
-        <Label className="text-sm text-muted-foreground">
-          บัญชี (ไม่บังคับ)
-        </Label>
-        <AccountSelector
-          value={selectedAccount}
-          onValueChange={onAccountChange}
-          companyCode={companyCode}
-          placeholder="เลือกบัญชี"
-          suggestedAccountId={suggestedAccountId}
-          alternatives={suggestedAccountAlternatives}
-          filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
-        />
-      </div>
-
-      {/* Internal Company (expense only) */}
-      {config.type === "expense" && onInternalCompanyChange && accessibleCompanies.length > 1 && (
-        <div className="space-y-1.5">
-          <Label className="text-sm text-muted-foreground">
-            บริษัทภายใน (เป็นค่าใช้จ่ายจริงของ)
-          </Label>
-          <Select
-            value={internalCompanyId || "__none__"}
-            onValueChange={(value) => onInternalCompanyChange(value === "__none__" ? null : value)}
-          >
-            <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-              <SelectValue placeholder="ไม่ระบุ (ใช้บริษัทที่บันทึก)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">
-                <span className="text-muted-foreground">ไม่ระบุ (ใช้บริษัทที่บันทึก)</span>
-              </SelectItem>
-              {accessibleCompanies.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name} ({company.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            ถ้าค่าใช้จ่ายนี้เป็นของบริษัทอื่น (ต่างจากที่บันทึก) ให้เลือกบริษัทจริงที่นี่
-          </p>
-        </div>
-      )}
-
-      {/* Description */}
-      {config.descriptionField && (
-        <div className="space-y-2">
-          <Label htmlFor={config.descriptionField.name} className="text-sm text-muted-foreground">
-            {config.descriptionField.label} <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id={config.descriptionField.name}
-            placeholder={config.descriptionField.placeholder}
-            className="h-11 bg-muted/30 border-border focus:bg-background transition-colors"
-            {...register(config.descriptionField.name)}
-            required
-          />
-        </div>
-      )}
-
-      {/* Additional fields + Status */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        {renderAdditionalFields?.()}
-        {mode === "create" && config.statusOptions.length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">สถานะเริ่มต้น</Label>
-            <Select
-              value={watchStatus || ""}
-              onValueChange={(value) => setValue("status", value)}
-            >
-              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-                <SelectValue placeholder="อัตโนมัติ" />
-              </SelectTrigger>
-              <SelectContent>
-                {config.statusOptions.map((option) => {
-                  if (option.condition && !option.condition(formData)) {
-                    return null;
-                  }
-                  return (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              ปกติระบบจะเลือกให้อัตโนมัติตามเอกสารที่แนบ
-            </p>
-          </div>
-        )}
-      </div>
-
-      {mode === "edit" && (
-        <DocumentSettingsBlock
-          mode="edit"
-          configType={config.type}
-          documentType={watchDocumentType}
-          isWht={isWht}
-          selectedContact={selectedContact}
-          whtDeliveryMethod={whtDeliveryMethod ?? null}
-          onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
-          whtDeliveryEmail={whtDeliveryEmail}
-          onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
-          whtDeliveryNotes={whtDeliveryNotes}
-          onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
-          updateContactDelivery={updateContactDelivery}
-          onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
-          taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
-          onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
-          taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-          onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
-          taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-          onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
-          updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-          onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
-          hasDocument={hasDocument}
-          onHasDocumentChange={onHasDocumentChange}
-          referenceUrls={referenceUrls}
-          onReferenceUrlsChange={onReferenceUrlsChange}
-        />
-      )}
+      {accountAndCompanyFields}
+      {descriptionField}
+      {additionalAndStatusFields}
+      {editModeDocSettings}
     </div>
   );
 }

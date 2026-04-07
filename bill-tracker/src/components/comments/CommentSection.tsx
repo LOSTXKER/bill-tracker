@@ -1,7 +1,6 @@
 "use client";
 
 import { MessageSquare, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,14 +75,6 @@ export function CommentSection({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold flex items-center gap-2">
-          <MessageSquare className="h-5 w-5" />
-          ความคิดเห็น
-          {comments.length > 0 && <Badge variant="secondary">{comments.length}</Badge>}
-        </h3>
-      </div>
-
       <CommentComposer
         value={newComment}
         onChange={setNewComment}

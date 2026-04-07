@@ -13,9 +13,17 @@ import {
   Loader2,
   Calendar,
   Send,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { formatThaiDateLong } from "@/lib/utils/tax-calculator";
 import {
   WORKFLOW_STATUS_INFO,
   getExpenseWorkflowLabel,
@@ -166,11 +174,15 @@ export function TransactionViewToolbar({
         <div className="flex items-center gap-3 min-w-0">
           <Button
             variant="ghost"
-            size="icon"
-            className={cn("shrink-0 rounded-full h-9 w-9", config.iconColor)}
+            size="sm"
+            className={cn("shrink-0 gap-1.5 px-2", config.iconColor)}
             onClick={onNavigateToList}
+            aria-label={config.type === "expense" ? "กลับไปหน้ารายจ่าย" : "กลับไปหน้ารายรับ"}
           >
             <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline text-sm font-medium">
+              {config.type === "expense" ? "รายจ่าย" : "รายรับ"}
+            </span>
           </Button>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -189,10 +201,7 @@ export function TransactionViewToolbar({
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {new Date(transaction[config.fields.dateField.name] as string).toLocaleDateString(
-                "th-TH",
-                { day: "numeric", month: "long", year: "numeric" }
-              )}
+              {formatThaiDateLong(new Date(transaction[config.fields.dateField.name] as string))}
             </p>
           </div>
         </div>
@@ -275,7 +284,8 @@ export function TransactionViewToolbar({
                 />
               )}
 
-              <Button variant="outline" size="sm" onClick={onEditClick}>
+              {/* Inline buttons for desktop */}
+              <Button variant="outline" size="sm" onClick={onEditClick} className="hidden sm:inline-flex">
                 <Edit className="h-4 w-4 mr-1" />
                 แก้ไข
               </Button>
@@ -283,11 +293,33 @@ export function TransactionViewToolbar({
                 variant="outline"
                 size="sm"
                 onClick={onDeleteClick}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="hidden sm:inline-flex text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 ลบ
               </Button>
+
+              {/* Overflow menu for mobile */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="sm:hidden h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={onEditClick}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    แก้ไข
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={onDeleteClick}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    ลบ
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight, User, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface PersonData {
   id: string;
@@ -31,14 +32,6 @@ interface PersonBreakdownTableProps {
   data: PersonData[];
   isLoading: boolean;
   companyCode: string;
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-    minimumFractionDigits: 2,
-  }).format(amount);
 }
 
 export function PersonBreakdownTable({ data, isLoading, companyCode }: PersonBreakdownTableProps) {

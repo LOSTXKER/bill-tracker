@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/permissions/checker";
 import { AuditLogTable } from "@/components/audit-logs/audit-log-table";
 import { History } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 interface AuditLogsPageProps {
   params: Promise<{ company: string }>;
@@ -27,15 +28,11 @@ export default async function AuditLogsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <History className="h-6 w-6" />
-          บันทึกระบบ
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          ประวัติการกระทำทั้งหมดในระบบ (Audit Log)
-        </p>
-      </div>
+      <PageHeader
+        title="บันทึกระบบ"
+        description="ประวัติการกระทำทั้งหมดในระบบ"
+        icon={History}
+      />
 
       <AuditLogTable companyId={company.id} />
     </div>

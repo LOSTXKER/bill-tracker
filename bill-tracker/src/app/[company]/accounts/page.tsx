@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { AccountsPageClient } from "@/components/accounts/accounts-page-client";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { BookOpen } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ company: string }>;
@@ -41,7 +43,13 @@ export default async function AccountsPage({ params }: PageProps) {
   });
 
   return (
-    <AccountsPageClient
+    <div className="space-y-6">
+      <PageHeader
+        title="ผังบัญชี"
+        description="จัดการผังบัญชี (Chart of Accounts)"
+        icon={BookOpen}
+      />
+      <AccountsPageClient
       companyCode={company.code}
       companyName={company.name}
       accounts={accounts.map((a) => ({
@@ -58,5 +66,6 @@ export default async function AccountsPage({ params }: PageProps) {
       canEdit={canEdit}
       lastAccountImportAt={company.lastAccountImportAt?.toISOString() || null}
     />
+    </div>
   );
 }

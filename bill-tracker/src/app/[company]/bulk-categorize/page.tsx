@@ -28,18 +28,20 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { CategorySelector } from "@/components/forms/shared/CategorySelector";
 import { Pagination } from "@/components/shared/Pagination";
 import {
-  ArrowLeft,
   Calendar,
   Check,
   CircleAlert,
+  FolderSync,
   Loader2,
   Search,
   Sparkles,
   Tags,
   X,
 } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatThaiDateShort } from "@/lib/utils/formatters";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -552,19 +554,13 @@ export default function BulkCategorizePage() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold">จัดการหมวดหมู่รายการ</h1>
-          <p className="text-sm text-muted-foreground">
-            คลิกที่หมวดหมู่ในแต่ละแถวเพื่อแก้ไขทันที หรือเลือกหลายรายการเพื่อจัดหมวดพร้อมกัน
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="จัดการหมวดหมู่รายการ"
+        description="คลิกที่หมวดหมู่ในแต่ละแถวเพื่อแก้ไขทันที หรือเลือกหลายรายการเพื่อจัดหมวดพร้อมกัน"
+        icon={FolderSync}
+        breadcrumb={{ label: "กลับ", href: `/${companyCode}/dashboard` }}
+      />
 
       {/* Tabs */}
       <Tabs value={type} onValueChange={(v) => setType(v as TransactionType)}>
@@ -909,20 +905,20 @@ export default function BulkCategorizePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
+                <TableHead className="w-10 text-muted-foreground">
                   <Checkbox
                     checked={allOnPageSelected && items.length > 0}
                     onCheckedChange={toggleSelectAll}
                     disabled={items.length === 0}
                   />
                 </TableHead>
-                <TableHead>
+                <TableHead className="text-muted-foreground">
                   {type === "expense" ? "คำอธิบาย" : "แหล่งรายรับ"}
                 </TableHead>
-                <TableHead className="w-[140px]">ผู้ติดต่อ</TableHead>
-                <TableHead className="w-[90px]">วันที่</TableHead>
-                <TableHead className="w-[110px] text-right">จำนวนเงิน</TableHead>
-                <TableHead className="w-[260px]">หมวดหมู่</TableHead>
+                <TableHead className="w-[140px] text-muted-foreground">ผู้ติดต่อ</TableHead>
+                <TableHead className="w-[90px] text-muted-foreground">วันที่</TableHead>
+                <TableHead className="w-[110px] text-right text-muted-foreground">จำนวนเงิน</TableHead>
+                <TableHead className="w-[260px] text-muted-foreground">หมวดหมู่</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -985,10 +981,7 @@ export default function BulkCategorizePage() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground tabular-nums">
                         {dateStr
-                          ? new Date(dateStr).toLocaleDateString("th-TH", {
-                              day: "numeric",
-                              month: "short",
-                            })
+                          ? formatThaiDateShort(new Date(dateStr))
                           : "-"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm font-medium">

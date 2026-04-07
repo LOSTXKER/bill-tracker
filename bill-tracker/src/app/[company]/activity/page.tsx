@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 // =============================================================================
 // Types
@@ -279,35 +280,30 @@ export default function ActivityPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Bell className="h-6 w-6" />
-            การแจ้งเตือน
-          </h1>
-          <p className="text-muted-foreground">
-            การแจ้งเตือนและกิจกรรมที่เกี่ยวข้องกับคุณ
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
-              <CheckCheck className="h-4 w-4 mr-1" />
-              อ่านทั้งหมด ({unreadCount})
+      <PageHeader
+        title="การแจ้งเตือน"
+        description="การแจ้งเตือนและกิจกรรมที่เกี่ยวข้องกับคุณ"
+        icon={Bell}
+        actions={
+          <>
+            {unreadCount > 0 && (
+              <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
+                <CheckCheck className="h-4 w-4 mr-1" />
+                อ่านทั้งหมด ({unreadCount})
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={async () => { setRefreshing(true); await mutate(); setRefreshing(false); }}
+              disabled={refreshing}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-1", refreshing && "animate-spin")} />
+              รีเฟรช
             </Button>
-          )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={async () => { setRefreshing(true); await mutate(); setRefreshing(false); }}
-            disabled={refreshing}
-          >
-            <RefreshCw className={cn("h-4 w-4 mr-1", refreshing && "animate-spin")} />
-            รีเฟรช
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Filters */}
       <Card>

@@ -24,32 +24,65 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
-  TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import {
-  Download,
   RefreshCw,
-  Calendar,
   Users,
+  UserSearch,
   TrendingUp,
   TrendingDown,
   Building2,
   ExternalLink,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { fetcher } from "@/lib/utils/fetcher";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/utils/tax-calculator";
+
+function BarChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card p-3 rounded-lg border border-border shadow-lg">
+      <p className="font-medium text-card-foreground mb-2">{label}</p>
+      <div className="space-y-1">
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2 text-sm">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="font-medium text-card-foreground">
+              {formatCurrency(entry.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface ContactReportPageProps {
   params: Promise<{ company: string }>;
@@ -102,11 +135,9 @@ interface ReportData {
   }>;
 }
 
-// Get current year and past 3 years
-const currentYear = new Date().getFullYear();
-const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+const thisYear = new Date().getFullYear();
+const years = [thisYear, thisYear - 1, thisYear - 2, thisYear - 3];
 
-// Thai month names
 const thaiMonths = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
@@ -118,33 +149,21 @@ function formatMonthLabel(monthKey: string) {
   return `${thaiMonths[monthIndex]} ${parseInt(year) + 543 - 2500}`;
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
-
 export default function ContactReportPage({ params }: ContactReportPageProps) {
   const { company: companyCode } = use(params);
-  const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
+  const [selectedYear, setSelectedYear] = useState<string>(thisYear.toString());
   const [selectedType, setSelectedType] = useState<string>("all");
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set());
 
-  // Build API URL with filters
   const buildApiUrl = () => {
     const params = new URLSearchParams();
-    
     if (selectedYear && selectedYear !== "all") {
       params.set("dateFrom", `${selectedYear}-01-01`);
       params.set("dateTo", `${selectedYear}-12-31`);
     }
-    
     if (selectedType && selectedType !== "all") {
       params.set("type", selectedType);
     }
-    
     return `/api/${companyCode}/contacts/report?${params.toString()}`;
   };
 
@@ -155,8 +174,8 @@ export default function ContactReportPage({ params }: ContactReportPageProps) {
   );
 
   const reportData = data?.data;
+  const summary = reportData?.summary;
 
-  // Prepare chart data
   const chartData = reportData?.byMonth
     .slice()
     .reverse()
@@ -177,494 +196,369 @@ export default function ContactReportPage({ params }: ContactReportPageProps) {
     setExpandedContacts(newExpanded);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Users className="h-6 w-6 text-primary" />
+  // Loading skeleton
+  if (isLoading && !reportData) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-10 w-80" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          ))}
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">รายงานตามผู้ติดต่อ</h1>
-          <p className="text-muted-foreground text-sm">
-            สรุปรายรับ-รายจ่ายตาม Vendor/Customer
-          </p>
-        </div>
+        <Skeleton className="h-[300px] w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
+    );
+  }
 
-      {/* Filters and Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="เลือกปี" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                {years.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year + 543}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="รายงานตามผู้ติดต่อ"
+        description="สรุปรายรับ-รายจ่ายตาม Vendor/Customer"
+        icon={UserSearch}
+      />
 
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="ประเภท" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                <SelectItem value="VENDOR">Vendor</SelectItem>
-                <SelectItem value="CUSTOMER">Customer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={selectedYear} onValueChange={setSelectedYear}>
+          <SelectTrigger className="h-8 w-[90px] text-xs">
+            <SelectValue placeholder="เลือกปี" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">ทั้งหมด</SelectItem>
+            {years.map((year) => (
+              <SelectItem key={year} value={year.toString()}>
+                {year + 543}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          {(selectedYear !== "all" || selectedType !== "all") && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedYear("all");
-                setSelectedType("all");
-              }}
-            >
-              ล้างตัวกรอง
-            </Button>
-          )}
-        </div>
+        <Select value={selectedType} onValueChange={setSelectedType}>
+          <SelectTrigger className="h-8 w-[110px] text-xs">
+            <SelectValue placeholder="ประเภท" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">ทั้งหมด</SelectItem>
+            <SelectItem value="VENDOR">Vendor</SelectItem>
+            <SelectItem value="CUSTOMER">Customer</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <div className="flex items-center gap-2">
+        {(selectedYear !== "all" || selectedType !== "all") && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            onClick={() => mutate()}
-            disabled={isLoading}
+            className="h-8 text-xs"
+            onClick={() => {
+              setSelectedYear("all");
+              setSelectedType("all");
+            }}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            รีเฟรช
+            ล้างตัวกรอง
           </Button>
-        </div>
+        )}
+
+        <div className="flex-1" />
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => mutate()}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          รีเฟรช
+        </Button>
       </div>
 
       {/* Error State */}
       {error && (
-        <div className="text-center py-8 text-destructive">
-          เกิดข้อผิดพลาดในการโหลดข้อมูล
-          <Button variant="link" onClick={() => mutate()}>
-            ลองอีกครั้ง
-          </Button>
-        </div>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่</span>
+            <Button variant="outline" size="sm" onClick={() => mutate()}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              ลองใหม่
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-red-200/50 dark:border-red-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-red-500" />
-              รายจ่ายรวม
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {formatCurrency(reportData?.summary?.totalExpenses || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {reportData?.summary?.expenseCount || 0} รายการ
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-green-200/50 dark:border-green-800/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-green-500" />
-              รายรับรวม
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {formatCurrency(reportData?.summary?.totalIncomes || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {reportData?.summary?.incomeCount || 0} รายการ
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Vendor
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {reportData?.summary?.vendorCount || 0}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">ผู้ขาย</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Customer
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {reportData?.summary?.customerCount || 0}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">ลูกค้า</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      {/* KPI Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <TrendingUp className="h-3 w-3 text-red-500" />
+            รายจ่ายรวม
+          </p>
+          <p className="text-xl font-bold text-red-600 dark:text-red-400 mt-0.5">
+            {formatCurrency(summary?.totalExpenses || 0)}
+          </p>
+          <p className="text-xs text-muted-foreground">{summary?.expenseCount || 0} รายการ</p>
+        </div>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <TrendingDown className="h-3 w-3 text-emerald-500" />
+            รายรับรวม
+          </p>
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+            {formatCurrency(summary?.totalIncomes || 0)}
+          </p>
+          <p className="text-xs text-muted-foreground">{summary?.incomeCount || 0} รายการ</p>
+        </div>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Building2 className="h-3 w-3" />
+            Vendor
+          </p>
+          <p className="text-xl font-bold mt-0.5">
+            {summary?.vendorCount || 0} <span className="text-sm font-normal text-muted-foreground">ผู้ขาย</span>
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            Customer
+          </p>
+          <p className="text-xl font-bold mt-0.5">
+            {summary?.customerCount || 0} <span className="text-sm font-normal text-muted-foreground">ลูกค้า</span>
+          </p>
+        </div>
       </div>
 
       {/* No Contact Warning */}
       {reportData && (reportData.summary.noContactExpenseCount > 0 || reportData.summary.noContactIncomeCount > 0) && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800/50 dark:bg-yellow-950/20 p-4">
-          <div className="flex items-start gap-3">
-            <div className="text-yellow-600 dark:text-yellow-400">
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                รายการที่ไม่ได้ระบุผู้ติดต่อ
-              </h3>
-              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                มีรายจ่าย {reportData.summary.noContactExpenseCount} รายการ ({formatCurrency(reportData.summary.noContactExpenses)})
-                และรายรับ {reportData.summary.noContactIncomeCount} รายการ ({formatCurrency(reportData.summary.noContactIncomes)})
-                ที่ไม่ได้ระบุผู้ติดต่อ
-              </p>
-            </div>
-          </div>
-        </div>
+        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/20 [&>svg]:text-amber-600">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <span className="font-medium text-amber-800 dark:text-amber-200">รายการที่ไม่ได้ระบุผู้ติดต่อ</span>
+            <span className="text-amber-700 dark:text-amber-300 ml-1">
+              — มีรายจ่าย {reportData.summary.noContactExpenseCount} รายการ ({formatCurrency(reportData.summary.noContactExpenses)})
+              และรายรับ {reportData.summary.noContactIncomeCount} รายการ ({formatCurrency(reportData.summary.noContactIncomes)})
+              ที่ไม่ได้ระบุผู้ติดต่อ
+            </span>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Charts and Table Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Monthly Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              รายรับ-รายจ่ายรายเดือน
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#374151"
-                    strokeOpacity={0.3}
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fill: "#9ca3af", fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#9ca3af", fontSize: 11 }}
-                    tickFormatter={(value) =>
-                      value >= 1000
-                        ? `฿${(value / 1000).toFixed(0)}k`
-                        : `฿${value}`
-                    }
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    formatter={(value: number | undefined) => [
-                      `฿${(value as number || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="รายจ่าย"
-                    fill="#ef4444"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="รายรับ"
-                    fill="#22c55e"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                ไม่มีข้อมูลในช่วงเวลาที่เลือก
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              Top 5 ผู้ติดต่อ
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : reportData?.byContact.slice(0, 5).map((contact, index) => (
-              <div
-                key={contact.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-muted-foreground w-5">
-                    {index + 1}.
-                  </span>
-                  <div>
-                    <div className="text-sm font-medium truncate max-w-[150px]">
-                      {contact.name}
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {contact.category === "VENDOR" ? "Vendor" : "Customer"}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-semibold">
-                    {formatCurrency(contact.total)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {contact.totalCount} รายการ
-                  </div>
-                </div>
-              </div>
-            ))}
-            {!isLoading && (!reportData?.byContact || reportData.byContact.length === 0) && (
-              <div className="text-center py-4 text-muted-foreground text-sm">
-                ไม่มีข้อมูล
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Monthly Chart — full width */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
+            รายรับ-รายจ่ายรายเดือน
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--border)"
+                  strokeOpacity={0.5}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickFormatter={formatCurrencyCompact}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip content={<BarChartTooltip />} cursor={{ fill: "var(--muted-foreground)", opacity: 0.08 }} />
+                <Legend />
+                <Bar
+                  dataKey="รายจ่าย"
+                  fill="#ef4444"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="รายรับ"
+                  fill="#22c55e"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+              ไม่มีข้อมูลในช่วงเวลาที่เลือก
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Contact Breakdown Table */}
-      <Card className="mt-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
             รายละเอียดตามผู้ติดต่อ ({reportData?.byContact?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : reportData?.byContact && reportData.byContact.length > 0 ? (
+          {reportData?.byContact && reportData.byContact.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead>ผู้ติดต่อ</TableHead>
-                    <TableHead>ประเภท</TableHead>
-                    <TableHead className="text-right">รายจ่าย</TableHead>
-                    <TableHead className="text-right">รายรับ</TableHead>
-                    <TableHead className="text-right">รวม</TableHead>
-                    <TableHead className="text-center">จำนวน</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
+                    <TableHead className="w-[40px] text-muted-foreground"></TableHead>
+                    <TableHead className="text-muted-foreground">ผู้ติดต่อ</TableHead>
+                    <TableHead className="text-muted-foreground">ประเภท</TableHead>
+                    <TableHead className="text-right text-muted-foreground">รายจ่าย</TableHead>
+                    <TableHead className="text-right text-muted-foreground">รายรับ</TableHead>
+                    <TableHead className="text-right text-muted-foreground">รวม</TableHead>
+                    <TableHead className="text-center text-muted-foreground">จำนวน</TableHead>
+                    <TableHead className="w-[100px] text-muted-foreground"></TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {reportData.byContact.map((contact) => (
-                    <Collapsible key={contact.id} asChild>
-                      <>
-                        <TableRow className="hover:bg-muted/50">
-                          <TableCell>
-                            <CollapsibleTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => toggleExpand(contact.id)}
-                              >
-                                {expandedContacts.has(contact.id) ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{contact.name}</div>
-                            {contact.taxId && (
-                              <div className="text-xs text-muted-foreground">
-                                เลขผู้เสียภาษี: {contact.taxId}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                contact.category === "VENDOR"
-                                  ? "border-red-200 text-red-600"
-                                  : "border-green-200 text-green-600"
-                              }
+                {reportData.byContact.map((contact) => (
+                  <Collapsible key={contact.id} asChild>
+                    <tbody>
+                      <TableRow className="hover:bg-muted/50">
+                        <TableCell>
+                          <CollapsibleTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => toggleExpand(contact.id)}
                             >
-                              {contact.category === "VENDOR" ? "Vendor" : "Customer"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right text-red-600">
-                            {contact.expense.count > 0
-                              ? formatCurrency(contact.expense.netPaid)
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-right text-green-600">
-                            {contact.income.count > 0
-                              ? formatCurrency(contact.income.netReceived)
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatCurrency(contact.total)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {contact.totalCount}
-                          </TableCell>
-                          <TableCell>
-                            <Link href={`/${companyCode}/contacts/${contact.id}`}>
-                              <Button variant="ghost" size="sm" className="gap-1">
-                                ดู
-                                <ExternalLink className="h-3 w-3" />
-                              </Button>
-                            </Link>
+                              {expandedContacts.has(contact.id) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </CollapsibleTrigger>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{contact.name}</div>
+                          {contact.taxId && (
+                            <div className="text-xs text-muted-foreground">
+                              เลขผู้เสียภาษี: {contact.taxId}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              contact.category === "VENDOR"
+                                ? "border-red-200 text-red-600"
+                                : "border-green-200 text-green-600"
+                            }
+                          >
+                            {contact.category === "VENDOR" ? "Vendor" : "Customer"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {contact.expense.count > 0
+                            ? formatCurrency(contact.expense.netPaid)
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600">
+                          {contact.income.count > 0
+                            ? formatCurrency(contact.income.netReceived)
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(contact.total)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {contact.totalCount}
+                        </TableCell>
+                        <TableCell>
+                          <Link href={`/${companyCode}/contacts/${contact.id}`}>
+                            <Button variant="ghost" size="sm" className="gap-1">
+                              ดู
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                      <CollapsibleContent asChild>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableCell colSpan={8} className="py-4">
+                            <div className="grid grid-cols-2 gap-6 px-4">
+                              <div>
+                                <h4 className="text-sm font-semibold text-red-600 mb-2">
+                                  รายละเอียดรายจ่าย
+                                </h4>
+                                <div className="space-y-1 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">ยอดรวม:</span>
+                                    <span>{formatCurrency(contact.expense.amount)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">VAT:</span>
+                                    <span>{formatCurrency(contact.expense.vatAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">หัก ณ ที่จ่าย:</span>
+                                    <span>{formatCurrency(contact.expense.whtAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between font-semibold pt-1 border-t">
+                                    <span>จ่ายสุทธิ:</span>
+                                    <span>{formatCurrency(contact.expense.netPaid)}</span>
+                                  </div>
+                                </div>
+                                {contact.expense.count > 0 && (
+                                  <Link href={`/${companyCode}/expenses?contactId=${contact.id}`}>
+                                    <Button variant="outline" size="sm" className="mt-3 gap-1">
+                                      ดูรายจ่ายทั้งหมด
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </Link>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-semibold text-green-600 mb-2">
+                                  รายละเอียดรายรับ
+                                </h4>
+                                <div className="space-y-1 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">ยอดรวม:</span>
+                                    <span>{formatCurrency(contact.income.amount)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">VAT:</span>
+                                    <span>{formatCurrency(contact.income.vatAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">โดนหัก ณ ที่จ่าย:</span>
+                                    <span>{formatCurrency(contact.income.whtAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between font-semibold pt-1 border-t">
+                                    <span>รับสุทธิ:</span>
+                                    <span>{formatCurrency(contact.income.netReceived)}</span>
+                                  </div>
+                                </div>
+                                {contact.income.count > 0 && (
+                                  <Link href={`/${companyCode}/incomes?contactId=${contact.id}`}>
+                                    <Button variant="outline" size="sm" className="mt-3 gap-1">
+                                      ดูรายรับทั้งหมด
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
                           </TableCell>
                         </TableRow>
-                        <CollapsibleContent asChild>
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={8} className="py-4">
-                              <div className="grid grid-cols-2 gap-6 px-4">
-                                <div>
-                                  <h4 className="text-sm font-semibold text-red-600 mb-2">
-                                    รายละเอียดรายจ่าย
-                                  </h4>
-                                  <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">ยอดรวม:</span>
-                                      <span>{formatCurrency(contact.expense.amount)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">VAT:</span>
-                                      <span>{formatCurrency(contact.expense.vatAmount)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">หัก ณ ที่จ่าย:</span>
-                                      <span>{formatCurrency(contact.expense.whtAmount)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-semibold pt-1 border-t">
-                                      <span>จ่ายสุทธิ:</span>
-                                      <span>{formatCurrency(contact.expense.netPaid)}</span>
-                                    </div>
-                                  </div>
-                                  {contact.expense.count > 0 && (
-                                    <Link href={`/${companyCode}/expenses?contactId=${contact.id}`}>
-                                      <Button variant="outline" size="sm" className="mt-3 gap-1">
-                                        ดูรายจ่ายทั้งหมด
-                                        <ExternalLink className="h-3 w-3" />
-                                      </Button>
-                                    </Link>
-                                  )}
-                                </div>
-                                <div>
-                                  <h4 className="text-sm font-semibold text-green-600 mb-2">
-                                    รายละเอียดรายรับ
-                                  </h4>
-                                  <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">ยอดรวม:</span>
-                                      <span>{formatCurrency(contact.income.amount)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">VAT:</span>
-                                      <span>{formatCurrency(contact.income.vatAmount)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">โดนหัก ณ ที่จ่าย:</span>
-                                      <span>{formatCurrency(contact.income.whtAmount)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-semibold pt-1 border-t">
-                                      <span>รับสุทธิ:</span>
-                                      <span>{formatCurrency(contact.income.netReceived)}</span>
-                                    </div>
-                                  </div>
-                                  {contact.income.count > 0 && (
-                                    <Link href={`/${companyCode}/incomes?contactId=${contact.id}`}>
-                                      <Button variant="outline" size="sm" className="mt-3 gap-1">
-                                        ดูรายรับทั้งหมด
-                                        <ExternalLink className="h-3 w-3" />
-                                      </Button>
-                                    </Link>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        </CollapsibleContent>
-                      </>
-                    </Collapsible>
-                  ))}
-                </TableBody>
+                      </CollapsibleContent>
+                    </tbody>
+                  </Collapsible>
+                ))}
               </Table>
             </div>
           ) : (

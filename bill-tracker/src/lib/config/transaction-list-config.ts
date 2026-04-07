@@ -76,7 +76,7 @@ export function createTransactionListConfig(
   const base = getTransactionListConfig(type);
   return {
     ...base,
-    captureUrl: "capture",
+    captureUrl: type === "expense" ? "capture?type=expense" : "capture?type=income",
     showCategory: true,
     renderRow,
   };

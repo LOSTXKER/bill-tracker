@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AmountInputMode, FormWatch, FormSetValue } from "./transaction-fields-types";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface AmountInputProps {
   watch: FormWatch;
@@ -230,11 +231,7 @@ export function AmountInput({ watch, setValue, vatRate, isWht, onModeChange }: A
       </div>
       {amountInputMode === "includingVat" && vatRate > 0 && (
         <p className="text-xs text-muted-foreground">
-          ยอดก่อน VAT: ฿
-          {((parseFloat(displayAmount) || 0) / (1 + vatRate / 100)).toLocaleString(
-            "th-TH",
-            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-          )}
+          ยอดก่อน VAT: {formatCurrency((parseFloat(displayAmount) || 0) / (1 + vatRate / 100))}
         </p>
       )}
       {amountInputMode === "afterWht" &&
@@ -245,19 +242,8 @@ export function AmountInput({ watch, setValue, vatRate, isWht, onModeChange }: A
             factor > 0 ? (parseFloat(displayAmount) || 0) / factor : 0;
           return (
             <p className="text-xs text-muted-foreground">
-              ยอดก่อน VAT: ฿
-              {baseAmount.toLocaleString("th-TH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-              {vatRate > 0 &&
-                ` · รวม VAT: ฿${(
-                  baseAmount *
-                  (1 + vatRate / 100)
-                ).toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`}
+              ยอดก่อน VAT: {formatCurrency(baseAmount)}
+              {vatRate > 0 && ` · รวม VAT: ${formatCurrency(baseAmount * (1 + vatRate / 100))}`}
             </p>
           );
         })()}

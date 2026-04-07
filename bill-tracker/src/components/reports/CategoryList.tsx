@@ -7,11 +7,11 @@ import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 const EXPENSE_COLORS = [
   "hsl(0 84% 60%)", "hsl(25 95% 53%)", "hsl(43 96% 56%)",
-  "hsl(262 80% 58%)", "hsl(198 89% 48%)", "hsl(var(--muted-foreground))",
+  "hsl(262 80% 58%)", "hsl(198 89% 48%)", "var(--muted-foreground)",
 ];
 const INCOME_COLORS = [
   "hsl(160 84% 39%)", "hsl(175 80% 40%)", "hsl(190 80% 45%)",
-  "hsl(142 71% 45%)", "hsl(84 60% 50%)", "hsl(var(--muted-foreground))",
+  "hsl(142 71% 45%)", "hsl(84 60% 50%)", "var(--muted-foreground)",
 ];
 
 interface CategoryGroup {

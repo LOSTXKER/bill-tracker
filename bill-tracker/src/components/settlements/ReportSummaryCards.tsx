@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, CheckCircle2, Users, AlertCircle } from "lucide-react";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ReportSummary {
@@ -54,7 +55,7 @@ export function ReportSummaryCards({ data, isLoading }: ReportSummaryCardsProps)
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            ฿{totalSettled.toLocaleString("th-TH", { maximumFractionDigits: 2 })}
+            {formatCurrency(totalSettled)}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {settledCount} รายการ
@@ -70,7 +71,7 @@ export function ReportSummaryCards({ data, isLoading }: ReportSummaryCardsProps)
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-orange-600">
-            ฿{totalPending.toLocaleString("th-TH", { maximumFractionDigits: 2 })}
+            {formatCurrency(totalPending)}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {pendingCount} รายการ

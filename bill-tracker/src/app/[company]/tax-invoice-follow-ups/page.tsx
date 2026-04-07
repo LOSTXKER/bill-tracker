@@ -23,6 +23,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  FileSearch,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -33,27 +34,10 @@ import {
   AlertTriangle,
   FileCheck,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
+import { formatThaiDateTimeShort } from "@/lib/utils/formatters";
 import { TAX_INVOICE_REQUEST_METHODS, getTaxInvoiceRequestMethod } from "@/lib/constants/delivery-methods";
 import { PermissionGuard } from "@/components/guards/permission-guard";
-
-// Format date to Thai locale
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: "2-digit",
-  });
-}
-
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 interface ExpenseItem {
   id: string;
@@ -254,8 +238,9 @@ export default function TaxInvoiceFollowUpsPage() {
 
   return (
     <PermissionGuard permission="expenses:read">
-      <div className="container py-6 space-y-6">
+      <div className="space-y-6">
         <PageHeader
+          icon={FileSearch}
           title="ตามใบกำกับภาษี"
           description="รายการค่าใช้จ่ายที่รอใบกำกับภาษีจาก Vendor จัดกลุ่มตามร้าน/ผู้ติดต่อ"
           actions={
@@ -455,7 +440,7 @@ export default function TaxInvoiceFollowUpsPage() {
                                       onCheckedChange={() => toggleExpense(expense.id)}
                                     />
                                   </td>
-                                  <td className="p-2 whitespace-nowrap">{formatDate(expense.billDate)}</td>
+                                  <td className="p-2 whitespace-nowrap">{formatThaiDate(new Date(expense.billDate))}</td>
                                   <td className="p-2">
                                     <div>
                                       <span
@@ -486,7 +471,7 @@ export default function TaxInvoiceFollowUpsPage() {
                                   </td>
                                   <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
                                     {expense.taxInvoiceRequestedAt
-                                      ? formatDateTime(expense.taxInvoiceRequestedAt)
+                                      ? formatThaiDateTimeShort(expense.taxInvoiceRequestedAt)
                                       : <span className="text-amber-600">ยังไม่ได้ขอ</span>
                                     }
                                   </td>

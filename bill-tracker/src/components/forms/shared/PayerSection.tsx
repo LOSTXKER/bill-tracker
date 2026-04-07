@@ -26,6 +26,7 @@ import {
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
 import { fetcher } from "@/lib/utils/fetcher";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 // =============================================================================
 // Types
@@ -260,9 +261,9 @@ export function PayerSection({
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2">
             <Wallet className="h-4 w-4" />
             ผู้จ่ายเงิน
           </CardTitle>
@@ -284,7 +285,7 @@ export function PayerSection({
       <CardContent className="space-y-4">
         {/* Empty State - No payers yet */}
         {payers.length === 0 && !isViewMode && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Label className="text-sm">ประเภทผู้จ่าย</Label>
             <div className="grid grid-cols-3 gap-2">
               {PAYER_TYPE_OPTIONS.map((option) => (
@@ -293,9 +294,9 @@ export function PayerSection({
                   type="button"
                   variant="outline"
                   onClick={() => onPayersChange([{ paidByType: option.value, amount: totalAmount }])}
-                  className="flex flex-col items-center gap-1 h-auto py-3"
+                  className="flex items-center justify-center gap-1.5 h-auto py-2"
                 >
-                  <option.icon className={`h-5 w-5 ${option.color}`} />
+                  <option.icon className={`h-4 w-4 ${option.color}`} />
                   <span className="text-xs">{option.label}</span>
                 </Button>
               ))}
@@ -327,8 +328,8 @@ export function PayerSection({
               </div>
             )}
 
-            {/* Payer Type Selector - Button Style */}
-            <div className="space-y-2">
+            {/* Payer Type Selector - Compact */}
+            <div className="space-y-1.5">
               <Label className="text-sm">ประเภทผู้จ่าย</Label>
               <div className="grid grid-cols-3 gap-2">
                 {PAYER_TYPE_OPTIONS.map((option) => {
@@ -341,11 +342,11 @@ export function PayerSection({
                       onClick={() => handlePayerTypeChange(index, option.value)}
                       disabled={isDisabled}
                       className={cn(
-                        "flex flex-col items-center gap-1 h-auto py-3",
+                        "flex items-center justify-center gap-1.5 h-auto py-2",
                         isSelected && "ring-2 ring-primary ring-offset-2"
                       )}
                     >
-                      <option.icon className={`h-5 w-5 ${isSelected ? "text-primary-foreground" : option.color}`} />
+                      <option.icon className={`h-4 w-4 ${isSelected ? "text-primary-foreground" : option.color}`} />
                       <span className="text-xs">{option.label}</span>
                     </Button>
                   );
@@ -418,7 +419,7 @@ export function PayerSection({
                             <Wallet className="h-4 w-4 text-green-600" />
                             <span>{fund.name}</span>
                             <span className="text-xs text-muted-foreground">
-                              (คงเหลือ ฿{fund.currentAmount.toLocaleString()})
+                              (คงเหลือ {formatCurrency(fund.currentAmount)})
                             </span>
                           </div>
                         </SelectItem>
@@ -489,8 +490,7 @@ export function PayerSection({
           >
             <span>ยอดรวมที่ระบุ:</span>
             <span className="font-medium">
-              ฿{totalAssigned.toLocaleString("th-TH", { minimumFractionDigits: 2 })} / ฿
-              {totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalAssigned)} / {formatCurrency(totalAmount)}
             </span>
           </div>
         )}

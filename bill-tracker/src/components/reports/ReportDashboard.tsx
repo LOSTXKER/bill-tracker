@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange } from "@/lib/queries/date-utils";
 import { getMonthlyChartData } from "@/lib/cache/chart-data";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueExpenseTrendChart } from "@/components/reports/charts/RevenueExpenseTrendChart";
 import { CategoryList } from "@/components/reports/CategoryList";
 
@@ -128,12 +129,16 @@ export async function ReportDashboard({
   return (
     <div>
       {/* Trend chart — full width */}
-      <div className="rounded-lg border bg-card p-5">
-        <h3 className="text-base font-semibold mb-3">แนวโน้มรายรับ-รายจ่าย (6 เดือน)</h3>
-        <div className="h-[240px]">
-          <RevenueExpenseTrendChart data={chartTrendData} />
-        </div>
-      </div>
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">แนวโน้มรายรับ-รายจ่าย (6 เดือน)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[240px]">
+            <RevenueExpenseTrendChart data={chartTrendData} />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Category breakdown — 2 columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 border-t pt-6">

@@ -1,12 +1,12 @@
 "use client";
 
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import {
   UseFormRegister,
   UseFormWatch,
   UseFormSetValue,
 } from "react-hook-form";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles, ArrowLeft, ListChecks } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, ListChecks, MessageSquareText, Settings2, Calculator, Wallet, Plus, Bookmark } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 import type { ContactSummary } from "@/types";
 
 const EMPTY_URLS: string[] = [];
-import type { ContactDefaults } from "@/hooks/use-contact-defaults";
+import type { ContactDefaults, DescriptionPreset } from "@/hooks/use-contact-defaults";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import {
   TransactionFieldsSection,
@@ -32,6 +42,7 @@ import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { CalculationSummary } from "./shared/CalculationSummary";
+import { AmountInput } from "./shared/AmountInput";
 import type { AmountInputMode } from "./shared/transaction-fields-types";
 import { PayerSection, type PayerInfo } from "./shared/PayerSection";
 import {
@@ -118,6 +129,7 @@ export interface CreateModeContentProps {
   defaultsSuggestionDismissed: boolean;
   setDefaultsSuggestionDismissed: Dispatch<SetStateAction<boolean>>;
   applyContactDefaults: () => void;
+  mutateContactDefaults: () => void;
   setAccountSuggestion: Dispatch<SetStateAction<AccountSuggestion>>;
   whtChangeInfo: WhtChangeInfo;
   handleWhtToggle: (enabled: boolean, confirmed?: boolean, reason?: string) => void;
@@ -160,6 +172,7 @@ export function CreateModeContent({
   defaultsSuggestionDismissed,
   setDefaultsSuggestionDismissed,
   applyContactDefaults,
+  mutateContactDefaults,
   setAccountSuggestion,
   whtChangeInfo,
   handleWhtToggle,
@@ -188,14 +201,17 @@ export function CreateModeContent({
     onHasDocumentChange,
     referenceUrls = EMPTY_URLS,
     onReferenceUrlsChange,
+    selectedAccount,
+    selectedCategory,
   } = useTransactionFormContext();
 
   const [amountInputMode, setAmountInputMode] = useState<AmountInputMode>("beforeVat");
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
 
   const fieldsConfig = buildFieldsConfig(config);
 
   return (
-    <>
+    <div>
       {/* Header row — mirrors TransactionViewToolbar layout */}
       <div className="flex items-center justify-between gap-4 py-3 mb-4 border-b border-border/60">
         <div className="flex items-center gap-3 min-w-0">
@@ -244,11 +260,12 @@ export function CreateModeContent({
         </div>
       </div>
 
-      {/* Two-column grid — same structure as ViewEditModeContent */}
+      {/* Two-column grid */}
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* Left Column: Main Info Card */}
+        {/* Left Column: Single Card with accounting sections */}
         <Card className="lg:col-span-3 shadow-sm border-border">
-          <CardContent className="p-6 lg:p-8 space-y-6">
+          <CardContent className="p-6 lg:p-8 space-y-5">
+            {/* Sections 1 & 2 rendered by TransactionFieldsSection (sectioned layout) */}
             <TransactionFieldsSection
               config={fieldsConfig}
               companyCode={companyCode}
@@ -262,6 +279,7 @@ export function CreateModeContent({
               }
               isWht={watchIsWht || false}
               onAmountInputModeChange={setAmountInputMode}
+              layout="sectioned"
               onAiSuggestAccount={(suggestion) => {
                 setAccountSuggestion({
                   accountId: suggestion.accountId,
@@ -283,169 +301,179 @@ export function CreateModeContent({
               />
             )}
 
-            {contactDefaults && contactDefaults.descriptionPresets.length > 0 && (
-              <PresetDropdown
-                presets={contactDefaults.descriptionPresets}
-                descriptionFieldName={config.fields.descriptionField?.name}
-                setValue={setValue}
+            {selectedContact && (
+              <div className="flex items-center gap-2">
+                {contactDefaults && contactDefaults.descriptionPresets.length > 0 && (
+                  <div className="flex-1">
+                    <PresetDropdown
+                      presets={contactDefaults.descriptionPresets}
+                      descriptionFieldName={config.fields.descriptionField?.name}
+                      setValue={setValue}
+                    />
+                  </div>
+                )}
+                <div className={contactDefaults && contactDefaults.descriptionPresets.length > 0 ? "" : "flex-1"}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs h-9 whitespace-nowrap"
+                    onClick={() => setSavePresetOpen(true)}
+                  >
+                    <Bookmark className="h-3.5 w-3.5" />
+                    บันทึกเป็นรายการที่ใช้บ่อย
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {selectedContact && (
+              <SavePresetDialog
+                open={savePresetOpen}
+                onOpenChange={setSavePresetOpen}
+                companyCode={companyCode}
+                contactId={selectedContact.id}
+                existingPresets={contactDefaults?.descriptionPresets ?? []}
+                initialDescription={
+                  config.fields.descriptionField
+                    ? String(watch(config.fields.descriptionField.name) || "")
+                    : ""
+                }
+                initialAccountId={selectedAccount}
+                initialCategoryId={selectedCategory}
+                onSaved={mutateContactDefaults}
               />
             )}
 
-            <CurrencyConversionNote
-              currencyConversion={currencyConversion ?? undefined}
-              manualMode={mode === "create"}
-              onManualToggle={(enabled) => {
-                if (enabled) {
-                  setCurrencyConversion({
-                    detected: true,
-                    currency: "USD",
-                    originalAmount: 0,
-                    convertedAmount: 0,
-                    exchangeRate: 0,
-                    conversionNote: null,
-                  });
-                  if (config.type === "expense") {
-                    setValue("vatRate", 0);
-                    setValue("documentType", "CASH_RECEIPT");
+            {/* Section 3: จำนวนเงินและภาษี */}
+            <div className="space-y-4">
+              <div className="border-t border-border pt-5 flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">จำนวนเงินและภาษี</span>
+              </div>
+
+              <AmountInput watch={watch} setValue={setValue} vatRate={watchVatRate || 0} isWht={watchIsWht || false} onModeChange={setAmountInputMode} />
+
+              <CurrencyConversionNote
+                currencyConversion={currencyConversion ?? undefined}
+                manualMode={mode === "create"}
+                onManualToggle={(enabled) => {
+                  if (enabled) {
+                    setCurrencyConversion({
+                      detected: true,
+                      currency: "USD",
+                      originalAmount: 0,
+                      convertedAmount: 0,
+                      exchangeRate: 0,
+                      conversionNote: null,
+                    });
+                    if (config.type === "expense") {
+                      setValue("vatRate", 0);
+                      setValue("documentType", "CASH_RECEIPT");
+                    }
+                  } else {
+                    setCurrencyConversion(null);
+                    setValue("amount", 0);
                   }
-                } else {
-                  setCurrencyConversion(null);
-                  setValue("amount", 0);
-                }
-              }}
-              onCurrencyChange={(currency) => {
-                setCurrencyConversion((prev) =>
-                  prev ? { ...prev, currency } : null
-                );
-              }}
-              onOriginalAmountChange={(originalAmount) => {
-                setCurrencyConversion((prev) => {
-                  if (!prev) return null;
-                  const rate = prev.exchangeRate || 0;
-                  const converted = rate > 0 ? Math.trunc(originalAmount * rate * 100) / 100 : 0;
-                  if (converted > 0) setValue("amount", converted);
-                  return { ...prev, originalAmount, convertedAmount: converted };
-                });
-              }}
-              onRateChange={(newRate, newConvertedAmount) => {
-                setValue("amount", newConvertedAmount);
-                setCurrencyConversion((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        exchangeRate: newRate,
-                        convertedAmount: newConvertedAmount,
-                        conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                      }
-                    : null
-                );
-                if (aiResult?.currencyConversion) {
-                  setAiResult((prev) =>
+                }}
+                onCurrencyChange={(currency) => {
+                  setCurrencyConversion((prev) =>
+                    prev ? { ...prev, currency } : null
+                  );
+                }}
+                onOriginalAmountChange={(originalAmount) => {
+                  setCurrencyConversion((prev) => {
+                    if (!prev) return null;
+                    const rate = prev.exchangeRate || 0;
+                    const converted = rate > 0 ? Math.trunc(originalAmount * rate * 100) / 100 : 0;
+                    if (converted > 0) setValue("amount", converted);
+                    return { ...prev, originalAmount, convertedAmount: converted };
+                  });
+                }}
+                onRateChange={(newRate, newConvertedAmount) => {
+                  setValue("amount", newConvertedAmount);
+                  setCurrencyConversion((prev) =>
                     prev
                       ? {
                           ...prev,
-                          currencyConversion: {
-                            ...prev.currencyConversion!,
-                            exchangeRate: newRate,
-                            convertedAmount: newConvertedAmount,
-                            conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                          },
+                          exchangeRate: newRate,
+                          convertedAmount: newConvertedAmount,
+                          conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ${formatCurrency(newRate)}`,
                         }
                       : null
                   );
-                }
-              }}
-            />
+                  if (aiResult?.currencyConversion) {
+                    setAiResult((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            currencyConversion: {
+                              ...prev.currencyConversion!,
+                              exchangeRate: newRate,
+                              convertedAmount: newConvertedAmount,
+                              conversionNote: `แปลงจาก ${prev.currencyConversion?.currency} ${prev.currencyConversion?.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ${formatCurrency(newRate)}`,
+                            },
+                          }
+                        : null
+                    );
+                  }
+                }}
+              />
 
-            <div className="border-t border-border" />
-
-            <TransactionAmountCard
-              mode={mode}
-              type={config.type}
-              amount={watchAmount || 0}
-              onAmountChange={(value) => setValue("amount", value)}
-              vatRate={watchVatRate || 0}
-              onVatRateChange={(value) => setValue("vatRate", value)}
-              vatAmount={calculation.vatAmount}
-              whtEnabled={watchIsWht || false}
-              onWhtToggle={handleWhtToggle}
-              whtRate={watchWhtRate}
-              whtType={watchWhtType}
-              onWhtRateSelect={(rate, type) => {
-                setValue("whtRate", rate);
-                setValue("whtType", type);
-              }}
-              whtAmount={calculation.whtAmount}
-              whtLabel={config.fields.whtField.label}
-              whtDescription={config.fields.whtField.description}
-              whtChangeInfo={whtChangeInfo}
-              documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
-              onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
-              totalWithVat={calculation.totalWithVat}
-              netAmount={calculation.netAmount}
-              netAmountLabel={config.fields.netAmountLabel}
-              showCalculationSummary={false}
-            />
-
-            <div className="lg:hidden">
-              <Card className="shadow-sm border-border">
-                <CardContent className="p-4">
-                  <CalculationSummary
-                    baseAmount={watchAmount || 0}
-                    vatRate={watchVatRate || 0}
-                    vatAmount={calculation.vatAmount}
-                    totalWithVat={calculation.totalWithVat}
-                    whtRate={watchWhtRate}
-                    whtAmount={calculation.whtAmount}
-                    netAmount={calculation.netAmount}
-                    type={config.type}
-                    showWhtNote={(watchIsWht || false) && !!watchWhtRate}
-                    inputMode={amountInputMode}
-                  />
-                </CardContent>
-              </Card>
+              <TransactionAmountCard
+                mode={mode}
+                type={config.type}
+                amount={watchAmount || 0}
+                onAmountChange={(value) => setValue("amount", value)}
+                vatRate={watchVatRate || 0}
+                onVatRateChange={(value) => setValue("vatRate", value)}
+                vatAmount={calculation.vatAmount}
+                whtEnabled={watchIsWht || false}
+                onWhtToggle={handleWhtToggle}
+                whtRate={watchWhtRate}
+                whtType={watchWhtType}
+                onWhtRateSelect={(rate, type) => {
+                  setValue("whtRate", rate);
+                  setValue("whtType", type);
+                }}
+                whtAmount={calculation.whtAmount}
+                whtLabel={config.fields.whtField.label}
+                whtDescription={config.fields.whtField.description}
+                whtChangeInfo={whtChangeInfo}
+                documentType={(watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"}
+                onDocumentTypeChange={config.type === "expense" ? handleDocumentTypeChange : undefined}
+                totalWithVat={calculation.totalWithVat}
+                netAmount={calculation.netAmount}
+                netAmountLabel={config.fields.netAmountLabel}
+                showCalculationSummary={false}
+              />
             </div>
 
+            {/* Section 4: ผู้จ่ายเงิน (expense only) */}
             {config.type === "expense" && mode === "create" && (
-              <PayerSection
-                companyCode={companyCode}
-                totalAmount={calculation.netAmount}
-                mode={mode}
-                payers={payers}
-                onPayersChange={setPayers}
-              />
+              <div className="space-y-4">
+                <div className="border-t border-border pt-5 flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">ผู้จ่ายเงิน</span>
+                </div>
+
+                <PayerSection
+                  companyCode={companyCode}
+                  totalAmount={calculation.netAmount}
+                  mode={mode}
+                  payers={payers}
+                  onPayersChange={setPayers}
+                />
+              </div>
             )}
 
-            <DocumentSettingsBlock
-              mode="edit"
-              configType={config.type}
-              documentType={watchDocumentType}
-              isWht={watchIsWht || false}
-              selectedContact={selectedContact}
-              whtDeliveryMethod={whtDeliveryMethod ?? null}
-              onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
-              whtDeliveryEmail={whtDeliveryEmail}
-              onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
-              whtDeliveryNotes={whtDeliveryNotes}
-              onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
-              updateContactDelivery={updateContactDelivery}
-              onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
-              taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
-              onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
-              taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-              onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
-              taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-              onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
-              updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-              onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
-              hasDocument={hasDocument}
-              onHasDocumentChange={onHasDocumentChange}
-              referenceUrls={referenceUrls}
-              onReferenceUrlsChange={onReferenceUrlsChange}
-            />
+            {/* Section 5: หมายเหตุ */}
+            <div className="space-y-3">
+              <div className="border-t border-border pt-5 flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">หมายเหตุ</span>
+              </div>
 
-            <div className="pt-2">
-              <p className="text-sm text-muted-foreground mb-1">หมายเหตุ</p>
               <Textarea
                 {...register("notes")}
                 placeholder="เพิ่มหมายเหตุ (ถ้ามี)..."
@@ -456,8 +484,8 @@ export function CreateModeContent({
           </CardContent>
         </Card>
 
-        {/* Right Column: Uploads + Sticky Summary */}
-        <div className="lg:col-span-2 order-first lg:order-none space-y-4">
+        {/* Right Column: Uploads + Document Settings + Sticky Summary */}
+        <div className="lg:col-span-2 order-first lg:order-none space-y-3">
           <InputMethodSection
             key={filesInitialized ? "with-prefill" : "fresh"}
             companyCode={companyCode}
@@ -468,7 +496,65 @@ export function CreateModeContent({
             initialFiles={filesInitialized ? categorizedFiles : undefined}
           />
 
-          <div className="hidden lg:block sticky top-20">
+          <Card className="shadow-sm border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+                ตั้งค่าเอกสาร
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0 space-y-4">
+              <DocumentSettingsBlock
+                mode="edit"
+                configType={config.type}
+                documentType={watchDocumentType}
+                isWht={watchIsWht || false}
+                selectedContact={selectedContact}
+                whtDeliveryMethod={whtDeliveryMethod ?? null}
+                onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
+                whtDeliveryEmail={whtDeliveryEmail}
+                onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
+                whtDeliveryNotes={whtDeliveryNotes}
+                onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
+                updateContactDelivery={updateContactDelivery}
+                onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
+                taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
+                onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
+                taxInvoiceRequestEmail={taxInvoiceRequestEmail}
+                onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
+                taxInvoiceRequestNotes={taxInvoiceRequestNotes}
+                onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
+                updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
+                onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
+                hasDocument={hasDocument}
+                onHasDocumentChange={onHasDocumentChange}
+                referenceUrls={referenceUrls}
+                onReferenceUrlsChange={onReferenceUrlsChange}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Mobile-only CalculationSummary */}
+          <div className="lg:hidden">
+            <Card className="shadow-sm border-border">
+              <CardContent className="p-4">
+                <CalculationSummary
+                  baseAmount={watchAmount || 0}
+                  vatRate={watchVatRate || 0}
+                  vatAmount={calculation.vatAmount}
+                  totalWithVat={calculation.totalWithVat}
+                  whtRate={watchWhtRate}
+                  whtAmount={calculation.whtAmount}
+                  netAmount={calculation.netAmount}
+                  type={config.type}
+                  showWhtNote={(watchIsWht || false) && !!watchWhtRate}
+                  inputMode={amountInputMode}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="hidden lg:block sticky top-20 z-10">
             <Card className="shadow-sm border-border">
               <CardContent className="p-4">
                 <CalculationSummary
@@ -488,7 +574,7 @@ export function CreateModeContent({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -543,5 +629,134 @@ function PresetDropdown({
         </Select>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Save Preset Dialog (internal)
+// ---------------------------------------------------------------------------
+
+function SavePresetDialog({
+  open,
+  onOpenChange,
+  companyCode,
+  contactId,
+  existingPresets,
+  initialDescription,
+  initialAccountId,
+  initialCategoryId,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  companyCode: string;
+  contactId: string;
+  existingPresets: DescriptionPreset[];
+  initialDescription: string;
+  initialAccountId: string | null;
+  initialCategoryId: string | null;
+  onSaved: () => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [description, setDescription] = useState(initialDescription);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setLabel("");
+      setDescription(initialDescription);
+    }
+  }, [open, initialDescription]);
+
+  const handleSave = async () => {
+    const trimmedLabel = label.trim();
+    const trimmedDesc = description.trim();
+    if (!trimmedLabel) {
+      toast.error("กรุณาระบุชื่อย่อ");
+      return;
+    }
+    if (!trimmedDesc) {
+      toast.error("กรุณาระบุคำอธิบาย");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const newPreset: DescriptionPreset = {
+        label: trimmedLabel,
+        description: trimmedDesc,
+        accountId: initialAccountId,
+        categoryId: initialCategoryId,
+      };
+
+      const res = await fetch(
+        `/api/${companyCode.toUpperCase()}/contacts/${contactId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            descriptionPresets: [...existingPresets, newPreset],
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "บันทึกไม่สำเร็จ");
+      }
+
+      toast.success("บันทึกรายการที่ใช้บ่อยแล้ว");
+      onSaved();
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>บันทึกเป็นรายการที่ใช้บ่อย</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm">ชื่อย่อ <span className="text-red-500">*</span></Label>
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="เช่น ค่าบริการรายเดือน"
+              className="h-10"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">คำอธิบาย <span className="text-red-500">*</span></Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="คำอธิบายเต็ม"
+              className="h-10"
+            />
+          </div>
+          {(initialAccountId || initialCategoryId) && (
+            <p className="text-xs text-muted-foreground">
+              บัญชีและหมวดหมู่ที่เลือกอยู่จะถูกบันทึกไปด้วย
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            ยกเลิก
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+            บันทึก
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

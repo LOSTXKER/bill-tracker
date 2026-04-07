@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, use, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, use, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowUpCircle, ArrowDownCircle, ReceiptText } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, ReceiptText, PenLine } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { ExpenseForm } from "@/components/forms/expense-form";
 import { IncomeForm } from "@/components/forms/income-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,8 +16,10 @@ interface CapturePageProps {
 export default function CapturePage({ params }: CapturePageProps) {
   const { company: companyCode } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const typeParam = searchParams.get("type");
   const fromReimbursement = searchParams.get("fromReimbursement");
+  const formContainerRef = useRef<HTMLDivElement>(null);
   
   // Set initial tab based on query parameter, default to "expense"
   const initialTab = (typeParam === "income" || typeParam === "expense") ? typeParam : "expense";
@@ -28,6 +31,21 @@ export default function CapturePage({ params }: CapturePageProps) {
       setActiveTab(typeParam);
     }
   }, [typeParam]);
+
+  const handleTabChange = (value: string) => {
+    const tab = value as "expense" | "income";
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("type", tab);
+    router.replace(`/${companyCode}/capture?${params.toString()}`, { scroll: false });
+    // Auto-focus first input after tab switch
+    requestAnimationFrame(() => {
+      const input = formContainerRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+        "input:not([type=hidden]):not([type=checkbox]):not([disabled]), textarea:not([disabled])"
+      );
+      input?.focus();
+    });
+  };
 
   // Parse pre-fill data from sessionStorage (for reimbursement → expense conversion)
   const [prefillData, setPrefillData] = useState<Record<string, unknown> | undefined>(undefined);
@@ -63,9 +81,15 @@ export default function CapturePage({ params }: CapturePageProps) {
   }, [fromReimbursement]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <PageHeader
+        title="บันทึกรายการ"
+        description="สร้างรายจ่ายหรือรายรับใหม่"
+        icon={PenLine}
+      />
+
       {fromReimbursement && (
-        <Alert className="mb-4 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
           <ReceiptText className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800 dark:text-blue-200">
             กำลังสร้างรายจ่ายจากคำขอเบิกจ่าย - ข้อมูลถูกกรอกให้อัตโนมัติ
@@ -73,8 +97,8 @@ export default function CapturePage({ params }: CapturePageProps) {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "expense" | "income")}>
-        <TabsList className="grid w-full max-w-xs grid-cols-2 mb-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="grid w-full max-w-xs grid-cols-2">
           <TabsTrigger
             value="expense"
             className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground"
@@ -91,23 +115,25 @@ export default function CapturePage({ params }: CapturePageProps) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="expense" className="mt-0">
-          {prefillLoaded ? (
-            <ExpenseForm 
-              companyCode={companyCode} 
-              prefillData={prefillData}
-              key={fromReimbursement || "new"}
-            />
-          ) : (
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          )}
-        </TabsContent>
+        <div ref={formContainerRef}>
+          <TabsContent value="expense" className="mt-0">
+            {prefillLoaded ? (
+              <ExpenseForm 
+                companyCode={companyCode} 
+                prefillData={prefillData}
+                key={fromReimbursement || "new"}
+              />
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            )}
+          </TabsContent>
 
-        <TabsContent value="income" className="mt-0">
-          <IncomeForm companyCode={companyCode} />
-        </TabsContent>
+          <TabsContent value="income" className="mt-0">
+            <IncomeForm companyCode={companyCode} />
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

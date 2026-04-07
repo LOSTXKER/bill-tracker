@@ -32,11 +32,13 @@ import {
   Sparkles,
   FolderOpen,
   Tag,
+  Tags,
   MoreHorizontal,
   GripVertical,
   Search,
   ChevronsUpDown,
 } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -867,21 +869,20 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">จัดการหมวดหมู่</h1>
-          <p className="text-sm text-muted-foreground">
-            กำหนดหมวดหมู่สำหรับค่าใช้จ่ายและรายรับ
-          </p>
-        </div>
-        {isEmpty && (
-          <Button onClick={handleSeedDefaults} className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            สร้างหมวดเริ่มต้น
-          </Button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="จัดการหมวดหมู่"
+        description="กำหนดหมวดหมู่สำหรับค่าใช้จ่ายและรายรับ"
+        icon={Tags}
+        actions={
+          isEmpty ? (
+            <Button onClick={handleSeedDefaults} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              สร้างหมวดเริ่มต้น
+            </Button>
+          ) : undefined
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center gap-3 flex-wrap">

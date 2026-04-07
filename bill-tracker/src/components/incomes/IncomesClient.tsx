@@ -11,9 +11,15 @@ interface TabCounts {
   all: number;
   draft: number;
   pending: number;
+  rejected: number;
   active: number;
   ready: number;
   sent: number;
+}
+
+interface FilterOptions {
+  categories?: Array<{ value: string; label: string }>;
+  contacts?: Array<{ id: string; name: string }>;
 }
 
 interface IncomesClientProps {
@@ -24,6 +30,7 @@ interface IncomesClientProps {
   canApprove?: boolean;
   isOwner?: boolean;
   tabCounts?: TabCounts;
+  filterOptions?: FilterOptions;
 }
 
 const incomeListConfig = createTransactionListConfig(
@@ -52,6 +59,7 @@ export function IncomesClient({
   canApprove = false,
   isOwner = false,
   tabCounts,
+  filterOptions,
 }: IncomesClientProps) {
   return (
     <TransactionListClient
@@ -63,6 +71,7 @@ export function IncomesClient({
       canApprove={canApprove}
       isOwner={isOwner}
       tabCounts={tabCounts}
+      filterOptions={filterOptions}
     />
   );
 }

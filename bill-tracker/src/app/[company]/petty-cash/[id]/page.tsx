@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowLeft,
+  Coins,
   Plus,
   Minus,
   RefreshCw,
@@ -148,27 +149,17 @@ export default function PettyCashDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/${companyCode}/petty-cash`)}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <PageHeader
-            title={fund.name}
-            description={
-              fund.Custodian
-                ? `ผู้ดูแล: ${fund.Custodian.name}`
-                : "ไม่มีผู้ดูแล"
-            }
-          />
-        </div>
-        {!fund.isActive && <Badge variant="secondary">ปิดใช้งาน</Badge>}
-      </div>
+      <PageHeader
+        icon={Coins}
+        title={fund.name}
+        description={
+          fund.Custodian
+            ? `ผู้ดูแล: ${fund.Custodian.name}`
+            : "ไม่มีผู้ดูแล"
+        }
+        breadcrumb={{ label: "เงินสดย่อย", href: `/${companyCode}/petty-cash` }}
+        actions={!fund.isActive ? <Badge variant="secondary">ปิดใช้งาน</Badge> : undefined}
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -274,11 +265,11 @@ export default function PettyCashDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>วันที่</TableHead>
-                  <TableHead>ประเภท</TableHead>
-                  <TableHead>รายละเอียด</TableHead>
-                  <TableHead>ผู้ทำรายการ</TableHead>
-                  <TableHead className="text-right">จำนวนเงิน</TableHead>
+                  <TableHead className="text-muted-foreground">วันที่</TableHead>
+                  <TableHead className="text-muted-foreground">ประเภท</TableHead>
+                  <TableHead className="text-muted-foreground">รายละเอียด</TableHead>
+                  <TableHead className="text-muted-foreground">ผู้ทำรายการ</TableHead>
+                  <TableHead className="text-right text-muted-foreground">จำนวนเงิน</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

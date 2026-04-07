@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { Prisma, WorkflowStatus } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { Plus, Receipt } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { serializeExpenses } from "@/lib/utils/serializers";
 import Link from "next/link";
@@ -32,6 +32,7 @@ export default async function ExpensesPage({ params, searchParams }: ExpensesPag
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={Receipt}
         title="รายจ่าย"
         description="จัดการรายจ่ายและติดตามสถานะเอกสาร"
         actions={
@@ -279,7 +280,7 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   // Base where clause for counting (always internal view — real ownership)
   const baseWhereClause = buildExpenseBaseWhere(companyId);
 
-  const [expensesRaw, total, tabCounts, crossCompanyCount] = await Promise.all([
+  const [expensesRaw, total, tabCounts, crossCompanyCount, distinctCategories, distinctContacts] = await Promise.all([
     prisma.expense.findMany({
       where: whereClause,
       orderBy,
@@ -326,6 +327,18 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     prisma.expense.count({
       where: buildExpensePayOnBehalfWhere(companyId),
     }),
+    // Distinct categories for filter dropdown
+    prisma.transactionCategory.findMany({
+      where: { Expenses: { some: { ...baseWhereClause } } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    // Distinct contacts for filter dropdown
+    prisma.contact.findMany({
+      where: { Expense: { some: { ...baseWhereClause } } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   // Map Prisma relation names to what the client expects
@@ -356,6 +369,10 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
       tabCounts={tabCounts}
       crossCompanyCount={crossCompanyCount}
       companies={companies}
+      filterOptions={{
+        categories: distinctCategories.map(c => ({ value: c.id, label: c.name })),
+        contacts: distinctContacts.map(c => ({ id: c.id, name: c.name })),
+      }}
     />
   );
 }

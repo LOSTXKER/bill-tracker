@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, DollarSign, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface ExchangeRatesProps {
   companyId: string;
@@ -125,11 +126,7 @@ export function ExchangeRatesSection({ companyId, initialRates }: ExchangeRatesP
               </div>
               {rates[currency.code] && (
                 <p className="text-xs text-muted-foreground">
-                  ตัวอย่าง: {currency.symbol}100 = ฿
-                  {(parseFloat(rates[currency.code]) * 100).toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  ตัวอย่าง: {currency.symbol}100 = {formatCurrency(parseFloat(rates[currency.code]) * 100)}
                 </p>
               )}
             </div>

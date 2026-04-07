@@ -9,11 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/shared/PageHeader";
 import {
+  UserCircle,
   User,
-  Mail,
   Shield,
   Receipt,
   FileText,
@@ -199,24 +198,11 @@ export default function MyProfilePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
-            <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">
-              {session.user.name?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {session.user.name}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {session.user.email}
-            </p>
-          </div>
-        </div>
-{/* ปุ่มขอเบิกจ่ายถูกลบออก - ใช้ระบบ Settlement ผ่านหน้ารายจ่ายแทน */}
-      </div>
+      <PageHeader
+        title={session.user.name || "ผู้ใช้"}
+        description={session.user.email || ""}
+        icon={UserCircle}
+      />
 
       {/* Stats Cards */}
       {stats && (

@@ -7,6 +7,8 @@ import { DataExportCard } from "./data-export/DataExportCard";
 import { BackupCard } from "./data-export/BackupCard";
 import { CloudStatusCard } from "./data-export/CloudStatusCard";
 import { DataExportPageProps } from "./data-export/types";
+import { PageHeader } from "./shared/PageHeader";
+import { Download } from "lucide-react";
 
 export type { DataExportPageProps };
 
@@ -45,12 +47,11 @@ export function DataExportPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">ส่งออกข้อมูล</h1>
-        <p className="text-muted-foreground mt-2">
-          ส่งออกเอกสารและข้อมูลสำหรับ {companyName}
-        </p>
-      </div>
+      <PageHeader
+        icon={Download}
+        title="ส่งออกข้อมูล"
+        description={`ส่งออกเอกสารและข้อมูลสำหรับ ${companyName}`}
+      />
 
       <ArchiveExportCard
         selectedMonth={selectedMonth}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { FileCheck2 } from "lucide-react";
 import { ReconcileSessionDetail } from "@/components/reconcile/ReconcileSessionDetail";
 
@@ -20,6 +21,12 @@ export default async function ReconcileSessionDetailPage({
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="รายละเอียดเทียบรายงาน"
+        description="ดูรายละเอียดการจับคู่รายการ"
+        icon={FileCheck2}
+        breadcrumb={{ label: "ประวัติเทียบรายงาน", href: `/${companyCode}/reconcile/history` }}
+      />
       <Suspense fallback={<DetailSkeleton />}>
         <SessionDataLoader companyCode={companyCode} sessionId={id} />
       </Suspense>

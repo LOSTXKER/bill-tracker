@@ -65,10 +65,16 @@ export function useTransactionFilters() {
     router.replace(`${pathname}?${params.toString()}`);
   }, [searchParams, pathname, router]);
 
-  // Clear all filters
+  // Clear all filters (preserve sort params)
   const clearFilters = useCallback(() => {
-    router.replace(pathname);
-  }, [pathname, router]);
+    const params = new URLSearchParams();
+    const sortByVal = searchParams.get("sortBy");
+    const sortOrderVal = searchParams.get("sortOrder");
+    if (sortByVal) params.set("sortBy", sortByVal);
+    if (sortOrderVal) params.set("sortOrder", sortOrderVal);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname, router, searchParams]);
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {

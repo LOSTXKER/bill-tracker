@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Coins,
   Wallet,
   Plus,
   RefreshCw,
@@ -168,6 +169,7 @@ export default function PettyCashPage({ params }: PettyCashPageProps) {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader
+          icon={Coins}
           title="เงินสดย่อย"
           description="จัดการกองทุนเงินสดย่อยและติดตามยอดคงเหลือ"
         />

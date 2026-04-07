@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ReconcileDashboard, type SessionSummary, type ReconcileType } from "@/components/reconcile/ReconcileDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GitCompare } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 interface ReconcilePageProps {
   params: Promise<{ company: string }>;
@@ -26,17 +27,11 @@ export default async function ReconcilePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <GitCompare className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">
-            เทียบรายงานบัญชี
-          </h1>
-        </div>
-        <p className="text-muted-foreground text-sm">
-          เลือกเดือนที่ต้องการเทียบรายงาน — รองรับ Auto-match และ AI ช่วยจับคู่
-        </p>
-      </div>
+      <PageHeader
+        title="เทียบรายงานบัญชี"
+        description="เลือกเดือนที่ต้องการเทียบรายงาน"
+        icon={GitCompare}
+      />
 
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardLoader

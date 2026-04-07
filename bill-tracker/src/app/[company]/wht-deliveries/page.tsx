@@ -30,17 +30,8 @@ import {
   CheckCircle,
   RefreshCw,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { DELIVERY_METHODS, getDeliveryMethod } from "@/lib/constants/delivery-methods";
-
-// Format date to Thai locale
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: "2-digit",
-  });
-}
 import { PermissionGuard } from "@/components/guards/permission-guard";
 
 interface ExpenseItem {
@@ -188,8 +179,9 @@ export default function WhtDeliveriesPage() {
 
   return (
     <PermissionGuard permission="expenses:read">
-      <div className="container py-6 space-y-6">
+      <div className="space-y-6">
         <PageHeader
+          icon={FileText}
           title="รอส่งใบ 50 ทวิ"
           description="รายการใบหัก ณ ที่จ่ายที่ออกแล้วแต่ยังไม่ได้ส่งให้ vendor"
           actions={
@@ -362,7 +354,7 @@ export default function WhtDeliveriesPage() {
                                       onCheckedChange={() => toggleExpense(expense.id)}
                                     />
                                   </td>
-                                  <td className="p-2">{formatDate(expense.billDate)}</td>
+                                  <td className="p-2">{formatThaiDate(new Date(expense.billDate))}</td>
                                   <td className="p-2">
                                     <div>
                                       <span 

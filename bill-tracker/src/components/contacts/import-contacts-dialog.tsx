@@ -379,7 +379,7 @@ export function ImportContactsDialog({
                   </p>
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-gray-800/30 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-gray-400">{stats.skip}</p>
+                  <p className="text-2xl font-bold text-muted-foreground">{stats.skip}</p>
                   <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                     <SkipForward className="h-3 w-3" /> ไม่เปลี่ยนแปลง
                   </p>

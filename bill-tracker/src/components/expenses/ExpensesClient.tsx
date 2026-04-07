@@ -16,9 +16,15 @@ interface TabCounts {
   all: number;
   draft: number;
   pending: number;
+  rejected: number;
   active: number;
   ready: number;
   sent: number;
+}
+
+interface FilterOptions {
+  categories?: Array<{ value: string; label: string }>;
+  contacts?: Array<{ id: string; name: string }>;
 }
 
 interface ExpensesClientProps {
@@ -31,6 +37,7 @@ interface ExpensesClientProps {
   tabCounts?: TabCounts;
   crossCompanyCount?: number;
   companies?: CompanyOption[];
+  filterOptions?: FilterOptions;
 }
 
 const expenseListConfig = createTransactionListConfig(
@@ -61,6 +68,7 @@ export function ExpensesClient({
   tabCounts,
   crossCompanyCount = 0,
   companies = [],
+  filterOptions,
 }: ExpensesClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -138,6 +146,7 @@ export function ExpensesClient({
         canApprove={canApprove}
         isOwner={isOwner}
         tabCounts={tabCounts}
+        filterOptions={filterOptions}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { FileCheck2 } from "lucide-react";
 import { ReconcileHistoryList } from "@/components/reconcile/ReconcileHistoryList";
 import { ReconcileSessionType } from "@prisma/client";
@@ -31,17 +32,12 @@ export default async function ReconcileHistoryPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <FileCheck2 className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">
-            ประวัติเทียบรายงานบัญชี
-          </h1>
-        </div>
-        <p className="text-muted-foreground text-sm">
-          ดูประวัติการจับคู่ สถานะการยืนยัน และเอกสารแนบทั้งหมด
-        </p>
-      </div>
+      <PageHeader
+        title="ประวัติเทียบรายงานบัญชี"
+        description="ดูประวัติการจับคู่และสถานะการยืนยัน"
+        icon={FileCheck2}
+        breadcrumb={{ label: "เทียบรายงานบัญชี", href: `/${companyCode}/reconcile` }}
+      />
 
       <Suspense fallback={<HistorySkeleton />}>
         <HistoryDataLoader

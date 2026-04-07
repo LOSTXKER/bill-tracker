@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatThaiDateShort } from "@/lib/utils/formatters";
 
 export interface ExpenseRow {
   id: string;
@@ -105,10 +106,7 @@ export function CategoryDrillDownSheet({
                         tabIndex={-1}
                         onClick={onClose}
                       />
-                      {new Date(expense.billDate).toLocaleDateString("th-TH", {
-                        day: "numeric",
-                        month: "short",
-                      })}
+                      {formatThaiDateShort(new Date(expense.billDate))}
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       <div className="truncate">{expense.description || "-"}</div>

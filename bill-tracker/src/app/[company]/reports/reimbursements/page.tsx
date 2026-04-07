@@ -23,15 +23,54 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
   Download,
   RefreshCw,
-  Calendar,
-  FileBarChart,
+  Receipt,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Users,
+  AlertTriangle,
 } from "lucide-react";
-import { ReportSummaryCards } from "@/components/settlements/ReportSummaryCards";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { PersonBreakdownTable } from "@/components/settlements/PersonBreakdownTable";
 import { fetcher } from "@/lib/utils/fetcher";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/utils/tax-calculator";
+
+function BarChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card p-3 rounded-lg border border-border shadow-lg">
+      <p className="font-medium text-card-foreground mb-2">{label}</p>
+      <div className="space-y-1">
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2 text-sm">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="font-medium text-card-foreground">
+              {formatCurrency(entry.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface ReimbursementReportPageProps {
   params: Promise<{ company: string }>;
@@ -65,28 +104,12 @@ interface ReportData {
   }>;
 }
 
-// Get current year and past 3 years
-const currentYear = new Date().getFullYear();
-const currentMonth = new Date().getMonth() + 1; // 1-12
-const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+const thisYear = new Date().getFullYear();
 
-// Thai month names
 const thaiMonths = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
   "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
 ];
-
-// Full Thai month names for dropdown
-const thaiMonthsFull = [
-  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-];
-
-// Months array for dropdown
-const months = Array.from({ length: 12 }, (_, i) => ({
-  value: (i + 1).toString(),
-  label: thaiMonthsFull[i],
-}));
 
 function formatMonthLabel(monthKey: string) {
   const [year, month] = monthKey.split("-");
@@ -96,29 +119,31 @@ function formatMonthLabel(monthKey: string) {
 
 export default function ReimbursementReportPage({ params }: ReimbursementReportPageProps) {
   const { company: companyCode } = use(params);
-  const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
-  const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
-  // Build API URL with filters
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+
+  const isCurrentOrFuture =
+    year > now.getFullYear() ||
+    (year === now.getFullYear() && month >= now.getMonth() + 1);
+
+  const handlePrevMonth = () => {
+    if (month === 1) { setMonth(12); setYear((y) => y - 1); }
+    else setMonth((m) => m - 1);
+  };
+
+  const handleNextMonth = () => {
+    if (month === 12) { setMonth(1); setYear((y) => y + 1); }
+    else setMonth((m) => m + 1);
+  };
+
+  const monthLabel = new Date(year, month - 1).toLocaleDateString("th-TH", { month: "long" });
+
   const buildApiUrl = () => {
-    const params = new URLSearchParams();
-    
-    // Year + Month filter
-    if (selectedYear && selectedYear !== "all") {
-      if (selectedMonth && selectedMonth !== "all") {
-        // Specific month selected
-        const month = selectedMonth.padStart(2, "0");
-        const lastDay = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate();
-        params.set("dateFrom", `${selectedYear}-${month}-01`);
-        params.set("dateTo", `${selectedYear}-${month}-${lastDay}`);
-      } else {
-        // Whole year
-        params.set("dateFrom", `${selectedYear}-01-01`);
-        params.set("dateTo", `${selectedYear}-12-31`);
-      }
-    }
-    
-    return `/api/${companyCode}/settlements/report?${params.toString()}`;
+    const m = month.toString().padStart(2, "0");
+    const lastDay = new Date(year, month, 0).getDate();
+    return `/api/${companyCode}/settlements/report?dateFrom=${year}-${m}-01&dateTo=${year}-${m}-${lastDay}`;
   };
 
   const { data, error, isLoading, mutate } = useSWR<{ data: ReportData }>(
@@ -128,256 +153,222 @@ export default function ReimbursementReportPage({ params }: ReimbursementReportP
   );
 
   const reportData = data?.data;
+  const summary = reportData?.summary;
 
-  // Prepare chart data (reverse to show oldest first)
   const chartData = reportData?.byMonth
     .slice()
     .reverse()
-    .slice(-12) // Last 12 months
+    .slice(-12)
     .map((item) => ({
       month: formatMonthLabel(item.month),
       จ่ายแล้ว: item.settled,
-      รอจ่าย: item.pending,
+      ค้างจ่าย: item.pending,
     })) || [];
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <FileBarChart className="h-6 w-6 text-primary" />
+  // Loading skeleton
+  if (isLoading && !reportData) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-10 w-80" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          ))}
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">รายงานเบิกจ่าย</h1>
-          <p className="text-muted-foreground text-sm">
-            สรุปยอดเบิกจ่ายรายบุคคลและรายเดือน
-          </p>
-        </div>
+        <Skeleton className="h-[300px] w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
+    );
+  }
 
-      {/* Filters and Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedYear} onValueChange={(val) => {
-              setSelectedYear(val);
-              if (val === "all") setSelectedMonth("all");
-            }}>
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="เลือกปี" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทุกปี</SelectItem>
-                {years.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year + 543}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="รายงานเบิกจ่าย"
+        description="สรุปยอดเบิกจ่ายรายบุคคลและรายเดือน"
+        icon={Receipt}
+      />
 
-          {selectedYear !== "all" && (
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="เลือกเดือน" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทุกเดือน</SelectItem>
-                {months.map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {(selectedYear !== "all" || selectedMonth !== "all") && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedYear("all");
-                setSelectedMonth("all");
-              }}
-            >
-              ล้างตัวกรอง
-            </Button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
+      {/* Navigation + Actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-0.5">
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => mutate()}
-            disabled={isLoading}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={handlePrevMonth}
+            aria-label="เดือนก่อนหน้า"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            รีเฟรช
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Link href={`/api/${companyCode}/settlements/report/export?year=${selectedYear}&month=${selectedMonth}`}>
-            <Button size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export Excel
-            </Button>
-          </Link>
+          <span className="text-sm font-semibold min-w-[140px] text-center select-none">
+            {monthLabel} {year + 543}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={handleNextMonth}
+            disabled={isCurrentOrFuture}
+            aria-label="เดือนถัดไป"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
+
+        <Select value={year.toString()} onValueChange={(y) => setYear(parseInt(y))}>
+          <SelectTrigger className="h-8 w-[80px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 5 }, (_, i) => (
+              <SelectItem key={i} value={(thisYear - i).toString()}>
+                {thisYear - i + 543}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex-1" />
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => mutate()}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          รีเฟรช
+        </Button>
+        <Link href={`/api/${companyCode}/settlements/report/export?year=${year}&month=${month}`}>
+          <Button size="sm" className="h-8 gap-1.5">
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </Button>
+        </Link>
       </div>
 
       {/* Error State */}
       {error && (
-        <div className="text-center py-8 text-destructive">
-          เกิดข้อผิดพลาดในการโหลดข้อมูล
-          <Button variant="link" onClick={() => mutate()}>
-            ลองอีกครั้ง
-          </Button>
-        </div>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่</span>
+            <Button variant="outline" size="sm" onClick={() => mutate()}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              ลองใหม่
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Summary Cards */}
-      <div>
-        <ReportSummaryCards 
-          data={reportData?.summary || null} 
-          isLoading={isLoading} 
-        />
+      {/* KPI Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            จ่ายแล้ว
+          </p>
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+            {formatCurrency(summary?.totalSettled || 0)}
+          </p>
+          <p className="text-xs text-muted-foreground">{summary?.settledCount || 0} รายการ</p>
+        </div>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3 text-amber-500" />
+            ค้างจ่าย
+          </p>
+          <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+            {formatCurrency(summary?.totalPending || 0)}
+          </p>
+          <p className="text-xs text-muted-foreground">{summary?.pendingCount || 0} รายการ</p>
+        </div>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <AlertCircle className="h-3 w-3 text-red-500" />
+            รอรับเงิน
+          </p>
+          <p className="text-xl font-bold mt-0.5">
+            {summary?.personsWithPending || 0} <span className="text-sm font-normal text-muted-foreground">คน</span>
+          </p>
+          <p className="text-xs text-muted-foreground">รอการโอนคืน</p>
+        </div>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Users className="h-3 w-3 text-blue-500" />
+            ทั้งหมด
+          </p>
+          <p className="text-xl font-bold mt-0.5">
+            {summary?.personCount || 0} <span className="text-sm font-normal text-muted-foreground">คน</span>
+          </p>
+          <p className="text-xs text-muted-foreground">มีประวัติการจ่าย</p>
+        </div>
       </div>
 
-      {/* Charts and Table Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Monthly Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              ยอดเบิกจ่ายรายเดือน
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[300px] w-full" />
-            ) : chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    stroke="#374151"
-                    strokeOpacity={0.3}
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fill: "#9ca3af", fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#9ca3af", fontSize: 11 }}
-                    tickFormatter={(value) => 
-                      value >= 1000 
-                        ? `฿${(value / 1000).toFixed(0)}k` 
-                        : `฿${value}`
-                    }
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    formatter={(value: number | undefined) => [
-                      `฿${(value as number || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Bar 
-                    dataKey="จ่ายแล้ว" 
-                    fill="#10b981" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar 
-                    dataKey="รอจ่าย" 
-                    fill="#f97316" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                ไม่มีข้อมูลในช่วงเวลาที่เลือก
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              สรุปภาพรวม
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : (
-              <>
-                <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                  <div className="text-sm text-green-600 font-medium">
-                    ยอดจ่ายแล้ว
-                  </div>
-                  <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                    ฿{(reportData?.summary?.totalSettled || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {reportData?.summary?.settledCount || 0} รายการ
-                  </div>
-                </div>
-                <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
-                  <div className="text-sm text-orange-600 font-medium">
-                    ยอดรอจ่าย
-                  </div>
-                  <div className="text-2xl font-bold text-orange-700 dark:text-orange-400">
-                    ฿{(reportData?.summary?.totalPending || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {reportData?.summary?.pendingCount || 0} รายการ
-                  </div>
-                </div>
-                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                  <div className="text-sm text-blue-600 font-medium">
-                    พนักงานที่รอรับเงิน
-                  </div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-                    {reportData?.summary?.personsWithPending || 0} คน
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    จากทั้งหมด {reportData?.summary?.personCount || 0} คน
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Monthly Chart — full width */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
+            ยอดเบิกจ่ายรายเดือน
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--border)"
+                  strokeOpacity={0.5}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickFormatter={formatCurrencyCompact}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip content={<BarChartTooltip />} cursor={{ fill: "var(--muted-foreground)", opacity: 0.08 }} />
+                <Legend />
+                <Bar
+                  dataKey="จ่ายแล้ว"
+                  fill="#10b981"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="ค้างจ่าย"
+                  fill="#f59e0b"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+              ไม่มีข้อมูลในช่วงเวลาที่เลือก
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Person Breakdown Table */}
-      <Card className="mt-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
             รายละเอียดตามพนักงาน
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <PersonBreakdownTable 
-            data={reportData?.byPerson || []} 
+          <PersonBreakdownTable
+            data={reportData?.byPerson || []}
             isLoading={isLoading}
             companyCode={companyCode}
           />

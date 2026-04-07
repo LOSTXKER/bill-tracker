@@ -20,6 +20,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface MatchDetail {
   id: string;
@@ -110,10 +111,6 @@ const SESSION_STATUS_MAP: Record<string, { label: string; color: string }> = {
     color: "text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-950/20 dark:border-slate-700",
   },
 };
-
-function formatAmt(n: number) {
-  return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "";
@@ -252,13 +249,13 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
         <Card>
           <CardContent className="py-3 px-4">
             <p className="text-xs text-muted-foreground">ยอดระบบ</p>
-            <p className="text-lg font-bold font-mono">{formatAmt(session.totalSystemAmount)}</p>
+            <p className="text-lg font-bold font-mono">{formatCurrency(session.totalSystemAmount)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-3 px-4">
             <p className="text-xs text-muted-foreground">ยอดรายงาน</p>
-            <p className="text-lg font-bold font-mono">{formatAmt(session.totalAccountAmount)}</p>
+            <p className="text-lg font-bold font-mono">{formatCurrency(session.totalAccountAmount)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -284,7 +281,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <span className="text-sm text-amber-700 dark:text-amber-400">
-            ยอดต่างกัน {formatAmt(diff)} บาท
+            ยอดต่างกัน {formatCurrency(diff)}
           </span>
         </div>
       )}
@@ -317,7 +314,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium truncate">{m.systemVendor}</p>
                     <span className="text-sm font-mono font-semibold flex-shrink-0">
-                      {formatAmt(m.systemAmount)}
+                      {formatCurrency(m.systemAmount)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -326,7 +323,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                       <span className="truncate max-w-[150px]">{m.expenseDescription}</span>
                     )}
                     <span className="text-blue-600 dark:text-blue-400 ml-auto flex-shrink-0">
-                      VAT {formatAmt(m.systemVat)}
+                      VAT {formatCurrency(m.systemVat)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-1">
@@ -376,7 +373,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                   )}
                   {m.amountDiff !== null && m.amountDiff > 0.01 && (
                     <span className="text-[10px] text-orange-600">
-                      ±{formatAmt(m.amountDiff)}
+                      ±{formatCurrency(m.amountDiff)}
                     </span>
                   )}
                   {m.matchedByName && (
@@ -391,7 +388,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium truncate">{m.acctVendor}</p>
                     <span className="text-sm font-mono font-semibold flex-shrink-0">
-                      {formatAmt(m.acctBase)}
+                      {formatCurrency(m.acctBase)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -403,7 +400,7 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
                       <span className="truncate max-w-[100px]">{m.acctTaxId}</span>
                     )}
                     <span className="text-blue-600 dark:text-blue-400 ml-auto flex-shrink-0">
-                      VAT {formatAmt(m.acctVat)}
+                      VAT {formatCurrency(m.acctVat)}
                     </span>
                   </div>
                   {m.aiReason && (

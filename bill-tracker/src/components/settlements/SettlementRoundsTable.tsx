@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
+import { formatThaiDateTime } from "@/lib/utils/formatters";
 
 interface Payment {
   id: string;
@@ -159,25 +161,7 @@ function SettlementRoundsTableInner({
     setShowSlipDialog(true);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("th-TH", {
-      day: "numeric",
-      month: "short",
-      year: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
-  const formatShortDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("th-TH", {
-      day: "numeric",
-      month: "short",
-      year: "2-digit",
-    });
-  };
 
   if (rounds.length === 0) {
     return (
@@ -193,14 +177,14 @@ function SettlementRoundsTableInner({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]"></TableHead>
-              <TableHead>วันที่โอน</TableHead>
-              <TableHead>พนักงาน</TableHead>
-              <TableHead className="text-center">รายการ</TableHead>
-              <TableHead className="text-right">ยอดเงิน</TableHead>
-              <TableHead>เลขอ้างอิง</TableHead>
-              <TableHead className="text-center">สลิป</TableHead>
-              <TableHead>ผู้ทำรายการ</TableHead>
+              <TableHead className="w-[40px] text-muted-foreground"></TableHead>
+              <TableHead className="text-muted-foreground">วันที่โอน</TableHead>
+              <TableHead className="text-muted-foreground">พนักงาน</TableHead>
+              <TableHead className="text-center text-muted-foreground">รายการ</TableHead>
+              <TableHead className="text-right text-muted-foreground">ยอดเงิน</TableHead>
+              <TableHead className="text-muted-foreground">เลขอ้างอิง</TableHead>
+              <TableHead className="text-center text-muted-foreground">สลิป</TableHead>
+              <TableHead className="text-muted-foreground">ผู้ทำรายการ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -225,7 +209,7 @@ function SettlementRoundsTableInner({
                       </Button>
                     </TableCell>
                     <TableCell className="font-medium">
-                      {formatDate(round.settledAt)}
+                      {formatThaiDateTime(round.settledAt)}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">{round.payerSummary}</span>
@@ -236,9 +220,7 @@ function SettlementRoundsTableInner({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-semibold text-green-600">
-                      ฿{round.totalAmount.toLocaleString("th-TH", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {formatCurrency(round.totalAmount)}
                     </TableCell>
                     <TableCell>
                       {round.settlementRef || (
@@ -329,17 +311,13 @@ function SettlementRoundsTableInner({
                                       )}
                                       <span>•</span>
                                       <span>
-                                        {formatShortDate(payment.Expense.billDate)}
+                                        {formatThaiDate(new Date(payment.Expense.billDate))}
                                       </span>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-3 ml-4">
                                     <span className="font-medium">
-                                      ฿
-                                      {Number(payment.amount).toLocaleString(
-                                        "th-TH",
-                                        { minimumFractionDigits: 2 }
-                                      )}
+                                      {formatCurrency(Number(payment.amount))}
                                     </span>
                                     {!isDeleted && (
                                       <Button

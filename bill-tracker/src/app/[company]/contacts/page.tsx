@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PageHeader } from "@/components/shared/PageHeader";
 import {
   Users,
   Plus,
@@ -355,53 +356,51 @@ export default function ContactsPage({ params }: ContactsPageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">ผู้ติดต่อ</h1>
-          <p className="text-muted-foreground">
-            จัดการรายชื่อลูกค้าและผู้ขาย
-          </p>
-          <div className="flex items-center gap-2 mt-2 text-sm">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              Import จาก Peak ล่าสุด:{" "}
-              <span className={isImportOutdated ? "text-amber-600 font-medium" : "text-foreground"}>
-                {lastContactImportAt 
-                  ? formatRelativeDate(lastContactImportAt)
-                  : "ยังไม่เคย import"}
+      <PageHeader
+        title="ผู้ติดต่อ"
+        description="จัดการรายชื่อลูกค้าและผู้ขาย"
+        icon={Users}
+        actions={
+          <>
+            <div className="flex items-center gap-2 text-sm mr-4">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">
+                Import จาก Peak ล่าสุด:{" "}
+                <span className={isImportOutdated ? "text-amber-600 font-medium" : "text-foreground"}>
+                  {lastContactImportAt
+                    ? formatRelativeDate(lastContactImportAt)
+                    : "ยังไม่เคย import"}
+                </span>
               </span>
-            </span>
-          </div>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            รีเฟรช
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.href = `/api/contacts/export?company=${companyCode.toUpperCase()}&format=peak`}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export Peak
-          </Button>
-          <ImportContactsDialog
-            companyCode={companyCode}
-            onImportComplete={handleImportComplete}
-          />
-          <Button size="sm" onClick={() => handleOpenDialog()}>
-            <Plus className="h-4 w-4 mr-2" />
-            เพิ่มผู้ติดต่อ
-          </Button>
-        </div>
-      </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              รีเฟรช
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = `/api/contacts/export?company=${companyCode.toUpperCase()}&format=peak`}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Peak
+            </Button>
+            <ImportContactsDialog
+              companyCode={companyCode}
+              onImportComplete={handleImportComplete}
+            />
+            <Button size="sm" onClick={() => handleOpenDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              เพิ่มผู้ติดต่อ
+            </Button>
+          </>
+        }
+      />
 
       {/* Outdated Import Alert */}
       {isImportOutdated && (

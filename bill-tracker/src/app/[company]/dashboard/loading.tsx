@@ -1,15 +1,12 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeaderSkeleton } from "@/components/shared/PageHeader";
 
 export default function DashboardLoading() {
   return (
-    <div className="space-y-8 animate-pulse">
-      {/* Page Header */}
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-72" />
-      </div>
+    <div className="space-y-6 animate-pulse">
+      <PageHeaderSkeleton hasActions />
 
-      {/* Stats Cards */}
+      {/* KPI Strip */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
@@ -23,37 +20,46 @@ export default function DashboardLoading() {
         ))}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {[1, 2].map((i) => (
-          <div key={i} className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
+      {/* Alert Banners */}
+      <div className="space-y-2">
+        <Skeleton className="h-10 w-full rounded-lg" />
+      </div>
+
+      {/* Main 2-column grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Trend Chart */}
+          <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
             <Skeleton className="h-5 w-36" />
             <Skeleton className="h-64 w-full rounded-xl" />
           </div>
-        ))}
-      </div>
-
-      {/* Bottom Section */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Action Required */}
-        <div className="lg:col-span-2 rounded-xl border border-border/50 bg-card p-4 space-y-3">
-          <Skeleton className="h-5 w-32" />
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-              <Skeleton className="h-6 w-16 rounded-full" />
+          {/* Recent Transactions */}
+          <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-5 w-28" />
+              <Skeleton className="h-4 w-16" />
             </div>
-          ))}
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            ))}
+          </div>
         </div>
 
-        {/* Category Chart */}
-        <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
-          <Skeleton className="h-5 w-36" />
-          <Skeleton className="h-48 w-full rounded-xl" />
+        {/* Right */}
+        <div className="space-y-6">
+          {/* Tasks Sidebar */}
+          <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
+            <Skeleton className="h-5 w-36" />
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
+          </div>
+          {/* Category Chart */}
+          <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
         </div>
       </div>
     </div>

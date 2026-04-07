@@ -70,10 +70,3 @@ export const MONTHS = [
   "พฤศจิกายน",
   "ธันวาคม",
 ];
-
-export function formatAmt(n: number) {
-  return n.toLocaleString("th-TH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}

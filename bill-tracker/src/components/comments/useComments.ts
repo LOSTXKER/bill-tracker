@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { formatThaiDateTimeShort } from "@/lib/utils/formatters";
 
 export interface Author {
   id: string;
@@ -43,12 +44,7 @@ export function formatTime(dateStr: string): string {
   if (minutes < 60) return `${minutes} นาทีที่แล้ว`;
   if (hours < 24) return `${hours} ชม.ที่แล้ว`;
   if (days < 7) return `${days} วันที่แล้ว`;
-  return date.toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatThaiDateTimeShort(date);
 }
 
 interface UseCommentsProps {

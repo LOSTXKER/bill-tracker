@@ -11,6 +11,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatThaiDateShort } from "@/lib/utils/formatters";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -178,7 +179,7 @@ export function NotificationCenter({ companyCode }: NotificationCenterProps) {
     if (minutes < 60) return `${minutes} นาทีที่แล้ว`;
     if (hours < 24) return `${hours} ชม.ที่แล้ว`;
     if (days < 7) return `${days} วันที่แล้ว`;
-    return date.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+    return formatThaiDateShort(date);
   };
 
   // Show placeholder before client hydration to prevent mismatch

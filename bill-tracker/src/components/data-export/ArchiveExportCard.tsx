@@ -29,7 +29,8 @@ import {
   FileCheck,
   Info,
 } from "lucide-react";
-import { ArchiveStats, THAI_MONTHS, formatCurrency } from "./types";
+import { ArchiveStats, THAI_MONTHS } from "./types";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface ArchiveExportCardProps {
   selectedMonth: number;
@@ -171,7 +172,7 @@ export function ArchiveExportCard({
                   ยอดจ่าย
                 </div>
                 <p className="text-lg font-bold mt-1">
-                  ฿{formatCurrency(archiveStats.totalExpenseAmount)}
+                  {formatCurrency(archiveStats.totalExpenseAmount)}
                 </p>
               </div>
 
@@ -181,7 +182,7 @@ export function ArchiveExportCard({
                   ยอดรับ
                 </div>
                 <p className="text-lg font-bold mt-1">
-                  ฿{formatCurrency(archiveStats.totalIncomeAmount)}
+                  {formatCurrency(archiveStats.totalIncomeAmount)}
                 </p>
               </div>
             </div>

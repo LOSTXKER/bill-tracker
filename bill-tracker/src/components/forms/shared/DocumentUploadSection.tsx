@@ -59,7 +59,8 @@ export function DocumentUploadSection({
   onAiResult,
   showWhtCert = false,
   initialFiles,
-}: DocumentUploadSectionProps) {
+  children,
+}: DocumentUploadSectionProps & { children?: React.ReactNode }) {
   const {
     files,
     isUploading,
@@ -239,6 +240,8 @@ export function DocumentUploadSection({
               </div>
             </div>
           )}
+
+          {children}
         </CardContent>
       </Card>
 

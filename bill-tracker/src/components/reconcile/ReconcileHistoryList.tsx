@@ -20,6 +20,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 import Link from "next/link";
 
 interface SessionSummary {
@@ -68,10 +69,6 @@ const MONTH_NAMES = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
 ];
-
-function formatAmt(n: number) {
-  return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
@@ -230,19 +227,19 @@ export function ReconcileHistoryList({
                       <div className="flex-shrink-0 text-right space-y-1">
                         <div>
                           <p className="text-sm font-mono font-semibold">
-                            {formatAmt(s.totalSystemAmount)}
+                            {formatCurrency(s.totalSystemAmount)}
                           </p>
                           <p className="text-[10px] text-muted-foreground">ระบบ</p>
                         </div>
                         <div>
                           <p className="text-sm font-mono font-semibold">
-                            {formatAmt(s.totalAccountAmount)}
+                            {formatCurrency(s.totalAccountAmount)}
                           </p>
                           <p className="text-[10px] text-muted-foreground">รายงาน</p>
                         </div>
                         {!isBalanced && (
                           <p className="text-[10px] text-amber-600 font-medium">
-                            ต่าง {formatAmt(diff)}
+                            ต่าง {formatCurrency(diff)}
                           </p>
                         )}
                       </div>

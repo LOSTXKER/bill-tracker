@@ -297,20 +297,20 @@ export function ApprovalsClient({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">
+                <TableHead className="w-12 text-muted-foreground">
                   <Checkbox
                     checked={selectedIds.length === items.length && items.length > 0}
                     onCheckedChange={toggleSelectAll}
                     aria-label="เลือกทั้งหมด"
                   />
                 </TableHead>
-                <TableHead>ประเภท</TableHead>
-                <TableHead>ส่งเมื่อ</TableHead>
-                <TableHead>ผู้ส่ง</TableHead>
-                <TableHead>ผู้ติดต่อ</TableHead>
-                <TableHead>รายละเอียด</TableHead>
-                <TableHead className="text-right">จำนวนเงิน</TableHead>
-                <TableHead className="text-center">ดำเนินการ</TableHead>
+                <TableHead className="text-muted-foreground">ประเภท</TableHead>
+                <TableHead className="text-muted-foreground">ส่งเมื่อ</TableHead>
+                <TableHead className="text-muted-foreground">ผู้ส่ง</TableHead>
+                <TableHead className="text-muted-foreground">ผู้ติดต่อ</TableHead>
+                <TableHead className="text-muted-foreground">รายละเอียด</TableHead>
+                <TableHead className="text-right text-muted-foreground">จำนวนเงิน</TableHead>
+                <TableHead className="text-center text-muted-foreground">ดำเนินการ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

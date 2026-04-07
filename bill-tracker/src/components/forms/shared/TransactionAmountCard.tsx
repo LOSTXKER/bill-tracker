@@ -23,8 +23,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Banknote, AlertTriangle } from "lucide-react";
+import { Banknote, AlertTriangle, FileText, Receipt, FileX } from "lucide-react";
 import { formatCurrency, WHT_RATES } from "@/lib/utils/tax-calculator";
+
+const DOCUMENT_TYPE_LABELS: Record<string, { label: string; icon: typeof FileText }> = {
+  TAX_INVOICE: { label: "ใบกำกับภาษี", icon: FileText },
+  CASH_RECEIPT: { label: "มีบิลเงินสด", icon: Receipt },
+  NO_DOCUMENT: { label: "ไม่มีเอกสาร", icon: FileX },
+};
 import { VatToggle } from "./VatToggle";
 import { WhtSection } from "./WhtSection";
 import { CalculationSummary } from "./CalculationSummary";
@@ -158,7 +164,7 @@ export function TransactionAmountCard({
   // Create mode uses a different layout with VatToggle and WhtSection components
   if (mode === "create") {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         <VatToggle value={vatRate} onChange={(value) => onVatRateChange?.(value)} />
 
         {/* Show document type selector for VAT 0% expenses */}
@@ -208,13 +214,27 @@ export function TransactionAmountCard({
   // View mode - clean table layout
   if (!isEditable) {
     return (
-      <div className="rounded-xl bg-muted/40 p-5 space-y-3">
+      <div className="rounded-xl bg-muted/40 p-4 space-y-3">
         <div className="flex items-center gap-2.5 pb-1">
           <Banknote className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium text-foreground">รายละเอียดยอดเงิน</span>
         </div>
 
         <div className="space-y-2">
+          {type === "expense" && documentType && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">ประเภทเอกสาร</span>
+              <span className="text-sm font-medium flex items-center gap-1.5">
+                {(() => {
+                  const info = DOCUMENT_TYPE_LABELS[documentType];
+                  if (!info) return documentType;
+                  const Icon = info.icon;
+                  return <><Icon className="h-3.5 w-3.5 text-muted-foreground" />{info.label}</>;
+                })()}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{vatRate > 0 ? "จำนวนเงินก่อนภาษี" : "จำนวนเงิน"}</span>
             <span className="font-mono text-sm font-medium">{formatCurrency(amount)}</span>
@@ -255,7 +275,7 @@ export function TransactionAmountCard({
 
   // Edit mode - with form controls
   return (
-    <div className="rounded-xl bg-muted/30 p-5 space-y-4">
+    <div className="rounded-xl bg-muted/30 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Banknote className="h-4 w-4 text-muted-foreground" />
         <span className="font-medium text-foreground">รายละเอียดยอดเงิน</span>

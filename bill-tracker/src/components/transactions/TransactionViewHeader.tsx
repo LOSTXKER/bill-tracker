@@ -15,6 +15,7 @@ import type { ApprovalStatus } from "@prisma/client";
 import type { StatusInfo } from "@/lib/constants/transaction";
 import { getExpenseWorkflowLabel } from "@/lib/constants/transaction";
 import { ApprovalBadge, DraftActions, ApprovalActions, WorkflowActions } from "@/components/transactions";
+import { formatThaiDateLong } from "@/lib/utils/tax-calculator";
 
 // =============================================================================
 // Types
@@ -101,11 +102,7 @@ export function TransactionViewHeader({
   // Format date
   const dateValue = transaction[dateFieldName] as string;
   const formattedDate = dateValue 
-    ? new Date(dateValue).toLocaleDateString("th-TH", { 
-        day: "numeric", 
-        month: "long", 
-        year: "numeric" 
-      })
+    ? formatThaiDateLong(new Date(dateValue))
     : "";
 
   return (

@@ -257,7 +257,7 @@ export function DataTable<T>({
             <TableHeader>
               <TableRow className="hover:bg-transparent group">
                 {selectable && (
-                  <TableHead className="w-12">
+                  <TableHead className="w-12 text-muted-foreground">
                     <Checkbox
                       checked={allSelected}
                       onCheckedChange={toggleSelectAll}

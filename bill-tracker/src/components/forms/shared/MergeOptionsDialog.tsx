@@ -20,6 +20,7 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 // =============================================================================
 // Types
@@ -60,14 +61,6 @@ interface MergeOptionsDialogProps {
 // =============================================================================
 // Helpers
 // =============================================================================
-
-function formatAmount(amount: number | null | undefined): string {
-  if (amount === null || amount === undefined) return "-";
-  return amount.toLocaleString("th-TH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function formatDate(date: string | null): string {
   if (!date) return "-";
@@ -118,7 +111,7 @@ function DataCard({ title, data, variant, className }: DataCardProps) {
       
       {/* Amount - Large */}
       <p className={cn("text-xl font-bold mb-3", amountClass)}>
-        {formatAmount(data.amount)}
+        {data.amount != null ? formatCurrency(data.amount) : "-"}
       </p>
 
       {/* Detail Fields */}
@@ -172,7 +165,7 @@ function DataCard({ title, data, variant, className }: DataCardProps) {
         <div className="flex justify-between gap-2">
           <span className="text-muted-foreground flex-shrink-0">VAT:</span>
           <span className="font-medium text-right">
-            {data.vatAmount ? formatAmount(data.vatAmount) : "-"}
+            {data.vatAmount ? formatCurrency(data.vatAmount) : "-"}
             {data.vatRate ? ` (${data.vatRate}%)` : ""}
           </span>
         </div>
@@ -182,7 +175,7 @@ function DataCard({ title, data, variant, className }: DataCardProps) {
           <div className="flex justify-between gap-2">
             <span className="text-muted-foreground flex-shrink-0">หัก ณ ที่จ่าย:</span>
             <span className="font-medium text-right text-orange-600">
-              {data.whtAmount ? formatAmount(data.whtAmount) : "-"}
+              {data.whtAmount ? formatCurrency(data.whtAmount) : "-"}
               {data.whtRate ? ` (${data.whtRate}%)` : ""}
             </span>
           </div>
@@ -320,7 +313,7 @@ export function MergeOptionsDialog({
             className={cn(
               "flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all text-sm",
               selectedAction === "cancel"
-                ? "border-gray-400 bg-gray-50 dark:bg-gray-950/30 text-gray-700"
+                ? "border-gray-400 bg-gray-50 dark:bg-gray-950/30 text-foreground"
                 : "border-muted hover:border-gray-300"
             )}
           >

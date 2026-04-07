@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { UserBadge } from "@/components/shared/UserBadge";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { DataTableSkeleton } from "@/components/shared/DataTableSkeleton";
+import { formatThaiDate } from "@/lib/utils/tax-calculator";
 import {
   Users,
   UserPlus,
@@ -173,11 +174,7 @@ export default function EmployeesPage() {
         return (
           <span className="text-muted-foreground text-sm">
             {lastLogin ? (
-              lastLogin.toLocaleDateString("th-TH", {
-                day: "numeric",
-                month: "short",
-                year: "2-digit",
-              })
+              formatThaiDate(lastLogin)
             ) : (
               "-"
             )}
@@ -190,6 +187,7 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={Users}
         title="พนักงาน"
         description="จัดการข้อมูลและสิทธิ์ของพนักงานในบริษัท"
         actions={

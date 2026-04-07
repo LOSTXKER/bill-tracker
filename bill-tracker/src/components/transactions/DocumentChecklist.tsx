@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { WORKFLOW_STATUS_INFO } from "@/lib/constants/transaction";
 import { buildChecklistItems } from "@/lib/workflow/build-checklist-input";
 import type { ChecklistItem } from "@/lib/workflow/checklist";
+import { formatThaiDate } from "@/lib/utils/tax-calculator";
 
 interface DocumentChecklistProps {
   transactionType: "expense" | "income";
@@ -68,12 +69,7 @@ export function DocumentChecklist({
 
   const formatDate = (d: Date | string | null | undefined) => {
     if (!d) return null;
-    const date = new Date(d);
-    return date.toLocaleDateString("th-TH", {
-      day: "numeric",
-      month: "short",
-      year: "2-digit",
-    });
+    return formatThaiDate(new Date(d));
   };
 
   if (compact) {

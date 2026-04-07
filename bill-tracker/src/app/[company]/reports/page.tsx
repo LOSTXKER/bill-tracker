@@ -1,5 +1,7 @@
 import { Suspense } from "react";
+import { BarChart3 } from "lucide-react";
 import { TabsContent } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { ReportControlsBar } from "@/components/reports/ReportControlsBar";
 import { ReportTabs } from "@/components/reports/ReportTabs";
 import { ReportKpiRibbon } from "@/components/reports/ReportKpiRibbon";
@@ -27,11 +29,12 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
   const currentTab = tab || "overview";
 
   return (
-    <div className="flex flex-col min-h-0">
-      {/* Page title */}
-      <div className="px-4 pt-4 pb-2">
-        <h1 className="text-xl font-bold text-foreground">รายงาน</h1>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="รายงาน"
+        description="ภาษีและสรุปรายรับ-รายจ่าย"
+        icon={BarChart3}
+      />
 
       {/* Sticky controls bar */}
       <ReportControlsBar
@@ -42,7 +45,7 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
       />
 
       {/* Always-visible KPI ribbon */}
-      <Suspense fallback={<div className="h-[88px] animate-pulse bg-muted/40 border-b" />}>
+      <Suspense fallback={<div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-muted/40 animate-pulse" />)}</div>}>
         <ReportKpiRibbon
           companyCode={companyCode}
           year={selectedYear}
@@ -52,53 +55,48 @@ export default async function ReportsPage({ params, searchParams }: ReportsPageP
       </Suspense>
 
       {/* Tab navigation + content */}
-      <div className="px-4 pt-4 pb-8 space-y-0">
-        <ReportTabs currentTab={currentTab}>
-          {/* Overview = charts + full detail tables */}
-          <TabsContent value="overview" className="space-y-6 mt-0">
-            <Suspense fallback={<ReportSkeleton />}>
-              <ReportDashboard
-                companyCode={companyCode}
-                year={selectedYear}
-                month={selectedMonth}
-                viewMode={viewMode}
-              />
-            </Suspense>
-            <Suspense fallback={<ReportSkeleton />}>
-              <MonthlySummary
-                companyCode={companyCode}
-                year={selectedYear}
-                month={selectedMonth}
-                viewMode={viewMode}
-              />
-            </Suspense>
-          </TabsContent>
+      <ReportTabs currentTab={currentTab}>
+        <TabsContent value="overview" className="space-y-6 mt-4">
+          <Suspense fallback={<ReportSkeleton />}>
+            <ReportDashboard
+              companyCode={companyCode}
+              year={selectedYear}
+              month={selectedMonth}
+              viewMode={viewMode}
+            />
+          </Suspense>
+          <Suspense fallback={<ReportSkeleton />}>
+            <MonthlySummary
+              companyCode={companyCode}
+              year={selectedYear}
+              month={selectedMonth}
+              viewMode={viewMode}
+            />
+          </Suspense>
+        </TabsContent>
 
-          {/* VAT */}
-          <TabsContent value="vat" className="mt-0">
-            <Suspense fallback={<ReportSkeleton />}>
-              <VATReport
-                companyCode={companyCode}
-                year={selectedYear}
-                month={selectedMonth}
-                viewMode={viewMode}
-              />
-            </Suspense>
-          </TabsContent>
+        <TabsContent value="vat" className="mt-4">
+          <Suspense fallback={<ReportSkeleton />}>
+            <VATReport
+              companyCode={companyCode}
+              year={selectedYear}
+              month={selectedMonth}
+              viewMode={viewMode}
+            />
+          </Suspense>
+        </TabsContent>
 
-          {/* WHT */}
-          <TabsContent value="wht" className="mt-0">
-            <Suspense fallback={<ReportSkeleton />}>
-              <WHTReport
-                companyCode={companyCode}
-                year={selectedYear}
-                month={selectedMonth}
-                viewMode={viewMode}
-              />
-            </Suspense>
-          </TabsContent>
-        </ReportTabs>
-      </div>
+        <TabsContent value="wht" className="mt-4">
+          <Suspense fallback={<ReportSkeleton />}>
+            <WHTReport
+              companyCode={companyCode}
+              year={selectedYear}
+              month={selectedMonth}
+              viewMode={viewMode}
+            />
+          </Suspense>
+        </TabsContent>
+      </ReportTabs>
     </div>
   );
 }

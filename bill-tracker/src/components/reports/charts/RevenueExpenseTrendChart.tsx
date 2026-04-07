@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/utils/tax-calculator";
 
 interface DataPoint {
   month: string;
@@ -28,9 +29,7 @@ const TICK_STYLE: React.CSSProperties = {
 };
 
 function formatShort(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
-  return String(value);
+  return formatCurrencyCompact(value);
 }
 
 function XTick({ x, y, payload }: { x?: number; y?: number; payload?: { value: string } }) {
@@ -60,8 +59,8 @@ function CustomTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border bg-background/95 backdrop-blur shadow-lg p-3 text-sm space-y-1">
-      <p className="font-semibold text-foreground">{label}</p>
+    <div className="rounded-lg border border-border bg-card shadow-lg p-3 text-sm space-y-1">
+      <p className="font-semibold text-card-foreground">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
@@ -69,7 +68,7 @@ function CustomTooltip({
             {p.name === "income" ? "รายรับ" : "รายจ่าย"}:
           </span>
           <span className="font-medium">
-            {p.value.toLocaleString("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 })}
+            {formatCurrency(p.value)}
           </span>
         </div>
       ))}
@@ -102,7 +101,7 @@ export function RevenueExpenseTrendChart({ data }: RevenueExpenseTrendChartProps
           tickLine={false}
           width={36}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--muted-foreground)", opacity: 0.08 }} />
         <Legend
           iconType="circle"
           iconSize={8}

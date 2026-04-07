@@ -1,26 +1,22 @@
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/shared/PageHeader";
 import {
   StatsCards,
   StatsSkeleton,
-  ActionRequired,
-  ActionSkeleton,
-  ReadyToSend,
   RecentTransactions,
   RecentSkeleton,
-  CashFlowChartData,
   MonthlyTrendChartData,
   ExpenseCategoryChartData,
   DataQualityStats,
   ChartSkeleton,
   SettlementAlert,
-  SettlementAlertSkeleton,
   ViewModeToggle,
   CrossCompanySummary,
-  CrossCompanySummarySkeleton,
 } from "@/components/dashboard";
+import { TasksSidebar, TasksSidebarSkeleton } from "@/components/dashboard/tasks-sidebar";
 
 interface DashboardPageProps {
   params: Promise<{ company: string }>;
@@ -34,79 +30,65 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-            Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            ภาพรวมรายรับ-รายจ่ายและเอกสารที่ต้องจัดการ
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <ViewModeToggle 
-            companyCode={companyCode} 
-            currentMode={viewMode as "official" | "internal"} 
-          />
-          <Link href={`/${companyCode.toLowerCase()}/capture`}>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="mr-2 h-4 w-4" />
-              บันทึกรายการ
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="ภาพรวม"
+        description="ภาพรวมรายรับ-รายจ่ายและเอกสารที่ต้องจัดการ"
+        icon={LayoutDashboard}
+        actions={
+          <div className="flex items-center gap-3">
+            <ViewModeToggle
+              companyCode={companyCode}
+              currentMode={viewMode as "official" | "internal"}
+            />
+            <Link href={`/${companyCode.toLowerCase()}/capture`}>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Plus className="mr-2 h-4 w-4" />
+                บันทึกรายการ
+              </Button>
+            </Link>
+          </div>
+        }
+      />
 
-      {/* Stats Cards */}
+      {/* KPI Strip */}
       <Suspense fallback={<StatsSkeleton />}>
         <StatsCards companyCode={companyCode} viewMode={viewMode as "official" | "internal"} />
       </Suspense>
 
-      {/* Cross-Company Summary - shows inter-company transactions */}
-      <Suspense fallback={<CrossCompanySummarySkeleton />}>
-        <CrossCompanySummary companyCode={companyCode} />
-      </Suspense>
-
-      {/* Action Required Section */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ActionSkeleton />}>
-          <ActionRequired companyCode={companyCode} />
+      {/* Alert Banners */}
+      <div className="space-y-2">
+        <Suspense fallback={null}>
+          <CrossCompanySummary companyCode={companyCode} />
         </Suspense>
-
-        <Suspense fallback={<ActionSkeleton />}>
-          <ReadyToSend companyCode={companyCode} />
+        <Suspense fallback={null}>
+          <SettlementAlert companyCode={companyCode} />
         </Suspense>
       </div>
 
-      {/* Settlement Alert - shows pending reimbursements for managers */}
-      <Suspense fallback={<SettlementAlertSkeleton />}>
-        <SettlementAlert companyCode={companyCode} />
-      </Suspense>
-
-      {/* Data Quality */}
-      <Suspense fallback={null}>
-        <DataQualityStats companyCode={companyCode} />
-      </Suspense>
-
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton />}>
-          <MonthlyTrendChartData companyCode={companyCode} />
-        </Suspense>
-        <Suspense fallback={<ChartSkeleton />}>
-          <ExpenseCategoryChartData companyCode={companyCode} />
-        </Suspense>
+      {/* Main 2-column grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left: chart + recent */}
+        <div className="lg:col-span-2 space-y-6">
+          <Suspense fallback={<ChartSkeleton />}>
+            <MonthlyTrendChartData companyCode={companyCode} />
+          </Suspense>
+          <Suspense fallback={<RecentSkeleton />}>
+            <RecentTransactions companyCode={companyCode} />
+          </Suspense>
+        </div>
+        {/* Right: tasks + quality + category */}
+        <div className="space-y-6">
+          <Suspense fallback={<TasksSidebarSkeleton />}>
+            <TasksSidebar companyCode={companyCode} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <DataQualityStats companyCode={companyCode} />
+          </Suspense>
+          <Suspense fallback={<ChartSkeleton />}>
+            <ExpenseCategoryChartData companyCode={companyCode} />
+          </Suspense>
+        </div>
       </div>
-
-      <Suspense fallback={<ChartSkeleton />}>
-        <CashFlowChartData companyCode={companyCode} />
-      </Suspense>
-
-      {/* Recent Transactions */}
-      <Suspense fallback={<RecentSkeleton />}>
-        <RecentTransactions companyCode={companyCode} />
-      </Suspense>
     </div>
   );
 }

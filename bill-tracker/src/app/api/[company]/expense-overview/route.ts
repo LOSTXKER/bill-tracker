@@ -17,42 +17,50 @@ export async function GET(
   return withCompanyAccessFromParams(
     async (req, { company }) => {
       const url = new URL(req.url);
-      const period = url.searchParams.get("period") || "month"; // month, quarter, year
+      const period = url.searchParams.get("period") || "month";
 
-      // Calculate date range (Thailand timezone)
       const thaiNow = toThaiLocalDate(new Date());
-      const thaiYear = thaiNow.getFullYear();
-      const thaiMonth = thaiNow.getMonth() + 1; // 1-based
+      const reqMonth = parseInt(url.searchParams.get("month") || "") || (thaiNow.getMonth() + 1);
+      const reqYear = parseInt(url.searchParams.get("year") || "") || thaiNow.getFullYear();
+
       let startDate: Date;
+      let endDate: Date;
       let lastPeriodStart: Date;
       let lastPeriodEnd: Date;
 
       switch (period) {
         case "quarter": {
-          const currentQuarter = Math.floor((thaiMonth - 1) / 3);
-          const { startDate: qs } = getThaiMonthRange(thaiYear, currentQuarter * 3 + 1);
-          const { startDate: lqs } = getThaiMonthRange(thaiYear, (currentQuarter - 1) * 3 + 1);
-          const { endDate: lqe } = getThaiMonthRange(thaiYear, currentQuarter * 3);
+          const currentQuarter = Math.floor((reqMonth - 1) / 3);
+          const qStartMonth = currentQuarter * 3 + 1;
+          const qEndMonth = qStartMonth + 2;
+          const { startDate: qs } = getThaiMonthRange(reqYear, qStartMonth);
+          const { endDate: qe } = getThaiMonthRange(reqYear, qEndMonth);
+          const { startDate: lqs } = getThaiMonthRange(reqYear, (currentQuarter - 1) * 3 + 1);
+          const { endDate: lqe } = getThaiMonthRange(reqYear, currentQuarter * 3);
           startDate = qs;
+          endDate = qe;
           lastPeriodStart = lqs;
           lastPeriodEnd = lqe;
           break;
         }
         case "year": {
-          const { startDate: ys } = getThaiMonthRange(thaiYear, 1);
-          const { startDate: lys } = getThaiMonthRange(thaiYear - 1, 1);
-          const { endDate: lye } = getThaiMonthRange(thaiYear - 1, 12);
+          const { startDate: ys } = getThaiMonthRange(reqYear, 1);
+          const { endDate: ye } = getThaiMonthRange(reqYear, 12);
+          const { startDate: lys } = getThaiMonthRange(reqYear - 1, 1);
+          const { endDate: lye } = getThaiMonthRange(reqYear - 1, 12);
           startDate = ys;
+          endDate = ye;
           lastPeriodStart = lys;
           lastPeriodEnd = lye;
           break;
         }
-        default: { // month
-          const { startDate: ms } = getThaiMonthRange(thaiYear, thaiMonth);
-          const prevMonth = thaiMonth === 1 ? 12 : thaiMonth - 1;
-          const prevYear = thaiMonth === 1 ? thaiYear - 1 : thaiYear;
+        default: {
+          const { startDate: ms, endDate: me } = getThaiMonthRange(reqYear, reqMonth);
+          const prevMonth = reqMonth === 1 ? 12 : reqMonth - 1;
+          const prevYear = reqMonth === 1 ? reqYear - 1 : reqYear;
           const { startDate: lms, endDate: lme } = getThaiMonthRange(prevYear, prevMonth);
           startDate = ms;
+          endDate = me;
           lastPeriodStart = lms;
           lastPeriodEnd = lme;
           break;
@@ -63,7 +71,7 @@ export async function GET(
       const expenses = await prisma.expense.findMany({
         where: {
           ...buildExpenseBaseWhere(company.id),
-          billDate: { gte: startDate },
+          billDate: { gte: startDate, lte: endDate },
         },
         select: {
           id: true,

@@ -83,9 +83,15 @@ interface TabCounts {
   all: number;
   draft: number;
   pending: number;
+  rejected: number;
   active: number;
   ready: number;
   sent: number;
+}
+
+interface FilterOptions {
+  categories?: Array<{ value: string; label: string }>;
+  contacts?: Array<{ id: string; name: string }>;
 }
 
 interface TransactionListClientProps {
@@ -96,8 +102,9 @@ interface TransactionListClientProps {
   companies?: CompanyOption[];
   currentUserId?: string;
   canApprove?: boolean;
-  isOwner?: boolean;  // Owner can change status to any status (forward or backward)
+  isOwner?: boolean;
   tabCounts?: TabCounts;
+  filterOptions?: FilterOptions;
 }
 
 // ============================================================================
@@ -114,6 +121,7 @@ export function TransactionListClient({
   canApprove = false,
   isOwner = false,
   tabCounts,
+  filterOptions,
 }: TransactionListClientProps) {
   const router = useRouter();
   const { filters, setFilter, setFilterWithSort, updateFilters } = useTransactionFilters();
@@ -194,7 +202,7 @@ export function TransactionListClient({
   const handleTabChange = (tabKey: string) => {
     const tab = statusTabs.find(t => t.key === tabKey);
     
-    if (tabKey === "draft") {
+    if (tab?.isTabFilter) {
       updateFilters({ status: "", tab: tabKey });
     } else if (tab && tab.statuses.length > 0) {
       updateFilters({ tab: "", status: tab.statuses.join(",") });
@@ -275,6 +283,8 @@ export function TransactionListClient({
         <TransactionFilters
           type={config.type}
           statuses={statusOptions}
+          categories={filterOptions?.categories}
+          contacts={filterOptions?.contacts}
           hideStatusFilter={true}
           hideStatusBadges={false}
         />
@@ -305,9 +315,10 @@ export function TransactionListClient({
                 <EmptyIcon className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                {filters.search || filters.status ? "ไม่พบรายการที่ตรงกับเงื่อนไข" : config.emptyStateTitle}
+                {(filters.search || filters.status || filters.tab || filters.category || filters.contact || filters.creator || filters.dateFrom || filters.dateTo)
+                  ? "ไม่พบรายการที่ตรงกับเงื่อนไข" : config.emptyStateTitle}
               </p>
-              {!filters.search && !filters.status && (
+              {!(filters.search || filters.status || filters.tab || filters.category || filters.contact || filters.creator || filters.dateFrom || filters.dateTo) && (
                 <Link href={`/${companyCode.toLowerCase()}/${config.captureUrl}`}>
                   <Button variant="outline">
                     <Plus className="mr-2 h-4 w-4" />
@@ -320,9 +331,9 @@ export function TransactionListClient({
             <>
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow className="hover:bg-transparent group">
-                      <TableHead className="w-12">
+                      <TableHead className="w-12 text-muted-foreground">
                         <Checkbox
                           checked={selectedIds.length === data.length && data.length > 0}
                           onCheckedChange={toggleSelectAll}

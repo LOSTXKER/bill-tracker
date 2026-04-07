@@ -39,13 +39,35 @@ export function formatDateLocal(date: Date | string): string {
 }
 
 /**
- * Format date and time in Thai format
+ * Format date in Thai short format without year (e.g., "5 ม.ค.")
+ */
+export function formatThaiDateShort(date: Date | string): string {
+  return new Date(date).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/**
+ * Format date and time in Thai format (e.g., "5 ม.ค. 68 14:30")
  */
 export function formatThaiDateTime(date: Date | string): string {
   return new Date(date).toLocaleString("th-TH", {
     day: "numeric",
     month: "short",
     year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Format date and time in Thai short format without year (e.g., "5 ม.ค. 14:30")
+ */
+export function formatThaiDateTimeShort(date: Date | string): string {
+  return new Date(date).toLocaleString("th-TH", {
+    day: "numeric",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
   });

@@ -191,7 +191,7 @@ export function AuditHistoryContent({
           )}>
             <div className={cn(
               "w-2 h-2 rounded-full",
-              index === 0 ? "bg-white" : "bg-muted-foreground"
+              index === 0 ? "bg-background" : "bg-muted-foreground"
             )} />
           </div>
           
@@ -200,7 +200,7 @@ export function AuditHistoryContent({
               <Badge
                 className={cn(
                   "text-[10px] px-1.5 py-0",
-                  ACTION_COLORS[log.action] || "bg-gray-100 text-gray-800"
+                  ACTION_COLORS[log.action] || "bg-muted text-muted-foreground"
                 )}
               >
                 {ACTION_LABELS[log.action] || log.action}

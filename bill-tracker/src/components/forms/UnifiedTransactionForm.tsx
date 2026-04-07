@@ -201,7 +201,7 @@ export function UnifiedTransactionForm({
 
   const [transaction, setTransaction] = useState<BaseTransaction | null>(null);
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
-  const loading = mode !== "create" && swrLoading && !transaction;
+  const loading = mode !== "create" && (swrLoading || (!!swrTransaction && !transaction));
   const error = swrError?.message || null;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -379,7 +379,7 @@ export function UnifiedTransactionForm({
   // ---------------------------------------------------------------------------
   // Contact defaults (SWR-based)
   // ---------------------------------------------------------------------------
-  const { defaults: contactDefaults, hasDefaults: hasContactDefaults } = useContactDefaults(
+  const { defaults: contactDefaults, hasDefaults: hasContactDefaults, mutate: mutateContactDefaults } = useContactDefaults(
     companyCode,
     contactState.selectedContact?.id || null
   );
@@ -1104,6 +1104,7 @@ export function UnifiedTransactionForm({
             defaultsSuggestionDismissed={contactState.defaultsSuggestionDismissed}
             setDefaultsSuggestionDismissed={setDefaultsSuggestionDismissed}
             applyContactDefaults={applyContactDefaults}
+            mutateContactDefaults={mutateContactDefaults}
             setAccountSuggestion={setAccountSuggestion}
             whtChangeInfo={whtChangeInfo}
             handleWhtToggle={handleWhtToggle}

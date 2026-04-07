@@ -115,7 +115,7 @@ export function ImageViewer({ urls, title }: { urls: string[]; title: string }) 
           {isPdf ? (
             <iframe
               src={currentUrl}
-              className="w-[90vw] h-[90vh] border-0 rounded-lg bg-white"
+              className="w-[90vw] h-[90vh] border-0 rounded-lg bg-background"
               title="PDF Fullscreen"
               onClick={(e) => e.stopPropagation()}
             />

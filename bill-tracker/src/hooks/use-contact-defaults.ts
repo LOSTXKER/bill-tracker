@@ -66,6 +66,7 @@ interface UseContactDefaultsReturn {
   hasDefaults: boolean;
   isLoading: boolean;
   error: string | null;
+  mutate: () => void;
 }
 
 function parsePresets(raw: unknown): DescriptionPreset[] {
@@ -88,7 +89,7 @@ export function useContactDefaults(
     ? `/api/${companyCode.toUpperCase()}/contacts/${contactId}`
     : null;
 
-  const { data, error, isLoading } = useSWR<ApiResponse>(key, {
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(key, {
     dedupingInterval: 5 * 60 * 1000,
     revalidateOnFocus: false,
   });
@@ -132,5 +133,6 @@ export function useContactDefaults(
     hasDefaults,
     isLoading,
     error: error ? getErrorMessage(error, "Failed to fetch contact defaults") : null,
+    mutate: () => { mutate(); },
   };
 }

@@ -76,4 +76,7 @@ export interface TransactionFieldsSectionProps {
   }) => void;
 
   onAmountInputModeChange?: (mode: AmountInputMode) => void;
+
+  /** When "sectioned", fields are grouped by accounting sections and AmountInput is omitted. */
+  layout?: "default" | "sectioned";
 }

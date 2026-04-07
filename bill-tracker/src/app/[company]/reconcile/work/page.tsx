@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { ReconcileWorkspace } from "@/components/reconcile/ReconcileWorkspace";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { GitCompare } from "lucide-react";
 import { ReconcileSessionType, type ExpensePayment } from "@prisma/client";
 import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 import { reimbursementFilter } from "@/lib/queries/expense-filters";
@@ -35,15 +37,23 @@ export default async function ReconcileWorkPage({
   const selectedMonth = month ? parseInt(month) : currentMonth;
 
   return (
-    <Suspense fallback={<WorkspaceSkeleton />}>
-      <WorkspaceDataLoader
+    <div className="space-y-6">
+      <PageHeader
+        title="เทียบรายการ"
+        description="จับคู่รายการบัญชีกับข้อมูลในระบบ"
+        icon={GitCompare}
+        breadcrumb={{ label: "เทียบรายงานบัญชี", href: `/${companyCode}/reconcile` }}
+      />
+      <Suspense fallback={<WorkspaceSkeleton />}>
+        <WorkspaceDataLoader
         companyCode={companyCode}
         year={selectedYear}
         month={selectedMonth}
         type={type as ReconcileSessionType}
         companiesParam={companies}
       />
-    </Suspense>
+      </Suspense>
+    </div>
   );
 }
 

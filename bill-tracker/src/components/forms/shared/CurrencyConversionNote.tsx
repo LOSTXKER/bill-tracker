@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DollarSign, Edit2, Check, X } from "lucide-react";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface CurrencyConversionState {
   detected: boolean;
@@ -198,11 +199,10 @@ export function CurrencyConversionNote({
               {!isEditing ? (
                 <span className="ml-1">
                   {symbol}
-                  {originalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} {currency} @ ฿
-                  {currentRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  {originalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} {currency} @ {formatCurrency(currentRate)}
                   {currencyConversion!.convertedAmount != null && (
                     <span className="font-semibold">
-                      {" "}= ฿{currencyConversion!.convertedAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                      {" "}= {formatCurrency(currencyConversion!.convertedAmount)}
                     </span>
                   )}
                 </span>
@@ -211,7 +211,7 @@ export function CurrencyConversionNote({
                   {symbol}
                   {originalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} {currency} @
                   <span className="inline-flex items-center gap-1">
-                    <span>฿</span>
+                    <span className="text-muted-foreground">฿</span>
                     <Input
                       type="text"
                       inputMode="decimal"
@@ -227,7 +227,7 @@ export function CurrencyConversionNote({
                   </span>
                   {previewAmount !== null && !isNaN(previewAmount) && (
                     <span className="text-xs opacity-75">
-                      = ฿{previewAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                      = {formatCurrency(previewAmount)}
                     </span>
                   )}
                 </span>

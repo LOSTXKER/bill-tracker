@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { CheckCircle, FileText } from "lucide-react";
 import type { AccountingRow } from "./import-types";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface PreviewStepProps {
   preview: AccountingRow[];
@@ -42,11 +43,11 @@ export function PreviewStep({ preview, pdfFileName, onBack, onImport }: PreviewS
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="text-xs">วันที่</TableHead>
-              <TableHead className="text-xs">เลขที่ใบกำกับ</TableHead>
-              <TableHead className="text-xs">ชื่อผู้ขาย</TableHead>
-              <TableHead className="text-xs text-right">ยอด</TableHead>
-              <TableHead className="text-xs text-right">VAT</TableHead>
+              <TableHead className="text-xs text-muted-foreground">วันที่</TableHead>
+              <TableHead className="text-xs text-muted-foreground">เลขที่ใบกำกับ</TableHead>
+              <TableHead className="text-xs text-muted-foreground">ชื่อผู้ขาย</TableHead>
+              <TableHead className="text-xs text-right text-muted-foreground">ยอด</TableHead>
+              <TableHead className="text-xs text-right text-muted-foreground">VAT</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -56,10 +57,10 @@ export function PreviewStep({ preview, pdfFileName, onBack, onImport }: PreviewS
                 <TableCell className="text-xs py-1.5">{row.invoiceNumber || "-"}</TableCell>
                 <TableCell className="text-xs py-1.5 max-w-[160px] truncate">{row.vendorName}</TableCell>
                 <TableCell className="text-xs py-1.5 text-right">
-                  {row.baseAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  {formatCurrency(row.baseAmount)}
                 </TableCell>
                 <TableCell className="text-xs py-1.5 text-right text-blue-600">
-                  {row.vatAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  {formatCurrency(row.vatAmount)}
                 </TableCell>
               </TableRow>
             ))}

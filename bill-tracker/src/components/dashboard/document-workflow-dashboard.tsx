@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface DocumentWorkflowDashboardProps {
   companyCode: string;
@@ -126,13 +127,6 @@ export function DocumentWorkflowDashboard({ companyCode }: DocumentWorkflowDashb
     );
   }
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("th-TH", {
-      style: "currency",
-      currency: "THB",
-    }).format(amount);
-  };
-
   return (
     <div className="space-y-6">
       {/* WHT Deadline Alert */}
@@ -149,7 +143,7 @@ export function DocumentWorkflowDashboard({ companyCode }: DocumentWorkflowDashb
                 </p>
                 <p className="text-sm text-muted-foreground">
                   กำหนดนำส่ง: วันที่ {new Date(whtSummary.deadline.date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}
-                  {" | "}ยอดที่ต้องนำส่ง: {formatAmount(whtSummary.toPay.total)}
+                  {" | "}ยอดที่ต้องนำส่ง: {formatCurrency(whtSummary.toPay.total)}
                 </p>
               </div>
             </div>
@@ -211,7 +205,7 @@ export function DocumentWorkflowDashboard({ companyCode }: DocumentWorkflowDashb
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">WHT ต้องนำส่ง</p>
-                <p className="text-2xl font-bold">{formatAmount(whtSummary?.toPay.total || 0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(whtSummary?.toPay.total || 0)}</p>
               </div>
               <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
                 <Calendar className="h-5 w-5 text-green-500" />
@@ -308,11 +302,11 @@ function PendingItemCard({ item, type }: { item: PendingItem; type?: "expense" |
               {date && formatDistanceToNow(new Date(date), { addSuffix: true, locale: th })}
             </span>
             <span>
-              {new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(Number(item.amount))}
+              {formatCurrency(Number(item.amount))}
             </span>
             {item.whtAmount && (
               <span className="text-purple-600">
-                WHT: {new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" }).format(Number(item.whtAmount))}
+                WHT: {formatCurrency(Number(item.whtAmount))}
               </span>
             )}
           </div>

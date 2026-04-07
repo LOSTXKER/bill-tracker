@@ -49,6 +49,7 @@ export default async function ApprovalsPage({ params, searchParams }: ApprovalsP
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={ClipboardCheck}
         title="รออนุมัติ"
         description="จัดการรายการที่รอการอนุมัติ"
       />

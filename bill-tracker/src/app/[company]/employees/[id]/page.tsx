@@ -9,10 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/shared/PageHeader";
 import {
-  ArrowLeft,
   User,
   Shield,
   Activity,
@@ -290,24 +288,13 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
-            <AvatarFallback className="bg-primary/10 text-primary font-medium text-lg">
-              {employee.user.name.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {employee.user.name}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {employee.user.email}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {isOwner && (
+      <PageHeader
+        title={employee.user.name}
+        description={employee.user.email}
+        icon={User}
+        breadcrumb={{ label: "พนักงาน", href: `/${companyCode.toLowerCase()}/employees` }}
+        actions={
+          isOwner ? (
             <>
               <Button
                 variant="outline"
@@ -332,13 +319,9 @@ export default function EmployeeDetailPage() {
                 ลบพนักงาน
               </Button>
             </>
-          )}
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            กลับ
-          </Button>
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">

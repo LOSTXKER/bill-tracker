@@ -8,7 +8,8 @@ import {
 } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquareText } from "lucide-react";
+import { MessageSquareText, Calculator, Wallet } from "lucide-react";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import type { BaseTransaction } from "./hooks/useTransactionForm";
 import {
@@ -98,9 +99,10 @@ export function ViewEditModeContent({
   return (
     <div className="max-w-6xl mx-auto px-4">
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* Left Column: Main Info */}
+        {/* Left Column: Main Info with accounting sections */}
         <Card className="lg:col-span-3 shadow-sm border-border">
-          <CardContent className="p-6 lg:p-8 space-y-6">
+          <CardContent className="p-6 lg:p-8 space-y-5">
+            {/* Sections 1 & 2 rendered by TransactionFieldsSection (sectioned layout) */}
             <TransactionFieldsSection
               config={fieldsConfig}
               companyCode={companyCode}
@@ -113,6 +115,7 @@ export function ViewEditModeContent({
                 config.renderAdditionalFields?.({ register, watch, setValue, mode })
               }
               isWht={config.type === "expense" ? transaction?.isWht : transaction?.isWhtDeducted}
+              layout="sectioned"
               onAiSuggestAccount={mode === "edit" ? (suggestion) => {
                 setAccountSuggestion({
                   accountId: suggestion.accountId,
@@ -125,70 +128,84 @@ export function ViewEditModeContent({
               } : undefined}
             />
 
-            {/* Currency Conversion Note - show in view/edit mode when currency data exists */}
-            {currencyConversion && (
-              <CurrencyConversionNote
-                currencyConversion={currencyConversion}
-                onRateChange={mode === "edit" ? (newRate, newConvertedAmount) => {
-                  setValue("amount", newConvertedAmount);
-                  setCurrencyConversion((prev) => prev ? {
-                    ...prev,
-                    exchangeRate: newRate,
-                    convertedAmount: newConvertedAmount,
-                    conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ฿${newRate.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`,
-                  } : null);
-                } : undefined}
-              />
-            )}
+            {/* Section 3: จำนวนเงินและภาษี */}
+            <div className="space-y-4">
+              <div className="border-t border-border pt-5 flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">จำนวนเงินและภาษี</span>
+              </div>
 
-            <div className="border-t border-border" />
+              {currencyConversion && (
+                <CurrencyConversionNote
+                  currencyConversion={currencyConversion}
+                  onRateChange={mode === "edit" ? (newRate, newConvertedAmount) => {
+                    setValue("amount", newConvertedAmount);
+                    setCurrencyConversion((prev) => prev ? {
+                      ...prev,
+                      exchangeRate: newRate,
+                      convertedAmount: newConvertedAmount,
+                      conversionNote: `แปลงจาก ${prev.currency} ${prev.originalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })} @ ${formatCurrency(newRate)}`,
+                    } : null);
+                  } : undefined}
+                />
+              )}
 
-            <TransactionAmountCard
-              mode={mode}
-              type={config.type}
-              amount={watchAmount || 0}
-              onAmountChange={(value) => setValue("amount", value)}
-              vatRate={watchVatRate || 0}
-              onVatRateChange={(value) => setValue("vatRate", value)}
-              vatAmount={calculation.vatAmount}
-              whtEnabled={watchIsWht || false}
-              onWhtToggle={handleWhtToggle}
-              whtRate={watchWhtRate}
-              whtType={watchWhtType}
-              onWhtRateSelect={(rate, type) => {
-                setValue("whtRate", rate);
-                setValue("whtType", type);
-              }}
-              whtAmount={calculation.whtAmount}
-              whtLabel={config.fields.whtField.label}
-              whtDescription={config.fields.whtField.description}
-              whtChangeInfo={whtChangeInfo}
-              documentType={mode === "edit"
-                ? (watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"
-                : (transaction?.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"
-              }
-              onDocumentTypeChange={config.type === "expense" && mode === "edit" ? handleDocumentTypeChange : undefined}
-              totalWithVat={calculation.totalWithVat}
-              netAmount={calculation.netAmount}
-              netAmountLabel={config.fields.netAmountLabel}
-            />
-
-            {/* Payer Section (expense only, view/edit mode) */}
-            {config.type === "expense" && (
-              <PayerSection
-                companyCode={companyCode}
-                totalAmount={calculation.netAmount}
+              <TransactionAmountCard
                 mode={mode}
-                payers={payers}
-                onPayersChange={setPayers}
+                type={config.type}
+                amount={watchAmount || 0}
+                onAmountChange={(value) => setValue("amount", value)}
+                vatRate={watchVatRate || 0}
+                onVatRateChange={(value) => setValue("vatRate", value)}
+                vatAmount={calculation.vatAmount}
+                whtEnabled={watchIsWht || false}
+                onWhtToggle={handleWhtToggle}
+                whtRate={watchWhtRate}
+                whtType={watchWhtType}
+                onWhtRateSelect={(rate, type) => {
+                  setValue("whtRate", rate);
+                  setValue("whtType", type);
+                }}
+                whtAmount={calculation.whtAmount}
+                whtLabel={config.fields.whtField.label}
+                whtDescription={config.fields.whtField.description}
+                whtChangeInfo={whtChangeInfo}
+                documentType={mode === "edit"
+                  ? (watchDocumentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"
+                  : (transaction?.documentType as "TAX_INVOICE" | "CASH_RECEIPT" | "NO_DOCUMENT") || "TAX_INVOICE"
+                }
+                onDocumentTypeChange={config.type === "expense" && mode === "edit" ? handleDocumentTypeChange : undefined}
+                totalWithVat={calculation.totalWithVat}
+                netAmount={calculation.netAmount}
+                netAmountLabel={config.fields.netAmountLabel}
               />
+            </div>
+
+            {/* Section 4: ผู้จ่ายเงิน (expense only) */}
+            {config.type === "expense" && (
+              <div className="space-y-4">
+                <div className="border-t border-border pt-5 flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">ผู้จ่ายเงิน</span>
+                </div>
+
+                <PayerSection
+                  companyCode={companyCode}
+                  totalAmount={calculation.netAmount}
+                  mode={mode}
+                  payers={payers}
+                  onPayersChange={setPayers}
+                />
+              </div>
             )}
 
-            <div className="pt-2">
-              <p className="text-sm text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                <MessageSquareText className="h-3.5 w-3.5" />
-                หมายเหตุ
-              </p>
+            {/* Section 5: หมายเหตุ */}
+            <div className="space-y-3">
+              <div className="border-t border-border pt-5 flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">หมายเหตุ</span>
+              </div>
+
               {mode === "edit" ? (
                 <Textarea
                   {...register("notes")}

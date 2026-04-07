@@ -19,6 +19,7 @@ import { ImportAccountsDialog } from "./import-accounts-dialog";
 import { useAccountsPage } from "./useAccountsPage";
 import { getAccountColumns, type Account } from "./accounts-table-config";
 import { AccountsFilters } from "./AccountsFilters";
+import { formatThaiDate } from "@/lib/utils/tax-calculator";
 
 interface AccountsPageClientProps {
   companyCode: string;
@@ -79,11 +80,7 @@ export function AccountsPageClient({
                 {lastAccountImportAt && (
                   <span className="text-amber-600 dark:text-amber-400">
                     {" "}(
-                    {new Date(lastAccountImportAt).toLocaleDateString("th-TH", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {formatThaiDate(new Date(lastAccountImportAt))}
                     )
                   </span>
                 )}
@@ -95,20 +92,14 @@ export function AccountsPageClient({
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">ผังบัญชี</h1>
-          <p className="text-muted-foreground mt-2">
-            จัดการผังบัญชี (Chart of Accounts) สำหรับ {companyName}
-          </p>
-          <div className="flex items-center gap-2 mt-2 text-sm">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              Import จาก Peak ล่าสุด:{" "}
-              <span className={needsUpdate ? "text-amber-600 font-medium" : "text-foreground"}>
-                {importStatus.text}
-              </span>
+        <div className="flex items-center gap-2 text-sm">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            Import จาก Peak ล่าสุด:{" "}
+            <span className={needsUpdate ? "text-amber-600 font-medium" : "text-foreground"}>
+              {importStatus.text}
             </span>
-          </div>
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>

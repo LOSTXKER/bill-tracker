@@ -2,7 +2,7 @@
 
 import { CheckCircle2, AlertCircle, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatAmt } from "./reconcile-types";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { RANGE_PRESETS } from "./ReconcileTable";
 import type { MatchedPair, SystemItem, MonthRange } from "./ReconcileTable";
 import type { AccountingRow } from "./ImportPanel";
@@ -48,7 +48,7 @@ export function ReconcileSummaryBar({
     <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground">ระบบ:</span>
-        <span className="font-semibold text-sm">{formatAmt(systemTotal)}</span>
+        <span className="font-semibold text-sm">{formatCurrency(systemTotal)}</span>
         <span className="text-muted-foreground">({systemItems.length})</span>
       </div>
 
@@ -68,7 +68,7 @@ export function ReconcileSummaryBar({
                 isBalanced ? "text-emerald-600" : "text-amber-600"
               )}
             >
-              ต่าง {formatAmt(totalDiff)}
+              ต่าง {formatCurrency(totalDiff)}
             </span>
           </div>
 
@@ -77,7 +77,7 @@ export function ReconcileSummaryBar({
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">รายงาน:</span>
             <span className="font-semibold text-sm">
-              {formatAmt(accountingTotal)}
+              {formatCurrency(accountingTotal)}
             </span>
             <span className="text-muted-foreground">
               ({accountingItems.length})

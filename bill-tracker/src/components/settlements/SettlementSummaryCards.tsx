@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, CheckCircle2, Users, TrendingUp } from "lucide-react";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 
 interface SummaryData {
   pending: {
@@ -61,7 +62,7 @@ export function SettlementSummaryCards({ data, isLoading }: SettlementSummaryCar
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-orange-600">
-            ฿{pendingAmount.toLocaleString("th-TH")}
+            {formatCurrency(pendingAmount)}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {pendingCount} รายการ
@@ -93,7 +94,7 @@ export function SettlementSummaryCards({ data, isLoading }: SettlementSummaryCar
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            ฿{settledAmount.toLocaleString("th-TH")}
+            {formatCurrency(settledAmount)}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {settledCount} รายการ

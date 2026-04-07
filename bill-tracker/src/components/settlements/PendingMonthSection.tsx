@@ -9,6 +9,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { formatCurrency } from "@/lib/utils/tax-calculator";
 import { SettlementGroupCard } from "./SettlementGroupCard";
 
 interface Payment {
@@ -76,7 +77,7 @@ export function PendingMonthSection({
   );
 
   return (
-    <Card className="border-l-4 border-l-blue-500">
+    <Card>
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -94,9 +95,7 @@ export function PendingMonthSection({
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xl font-semibold text-orange-600">
-                  ฿{monthGroup.totalAmount.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}
+                  {formatCurrency(monthGroup.totalAmount)}
                 </p>
               </div>
               <CollapsibleTrigger asChild>

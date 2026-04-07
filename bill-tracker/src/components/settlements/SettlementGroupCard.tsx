@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { SettlePaymentDialog } from "./SettlePaymentDialog";
+import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 
 interface Payment {
   id: string;
@@ -113,7 +114,7 @@ export function SettlementGroupCard({
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className={`font-semibold text-orange-600 ${compact ? "text-base" : "text-lg"}`}>
-                    ฿{group.totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                    {formatCurrency(group.totalAmount)}
                   </p>
                   {!compact && (
                     <p className="text-xs text-muted-foreground">
@@ -172,19 +173,13 @@ export function SettlementGroupCard({
                         )}
                         <span>•</span>
                         <span>
-                          {new Date(payment.Expense.billDate).toLocaleDateString("th-TH", {
-                            day: "numeric",
-                            month: "short",
-                            year: "2-digit",
-                          })}
+                          {formatThaiDate(new Date(payment.Expense.billDate))}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-4">
                       <span className="font-medium">
-                        ฿{Number(payment.amount).toLocaleString("th-TH", {
-                          minimumFractionDigits: 2,
-                        })}
+                        {formatCurrency(Number(payment.amount))}
                       </span>
                       <Button
                         size="sm"

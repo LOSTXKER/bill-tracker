@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
+import { formatThaiDateShort } from "@/lib/utils/formatters";
 
 interface Payment {
   id: string;
@@ -160,7 +162,7 @@ export function SettledGroupCard({
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-lg font-semibold text-green-600">
-                    ฿{group.totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                    {formatCurrency(group.totalAmount)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {group.payments.length} รายการ
@@ -228,21 +230,14 @@ export function SettledGroupCard({
                           )}
                           <span>•</span>
                           <span>
-                            {new Date(payment.Expense.billDate).toLocaleDateString("th-TH", {
-                              day: "numeric",
-                              month: "short",
-                              year: "2-digit",
-                            })}
+                            {formatThaiDate(new Date(payment.Expense.billDate))}
                           </span>
                           {payment.settledAt && (
                             <>
                               <span>•</span>
                               <span className="text-green-600">
                                 โอนคืนเมื่อ{" "}
-                                {new Date(payment.settledAt).toLocaleDateString("th-TH", {
-                                  day: "numeric",
-                                  month: "short",
-                                })}
+                                {formatThaiDateShort(new Date(payment.settledAt))}
                               </span>
                             </>
                           )}
@@ -251,9 +246,7 @@ export function SettledGroupCard({
                       <div className="flex items-center gap-3 ml-4">
                         <div className="text-right">
                           <span className="font-medium">
-                            ฿{Number(payment.amount).toLocaleString("th-TH", {
-                              minimumFractionDigits: 2,
-                            })}
+                            {formatCurrency(Number(payment.amount))}
                           </span>
                           <div className="flex items-center gap-1 text-xs text-green-600">
                             <CheckCircle className="h-3 w-3" />

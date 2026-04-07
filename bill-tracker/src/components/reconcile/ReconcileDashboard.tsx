@@ -83,13 +83,6 @@ interface ReconcileDashboardProps {
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-function formatAmt(n: number) {
-  return n.toLocaleString("th-TH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 export function ReconcileDashboard({
   companyCode,
   year,

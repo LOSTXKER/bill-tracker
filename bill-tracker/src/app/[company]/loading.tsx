@@ -1,16 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeaderSkeleton } from "@/components/shared/PageHeader";
 
 export default function CompanyLoading() {
   return (
-    <div className="space-y-8 animate-pulse">
-      {/* Page Header Skeleton */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <Skeleton className="h-9 w-32" />
-      </div>
+    <div className="space-y-6 animate-pulse">
+      <PageHeaderSkeleton hasActions />
 
       {/* Stats Skeleton */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

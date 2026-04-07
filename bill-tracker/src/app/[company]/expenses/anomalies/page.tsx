@@ -1,22 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CategorySelector } from "@/components/forms/shared/CategorySelector";
 import {
-  ArrowLeft,
+  AlertTriangle,
   ArrowRight,
   Check,
   Loader2,
   SearchCheck,
   Tags,
 } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/utils/tax-calculator";
+import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 
 interface AnomalyCategory {
   id: string;
@@ -48,7 +49,6 @@ function formatCategoryLabel(cat: AnomalyCategory): string {
 
 export default function AnomalyDetectionPage() {
   const params = useParams();
-  const router = useRouter();
   const companyCode = (params.company as string) || "";
 
   const [groups, setGroups] = useState<AnomalyGroup[]>([]);
@@ -166,12 +166,11 @@ export default function AnomalyDetectionPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-xl font-semibold">ตรวจสอบหมวดหมู่ผิดปกติ</h1>
-        </div>
+        <PageHeader
+          title="ตรวจสอบหมวดหมู่ผิดปกติ"
+          icon={AlertTriangle}
+          breadcrumb={{ label: "รายจ่าย", href: `/${companyCode}/expenses` }}
+        />
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -182,12 +181,11 @@ export default function AnomalyDetectionPage() {
   if (groups.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-xl font-semibold">ตรวจสอบหมวดหมู่ผิดปกติ</h1>
-        </div>
+        <PageHeader
+          title="ตรวจสอบหมวดหมู่ผิดปกติ"
+          icon={AlertTriangle}
+          breadcrumb={{ label: "รายจ่าย", href: `/${companyCode}/expenses` }}
+        />
         <Card>
           <CardContent className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <Check className="h-12 w-12 mb-4 text-green-500" />
@@ -205,21 +203,12 @@ export default function AnomalyDetectionPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold">ตรวจสอบหมวดหมู่ผิดปกติ</h1>
-            <p className="text-sm text-muted-foreground">
-              พบ {totalAnomalies} รายการ จาก {groups.length} ผู้ติดต่อ
-              ที่ลงหมวดหมู่ต่างจากส่วนใหญ่
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="ตรวจสอบหมวดหมู่ผิดปกติ"
+        description={`พบ ${totalAnomalies} รายการ จาก ${groups.length} ผู้ติดต่อ ที่ลงหมวดหมู่ต่างจากส่วนใหญ่`}
+        icon={AlertTriangle}
+        breadcrumb={{ label: "รายจ่าย", href: `/${companyCode}/expenses` }}
+      />
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
@@ -297,11 +286,7 @@ export default function AnomalyDetectionPage() {
                         onCheckedChange={() => toggleSelect(expense.id)}
                       />
                       <span className="text-muted-foreground text-xs w-24 shrink-0">
-                        {new Date(expense.billDate).toLocaleDateString("th-TH", {
-                          day: "numeric",
-                          month: "short",
-                          year: "2-digit",
-                        })}
+                        {formatThaiDate(new Date(expense.billDate))}
                       </span>
                       <span className="flex-1 truncate">
                         {expense.description || "-"}

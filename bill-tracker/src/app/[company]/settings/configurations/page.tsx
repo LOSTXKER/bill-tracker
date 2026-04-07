@@ -7,6 +7,8 @@ import { Metadata } from "next";
 import { requireOwner } from "@/lib/permissions/checker";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Settings } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "ตั้งค่าระบบ | Configuration",
@@ -32,13 +34,12 @@ export default async function ConfigurationsPage({ params }: PageProps) {
   const configs = company.CompanyConfig ?? [];
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">ตั้งค่าระบบ</h1>
-        <p className="text-muted-foreground mt-2">
-          จัดการการตั้งค่าเฉพาะของบริษัท เช่น อัตราภาษีหัก ณ ที่จ่าย, วิธีการชำระเงิน, สถานะเวิร์กโฟลว์
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="ตั้งค่าระบบ"
+        description="จัดการการตั้งค่าเฉพาะของบริษัท"
+        icon={Settings}
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* WHT Rates Configuration */}

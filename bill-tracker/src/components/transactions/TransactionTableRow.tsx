@@ -300,19 +300,21 @@ function TransactionTableRowInner({
           )}
         </TableCell>
       ) : (
-        <TableCell>
-          <p className="font-medium text-foreground">
+        <TableCell className="max-w-[200px]">
+          <p className="font-medium text-foreground truncate">
             {transaction.contact?.name || transaction.contactName || "ไม่ระบุผู้ติดต่อ"}
           </p>
         </TableCell>
       )}
 
       {/* Category - show parent (main) category only */}
-      <TableCell className="text-muted-foreground">
+      <TableCell className="text-muted-foreground max-w-[180px]">
+        <span className="truncate block">
         {transaction.category
           ? transaction.category.parent?.name ?? transaction.category.name
           : "-"
         }
+        </span>
       </TableCell>
 
       {/* Description/Source */}

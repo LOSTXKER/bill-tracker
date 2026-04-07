@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Receipt,
 } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 // Settings sections
 import { CompanyInfoSection } from "./sections/company-info";
@@ -181,20 +182,12 @@ export function SettingsLayout({
   const activeNavItem = allNavItems.find((item) => item.id === activeSection);
 
   return (
-    <div className="min-h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-          <Settings className="h-4 w-4" />
-          <span className="text-sm">ตั้งค่า</span>
-        </div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {activeNavItem?.label || "ตั้งค่า"}
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {activeNavItem?.description}
-        </p>
-      </div>
+    <div className="min-h-[calc(100vh-8rem)] space-y-6">
+      <PageHeader
+        icon={Settings}
+        title={activeNavItem?.label || "ตั้งค่า"}
+        description={activeNavItem?.description}
+      />
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar Navigation - Desktop */}
