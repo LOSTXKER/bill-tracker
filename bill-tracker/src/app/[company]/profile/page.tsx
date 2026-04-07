@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr-config";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -413,10 +414,10 @@ export default function MyProfilePage() {
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
                         <p>
-                          {new Date(log.createdAt).toLocaleDateString("th-TH")}
+                          {new Date(log.createdAt).toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                         </p>
                         <p>
-                          {new Date(log.createdAt).toLocaleTimeString("th-TH")}
+                          {new Date(log.createdAt).toLocaleTimeString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                         </p>
                       </div>
                     </div>

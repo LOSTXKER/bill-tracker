@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import {
@@ -57,8 +58,9 @@ export function ReportControlsBar({
     pushParams({ month: String(m), year: String(y) });
   };
 
-  const monthLabel = new Date(currentYear, currentMonth - 1).toLocaleDateString("th-TH", {
+  const monthLabel = new Date(currentYear, currentMonth - 1).toLocaleDateString(APP_LOCALE, {
     month: "long",
+    timeZone: APP_TIMEZONE,
   });
 
   const isCurrentOrFuture =

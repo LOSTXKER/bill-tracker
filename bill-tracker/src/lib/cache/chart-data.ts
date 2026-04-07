@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
-import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
+import { getThaiMonthRange, toThaiLocalDate, APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { buildExpenseBaseWhere, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
 export interface MonthlyDataPoint {
@@ -72,7 +72,7 @@ async function _getMonthlyChartDataImpl(
     const [year, month] = key.split("-").map(Number);
     const date = new Date(year, month - 1, 1);
     return {
-      month: date.toLocaleDateString("th-TH", { month: "short", year: "2-digit" }),
+      month: date.toLocaleDateString(APP_LOCALE, { month: "short", year: "2-digit", timeZone: APP_TIMEZONE }),
       monthKey: key,
       income,
       expense,
@@ -114,7 +114,7 @@ export async function getMonthlyTrendData(
     const [year, month] = monthKey.split("-").map(Number);
     const date = new Date(year, month - 1, 1);
     return {
-      month: date.toLocaleDateString("th-TH", { month: "short" }),
+      month: date.toLocaleDateString(APP_LOCALE, { month: "short", timeZone: APP_TIMEZONE }),
       income,
       expense,
     };

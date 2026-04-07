@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import {
   Table,
   TableBody,
@@ -92,7 +93,7 @@ export function MonthlySummaryContent({
                             className="absolute inset-0"
                             tabIndex={-1}
                           />
-                          {new Date(expense.billDate).toLocaleDateString("th-TH")}
+                          {new Date(expense.billDate).toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">
                           {expense.description || "-"}
@@ -162,7 +163,7 @@ export function MonthlySummaryContent({
                             className="absolute inset-0"
                             tabIndex={-1}
                           />
-                          {new Date(income.receiveDate).toLocaleDateString("th-TH")}
+                          {new Date(income.receiveDate).toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">
                           {income.source || "-"}

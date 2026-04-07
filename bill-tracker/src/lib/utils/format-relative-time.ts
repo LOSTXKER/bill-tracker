@@ -1,3 +1,5 @@
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
+
 /**
  * Format a date as a relative time string in Thai.
  * Works with both Date objects and ISO date strings.
@@ -15,9 +17,10 @@ export function formatRelativeTime(date: Date | string): string {
   if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
   if (diffDays < 7) return `${diffDays} วันที่แล้ว`;
 
-  return d.toLocaleDateString("th-TH", {
+  return d.toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "short",
     year: diffDays > 365 ? "numeric" : undefined,
+    timeZone: APP_TIMEZONE,
   });
 }

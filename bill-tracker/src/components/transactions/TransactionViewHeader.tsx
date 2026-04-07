@@ -8,6 +8,7 @@
  */
 
 import { Button } from "@/components/ui/button";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Edit, Save, X, Trash2, Loader2, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -114,7 +115,7 @@ export function TransactionViewHeader({
           <div>
             <p className="font-medium text-destructive text-sm">รายการนี้ถูกลบแล้ว</p>
             <p className="text-xs text-muted-foreground">
-              ลบเมื่อ {new Date(transaction.deletedAt as string).toLocaleString("th-TH")}
+              ลบเมื่อ {new Date(transaction.deletedAt as string).toLocaleString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
               {transaction.deletedByUser && ` โดย ${transaction.deletedByUser.name}`}
             </p>
           </div>

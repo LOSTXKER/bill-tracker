@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -163,7 +164,7 @@ export function TransactionViewToolbar({
           <div>
             <p className="font-medium text-destructive text-sm">รายการนี้ถูกลบแล้ว</p>
             <p className="text-xs text-muted-foreground">
-              ลบเมื่อ {new Date(transaction.deletedAt as string).toLocaleString("th-TH")}
+              ลบเมื่อ {new Date(transaction.deletedAt as string).toLocaleString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
               {transaction.deletedByUser && ` โดย ${transaction.deletedByUser.name}`}
             </p>
           </div>

@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import type { LineWebhookEvent, LineCompanyConfig } from "../types";
 import { replyToLine, formatCurrency } from "../api";
 import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
-import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import { toThaiStartOfDay, toThaiEndOfDay, APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 /**
  * Handle text message commands
@@ -110,7 +110,7 @@ async function handleSummaryCommand(
   const replyToken = event.replyToken!;
 
   // Get today's date range (Thailand timezone)
-  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Bangkok" });
+  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: APP_TIMEZONE });
   const today = toThaiStartOfDay(todayStr);
   const tomorrow = toThaiEndOfDay(todayStr);
 
@@ -145,10 +145,11 @@ async function handleSummaryCommand(
   const netCashFlow = totalIncome - totalExpense;
 
   // Format and send response
-  const dateStr = today.toLocaleDateString("th-TH", {
+  const dateStr = today.toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 
   await replyToLine(

@@ -3,16 +3,18 @@
  * Handles file naming, folder structure, and Thai date formatting
  */
 
+import { APP_TIMEZONE } from "@/lib/queries/date-utils";
+
 /**
- * Convert Date to Thai Buddhist Era (พ.ศ.) format
+ * Convert Date to Thai Buddhist Era (พ.ศ.) format, in Thailand timezone.
  * @param date - Date object
  * @returns Formatted date string: YYYY-MM-DD (พ.ศ.)
  */
 export function formatThaiDate(date: Date): string {
-  const year = date.getFullYear() + 543; // Convert to Buddhist Era
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const localStr = date.toLocaleDateString("sv-SE", { timeZone: APP_TIMEZONE });
+  const [year, month, day] = localStr.split("-").map(Number);
+  const buddhistYear = year + 543;
+  return `${buddhistYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 /**
@@ -148,7 +150,7 @@ export function generateReadmeContent(
 
 บริษัท: ${companyName}
 ช่วงเวลา: ${period}
-วันที่สร้างไฟล์: ${new Date().toLocaleString("th-TH")}
+วันที่สร้างไฟล์: ${new Date().toLocaleString("th-TH", { timeZone: APP_TIMEZONE })}
 
 สถิติ
 ------------------------------------

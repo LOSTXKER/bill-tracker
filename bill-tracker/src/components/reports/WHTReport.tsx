@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { buildExpenseWhereForMode, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
-import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { getThaiMonthRange, APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -109,7 +109,7 @@ export async function WHTReport({
                   >
                     <TableCell className="whitespace-nowrap">
                       <Link href={`/${companyCode}/expenses/${expense.id}`} className="absolute inset-0" tabIndex={-1} />
-                      {expense.billDate.toLocaleDateString("th-TH")}
+                      {expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{expense.Contact?.name || expense.description || "-"}</div>
@@ -200,7 +200,7 @@ export async function WHTReport({
                   >
                     <TableCell className="whitespace-nowrap">
                       <Link href={`/${companyCode}/incomes/${income.id}`} className="absolute inset-0" tabIndex={-1} />
-                      {income.receiveDate.toLocaleDateString("th-TH")}
+                      {income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{income.Contact?.name || income.source || "-"}</div>

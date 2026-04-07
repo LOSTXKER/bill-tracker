@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import {
   Dialog,
   DialogContent,
@@ -65,10 +66,11 @@ interface MergeOptionsDialogProps {
 function formatDate(date: string | null): string {
   if (!date) return "-";
   try {
-    return new Date(date).toLocaleDateString("th-TH", {
+    return new Date(date).toLocaleDateString(APP_LOCALE, {
       day: "numeric",
       month: "short",
       year: "numeric",
+      timeZone: APP_TIMEZONE,
     });
   } catch {
     return date;

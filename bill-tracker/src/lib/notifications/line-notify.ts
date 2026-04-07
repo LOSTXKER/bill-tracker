@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/db";
 import { createLogger } from "@/lib/utils/logger";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { formatCurrency, STATUS_LABELS, parseTemplate } from "./settings";
 import { getCompanyLineConfig, getCompanyLineConfigByCode } from "./line-config";
 import { sendLineMessage, sendTextMessage } from "./line-core";
@@ -166,7 +167,7 @@ export async function notifyExpense(
       oldStatus: expense.oldStatus ? (STATUS_LABELS[expense.oldStatus] || expense.oldStatus) : "",
       newStatus: STATUS_LABELS[expense.status] || expense.status,
       category: expense.category || "",
-      date: new Date().toLocaleDateString("th-TH"),
+      date: new Date().toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNumber: expense.invoiceNumber || "",
     });
     
@@ -239,7 +240,7 @@ export async function notifyIncome(
       oldStatus: income.oldStatus ? (STATUS_LABELS[income.oldStatus] || income.oldStatus) : "",
       newStatus: STATUS_LABELS[income.status] || income.status,
       category: income.category || "",
-      date: new Date().toLocaleDateString("th-TH"),
+      date: new Date().toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNumber: income.invoiceNumber || "",
     });
     

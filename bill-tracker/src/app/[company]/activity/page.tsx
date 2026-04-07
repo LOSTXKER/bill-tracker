@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr-config";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { 
   Bell, 
   Check, 
@@ -224,23 +225,25 @@ export default function ActivityPage({ params }: PageProps) {
     if (minutes < 60) return `${minutes} นาทีที่แล้ว`;
     if (hours < 24) return `${hours} ชม.ที่แล้ว`;
     if (days < 7) return `${days} วันที่แล้ว`;
-    return date.toLocaleDateString("th-TH", { 
-      day: "numeric", 
+    return date.toLocaleDateString(APP_LOCALE, {
+      day: "numeric",
       month: "short",
-      year: days > 365 ? "numeric" : undefined 
+      year: days > 365 ? "numeric" : undefined,
+      timeZone: APP_TIMEZONE,
     });
   };
 
   // Format full date
   const formatFullDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("th-TH", {
+    return date.toLocaleDateString(APP_LOCALE, {
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: APP_TIMEZONE,
     });
   };
 
@@ -268,10 +271,11 @@ export default function ActivityPage({ params }: PageProps) {
 
   // Group by date
   const groupedNotifications = filteredNotifications.reduce((acc, n) => {
-    const date = new Date(n.createdAt).toLocaleDateString("th-TH", {
+    const date = new Date(n.createdAt).toLocaleDateString(APP_LOCALE, {
       day: "numeric",
       month: "long",
       year: "numeric",
+      timeZone: APP_TIMEZONE,
     });
     if (!acc[date]) acc[date] = [];
     acc[date].push(n);

@@ -1,4 +1,5 @@
 import type { TaxCalculation } from "@/types";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 /**
  * Calculate VAT amount from base amount
@@ -81,10 +82,11 @@ export function formatCurrencyCompact(value: number): string {
  * Format date in Thai short format (e.g., "5 ม.ค. 68")
  */
 export function formatThaiDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("th-TH", {
+  return new Date(date).toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "short",
     year: "2-digit",
+    timeZone: APP_TIMEZONE,
   });
 }
 
@@ -92,10 +94,11 @@ export function formatThaiDate(date: Date | string): string {
  * Format date in Thai long format (e.g., "5 มกราคม 2568")
  */
 export function formatThaiDateLong(date: Date | string): string {
-  return new Date(date).toLocaleDateString("th-TH", {
+  return new Date(date).toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 }
 

@@ -4,7 +4,7 @@ import { apiResponse } from "@/lib/api/response";
 import { prisma } from "@/lib/db";
 import ExcelJS from "exceljs";
 import type { PaidByType } from "@prisma/client";
-import { getThaiMonthRange, toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import { getThaiMonthRange, toThaiStartOfDay, toThaiEndOfDay, APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 /**
  * GET /api/[company]/settlements/report/export
@@ -246,15 +246,15 @@ export const GET = withCompanyAccessFromParams(
       const payerName = payment.PaidByUser?.name || "ไม่ระบุ";
 
       transactionSheet.addRow({
-        date: payment.Expense.billDate.toLocaleDateString("th-TH"),
+        date: payment.Expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
         payerName,
         description: payment.Expense.description || "-",
         vendor: payment.Expense.Contact?.name || "-",
         invoiceNumber: payment.Expense.invoiceNumber || "-",
         amount: Number(payment.amount),
         status: payment.settlementStatus === "SETTLED" ? "โอนคืนแล้ว" : "รอโอนคืน",
-        settledAt: payment.settledAt 
-          ? payment.settledAt.toLocaleDateString("th-TH") 
+        settledAt: payment.settledAt
+          ? payment.settledAt.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })
           : "-",
         settlementRef: payment.settlementRef || "-",
         settledBy: payment.SettledByUser?.name || "-",

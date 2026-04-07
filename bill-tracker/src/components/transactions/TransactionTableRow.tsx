@@ -156,6 +156,7 @@ function getFraudScoreColor(score: number | null): string {
 }
 
 import { formatRelativeTime } from "@/lib/utils/format-relative-time";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 // =============================================================================
 // Component
@@ -409,7 +410,7 @@ function TransactionTableRowInner({
       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
         {transaction.updatedAt ? (
           <span 
-            title={new Date(transaction.updatedAt).toLocaleString("th-TH")}
+            title={new Date(transaction.updatedAt).toLocaleString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
             className="inline-flex items-center gap-1"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />

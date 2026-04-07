@@ -5,6 +5,7 @@
 
 import { Metadata } from "next";
 import { requireOwner } from "@/lib/permissions/checker";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -126,7 +127,7 @@ export default async function ConfigurationsPage({ params }: PageProps) {
                   <div>
                     <p className="font-medium">{config.key}</p>
                     <p className="text-sm text-muted-foreground">
-                      อัปเดตล่าสุด: {new Date(config.updatedAt).toLocaleDateString("th-TH")}
+                      อัปเดตล่าสุด: {new Date(config.updatedAt).toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                     </p>
                   </div>
                 </div>

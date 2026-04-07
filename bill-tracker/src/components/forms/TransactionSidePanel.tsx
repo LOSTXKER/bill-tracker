@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -144,7 +145,7 @@ export function TransactionSidePanel({
               <Calendar className="h-3.5 w-3.5" />
               วันที่สร้าง
             </span>
-            <span>{new Date(transaction.createdAt).toLocaleDateString("th-TH")}</span>
+            <span>{new Date(transaction.createdAt).toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}</span>
           </div>
         </div>
       </Card>

@@ -7,6 +7,7 @@ import {
   styleHeaderRow,
   styleNumericColumns,
 } from "./excel-types";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 export async function exportExpensesToExcel(
   expenses: ExpenseData[],
@@ -37,7 +38,7 @@ export async function exportExpensesToExcel(
 
   expenses.forEach((expense) => {
     worksheet.addRow({
-      date: expense.billDate.toLocaleDateString("th-TH"),
+      date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: expense.invoiceNumber || "-",
       vendor: expense.vendorName || "-",
       taxId: expense.vendorTaxId || "-",
@@ -111,7 +112,7 @@ export async function exportIncomesToExcel(
 
   incomes.forEach((income) => {
     worksheet.addRow({
-      date: income.receiveDate.toLocaleDateString("th-TH"),
+      date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: income.invoiceNumber || "-",
       customer: income.customerName || "-",
       taxId: income.customerTaxId || "-",

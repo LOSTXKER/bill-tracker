@@ -1,5 +1,6 @@
 import type { AccountingRow } from "./ImportPanel";
 import type { ReconcileSessionType } from "@prisma/client";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 export interface SystemItem {
   id: string;
@@ -83,7 +84,7 @@ export function fmtDate(iso?: string) {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    return d.toLocaleDateString(APP_LOCALE, { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: APP_TIMEZONE });
   } catch {
     return iso;
   }

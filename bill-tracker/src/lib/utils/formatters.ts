@@ -3,6 +3,8 @@
  * Re-exports from tax-calculator.ts and adds additional formatters
  */
 
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
+
 // Re-export existing formatters from tax-calculator
 export {
   formatCurrency,
@@ -31,20 +33,21 @@ export function formatCurrencyThai(amount: number): string {
 }
 
 /**
- * Format date in local format for form inputs (yyyy-MM-dd)
+ * Format date in local format for form inputs (yyyy-MM-dd), in Thailand timezone.
+ * Uses sv-SE locale which produces ISO yyyy-MM-dd format.
  */
 export function formatDateLocal(date: Date | string): string {
-  const d = new Date(date);
-  return d.toISOString().split("T")[0];
+  return new Date(date).toLocaleDateString("sv-SE", { timeZone: APP_TIMEZONE });
 }
 
 /**
  * Format date in Thai short format without year (e.g., "5 ม.ค.")
  */
 export function formatThaiDateShort(date: Date | string): string {
-  return new Date(date).toLocaleDateString("th-TH", {
+  return new Date(date).toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "short",
+    timeZone: APP_TIMEZONE,
   });
 }
 
@@ -52,12 +55,13 @@ export function formatThaiDateShort(date: Date | string): string {
  * Format date and time in Thai format (e.g., "5 ม.ค. 68 14:30")
  */
 export function formatThaiDateTime(date: Date | string): string {
-  return new Date(date).toLocaleString("th-TH", {
+  return new Date(date).toLocaleString(APP_LOCALE, {
     day: "numeric",
     month: "short",
     year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIMEZONE,
   });
 }
 
@@ -65,23 +69,20 @@ export function formatThaiDateTime(date: Date | string): string {
  * Format date and time in Thai short format without year (e.g., "5 ม.ค. 14:30")
  */
 export function formatThaiDateTimeShort(date: Date | string): string {
-  return new Date(date).toLocaleString("th-TH", {
+  return new Date(date).toLocaleString(APP_LOCALE, {
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIMEZONE,
   });
 }
 
 /**
- * Format date for folder names (safe characters)
+ * Format date for folder names (safe characters), in Thailand timezone.
  */
 export function formatDateForFolder(date: Date | string): string {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return new Date(date).toLocaleDateString("sv-SE", { timeZone: APP_TIMEZONE });
 }
 
 /**

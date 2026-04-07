@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr-config";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -394,9 +395,7 @@ export default function EmployeeDetailPage() {
                       เข้าสู่ระบบล่าสุด
                     </p>
                     <p className="font-medium">
-                      {new Date(employee.user.lastLoginAt).toLocaleString(
-                        "th-TH"
-                      )}
+                      {new Date(employee.user.lastLoginAt).toLocaleString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
                     </p>
                   </div>
                 )}
@@ -477,13 +476,15 @@ export default function EmployeeDetailPage() {
                         
                         {/* Time and date */}
                         <p className="text-xs text-muted-foreground">
-                          {new Date(log.createdAt).toLocaleDateString("th-TH", {
+                          {new Date(log.createdAt).toLocaleDateString(APP_LOCALE, {
                             day: "numeric",
                             month: "short",
                             year: "numeric",
-                          })} เวลา {new Date(log.createdAt).toLocaleTimeString("th-TH", {
+                            timeZone: APP_TIMEZONE,
+                          })} เวลา {new Date(log.createdAt).toLocaleTimeString(APP_LOCALE, {
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: APP_TIMEZONE,
                           })}
                         </p>
                       </div>

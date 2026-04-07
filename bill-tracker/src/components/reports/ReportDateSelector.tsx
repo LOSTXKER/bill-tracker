@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import {
   Select,
   SelectContent,
@@ -46,7 +47,7 @@ export function ReportDateSelector({
         <SelectContent>
           {Array.from({ length: 12 }, (_, i) => (
             <SelectItem key={i + 1} value={(i + 1).toString()}>
-              {new Date(2000, i).toLocaleDateString("th-TH", { month: "long" })}
+              {new Date(2000, i).toLocaleDateString(APP_LOCALE, { month: "long", timeZone: APP_TIMEZONE })}
             </SelectItem>
           ))}
         </SelectContent>

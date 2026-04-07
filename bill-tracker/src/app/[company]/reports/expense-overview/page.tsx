@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -141,7 +142,7 @@ export default function ExpenseOverviewPage({
   );
   const data = response?.data;
 
-  const monthLabel = new Date(year, month - 1).toLocaleDateString("th-TH", { month: "long" });
+  const monthLabel = new Date(year, month - 1).toLocaleDateString(APP_LOCALE, { month: "long", timeZone: APP_TIMEZONE });
   const isCurrentOrFuture =
     year > now.getFullYear() ||
     (year === now.getFullYear() && month >= now.getMonth() + 1);

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils"
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -41,7 +42,7 @@ function Calendar({
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: (date) =>
-          date.toLocaleString("th-TH", { month: "short" }),
+          date.toLocaleString(APP_LOCALE, { month: "short", timeZone: APP_TIMEZONE }),
         ...formatters,
       }}
       classNames={{
@@ -197,7 +198,7 @@ function CalendarDayButton({
       ref={ref}
       variant="ghost"
       size="icon"
-      data-day={day.date.toLocaleDateString("th-TH")}
+      data-day={day.date.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE })}
       data-selected-single={
         modifiers.selected &&
         !modifiers.range_start &&

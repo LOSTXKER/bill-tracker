@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import Link from "next/link";
 import useSWR from "swr";
 import {
@@ -138,7 +139,7 @@ export default function ReimbursementReportPage({ params }: ReimbursementReportP
     else setMonth((m) => m + 1);
   };
 
-  const monthLabel = new Date(year, month - 1).toLocaleDateString("th-TH", { month: "long" });
+  const monthLabel = new Date(year, month - 1).toLocaleDateString(APP_LOCALE, { month: "long", timeZone: APP_TIMEZONE });
 
   const buildApiUrl = () => {
     const m = month.toString().padStart(2, "0");

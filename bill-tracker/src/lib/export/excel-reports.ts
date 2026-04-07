@@ -6,6 +6,7 @@ import {
   styleHeaderRow,
   styleNumericColumns,
 } from "./excel-types";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 export async function exportMonthlyReport(
   expenses: ExpenseData[],
@@ -56,7 +57,7 @@ export async function exportMonthlyReport(
 
   expenses.forEach((expense) => {
     expenseSheet.addRow({
-      date: expense.billDate.toLocaleDateString("th-TH"),
+      date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       vendor: expense.vendorName || "-",
       description: expense.description || "-",
       category: expense.category ? CATEGORY_LABELS[expense.category] || expense.category : "-",
@@ -81,7 +82,7 @@ export async function exportMonthlyReport(
 
   incomes.forEach((income) => {
     incomeSheet.addRow({
-      date: income.receiveDate.toLocaleDateString("th-TH"),
+      date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       customer: income.customerName || "-",
       source: income.source || "-",
       amount: Number(income.amount),
@@ -152,7 +153,7 @@ export async function exportVATReport(
 
   expenses.forEach((expense) => {
     inputSheet.addRow({
-      date: expense.billDate.toLocaleDateString("th-TH"),
+      date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: expense.invoiceNumber || "-",
       vendor: expense.vendorName || "-",
       taxId: expense.vendorTaxId || "-",
@@ -174,7 +175,7 @@ export async function exportVATReport(
 
   incomes.forEach((income) => {
     outputSheet.addRow({
-      date: income.receiveDate.toLocaleDateString("th-TH"),
+      date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: income.invoiceNumber || "-",
       customer: income.customerName || "-",
       amount: Number(income.amount),
@@ -245,7 +246,7 @@ export async function exportWHTReport(
     .filter((e) => e.isWht)
     .forEach((expense) => {
       paidSheet.addRow({
-        date: expense.billDate.toLocaleDateString("th-TH"),
+        date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
         vendor: expense.vendorName || "-",
         taxId: expense.vendorTaxId || "-",
         amount: Number(expense.amount),
@@ -268,7 +269,7 @@ export async function exportWHTReport(
     .filter((i) => i.isWhtDeducted)
     .forEach((income) => {
       receivedSheet.addRow({
-        date: income.receiveDate.toLocaleDateString("th-TH"),
+        date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
         customer: income.customerName || "-",
         amount: Number(income.amount),
         rate: Number(income.whtRate) || 0,

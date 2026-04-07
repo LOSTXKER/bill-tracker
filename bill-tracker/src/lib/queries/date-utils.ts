@@ -1,6 +1,9 @@
 export const THAILAND_OFFSET_HOURS = 7;
 export const THAILAND_OFFSET_MS = THAILAND_OFFSET_HOURS * 3600_000;
 
+export const APP_TIMEZONE = "Asia/Bangkok" as const;
+export const APP_LOCALE = "th-TH" as const;
+
 /**
  * Convert a date string like "2026-02-01" to the start of that day in
  * Thailand time (UTC+7), expressed as a UTC Date.

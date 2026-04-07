@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -117,7 +118,7 @@ function fmtDate(iso?: string | null) {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    return d.toLocaleDateString(APP_LOCALE, { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: APP_TIMEZONE });
   } catch {
     return iso;
   }
@@ -211,12 +212,13 @@ export function ReconcileSessionDetail({ session, matches, companyCode }: Props)
           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {new Date(session.createdAt).toLocaleDateString("th-TH", {
+              {new Date(session.createdAt).toLocaleDateString(APP_LOCALE, {
                 day: "numeric",
                 month: "short",
                 year: "2-digit",
                 hour: "2-digit",
                 minute: "2-digit",
+                timeZone: APP_TIMEZONE,
               })}
             </span>
             {session.sourceFileName && (

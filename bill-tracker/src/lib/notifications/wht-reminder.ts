@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db";
 import { sendTextMessage } from "./line-messaging";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
 import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
-import { getThaiMonthRange } from "@/lib/queries/date-utils";
+import { getThaiMonthRange, APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 interface WhtReminderResult {
   success: boolean;
@@ -298,10 +298,11 @@ function formatWhtReminderMessage(params: {
 }): string {
   const { companyName, deadlineDate, daysUntilDeadline, totalWhtAmount, whtCount, isOverdue } = params;
   
-  const formattedDate = deadlineDate.toLocaleDateString("th-TH", {
+  const formattedDate = deadlineDate.toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 
   const formattedAmount = new Intl.NumberFormat("th-TH", {

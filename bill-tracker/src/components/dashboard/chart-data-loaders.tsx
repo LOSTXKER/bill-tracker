@@ -6,6 +6,7 @@ import { ExpenseCategoryChart } from "@/components/charts/expense-category-chart
 import { MonthlyTrendChart } from "@/components/charts/monthly-trend-chart";
 import { getCompanyId } from "@/lib/cache/company";
 import { getMonthlyChartData } from "@/lib/cache/chart-data";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { buildExpenseBaseWhere } from "@/lib/queries/expense-filters";
 import { getThaiMonthRange, toThaiLocalDate } from "@/lib/queries/date-utils";
 
@@ -27,7 +28,7 @@ export async function MonthlyTrendChartData({ companyCode }: { companyCode: stri
     const [year, month] = monthKey.split("-").map(Number);
     const date = new Date(year, month - 1, 1);
     return {
-      month: date.toLocaleDateString("th-TH", { month: "short" }),
+      month: date.toLocaleDateString(APP_LOCALE, { month: "short", timeZone: APP_TIMEZONE }),
       income,
       expense,
     };

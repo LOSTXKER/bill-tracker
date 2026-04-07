@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,7 +143,7 @@ export function DocumentWorkflowDashboard({ companyCode }: DocumentWorkflowDashb
                     : `📢 ใกล้กำหนดนำส่ง WHT อีก ${whtSummary.deadline.daysUntil} วัน`}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  กำหนดนำส่ง: วันที่ {new Date(whtSummary.deadline.date).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}
+                  กำหนดนำส่ง: วันที่ {new Date(whtSummary.deadline.date).toLocaleDateString(APP_LOCALE, { day: "numeric", month: "long", year: "numeric", timeZone: APP_TIMEZONE })}
                   {" | "}ยอดที่ต้องนำส่ง: {formatCurrency(whtSummary.toPay.total)}
                 </p>
               </div>

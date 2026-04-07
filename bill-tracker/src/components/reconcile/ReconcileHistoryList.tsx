@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -213,12 +214,13 @@ export function ReconcileHistoryList({
                           )}
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(s.createdAt).toLocaleDateString("th-TH", {
+                            {new Date(s.createdAt).toLocaleDateString(APP_LOCALE, {
                               day: "numeric",
                               month: "short",
                               year: "2-digit",
                               hour: "2-digit",
                               minute: "2-digit",
+                              timeZone: APP_TIMEZONE,
                             })}
                           </span>
                         </div>

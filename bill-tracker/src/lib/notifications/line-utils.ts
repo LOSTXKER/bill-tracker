@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@/lib/utils/logger";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
 
 const log = createLogger("line-utils");
 
@@ -38,10 +39,11 @@ export function formatNumber(amount: number): string {
  * Format date for Thai locale
  */
 export function formatDateThai(date: Date): string {
-  return date.toLocaleDateString("th-TH", {
+  return date.toLocaleDateString(APP_LOCALE, {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 }
 
@@ -49,9 +51,10 @@ export function formatDateThai(date: Date): string {
  * Format time for Thai locale
  */
 export function formatTimeThai(date: Date): string {
-  return date.toLocaleTimeString("th-TH", { 
-    hour: "2-digit", 
-    minute: "2-digit" 
+  return date.toLocaleTimeString(APP_LOCALE, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: APP_TIMEZONE,
   });
 }
 
@@ -59,10 +62,11 @@ export function formatTimeThai(date: Date): string {
  * Format date for short display
  */
 export function formatDateShort(date: Date): string {
-  return date.toLocaleDateString("th-TH", { 
-    day: "numeric", 
-    month: "short", 
-    year: "numeric" 
+  return date.toLocaleDateString(APP_LOCALE, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 }
 
