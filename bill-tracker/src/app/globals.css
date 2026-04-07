@@ -106,43 +106,43 @@
   --sidebar-ring: oklch(0.596 0.145 163.225);
 }
 
-/* Minimal Dark Theme */
+/* Charcoal Dark Theme */
 .dark {
-  /* Deep neutral background */
-  --background: oklch(0.12 0 0);
+  /* Charcoal gray background */
+  --background: oklch(0.18 0 0);
   --foreground: oklch(0.93 0 0);
   
   /* Card */
-  --card: oklch(0.16 0 0);
+  --card: oklch(0.22 0 0);
   --card-foreground: oklch(0.93 0 0);
   
   /* Popover */
-  --popover: oklch(0.16 0 0);
+  --popover: oklch(0.22 0 0);
   --popover-foreground: oklch(0.93 0 0);
   
   /* Primary - Emerald (slightly brighter for dark mode) */
   --primary: oklch(0.696 0.17 162.48);
-  --primary-foreground: oklch(0.12 0 0);
+  --primary-foreground: oklch(0.18 0 0);
   
   /* Secondary */
-  --secondary: oklch(0.22 0 0);
+  --secondary: oklch(0.26 0 0);
   --secondary-foreground: oklch(0.93 0 0);
   
   /* Muted */
-  --muted: oklch(0.22 0 0);
+  --muted: oklch(0.26 0 0);
   --muted-foreground: oklch(0.6 0 0);
   
   /* Accent */
-  --accent: oklch(0.22 0 0);
+  --accent: oklch(0.26 0 0);
   --accent-foreground: oklch(0.93 0 0);
   
   /* Destructive - Vibrant red for dark mode */
   --destructive: oklch(0.696 0.20 25);
-  --destructive-foreground: oklch(0.12 0 0);
+  --destructive-foreground: oklch(0.18 0 0);
   
   /* Borders */
-  --border: oklch(0.25 0 0);
-  --input: oklch(0.25 0 0);
+  --border: oklch(0.30 0 0);
+  --input: oklch(0.30 0 0);
   --ring: oklch(0.696 0.17 162.48);
   
   /* Charts */
@@ -152,14 +152,14 @@
   --chart-4: oklch(0.627 0.2 303.9);
   --chart-5: oklch(0.645 0.18 16.439);
   
-  /* Sidebar */
-  --sidebar: oklch(0.14 0 0);
+  /* Sidebar - slightly darker than background for depth */
+  --sidebar: oklch(0.16 0 0);
   --sidebar-foreground: oklch(0.93 0 0);
   --sidebar-primary: oklch(0.696 0.17 162.48);
-  --sidebar-primary-foreground: oklch(0.12 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
+  --sidebar-primary-foreground: oklch(0.18 0 0);
+  --sidebar-accent: oklch(0.26 0 0);
   --sidebar-accent-foreground: oklch(0.93 0 0);
-  --sidebar-border: oklch(0.25 0 0);
+  --sidebar-border: oklch(0.30 0 0);
   --sidebar-ring: oklch(0.696 0.17 162.48);
 }
 
