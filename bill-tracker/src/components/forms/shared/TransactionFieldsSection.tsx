@@ -47,6 +47,7 @@ export function TransactionFieldsSection({
   onAiSuggestAccount,
   onAmountInputModeChange,
   layout = "default",
+  renderAfterInfoSection,
 }: TransactionFieldsSectionProps) {
   const {
     contacts,
@@ -66,23 +67,12 @@ export function TransactionFieldsSection({
     suggestedCategoryId,
     suggestedCategoryAlternatives,
     whtDeliveryMethod,
-    onWhtDeliveryMethodChange,
     whtDeliveryEmail,
-    onWhtDeliveryEmailChange,
     whtDeliveryNotes,
-    onWhtDeliveryNotesChange,
-    updateContactDelivery = false,
-    onUpdateContactDeliveryChange,
     taxInvoiceRequestMethod,
-    onTaxInvoiceRequestMethodChange,
     taxInvoiceRequestEmail,
-    onTaxInvoiceRequestEmailChange,
     taxInvoiceRequestNotes,
-    onTaxInvoiceRequestNotesChange,
-    updateContactTaxInvoiceRequest = false,
-    onUpdateContactTaxInvoiceRequestChange,
     hasDocument,
-    onHasDocumentChange,
     internalCompanyId,
     onInternalCompanyChange,
     accessibleCompanies = [],
@@ -343,25 +333,6 @@ export function TransactionFieldsSection({
       configType={config.type}
       documentType={watchDocumentType}
       isWht={isWht}
-      selectedContact={selectedContact}
-      whtDeliveryMethod={whtDeliveryMethod ?? null}
-      onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
-      whtDeliveryEmail={whtDeliveryEmail}
-      onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
-      whtDeliveryNotes={whtDeliveryNotes}
-      onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
-      updateContactDelivery={updateContactDelivery}
-      onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
-      taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
-      onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
-      taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-      onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
-      taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-      onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
-      updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-      onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
-      hasDocument={hasDocument}
-      onHasDocumentChange={onHasDocumentChange}
       referenceUrls={referenceUrls}
       onReferenceUrlsChange={onReferenceUrlsChange}
     />
@@ -393,6 +364,8 @@ export function TransactionFieldsSection({
 
           {descriptionField}
         </div>
+
+        {renderAfterInfoSection}
 
         {/* Section 2: การจำแนกทางบัญชี */}
         <div className="space-y-4">

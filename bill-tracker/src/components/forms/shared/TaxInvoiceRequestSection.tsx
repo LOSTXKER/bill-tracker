@@ -4,32 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { FileText, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTaxInvoiceRequestMethod, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
+import { MethodDropdown } from "./MethodDropdown";
+import { useTransactionFormContext } from "../TransactionFormContext";
 import type { ContactSummary } from "@/types";
 
 interface TaxInvoiceRequestEditProps {
   mode: "edit";
   documentType?: string;
-  taxInvoiceRequestMethod: string | null;
-  onTaxInvoiceRequestMethodChange: (method: string | null) => void;
-  taxInvoiceRequestEmail?: string | null;
-  onTaxInvoiceRequestEmailChange?: (email: string | null) => void;
-  taxInvoiceRequestNotes?: string | null;
-  onTaxInvoiceRequestNotesChange?: (notes: string | null) => void;
-  updateContactTaxInvoiceRequest?: boolean;
-  onUpdateContactTaxInvoiceRequestChange?: (update: boolean) => void;
-  selectedContact: ContactSummary | null;
-  hasDocument?: boolean;
-  onHasDocumentChange?: (value: boolean) => void;
 }
 
 interface TaxInvoiceRequestViewProps {
@@ -48,7 +32,7 @@ export function TaxInvoiceRequestSection(props: TaxInvoiceRequestSectionProps) {
   if (props.mode === "view") {
     return <TaxInvoiceRequestView {...props} />;
   }
-  return <TaxInvoiceRequestEdit {...props} />;
+  return <TaxInvoiceRequestEdit documentType={props.documentType} />;
 }
 
 function TaxInvoiceRequestView({
@@ -114,30 +98,39 @@ function TaxInvoiceRequestView({
   );
 }
 
-function TaxInvoiceRequestEdit({
-  documentType,
-  taxInvoiceRequestMethod,
-  onTaxInvoiceRequestMethodChange,
-  taxInvoiceRequestEmail,
-  onTaxInvoiceRequestEmailChange,
-  taxInvoiceRequestNotes,
-  onTaxInvoiceRequestNotesChange,
-  updateContactTaxInvoiceRequest,
-  onUpdateContactTaxInvoiceRequestChange,
-  selectedContact,
-  hasDocument,
-  onHasDocumentChange,
-}: TaxInvoiceRequestEditProps) {
+function TaxInvoiceRequestEdit({ documentType }: { documentType?: string }) {
+  const {
+    selectedContact,
+    taxInvoiceRequestMethod,
+    onTaxInvoiceRequestMethodChange,
+    taxInvoiceRequestEmail,
+    onTaxInvoiceRequestEmailChange,
+    taxInvoiceRequestNotes,
+    onTaxInvoiceRequestNotesChange,
+    updateContactTaxInvoiceRequest,
+    onUpdateContactTaxInvoiceRequestChange,
+    hasDocument,
+    onHasDocumentChange,
+  } = useTransactionFormContext();
+
   const isCashReceipt = documentType === "CASH_RECEIPT";
   const docLabel = isCashReceipt ? "บิลเงินสด" : "ใบกำกับภาษี";
   const sectionLabel = isCashReceipt ? "ช่องทางขอบิลเงินสด" : "ช่องทางขอใบกำกับภาษี";
   const placeholder = isCashReceipt ? "เลือกช่องทางขอบิลเงินสด *" : "เลือกช่องทางขอใบกำกับ *";
+
+  const isAutoFilled = !!(taxInvoiceRequestMethod && selectedContact?.taxInvoiceRequestMethod &&
+    taxInvoiceRequestMethod.toUpperCase() === selectedContact.taxInvoiceRequestMethod.toUpperCase());
 
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-2">
         <FileText className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
         <Label className="text-sm font-medium">{sectionLabel}</Label>
+        {isAutoFilled && (
+          <span className="text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 px-1.5 py-0.5 rounded-full">
+            จากผู้ติดต่อ
+          </span>
+        )}
       </div>
 
       {onHasDocumentChange && (
@@ -176,27 +169,13 @@ function TaxInvoiceRequestEdit({
 
       {!hasDocument && (
         <>
-          <Select
-            value={taxInvoiceRequestMethod || ""}
-            onValueChange={(v) => onTaxInvoiceRequestMethodChange(v || null)}
-          >
-            <SelectTrigger className="h-9 bg-background">
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {TAX_INVOICE_REQUEST_METHODS.map((method) => {
-                const Icon = method.Icon;
-                return (
-                  <SelectItem key={method.value} value={method.value}>
-                    <span className="flex items-center gap-2">
-                      <Icon className="h-3.5 w-3.5" />
-                      {method.label}
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+          <MethodDropdown
+            value={taxInvoiceRequestMethod ?? null}
+            onValueChange={(v) => onTaxInvoiceRequestMethodChange?.(v || null)}
+            options={TAX_INVOICE_REQUEST_METHODS}
+            placeholder={placeholder}
+            className="bg-background"
+          />
 
           {taxInvoiceRequestMethod === "EMAIL" && onTaxInvoiceRequestEmailChange && (
             <Input

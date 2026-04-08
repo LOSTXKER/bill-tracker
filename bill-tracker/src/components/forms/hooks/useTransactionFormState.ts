@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ContactSummary } from "@/types";
 import type { MultiDocAnalysisResult } from "../shared/InputMethodSection";
+import { buildDeliveryPatch } from "./useFormContextFactory";
 
 // =============================================================================
 // Types
@@ -141,14 +142,16 @@ export function useTransactionFormState({
     if (contactState.pendingContactId && contacts.length > 0 && !contactState.selectedContact) {
       const contact = contacts.find((c) => c.id === contactState.pendingContactId);
       if (contact) {
+        const deliveryPatch = configType === "expense" ? buildDeliveryPatch(contact) : {};
         setContactState(prev => ({
           ...prev,
           selectedContact: contact,
           pendingContactId: null,
+          ...deliveryPatch,
         }));
       }
     }
-  }, [contactState.pendingContactId, contacts, contactState.selectedContact]);
+  }, [contactState.pendingContactId, contacts, contactState.selectedContact, configType]);
 
   return {
     contactState,

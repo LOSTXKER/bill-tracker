@@ -37,7 +37,7 @@ interface FormContextFactoryParams {
   setReferenceUrls: (urls: string[]) => void;
 }
 
-function buildDeliveryPatch(contact: ContactSummary | null): Partial<ContactFormState> {
+export function buildDeliveryPatch(contact: ContactSummary | null): Partial<ContactFormState> {
   const patch: Partial<ContactFormState> = {
     whtDeliveryMethod: null,
     whtDeliveryEmail: null,
@@ -52,12 +52,12 @@ function buildDeliveryPatch(contact: ContactSummary | null): Partial<ContactForm
 
   if (contact) {
     if (contact.preferredDeliveryMethod) {
-      patch.whtDeliveryMethod = contact.preferredDeliveryMethod;
+      patch.whtDeliveryMethod = contact.preferredDeliveryMethod.toUpperCase();
       if (contact.deliveryEmail) patch.whtDeliveryEmail = contact.deliveryEmail;
       if (contact.deliveryNotes) patch.whtDeliveryNotes = contact.deliveryNotes;
     }
     if (contact.taxInvoiceRequestMethod) {
-      patch.taxInvoiceRequestMethod = contact.taxInvoiceRequestMethod;
+      patch.taxInvoiceRequestMethod = contact.taxInvoiceRequestMethod.toUpperCase();
       if (contact.taxInvoiceRequestEmail) patch.taxInvoiceRequestEmail = contact.taxInvoiceRequestEmail;
       if (contact.taxInvoiceRequestNotes) patch.taxInvoiceRequestNotes = contact.taxInvoiceRequestNotes;
     }

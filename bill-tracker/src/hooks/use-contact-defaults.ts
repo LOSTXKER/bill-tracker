@@ -13,12 +13,6 @@ export interface TransactionPreset {
   whtRate?: number | null;
   whtType?: string | null;
   documentType?: string | null;
-  deliveryMethod?: string | null;
-  deliveryEmail?: string | null;
-  deliveryNotes?: string | null;
-  taxInvoiceRequestMethod?: string | null;
-  taxInvoiceRequestEmail?: string | null;
-  taxInvoiceRequestNotes?: string | null;
   notes?: string | null;
 }
 
@@ -97,12 +91,6 @@ function parsePresets(raw: unknown): TransactionPreset[] {
       whtRate: p.whtRate ?? null,
       whtType: p.whtType || null,
       documentType: p.documentType || null,
-      deliveryMethod: p.deliveryMethod || null,
-      deliveryEmail: p.deliveryEmail || null,
-      deliveryNotes: p.deliveryNotes || null,
-      taxInvoiceRequestMethod: p.taxInvoiceRequestMethod || null,
-      taxInvoiceRequestEmail: p.taxInvoiceRequestEmail || null,
-      taxInvoiceRequestNotes: p.taxInvoiceRequestNotes || null,
       notes: p.notes || null,
     }));
 }

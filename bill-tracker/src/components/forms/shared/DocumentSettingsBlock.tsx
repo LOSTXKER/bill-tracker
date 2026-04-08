@@ -5,148 +5,96 @@ import { WhtDeliverySection } from "./WhtDeliverySection";
 import { TaxInvoiceRequestSection } from "./TaxInvoiceRequestSection";
 import { ReferenceUrlsSection } from "./ReferenceUrlsSection";
 
-interface DocumentSettingsBlockProps {
-  mode: "edit" | "view";
+interface DocumentSettingsEditProps {
+  mode: "edit";
   configType: "expense" | "income";
   documentType?: string;
   isWht?: boolean;
-  selectedContact?: ContactSummary | null;
-  // WHT delivery
-  whtDeliveryMethod?: string | null;
-  onWhtDeliveryMethodChange?: ((v: string | null) => void) | undefined;
-  whtDeliveryEmail?: string | null;
-  onWhtDeliveryEmailChange?: ((v: string | null) => void) | undefined;
-  whtDeliveryNotes?: string | null;
-  onWhtDeliveryNotesChange?: ((v: string | null) => void) | undefined;
-  updateContactDelivery?: boolean;
-  onUpdateContactDeliveryChange?: ((v: boolean) => void) | undefined;
-  // Tax invoice
-  taxInvoiceRequestMethod?: string | null;
-  onTaxInvoiceRequestMethodChange?: ((v: string | null) => void) | undefined;
-  taxInvoiceRequestEmail?: string | null;
-  onTaxInvoiceRequestEmailChange?: ((v: string | null) => void) | undefined;
-  taxInvoiceRequestNotes?: string | null;
-  onTaxInvoiceRequestNotesChange?: ((v: string | null) => void) | undefined;
-  updateContactTaxInvoiceRequest?: boolean;
-  onUpdateContactTaxInvoiceRequestChange?: ((v: boolean) => void) | undefined;
-  hasDocument?: boolean;
-  onHasDocumentChange?: ((v: boolean) => void) | undefined;
-  // Reference URLs
   referenceUrls: string[];
-  onReferenceUrlsChange?: ((urls: string[]) => void) | undefined;
+  onReferenceUrlsChange?: (urls: string[]) => void;
 }
 
-export function DocumentSettingsBlock({
-  mode,
-  configType,
-  documentType,
-  isWht,
-  selectedContact,
-  whtDeliveryMethod,
-  onWhtDeliveryMethodChange,
-  whtDeliveryEmail,
-  onWhtDeliveryEmailChange,
-  whtDeliveryNotes,
-  onWhtDeliveryNotesChange,
-  updateContactDelivery,
-  onUpdateContactDeliveryChange,
-  taxInvoiceRequestMethod,
-  onTaxInvoiceRequestMethodChange,
-  taxInvoiceRequestEmail,
-  onTaxInvoiceRequestEmailChange,
-  taxInvoiceRequestNotes,
-  onTaxInvoiceRequestNotesChange,
-  updateContactTaxInvoiceRequest,
-  onUpdateContactTaxInvoiceRequestChange,
-  hasDocument,
-  onHasDocumentChange,
-  referenceUrls,
-  onReferenceUrlsChange,
-}: DocumentSettingsBlockProps) {
+interface DocumentSettingsViewProps {
+  mode: "view";
+  configType: "expense" | "income";
+  documentType?: string;
+  isWht?: boolean;
+  selectedContact: ContactSummary | null;
+  whtDeliveryMethod?: string | null;
+  whtDeliveryEmail?: string | null;
+  whtDeliveryNotes?: string | null;
+  taxInvoiceRequestMethod?: string | null;
+  taxInvoiceRequestEmail?: string | null;
+  taxInvoiceRequestNotes?: string | null;
+  hasDocument?: boolean;
+  referenceUrls: string[];
+}
+
+type DocumentSettingsBlockProps = DocumentSettingsEditProps | DocumentSettingsViewProps;
+
+export function DocumentSettingsBlock(props: DocumentSettingsBlockProps) {
+  const { mode, configType, documentType, isWht, referenceUrls } = props;
   const isExpense = configType === "expense";
-  const contact = selectedContact ?? null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const contactAny = selectedContact as any;
 
-  const showWhtDelivery = isExpense && !!isWht && (
-    mode === "edit"
-      ? !!onWhtDeliveryMethodChange
-      : !!(whtDeliveryMethod || contact?.preferredDeliveryMethod || contact?.deliveryNotes)
-  );
+  if (mode === "edit") {
+    const showWhtDelivery = isExpense && !!isWht;
+    const showTaxInvoice = isExpense && documentType !== "NO_DOCUMENT";
+    const showRefUrls = !!props.onReferenceUrlsChange;
 
-  const showTaxInvoice = isExpense && documentType !== "NO_DOCUMENT" && (
-    mode === "edit"
-      ? !!onTaxInvoiceRequestMethodChange
-      : !!(taxInvoiceRequestMethod || contactAny?.taxInvoiceRequestMethod || contactAny?.taxInvoiceRequestNotes || hasDocument)
-  );
+    if (!showWhtDelivery && !showTaxInvoice && !showRefUrls) return null;
 
-  const showRefUrls = mode === "edit" ? !!onReferenceUrlsChange : referenceUrls.length > 0;
+    return (
+      <div className="space-y-3">
+        {showWhtDelivery && <WhtDeliverySection mode="edit" />}
+        {showTaxInvoice && (
+          <TaxInvoiceRequestSection
+            mode="edit"
+            documentType={documentType || "TAX_INVOICE"}
+          />
+        )}
+        {showRefUrls && props.onReferenceUrlsChange && (
+          <ReferenceUrlsSection
+            mode="edit"
+            referenceUrls={referenceUrls}
+            onReferenceUrlsChange={props.onReferenceUrlsChange}
+          />
+        )}
+      </div>
+    );
+  }
+
+  const contact = props.selectedContact;
+  const showWhtDelivery = isExpense && !!isWht &&
+    !!(props.whtDeliveryMethod || contact?.preferredDeliveryMethod || contact?.deliveryNotes);
+  const showTaxInvoice = isExpense && documentType !== "NO_DOCUMENT" &&
+    !!(props.taxInvoiceRequestMethod || contact?.taxInvoiceRequestMethod || contact?.taxInvoiceRequestNotes || props.hasDocument);
+  const showRefUrls = referenceUrls.length > 0;
 
   if (!showWhtDelivery && !showTaxInvoice && !showRefUrls) return null;
 
   return (
     <div className="space-y-3">
-      {showWhtDelivery && mode === "edit" && onWhtDeliveryMethodChange && (
-        <WhtDeliverySection
-          mode="edit"
-          whtDeliveryMethod={whtDeliveryMethod ?? null}
-          onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
-          whtDeliveryEmail={whtDeliveryEmail}
-          onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
-          whtDeliveryNotes={whtDeliveryNotes}
-          onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
-          updateContactDelivery={updateContactDelivery}
-          onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
-          selectedContact={contact}
-        />
-      )}
-      {showWhtDelivery && mode === "view" && (
+      {showWhtDelivery && (
         <WhtDeliverySection
           mode="view"
-          whtDeliveryMethod={whtDeliveryMethod}
-          whtDeliveryEmail={whtDeliveryEmail}
-          whtDeliveryNotes={whtDeliveryNotes}
+          whtDeliveryMethod={props.whtDeliveryMethod}
+          whtDeliveryEmail={props.whtDeliveryEmail}
+          whtDeliveryNotes={props.whtDeliveryNotes}
           selectedContact={contact}
         />
       )}
-
-      {showTaxInvoice && mode === "edit" && onTaxInvoiceRequestMethodChange && (
-        <TaxInvoiceRequestSection
-          mode="edit"
-          documentType={documentType || "TAX_INVOICE"}
-          taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
-          onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
-          taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-          onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
-          taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-          onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
-          updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-          onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
-          selectedContact={contact}
-          hasDocument={hasDocument}
-          onHasDocumentChange={onHasDocumentChange}
-        />
-      )}
-      {showTaxInvoice && mode === "view" && (
+      {showTaxInvoice && (
         <TaxInvoiceRequestSection
           mode="view"
           documentType={documentType}
-          taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
-          taxInvoiceRequestEmail={taxInvoiceRequestEmail ?? null}
-          taxInvoiceRequestNotes={taxInvoiceRequestNotes ?? null}
+          taxInvoiceRequestMethod={props.taxInvoiceRequestMethod}
+          taxInvoiceRequestEmail={props.taxInvoiceRequestEmail}
+          taxInvoiceRequestNotes={props.taxInvoiceRequestNotes}
           selectedContact={contact}
-          hasDocument={hasDocument}
+          hasDocument={props.hasDocument}
         />
       )}
-
-      {showRefUrls && mode === "edit" && onReferenceUrlsChange && (
-        <ReferenceUrlsSection
-          mode="edit"
-          referenceUrls={referenceUrls}
-          onReferenceUrlsChange={onReferenceUrlsChange}
-        />
-      )}
-      {showRefUrls && mode === "view" && (
+      {showRefUrls && (
         <ReferenceUrlsSection mode="view" referenceUrls={referenceUrls} />
       )}
     </div>

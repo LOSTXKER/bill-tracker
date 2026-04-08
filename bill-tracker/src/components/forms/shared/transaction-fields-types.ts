@@ -79,4 +79,7 @@ export interface TransactionFieldsSectionProps {
 
   /** When "sectioned", fields are grouped by accounting sections and AmountInput is omitted. */
   layout?: "default" | "sectioned";
+
+  /** Rendered between Section 1 (ข้อมูลรายการ) and Section 2 (การจำแนกทางบัญชี) in sectioned layout. */
+  renderAfterInfoSection?: React.ReactNode;
 }

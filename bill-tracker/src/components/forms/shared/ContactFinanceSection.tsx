@@ -21,7 +21,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Lightbulb, Plus, Trash2, ChevronDown, Layers } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
-import { DELIVERY_METHODS, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
 import { AccountSelector } from "@/components/forms/shared/account-selector";
 import { CategorySelector } from "@/components/forms/shared/CategorySelector";
 import { cn } from "@/lib/utils";
@@ -459,69 +458,7 @@ function PresetCard({
               )}
             </div>
 
-            {/* Row 4: Delivery + Tax Invoice */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">วิธีส่งเอกสาร</Label>
-                <Select
-                  value={preset.deliveryMethod || "__NONE__"}
-                  onValueChange={(v) => onUpdate(index, "deliveryMethod", v === "__NONE__" ? "" : v)}
-                >
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="ไม่ระบุ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                    {DELIVERY_METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">ช่องทางขอใบกำกับ</Label>
-                <Select
-                  value={preset.taxInvoiceRequestMethod || "__NONE__"}
-                  onValueChange={(v) => onUpdate(index, "taxInvoiceRequestMethod", v === "__NONE__" ? "" : v)}
-                >
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="ไม่ระบุ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                    {TAX_INVOICE_REQUEST_METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Conditional email fields */}
-            {preset.deliveryMethod === "EMAIL" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">อีเมลส่งเอกสาร</Label>
-                <Input
-                  value={preset.deliveryEmail}
-                  onChange={(e) => onUpdate(index, "deliveryEmail", e.target.value)}
-                  placeholder="email@example.com"
-                  className="h-9 text-sm"
-                />
-              </div>
-            )}
-            {preset.taxInvoiceRequestMethod === "EMAIL" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">อีเมลขอใบกำกับ</Label>
-                <Input
-                  value={preset.taxInvoiceRequestEmail}
-                  onChange={(e) => onUpdate(index, "taxInvoiceRequestEmail", e.target.value)}
-                  placeholder="email@example.com"
-                  className="h-9 text-sm"
-                />
-              </div>
-            )}
-
-            {/* Row 5: Notes */}
+            {/* Row 4: Notes */}
             <div className="space-y-1.5">
               <Label className="text-xs">หมายเหตุ</Label>
               <Textarea

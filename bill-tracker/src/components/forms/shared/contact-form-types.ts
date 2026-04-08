@@ -8,12 +8,6 @@ export interface TransactionPreset {
   whtRate: string;
   whtType: string;
   documentType: string;
-  deliveryMethod: string;
-  deliveryEmail: string;
-  deliveryNotes: string;
-  taxInvoiceRequestMethod: string;
-  taxInvoiceRequestEmail: string;
-  taxInvoiceRequestNotes: string;
   notes: string;
 }
 
@@ -161,12 +155,6 @@ export const EMPTY_PRESET: TransactionPreset = {
   whtRate: "",
   whtType: "",
   documentType: "",
-  deliveryMethod: "",
-  deliveryEmail: "",
-  deliveryNotes: "",
-  taxInvoiceRequestMethod: "",
-  taxInvoiceRequestEmail: "",
-  taxInvoiceRequestNotes: "",
   notes: "",
 };
 
@@ -184,12 +172,6 @@ function parsePresets(raw: unknown): TransactionPreset[] {
       whtRate: p.whtRate?.toString() ?? "",
       whtType: p.whtType || "",
       documentType: p.documentType || "",
-      deliveryMethod: p.deliveryMethod || "",
-      deliveryEmail: p.deliveryEmail || "",
-      deliveryNotes: p.deliveryNotes || "",
-      taxInvoiceRequestMethod: p.taxInvoiceRequestMethod || "",
-      taxInvoiceRequestEmail: p.taxInvoiceRequestEmail || "",
-      taxInvoiceRequestNotes: p.taxInvoiceRequestNotes || "",
       notes: p.notes || "",
     }));
 }

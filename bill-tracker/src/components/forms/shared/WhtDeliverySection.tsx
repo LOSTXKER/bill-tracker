@@ -4,29 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Send } from "lucide-react";
 import { getDeliveryMethod, DELIVERY_METHODS } from "@/lib/constants/delivery-methods";
+import { MethodDropdown } from "./MethodDropdown";
+import { useTransactionFormContext } from "../TransactionFormContext";
 import type { ContactSummary } from "@/types";
-
-interface WhtDeliverySectionEditProps {
-  mode: "edit";
-  whtDeliveryMethod: string | null;
-  onWhtDeliveryMethodChange: (method: string | null) => void;
-  whtDeliveryEmail?: string | null;
-  onWhtDeliveryEmailChange?: (email: string | null) => void;
-  whtDeliveryNotes?: string | null;
-  onWhtDeliveryNotesChange?: (notes: string | null) => void;
-  updateContactDelivery?: boolean;
-  onUpdateContactDeliveryChange?: (update: boolean) => void;
-  selectedContact: ContactSummary | null;
-}
 
 interface WhtDeliverySectionViewProps {
   mode: "view";
@@ -36,13 +18,17 @@ interface WhtDeliverySectionViewProps {
   selectedContact: ContactSummary | null;
 }
 
+interface WhtDeliverySectionEditProps {
+  mode: "edit";
+}
+
 type WhtDeliverySectionProps = WhtDeliverySectionEditProps | WhtDeliverySectionViewProps;
 
 export function WhtDeliverySection(props: WhtDeliverySectionProps) {
   if (props.mode === "view") {
     return <WhtDeliveryView {...props} />;
   }
-  return <WhtDeliveryEdit {...props} />;
+  return <WhtDeliveryEdit />;
 }
 
 function WhtDeliveryView({
@@ -90,45 +76,41 @@ function WhtDeliveryView({
   );
 }
 
-function WhtDeliveryEdit({
-  whtDeliveryMethod,
-  onWhtDeliveryMethodChange,
-  whtDeliveryEmail,
-  onWhtDeliveryEmailChange,
-  whtDeliveryNotes,
-  onWhtDeliveryNotesChange,
-  updateContactDelivery,
-  onUpdateContactDeliveryChange,
-  selectedContact,
-}: WhtDeliverySectionEditProps) {
+function WhtDeliveryEdit() {
+  const {
+    selectedContact,
+    whtDeliveryMethod,
+    onWhtDeliveryMethodChange,
+    whtDeliveryEmail,
+    onWhtDeliveryEmailChange,
+    whtDeliveryNotes,
+    onWhtDeliveryNotesChange,
+    updateContactDelivery,
+    onUpdateContactDeliveryChange,
+  } = useTransactionFormContext();
+
+  const isAutoFilled = !!(whtDeliveryMethod && selectedContact?.preferredDeliveryMethod &&
+    whtDeliveryMethod.toUpperCase() === selectedContact.preferredDeliveryMethod.toUpperCase());
+
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-2">
         <Send className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
         <Label className="text-sm font-medium">วิธีส่งเอกสาร (ใบหัก ณ ที่จ่าย)</Label>
+        {isAutoFilled && (
+          <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded-full">
+            จากผู้ติดต่อ
+          </span>
+        )}
       </div>
 
-      <Select
-        value={whtDeliveryMethod || ""}
-        onValueChange={(v) => onWhtDeliveryMethodChange(v || null)}
-      >
-        <SelectTrigger className="h-9 bg-background">
-          <SelectValue placeholder="เลือกวิธีส่งเอกสาร *" />
-        </SelectTrigger>
-        <SelectContent>
-          {DELIVERY_METHODS.map((method) => {
-            const Icon = method.Icon;
-            return (
-              <SelectItem key={method.value} value={method.value}>
-                <span className="flex items-center gap-2">
-                  <Icon className="h-3.5 w-3.5" />
-                  {method.label}
-                </span>
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+      <MethodDropdown
+        value={whtDeliveryMethod ?? null}
+        onValueChange={(v) => onWhtDeliveryMethodChange?.(v || null)}
+        options={DELIVERY_METHODS}
+        placeholder="เลือกวิธีส่งเอกสาร *"
+        className="bg-background"
+      />
 
       {whtDeliveryMethod === "EMAIL" && onWhtDeliveryEmailChange && (
         <Input

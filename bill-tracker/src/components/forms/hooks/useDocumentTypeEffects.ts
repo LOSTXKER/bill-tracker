@@ -29,6 +29,12 @@ export function useDocumentTypeEffects({
   const docTypeRef = useRef(watchDocumentType);
   docTypeRef.current = watchDocumentType;
 
+  const taxMethodRef = useRef(taxInvoiceRequestMethod);
+  taxMethodRef.current = taxInvoiceRequestMethod;
+
+  const clearRef = useRef(clearTaxInvoiceRequest);
+  clearRef.current = clearTaxInvoiceRequest;
+
   useEffect(() => {
     if (configType !== "expense" || prevVatRateRef.current === safeVatRate) return;
 
@@ -45,9 +51,9 @@ export function useDocumentTypeEffects({
 
   useEffect(() => {
     if (configType === "expense" && watchDocumentType === "NO_DOCUMENT") {
-      if (taxInvoiceRequestMethod) {
-        clearTaxInvoiceRequest();
+      if (taxMethodRef.current) {
+        clearRef.current();
       }
     }
-  }, [watchDocumentType, configType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [watchDocumentType, configType]);
 }

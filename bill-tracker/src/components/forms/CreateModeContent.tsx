@@ -33,7 +33,6 @@ import type { ContactSummary } from "@/types";
 
 const EMPTY_URLS: string[] = [];
 import type { ContactDefaults, TransactionPreset } from "@/hooks/use-contact-defaults";
-import type { ContactFormState } from "./hooks/useTransactionFormState";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import {
   TransactionFieldsSection,
@@ -126,7 +125,6 @@ export interface CreateModeContentProps {
   selectedContact: ContactSummary | null;
   contactDefaults: ContactDefaults | null;
   mutateContactDefaults: () => void;
-  patchContactState: (patch: Partial<ContactFormState>) => void;
   setAccountSuggestion: Dispatch<SetStateAction<AccountSuggestion>>;
   whtChangeInfo: WhtChangeInfo;
   handleWhtToggle: (enabled: boolean, confirmed?: boolean, reason?: string) => void;
@@ -166,7 +164,6 @@ export function CreateModeContent({
   selectedContact,
   contactDefaults,
   mutateContactDefaults,
-  patchContactState,
   setAccountSuggestion,
   whtChangeInfo,
   handleWhtToggle,
@@ -175,24 +172,6 @@ export function CreateModeContent({
   router,
 }: CreateModeContentProps) {
   const {
-    whtDeliveryMethod,
-    onWhtDeliveryMethodChange,
-    whtDeliveryEmail,
-    onWhtDeliveryEmailChange,
-    whtDeliveryNotes,
-    onWhtDeliveryNotesChange,
-    updateContactDelivery = false,
-    onUpdateContactDeliveryChange,
-    taxInvoiceRequestMethod,
-    onTaxInvoiceRequestMethodChange,
-    taxInvoiceRequestEmail,
-    onTaxInvoiceRequestEmailChange,
-    taxInvoiceRequestNotes,
-    onTaxInvoiceRequestNotesChange,
-    updateContactTaxInvoiceRequest = false,
-    onUpdateContactTaxInvoiceRequestChange,
-    hasDocument,
-    onHasDocumentChange,
     referenceUrls = EMPTY_URLS,
     onReferenceUrlsChange,
     selectedAccount,
@@ -284,47 +263,46 @@ export function CreateModeContent({
                   alternatives: suggestion.alternatives,
                 });
               }}
-            />
-
-            {selectedContact && (
-              <div className="flex items-center gap-2">
-                {contactDefaults && contactDefaults.presets.length > 0 && (
-                  <div className="flex-1">
-                    <PresetDropdown
-                      presets={contactDefaults.presets}
+              renderAfterInfoSection={
+                selectedContact ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {contactDefaults && contactDefaults.presets.length > 0 && (
+                        <div className="flex-1">
+                          <PresetDropdown
+                            presets={contactDefaults.presets}
+                            config={config}
+                            setValue={setValue}
+                          />
+                        </div>
+                      )}
+                      <div className={contactDefaults && contactDefaults.presets.length > 0 ? "" : "flex-1"}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-9 whitespace-nowrap"
+                          onClick={() => setSavePresetOpen(true)}
+                        >
+                          <Bookmark className="h-3.5 w-3.5" />
+                          บันทึกเป็น Preset
+                        </Button>
+                      </div>
+                    </div>
+                    <SavePresetDialog
+                      open={savePresetOpen}
+                      onOpenChange={setSavePresetOpen}
+                      companyCode={companyCode}
+                      contactId={selectedContact.id}
+                      existingPresets={contactDefaults?.presets ?? []}
                       config={config}
-                      setValue={setValue}
-                      patchContactState={patchContactState}
+                      watch={watch}
+                      onSaved={mutateContactDefaults}
                     />
-                  </div>
-                )}
-                <div className={contactDefaults && contactDefaults.presets.length > 0 ? "" : "flex-1"}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs h-9 whitespace-nowrap"
-                    onClick={() => setSavePresetOpen(true)}
-                  >
-                    <Bookmark className="h-3.5 w-3.5" />
-                    บันทึกเป็น Preset
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {selectedContact && (
-              <SavePresetDialog
-                open={savePresetOpen}
-                onOpenChange={setSavePresetOpen}
-                companyCode={companyCode}
-                contactId={selectedContact.id}
-                existingPresets={contactDefaults?.presets ?? []}
-                config={config}
-                watch={watch}
-                onSaved={mutateContactDefaults}
-              />
-            )}
+                  </>
+                ) : undefined
+              }
+            />
 
             {/* Section 3: จำนวนเงินและภาษี */}
             <div className="space-y-4">
@@ -490,25 +468,6 @@ export function CreateModeContent({
                 configType={config.type}
                 documentType={watchDocumentType}
                 isWht={watchIsWht || false}
-                selectedContact={selectedContact}
-                whtDeliveryMethod={whtDeliveryMethod ?? null}
-                onWhtDeliveryMethodChange={onWhtDeliveryMethodChange}
-                whtDeliveryEmail={whtDeliveryEmail}
-                onWhtDeliveryEmailChange={onWhtDeliveryEmailChange}
-                whtDeliveryNotes={whtDeliveryNotes}
-                onWhtDeliveryNotesChange={onWhtDeliveryNotesChange}
-                updateContactDelivery={updateContactDelivery}
-                onUpdateContactDeliveryChange={onUpdateContactDeliveryChange}
-                taxInvoiceRequestMethod={taxInvoiceRequestMethod ?? null}
-                onTaxInvoiceRequestMethodChange={onTaxInvoiceRequestMethodChange}
-                taxInvoiceRequestEmail={taxInvoiceRequestEmail}
-                onTaxInvoiceRequestEmailChange={onTaxInvoiceRequestEmailChange}
-                taxInvoiceRequestNotes={taxInvoiceRequestNotes}
-                onTaxInvoiceRequestNotesChange={onTaxInvoiceRequestNotesChange}
-                updateContactTaxInvoiceRequest={updateContactTaxInvoiceRequest}
-                onUpdateContactTaxInvoiceRequestChange={onUpdateContactTaxInvoiceRequestChange}
-                hasDocument={hasDocument}
-                onHasDocumentChange={onHasDocumentChange}
                 referenceUrls={referenceUrls}
                 onReferenceUrlsChange={onReferenceUrlsChange}
               />
@@ -567,12 +526,10 @@ function PresetDropdown({
   presets,
   config,
   setValue,
-  patchContactState,
 }: {
   presets: TransactionPreset[];
   config: UnifiedTransactionConfig;
   setValue: UseFormSetValue<Record<string, unknown>>;
-  patchContactState: (patch: Partial<ContactFormState>) => void;
 }) {
   const { onAccountChange, onCategoryChange } = useTransactionFormContext();
 
@@ -592,16 +549,6 @@ function PresetDropdown({
       if (preset.whtRate != null) setValue("whtRate", Number(preset.whtRate));
     }
     if (preset.documentType) setValue("documentType", preset.documentType);
-
-    const contactPatch: Partial<ContactFormState> = {};
-    if (preset.deliveryMethod) contactPatch.whtDeliveryMethod = preset.deliveryMethod;
-    if (preset.deliveryEmail) contactPatch.whtDeliveryEmail = preset.deliveryEmail;
-    if (preset.deliveryNotes) contactPatch.whtDeliveryNotes = preset.deliveryNotes;
-    if (preset.taxInvoiceRequestMethod) contactPatch.taxInvoiceRequestMethod = preset.taxInvoiceRequestMethod;
-    if (preset.taxInvoiceRequestEmail) contactPatch.taxInvoiceRequestEmail = preset.taxInvoiceRequestEmail;
-    if (preset.taxInvoiceRequestNotes) contactPatch.taxInvoiceRequestNotes = preset.taxInvoiceRequestNotes;
-    if (Object.keys(contactPatch).length > 0) patchContactState(contactPatch);
-
     if (preset.notes) setValue("notes", preset.notes);
   };
 
@@ -655,12 +602,6 @@ function SavePresetDialog({
   const {
     selectedAccount,
     selectedCategory,
-    whtDeliveryMethod,
-    whtDeliveryEmail,
-    whtDeliveryNotes,
-    taxInvoiceRequestMethod,
-    taxInvoiceRequestEmail,
-    taxInvoiceRequestNotes,
   } = useTransactionFormContext();
 
   const [saveMode, setSaveMode] = useState<"new" | "overwrite">("new");
@@ -690,12 +631,6 @@ function SavePresetDialog({
       whtRate: watch("whtRate") != null ? Number(watch("whtRate")) : null,
       whtType: (watch("whtType") as string) || null,
       documentType: (watch("documentType") as string) || null,
-      deliveryMethod: whtDeliveryMethod || null,
-      deliveryEmail: whtDeliveryEmail || null,
-      deliveryNotes: whtDeliveryNotes || null,
-      taxInvoiceRequestMethod: taxInvoiceRequestMethod || null,
-      taxInvoiceRequestEmail: taxInvoiceRequestEmail || null,
-      taxInvoiceRequestNotes: taxInvoiceRequestNotes || null,
       notes: (watch("notes") as string) || null,
     };
   };
@@ -769,7 +704,7 @@ function SavePresetDialog({
         </DialogHeader>
         <div className="space-y-4 py-2">
           <p className="text-xs text-muted-foreground">
-            ข้อมูลทั้งหมดในฟอร์มปัจจุบัน (VAT, WHT, บัญชี, หมวดหมู่, คำอธิบาย, วิธีส่งเอกสาร, ฯลฯ) จะถูกบันทึกลงใน preset
+            ข้อมูลทั้งหมดในฟอร์มปัจจุบัน (VAT, WHT, บัญชี, หมวดหมู่, คำอธิบาย, ฯลฯ) จะถูกบันทึกลงใน preset
           </p>
 
           {hasExisting && (

@@ -2,16 +2,10 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Send, FileText } from "lucide-react";
 import { DELIVERY_METHODS, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
+import { MethodDropdown } from "./MethodDropdown";
 import type { ContactFormSectionProps } from "./contact-form-types";
 
 export function ContactDeliverySection({ formData, setFormData }: ContactFormSectionProps) {
@@ -29,29 +23,13 @@ export function ContactDeliverySection({ formData, setFormData }: ContactFormSec
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="contact-deliveryMethod">วิธีส่งที่ต้องการ</Label>
-            <Select
-              value={formData.preferredDeliveryMethod || "__NONE__"}
-              onValueChange={(value) => setFormData({ ...formData, preferredDeliveryMethod: value === "__NONE__" ? "" : value })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="ไม่ระบุ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                {DELIVERY_METHODS.map((method) => {
-                  const Icon = method.Icon;
-                  return (
-                    <SelectItem key={method.value} value={method.value}>
-                      <span className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
-                        {method.label}
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <Label>วิธีส่งที่ต้องการ</Label>
+            <MethodDropdown
+              value={formData.preferredDeliveryMethod || null}
+              onValueChange={(v) => setFormData({ ...formData, preferredDeliveryMethod: v || "" })}
+              options={DELIVERY_METHODS}
+              allowClear
+            />
           </div>
 
           {formData.preferredDeliveryMethod === "EMAIL" && (
@@ -98,29 +76,13 @@ export function ContactDeliverySection({ formData, setFormData }: ContactFormSec
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="contact-taxInvoiceRequestMethod">ช่องทางขอใบกำกับ</Label>
-            <Select
-              value={formData.taxInvoiceRequestMethod || "__NONE__"}
-              onValueChange={(value) => setFormData({ ...formData, taxInvoiceRequestMethod: value === "__NONE__" ? "" : value })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="ไม่ระบุ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                {TAX_INVOICE_REQUEST_METHODS.map((method) => {
-                  const Icon = method.Icon;
-                  return (
-                    <SelectItem key={method.value} value={method.value}>
-                      <span className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
-                        {method.label}
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <Label>ช่องทางขอใบกำกับ</Label>
+            <MethodDropdown
+              value={formData.taxInvoiceRequestMethod || null}
+              onValueChange={(v) => setFormData({ ...formData, taxInvoiceRequestMethod: v || "" })}
+              options={TAX_INVOICE_REQUEST_METHODS}
+              allowClear
+            />
           </div>
 
           {formData.taxInvoiceRequestMethod === "EMAIL" && (

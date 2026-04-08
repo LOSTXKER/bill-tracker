@@ -905,6 +905,44 @@ export function UnifiedTransactionForm({
   });
 
   // ---------------------------------------------------------------------------
+  // Fallback: fill delivery/tax-invoice from contactDefaults (fresh API data)
+  // when contacts list data was stale/missing these fields
+  // ---------------------------------------------------------------------------
+  const selectedContactId = contactState.selectedContact?.id || null;
+  const defaultsAppliedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (defaultsAppliedRef.current !== selectedContactId) {
+      defaultsAppliedRef.current = null;
+    }
+  }, [selectedContactId]);
+
+  useEffect(() => {
+    if (!contactDefaults || !selectedContactId || config.type !== "expense") return;
+    if (defaultsAppliedRef.current === selectedContactId) return;
+
+    defaultsAppliedRef.current = selectedContactId;
+
+    const patch: Partial<ContactFormState> = {};
+
+    if (contactDefaults.preferredDeliveryMethod) {
+      patch.whtDeliveryMethod = contactDefaults.preferredDeliveryMethod.toUpperCase();
+      if (contactDefaults.deliveryEmail) patch.whtDeliveryEmail = contactDefaults.deliveryEmail;
+      if (contactDefaults.deliveryNotes) patch.whtDeliveryNotes = contactDefaults.deliveryNotes;
+    }
+
+    if (contactDefaults.taxInvoiceRequestMethod) {
+      patch.taxInvoiceRequestMethod = contactDefaults.taxInvoiceRequestMethod.toUpperCase();
+      if (contactDefaults.taxInvoiceRequestEmail) patch.taxInvoiceRequestEmail = contactDefaults.taxInvoiceRequestEmail;
+      if (contactDefaults.taxInvoiceRequestNotes) patch.taxInvoiceRequestNotes = contactDefaults.taxInvoiceRequestNotes;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      patchContactState(patch);
+    }
+  }, [contactDefaults, selectedContactId, config.type, patchContactState]);
+
+  // ---------------------------------------------------------------------------
   // Form context
   // ---------------------------------------------------------------------------
   const stableAccessibleCompanies = useMemo(
@@ -1011,7 +1049,6 @@ export function UnifiedTransactionForm({
             selectedContact={contactState.selectedContact}
             contactDefaults={contactDefaults}
             mutateContactDefaults={mutateContactDefaults}
-            patchContactState={patchContactState}
             setAccountSuggestion={setAccountSuggestion}
             whtChangeInfo={whtChangeInfo}
             handleWhtToggle={handleWhtToggle}

@@ -44,7 +44,8 @@ export const TAX_INVOICE_REQUEST_METHODS: DeliveryMethodOption[] = [
  */
 export function getDeliveryMethod(value: string | null | undefined): DeliveryMethodOption | undefined {
   if (!value) return undefined;
-  return DELIVERY_METHODS.find((m) => m.value === value);
+  const upper = value.toUpperCase();
+  return DELIVERY_METHODS.find((m) => m.value === value || m.value === upper);
 }
 
 /**
@@ -52,7 +53,8 @@ export function getDeliveryMethod(value: string | null | undefined): DeliveryMet
  */
 export function getTaxInvoiceRequestMethod(value: string | null | undefined): DeliveryMethodOption | undefined {
   if (!value) return undefined;
-  return TAX_INVOICE_REQUEST_METHODS.find((m) => m.value === value);
+  const upper = value.toUpperCase();
+  return TAX_INVOICE_REQUEST_METHODS.find((m) => m.value === value || m.value === upper);
 }
 
 /**
