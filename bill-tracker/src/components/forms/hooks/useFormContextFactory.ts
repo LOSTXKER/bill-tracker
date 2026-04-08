@@ -37,6 +37,35 @@ interface FormContextFactoryParams {
   setReferenceUrls: (urls: string[]) => void;
 }
 
+function buildDeliveryPatch(contact: ContactSummary | null): Partial<ContactFormState> {
+  const patch: Partial<ContactFormState> = {
+    whtDeliveryMethod: null,
+    whtDeliveryEmail: null,
+    whtDeliveryNotes: null,
+    updateContactDelivery: false,
+    taxInvoiceRequestMethod: null,
+    taxInvoiceRequestEmail: null,
+    taxInvoiceRequestNotes: null,
+    updateContactTaxInvoiceRequest: false,
+    hasDocument: false,
+  };
+
+  if (contact) {
+    if (contact.preferredDeliveryMethod) {
+      patch.whtDeliveryMethod = contact.preferredDeliveryMethod;
+      if (contact.deliveryEmail) patch.whtDeliveryEmail = contact.deliveryEmail;
+      if (contact.deliveryNotes) patch.whtDeliveryNotes = contact.deliveryNotes;
+    }
+    if (contact.taxInvoiceRequestMethod) {
+      patch.taxInvoiceRequestMethod = contact.taxInvoiceRequestMethod;
+      if (contact.taxInvoiceRequestEmail) patch.taxInvoiceRequestEmail = contact.taxInvoiceRequestEmail;
+      if (contact.taxInvoiceRequestNotes) patch.taxInvoiceRequestNotes = contact.taxInvoiceRequestNotes;
+    }
+  }
+
+  return patch;
+}
+
 /**
  * Builds the TransactionFormContextValue from grouped state objects.
  * Centralizes the "can edit" logic: only expenses in create/edit mode get onChange handlers.
@@ -55,6 +84,7 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
       params.patchContactState({
         selectedContact: contact,
         aiVendorSuggestion: contact ? null : cs.aiVendorSuggestion,
+        ...(isExpenseEditable ? buildDeliveryPatch(contact) : {}),
       });
     },
     onContactCreated: (contact) => {
@@ -62,6 +92,7 @@ export function useFormContextFactory(params: FormContextFactoryParams): Transac
       params.patchContactState({
         selectedContact: contact,
         aiVendorSuggestion: null,
+        ...(isExpenseEditable ? buildDeliveryPatch(contact) : {}),
       });
     },
     oneTimeContactName: cs.oneTimeContactName,

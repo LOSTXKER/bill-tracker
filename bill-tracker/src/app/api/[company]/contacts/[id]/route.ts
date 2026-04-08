@@ -56,7 +56,6 @@ async function handleGet(
   const hasDefaults =
     contact.defaultVatRate !== null ||
     contact.defaultWhtEnabled !== null ||
-    contact.descriptionTemplate !== null ||
     contact.defaultAccountId !== null ||
     (Array.isArray(contact.descriptionPresets) && (contact.descriptionPresets as unknown[]).length > 0) ||
     contact.preferredDeliveryMethod !== null ||

@@ -110,6 +110,12 @@ export function ContactSelector({
       id: contact.id,
       name: contact.name,
       taxId: contact.taxId || undefined,
+      preferredDeliveryMethod: contact.preferredDeliveryMethod,
+      deliveryEmail: contact.deliveryEmail,
+      deliveryNotes: contact.deliveryNotes,
+      taxInvoiceRequestMethod: contact.taxInvoiceRequestMethod,
+      taxInvoiceRequestEmail: contact.taxInvoiceRequestEmail,
+      taxInvoiceRequestNotes: contact.taxInvoiceRequestNotes,
     };
     onSelect(contactSummary);
     onContactNameChange?.("");

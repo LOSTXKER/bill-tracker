@@ -1,9 +1,24 @@
-export interface DescriptionPreset {
+export interface TransactionPreset {
   label: string;
   description: string;
   accountId: string;
   categoryId: string;
+  vatRate: string;
+  whtEnabled: boolean;
+  whtRate: string;
+  whtType: string;
+  documentType: string;
+  deliveryMethod: string;
+  deliveryEmail: string;
+  deliveryNotes: string;
+  taxInvoiceRequestMethod: string;
+  taxInvoiceRequestEmail: string;
+  taxInvoiceRequestNotes: string;
+  notes: string;
 }
+
+/** @deprecated Use TransactionPreset instead */
+export type DescriptionPreset = TransactionPreset;
 
 export interface ContactFormData {
   peakCode: string;
@@ -136,7 +151,26 @@ export const defaultFormData: ContactFormData = {
   taxInvoiceRequestNotes: "",
 };
 
-function parsePresets(raw: unknown): DescriptionPreset[] {
+export const EMPTY_PRESET: TransactionPreset = {
+  label: "",
+  description: "",
+  accountId: "",
+  categoryId: "",
+  vatRate: "",
+  whtEnabled: false,
+  whtRate: "",
+  whtType: "",
+  documentType: "",
+  deliveryMethod: "",
+  deliveryEmail: "",
+  deliveryNotes: "",
+  taxInvoiceRequestMethod: "",
+  taxInvoiceRequestEmail: "",
+  taxInvoiceRequestNotes: "",
+  notes: "",
+};
+
+function parsePresets(raw: unknown): TransactionPreset[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((p) => p && typeof p === "object" && typeof p.label === "string")
@@ -145,21 +179,23 @@ function parsePresets(raw: unknown): DescriptionPreset[] {
       description: p.description || "",
       accountId: p.accountId || "",
       categoryId: p.categoryId || "",
+      vatRate: p.vatRate?.toString() ?? "",
+      whtEnabled: p.whtEnabled ?? false,
+      whtRate: p.whtRate?.toString() ?? "",
+      whtType: p.whtType || "",
+      documentType: p.documentType || "",
+      deliveryMethod: p.deliveryMethod || "",
+      deliveryEmail: p.deliveryEmail || "",
+      deliveryNotes: p.deliveryNotes || "",
+      taxInvoiceRequestMethod: p.taxInvoiceRequestMethod || "",
+      taxInvoiceRequestEmail: p.taxInvoiceRequestEmail || "",
+      taxInvoiceRequestNotes: p.taxInvoiceRequestNotes || "",
+      notes: p.notes || "",
     }));
 }
 
 export function contactToFormData(contact: Contact): ContactFormData {
   const presets = parsePresets(contact.descriptionPresets);
-
-  // Auto-migrate legacy descriptionTemplate into presets if presets are empty
-  if (presets.length === 0 && contact.descriptionTemplate) {
-    presets.push({
-      label: contact.descriptionTemplate,
-      description: contact.descriptionTemplate,
-      accountId: "",
-      categoryId: "",
-    });
-  }
 
   return {
     peakCode: contact.peakCode || "",

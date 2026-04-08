@@ -272,16 +272,6 @@ export function UnifiedTransactionForm({
     [setAiState],
   );
 
-  const setDefaultsSuggestionDismissed = useCallback(
-    (v: SetStateAction<boolean>) => {
-      setContactState(prev => ({
-        ...prev,
-        defaultsSuggestionDismissed: typeof v === "function" ? v(prev.defaultsSuggestionDismissed) : v,
-      }));
-    },
-    [setContactState],
-  );
-
   // ---------------------------------------------------------------------------
   // Document files
   // ---------------------------------------------------------------------------
@@ -379,7 +369,7 @@ export function UnifiedTransactionForm({
   // ---------------------------------------------------------------------------
   // Contact defaults (SWR-based)
   // ---------------------------------------------------------------------------
-  const { defaults: contactDefaults, hasDefaults: hasContactDefaults, mutate: mutateContactDefaults } = useContactDefaults(
+  const { defaults: contactDefaults, mutate: mutateContactDefaults } = useContactDefaults(
     companyCode,
     contactState.selectedContact?.id || null
   );
@@ -714,50 +704,6 @@ export function UnifiedTransactionForm({
     return hasAmount || hasContact;
   }, [watchAmount, contactState.selectedContact]);
 
-  const applyContactDefaults = useCallback(() => {
-    if (!contactDefaults) return;
-
-    if (contactDefaults.defaultVatRate !== null) {
-      setValue("vatRate", contactDefaults.defaultVatRate);
-    }
-
-    if (contactDefaults.defaultWhtEnabled !== null) {
-      const whtField = config.type === "expense" ? "isWht" : "isWhtDeducted";
-      setValue(whtField, contactDefaults.defaultWhtEnabled);
-
-      if (contactDefaults.defaultWhtEnabled) {
-        if (contactDefaults.defaultWhtRate !== null) setValue("whtRate", Number(contactDefaults.defaultWhtRate));
-        if (contactDefaults.defaultWhtType) setValue("whtType", contactDefaults.defaultWhtType);
-      }
-    }
-
-    if (contactDefaults.descriptionTemplate && config.fields.descriptionField) {
-      setValue(config.fields.descriptionField.name, contactDefaults.descriptionTemplate);
-    }
-
-    if (contactDefaults.defaultAccountId && !selectedAccount) {
-      setSelectedAccount(contactDefaults.defaultAccountId);
-    }
-
-    const deliveryPatch: Partial<ContactFormState> = { defaultsSuggestionDismissed: true };
-
-    if (config.type === "expense") {
-      if (contactDefaults.preferredDeliveryMethod) {
-        deliveryPatch.whtDeliveryMethod = contactDefaults.preferredDeliveryMethod;
-        if (contactDefaults.deliveryEmail) deliveryPatch.whtDeliveryEmail = contactDefaults.deliveryEmail;
-        if (contactDefaults.deliveryNotes) deliveryPatch.whtDeliveryNotes = contactDefaults.deliveryNotes;
-      }
-      if (contactDefaults.taxInvoiceRequestMethod) {
-        deliveryPatch.taxInvoiceRequestMethod = contactDefaults.taxInvoiceRequestMethod;
-        if (contactDefaults.taxInvoiceRequestEmail) deliveryPatch.taxInvoiceRequestEmail = contactDefaults.taxInvoiceRequestEmail;
-        if (contactDefaults.taxInvoiceRequestNotes) deliveryPatch.taxInvoiceRequestNotes = contactDefaults.taxInvoiceRequestNotes;
-      }
-    }
-
-    patchContactState(deliveryPatch);
-    toast.success("ใช้ค่าแนะนำจากผู้ติดต่อแล้ว");
-  }, [contactDefaults, setValue, config.type, config.fields.descriptionField, patchContactState]);
-
   const extractFormData = useCallback((): MergeData => {
     return {
       amount: watchAmount ? Number(watchAmount) : null,
@@ -1064,11 +1010,8 @@ export function UnifiedTransactionForm({
             filesInitialized={filesInitialized}
             selectedContact={contactState.selectedContact}
             contactDefaults={contactDefaults}
-            hasContactDefaults={hasContactDefaults}
-            defaultsSuggestionDismissed={contactState.defaultsSuggestionDismissed}
-            setDefaultsSuggestionDismissed={setDefaultsSuggestionDismissed}
-            applyContactDefaults={applyContactDefaults}
             mutateContactDefaults={mutateContactDefaults}
+            patchContactState={patchContactState}
             setAccountSuggestion={setAccountSuggestion}
             whtChangeInfo={whtChangeInfo}
             handleWhtToggle={handleWhtToggle}

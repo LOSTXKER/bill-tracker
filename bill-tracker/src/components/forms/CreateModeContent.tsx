@@ -32,13 +32,13 @@ import { formatCurrency } from "@/lib/utils/tax-calculator";
 import type { ContactSummary } from "@/types";
 
 const EMPTY_URLS: string[] = [];
-import type { ContactDefaults, DescriptionPreset } from "@/hooks/use-contact-defaults";
+import type { ContactDefaults, TransactionPreset } from "@/hooks/use-contact-defaults";
+import type { ContactFormState } from "./hooks/useTransactionFormState";
 import type { UnifiedTransactionConfig } from "./UnifiedTransactionForm";
 import {
   TransactionFieldsSection,
   buildFieldsConfig,
 } from "./shared/TransactionFieldsSection";
-import { ContactDefaultsSuggestion } from "./shared/ContactDefaultsSuggestion";
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { CalculationSummary } from "./shared/CalculationSummary";
@@ -52,8 +52,6 @@ import {
 } from "./shared/InputMethodSection";
 import { DocumentSettingsBlock } from "./shared/DocumentSettingsBlock";
 import { useTransactionFormContext } from "./TransactionFormContext";
-import { AccountSelector } from "./shared/account-selector";
-import { CategorySelector } from "./shared/CategorySelector";
 
 // ---------------------------------------------------------------------------
 // Shared local types
@@ -127,11 +125,8 @@ export interface CreateModeContentProps {
   filesInitialized: boolean;
   selectedContact: ContactSummary | null;
   contactDefaults: ContactDefaults | null;
-  hasContactDefaults: boolean;
-  defaultsSuggestionDismissed: boolean;
-  setDefaultsSuggestionDismissed: Dispatch<SetStateAction<boolean>>;
-  applyContactDefaults: () => void;
   mutateContactDefaults: () => void;
+  patchContactState: (patch: Partial<ContactFormState>) => void;
   setAccountSuggestion: Dispatch<SetStateAction<AccountSuggestion>>;
   whtChangeInfo: WhtChangeInfo;
   handleWhtToggle: (enabled: boolean, confirmed?: boolean, reason?: string) => void;
@@ -170,11 +165,8 @@ export function CreateModeContent({
   filesInitialized,
   selectedContact,
   contactDefaults,
-  hasContactDefaults,
-  defaultsSuggestionDismissed,
-  setDefaultsSuggestionDismissed,
-  applyContactDefaults,
   mutateContactDefaults,
+  patchContactState,
   setAccountSuggestion,
   whtChangeInfo,
   handleWhtToggle,
@@ -294,27 +286,19 @@ export function CreateModeContent({
               }}
             />
 
-            {selectedContact && hasContactDefaults && contactDefaults && !defaultsSuggestionDismissed && (
-              <ContactDefaultsSuggestion
-                contactName={selectedContact.name}
-                defaults={contactDefaults}
-                onApply={applyContactDefaults}
-                onDismiss={() => setDefaultsSuggestionDismissed(true)}
-              />
-            )}
-
             {selectedContact && (
               <div className="flex items-center gap-2">
-                {contactDefaults && contactDefaults.descriptionPresets.length > 0 && (
+                {contactDefaults && contactDefaults.presets.length > 0 && (
                   <div className="flex-1">
                     <PresetDropdown
-                      presets={contactDefaults.descriptionPresets}
-                      descriptionFieldName={config.fields.descriptionField?.name}
+                      presets={contactDefaults.presets}
+                      config={config}
                       setValue={setValue}
+                      patchContactState={patchContactState}
                     />
                   </div>
                 )}
-                <div className={contactDefaults && contactDefaults.descriptionPresets.length > 0 ? "" : "flex-1"}>
+                <div className={contactDefaults && contactDefaults.presets.length > 0 ? "" : "flex-1"}>
                   <Button
                     type="button"
                     variant="outline"
@@ -323,7 +307,7 @@ export function CreateModeContent({
                     onClick={() => setSavePresetOpen(true)}
                   >
                     <Bookmark className="h-3.5 w-3.5" />
-                    บันทึกเป็นรายการที่ใช้บ่อย
+                    บันทึกเป็น Preset
                   </Button>
                 </div>
               </div>
@@ -335,15 +319,9 @@ export function CreateModeContent({
                 onOpenChange={setSavePresetOpen}
                 companyCode={companyCode}
                 contactId={selectedContact.id}
-                existingPresets={contactDefaults?.descriptionPresets ?? []}
-                initialDescription={
-                  config.fields.descriptionField
-                    ? String(watch(config.fields.descriptionField.name) || "")
-                    : ""
-                }
-                initialAccountId={selectedAccount}
-                initialCategoryId={selectedCategory}
-                configType={config.type}
+                existingPresets={contactDefaults?.presets ?? []}
+                config={config}
+                watch={watch}
                 onSaved={mutateContactDefaults}
               />
             )}
@@ -587,12 +565,14 @@ export function CreateModeContent({
 
 function PresetDropdown({
   presets,
-  descriptionFieldName,
+  config,
   setValue,
+  patchContactState,
 }: {
-  presets: { label: string; description: string; accountId?: string | null; categoryId?: string | null }[];
-  descriptionFieldName?: string;
+  presets: TransactionPreset[];
+  config: UnifiedTransactionConfig;
   setValue: UseFormSetValue<Record<string, unknown>>;
+  patchContactState: (patch: Partial<ContactFormState>) => void;
 }) {
   const { onAccountChange, onCategoryChange } = useTransactionFormContext();
 
@@ -600,15 +580,29 @@ function PresetDropdown({
     const preset = presets[Number(index)];
     if (!preset) return;
 
-    if (preset.description && descriptionFieldName) {
-      setValue(descriptionFieldName, preset.description);
+    if (preset.description && config.fields.descriptionField?.name) {
+      setValue(config.fields.descriptionField.name, preset.description);
     }
-    if (preset.accountId) {
-      onAccountChange(preset.accountId);
+    if (preset.accountId) onAccountChange(preset.accountId);
+    if (preset.categoryId) onCategoryChange(preset.categoryId);
+    if (preset.vatRate != null) setValue("vatRate", Number(preset.vatRate));
+    if (preset.whtEnabled != null) {
+      setValue("isWht", preset.whtEnabled);
+      if (preset.whtType) setValue("whtType", preset.whtType);
+      if (preset.whtRate != null) setValue("whtRate", Number(preset.whtRate));
     }
-    if (preset.categoryId) {
-      onCategoryChange(preset.categoryId);
-    }
+    if (preset.documentType) setValue("documentType", preset.documentType);
+
+    const contactPatch: Partial<ContactFormState> = {};
+    if (preset.deliveryMethod) contactPatch.whtDeliveryMethod = preset.deliveryMethod;
+    if (preset.deliveryEmail) contactPatch.whtDeliveryEmail = preset.deliveryEmail;
+    if (preset.deliveryNotes) contactPatch.whtDeliveryNotes = preset.deliveryNotes;
+    if (preset.taxInvoiceRequestMethod) contactPatch.taxInvoiceRequestMethod = preset.taxInvoiceRequestMethod;
+    if (preset.taxInvoiceRequestEmail) contactPatch.taxInvoiceRequestEmail = preset.taxInvoiceRequestEmail;
+    if (preset.taxInvoiceRequestNotes) contactPatch.taxInvoiceRequestNotes = preset.taxInvoiceRequestNotes;
+    if (Object.keys(contactPatch).length > 0) patchContactState(contactPatch);
+
+    if (preset.notes) setValue("notes", preset.notes);
   };
 
   return (
@@ -616,11 +610,11 @@ function PresetDropdown({
       <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
       <div className="flex-1">
         <Label className="text-xs text-muted-foreground mb-1 block">
-          เลือกรายการบันทึกที่ใช้บ่อย
+          เลือก Preset
         </Label>
         <Select onValueChange={handleSelect}>
           <SelectTrigger className="h-9 text-sm">
-            <SelectValue placeholder="เลือกรายการที่ต้องการ..." />
+            <SelectValue placeholder="เลือก preset..." />
           </SelectTrigger>
           <SelectContent>
             {presets.map((preset, index) => (
@@ -645,29 +639,33 @@ function SavePresetDialog({
   companyCode,
   contactId,
   existingPresets,
-  initialDescription,
-  initialAccountId,
-  initialCategoryId,
-  configType,
+  config,
+  watch,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyCode: string;
   contactId: string;
-  existingPresets: DescriptionPreset[];
-  initialDescription: string;
-  initialAccountId: string | null;
-  initialCategoryId: string | null;
-  configType: string;
+  existingPresets: TransactionPreset[];
+  config: UnifiedTransactionConfig;
+  watch: UseFormWatch<Record<string, unknown>>;
   onSaved: () => void;
 }) {
+  const {
+    selectedAccount,
+    selectedCategory,
+    whtDeliveryMethod,
+    whtDeliveryEmail,
+    whtDeliveryNotes,
+    taxInvoiceRequestMethod,
+    taxInvoiceRequestEmail,
+    taxInvoiceRequestNotes,
+  } = useTransactionFormContext();
+
   const [saveMode, setSaveMode] = useState<"new" | "overwrite">("new");
   const [overwriteIndex, setOverwriteIndex] = useState<number | null>(null);
   const [label, setLabel] = useState("");
-  const [description, setDescription] = useState(initialDescription);
-  const [accountId, setAccountId] = useState<string | null>(initialAccountId);
-  const [categoryId, setCategoryId] = useState<string | null>(initialCategoryId);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -675,21 +673,37 @@ function SavePresetDialog({
       setSaveMode("new");
       setOverwriteIndex(null);
       setLabel("");
-      setDescription(initialDescription);
-      setAccountId(initialAccountId);
-      setCategoryId(initialCategoryId);
     }
-  }, [open, initialDescription, initialAccountId, initialCategoryId]);
+  }, [open]);
+
+  const buildPresetFromForm = (): TransactionPreset => {
+    const desc = config.fields.descriptionField
+      ? String(watch(config.fields.descriptionField.name) || "")
+      : "";
+    return {
+      label: label.trim(),
+      description: desc,
+      accountId: selectedAccount || null,
+      categoryId: selectedCategory || null,
+      vatRate: watch("vatRate") != null ? Number(watch("vatRate")) : null,
+      whtEnabled: !!watch("isWht"),
+      whtRate: watch("whtRate") != null ? Number(watch("whtRate")) : null,
+      whtType: (watch("whtType") as string) || null,
+      documentType: (watch("documentType") as string) || null,
+      deliveryMethod: whtDeliveryMethod || null,
+      deliveryEmail: whtDeliveryEmail || null,
+      deliveryNotes: whtDeliveryNotes || null,
+      taxInvoiceRequestMethod: taxInvoiceRequestMethod || null,
+      taxInvoiceRequestEmail: taxInvoiceRequestEmail || null,
+      taxInvoiceRequestNotes: taxInvoiceRequestNotes || null,
+      notes: (watch("notes") as string) || null,
+    };
+  };
 
   const handleSelectOverwriteTarget = (index: number) => {
     setOverwriteIndex(index);
     const preset = existingPresets[index];
-    if (preset) {
-      setLabel(preset.label);
-      setDescription(preset.description);
-      setAccountId(preset.accountId ?? null);
-      setCategoryId(preset.categoryId ?? null);
-    }
+    if (preset) setLabel(preset.label);
   };
 
   const handleSaveModeChange = (mode: "new" | "overwrite") => {
@@ -697,38 +711,24 @@ function SavePresetDialog({
     if (mode === "new") {
       setOverwriteIndex(null);
       setLabel("");
-      setDescription(initialDescription);
-      setAccountId(initialAccountId);
-      setCategoryId(initialCategoryId);
     } else if (mode === "overwrite" && existingPresets.length > 0) {
       handleSelectOverwriteTarget(0);
     }
   };
 
   const handleSave = async () => {
-    const trimmedLabel = label.trim();
-    const trimmedDesc = description.trim();
-    if (!trimmedLabel) {
-      toast.error("กรุณาระบุชื่อย่อ");
-      return;
-    }
-    if (!trimmedDesc) {
-      toast.error("กรุณาระบุคำอธิบาย");
+    if (!label.trim()) {
+      toast.error("กรุณาระบุชื่อ Preset");
       return;
     }
     if (saveMode === "overwrite" && overwriteIndex === null) {
-      toast.error("กรุณาเลือกรายการที่ต้องการบันทึกทับ");
+      toast.error("กรุณาเลือก preset ที่ต้องการบันทึกทับ");
       return;
     }
 
     setSaving(true);
     try {
-      const newPreset: DescriptionPreset = {
-        label: trimmedLabel,
-        description: trimmedDesc,
-        accountId,
-        categoryId,
-      };
+      const newPreset = buildPresetFromForm();
 
       const updatedPresets =
         saveMode === "overwrite" && overwriteIndex !== null
@@ -740,9 +740,7 @@ function SavePresetDialog({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            descriptionPresets: updatedPresets,
-          }),
+          body: JSON.stringify({ descriptionPresets: updatedPresets }),
         }
       );
 
@@ -751,11 +749,7 @@ function SavePresetDialog({
         throw new Error(data.error || "บันทึกไม่สำเร็จ");
       }
 
-      toast.success(
-        saveMode === "overwrite"
-          ? "บันทึกทับรายการที่ใช้บ่อยแล้ว"
-          : "บันทึกรายการที่ใช้บ่อยแล้ว"
-      );
+      toast.success(saveMode === "overwrite" ? "บันทึกทับ preset แล้ว" : "บันทึก preset แล้ว");
       onSaved();
       onOpenChange(false);
     } catch (err) {
@@ -771,9 +765,13 @@ function SavePresetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>บันทึกเป็นรายการที่ใช้บ่อย</DialogTitle>
+          <DialogTitle>บันทึกเป็น Preset</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          <p className="text-xs text-muted-foreground">
+            ข้อมูลทั้งหมดในฟอร์มปัจจุบัน (VAT, WHT, บัญชี, หมวดหมู่, คำอธิบาย, วิธีส่งเอกสาร, ฯลฯ) จะถูกบันทึกลงใน preset
+          </p>
+
           {hasExisting && (
             <div className="flex gap-2">
               <Button
@@ -801,13 +799,13 @@ function SavePresetDialog({
 
           {saveMode === "overwrite" && hasExisting && (
             <div className="space-y-1.5">
-              <Label className="text-sm">เลือกรายการที่ต้องการบันทึกทับ</Label>
+              <Label className="text-sm">เลือก preset ที่ต้องการบันทึกทับ</Label>
               <Select
                 value={overwriteIndex !== null ? String(overwriteIndex) : undefined}
                 onValueChange={(val) => handleSelectOverwriteTarget(Number(val))}
               >
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="เลือกรายการ..." />
+                  <SelectValue placeholder="เลือก preset..." />
                 </SelectTrigger>
                 <SelectContent>
                   {existingPresets.map((preset, index) => (
@@ -821,39 +819,13 @@ function SavePresetDialog({
           )}
 
           <div className="space-y-1.5">
-            <Label className="text-sm">ชื่อย่อ <span className="text-red-500">*</span></Label>
+            <Label className="text-sm">ชื่อ Preset <span className="text-red-500">*</span></Label>
             <Input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="เช่น ค่าบริการรายเดือน"
               className="h-10"
               autoFocus
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-sm">คำอธิบาย <span className="text-red-500">*</span></Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="คำอธิบายเต็ม"
-              className="h-10"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-sm">บัญชี</Label>
-            <AccountSelector
-              value={accountId}
-              onValueChange={setAccountId}
-              companyCode={companyCode}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-sm">หมวดหมู่</Label>
-            <CategorySelector
-              value={categoryId}
-              onValueChange={setCategoryId}
-              companyCode={companyCode}
-              type={configType === "expense" ? "EXPENSE" : "INCOME"}
             />
           </div>
         </div>

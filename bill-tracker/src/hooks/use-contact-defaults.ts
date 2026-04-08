@@ -3,20 +3,34 @@
 import useSWR from "swr";
 import { getErrorMessage } from "@/lib/utils/error-helpers";
 
-export interface DescriptionPreset {
+export interface TransactionPreset {
   label: string;
   description: string;
   accountId?: string | null;
   categoryId?: string | null;
+  vatRate?: number | null;
+  whtEnabled?: boolean | null;
+  whtRate?: number | null;
+  whtType?: string | null;
+  documentType?: string | null;
+  deliveryMethod?: string | null;
+  deliveryEmail?: string | null;
+  deliveryNotes?: string | null;
+  taxInvoiceRequestMethod?: string | null;
+  taxInvoiceRequestEmail?: string | null;
+  taxInvoiceRequestNotes?: string | null;
+  notes?: string | null;
 }
+
+/** @deprecated Use TransactionPreset instead */
+export type DescriptionPreset = TransactionPreset;
 
 export interface ContactDefaults {
   defaultVatRate: number | null;
   defaultWhtEnabled: boolean | null;
   defaultWhtRate: number | null;
   defaultWhtType: string | null;
-  descriptionTemplate: string | null;
-  descriptionPresets: DescriptionPreset[];
+  presets: TransactionPreset[];
   defaultAccountId: string | null;
   defaultAccountCode: string | null;
   defaultAccountName: string | null;
@@ -38,7 +52,7 @@ export interface ContactWithDefaults {
   defaultWhtRate: number | null;
   defaultWhtType: string | null;
   descriptionTemplate: string | null;
-  descriptionPresets: DescriptionPreset[] | unknown;
+  descriptionPresets: TransactionPreset[] | unknown;
   defaultAccountId: string | null;
   defaultAccountCode: string | null;
   defaultAccountName: string | null;
@@ -69,7 +83,7 @@ interface UseContactDefaultsReturn {
   mutate: () => void;
 }
 
-function parsePresets(raw: unknown): DescriptionPreset[] {
+function parsePresets(raw: unknown): TransactionPreset[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((p) => p && typeof p === "object" && typeof p.label === "string")
@@ -78,6 +92,18 @@ function parsePresets(raw: unknown): DescriptionPreset[] {
       description: p.description || "",
       accountId: p.accountId || null,
       categoryId: p.categoryId || null,
+      vatRate: p.vatRate ?? null,
+      whtEnabled: p.whtEnabled ?? null,
+      whtRate: p.whtRate ?? null,
+      whtType: p.whtType || null,
+      documentType: p.documentType || null,
+      deliveryMethod: p.deliveryMethod || null,
+      deliveryEmail: p.deliveryEmail || null,
+      deliveryNotes: p.deliveryNotes || null,
+      taxInvoiceRequestMethod: p.taxInvoiceRequestMethod || null,
+      taxInvoiceRequestEmail: p.taxInvoiceRequestEmail || null,
+      taxInvoiceRequestNotes: p.taxInvoiceRequestNotes || null,
+      notes: p.notes || null,
     }));
 }
 
@@ -104,8 +130,7 @@ export function useContactDefaults(
     defaultWhtEnabled: contact.defaultWhtEnabled,
     defaultWhtRate: contact.defaultWhtRate,
     defaultWhtType: contact.defaultWhtType,
-    descriptionTemplate: contact.descriptionTemplate,
-    descriptionPresets: presets,
+    presets,
     defaultAccountId: contact.defaultAccountId,
     defaultAccountCode: contact.defaultAccountCode,
     defaultAccountName: contact.defaultAccountName,

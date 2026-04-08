@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -10,13 +12,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Lightbulb, Plus, Trash2 } from "lucide-react";
+import { Lightbulb, Plus, Trash2, ChevronDown, Layers } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
+import { DELIVERY_METHODS, TAX_INVOICE_REQUEST_METHODS } from "@/lib/constants/delivery-methods";
 import { AccountSelector } from "@/components/forms/shared/account-selector";
 import { CategorySelector } from "@/components/forms/shared/CategorySelector";
-import type { ContactFormSectionProps, DescriptionPreset } from "./contact-form-types";
+import { cn } from "@/lib/utils";
+import { EMPTY_PRESET, type ContactFormSectionProps, type TransactionPreset } from "./contact-form-types";
 
 function getFilterClass(category: string): string | undefined {
   if (category === "VENDOR") return "EXPENSE";
@@ -33,7 +42,7 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
   const filterClass = getFilterClass(formData.contactCategory);
   const categoryType = getCategoryType(formData.contactCategory);
 
-  const updatePreset = (index: number, field: keyof DescriptionPreset, value: string) => {
+  const updatePreset = (index: number, field: keyof TransactionPreset, value: string | boolean) => {
     const updated = [...formData.descriptionPresets];
     updated[index] = { ...updated[index], [field]: value };
     setFormData({ ...formData, descriptionPresets: updated });
@@ -42,10 +51,7 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
   const addPreset = () => {
     setFormData({
       ...formData,
-      descriptionPresets: [
-        ...formData.descriptionPresets,
-        { label: "", description: "", accountId: "", categoryId: "" },
-      ],
+      descriptionPresets: [...formData.descriptionPresets, { ...EMPTY_PRESET }],
     });
   };
 
@@ -118,7 +124,7 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
           <h3 className="font-medium text-sm">ค่าเริ่มต้นสำหรับธุรกรรม</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          ค่าเหล่านี้จะแสดงเป็นคำแนะนำเมื่อเลือกผู้ติดต่อนี้ในฟอร์มรายจ่าย/รายรับ
+          ค่าเหล่านี้จะถูกเติมอัตโนมัติเมื่อเลือกผู้ติดต่อนี้ในฟอร์มรายจ่าย/รายรับ
         </p>
 
         <div className="grid grid-cols-2 gap-4">
@@ -220,93 +226,315 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
 
       <Separator />
 
-      {/* Description Presets */}
+      {/* Transaction Presets */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-medium text-sm">รายการบันทึกที่ใช้บ่อย</h3>
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-violet-500" />
+              <h3 className="font-medium text-sm">Preset รายการบันทึก</h3>
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              สร้างรายการไว้ล่วงหน้า เวลาบันทึกธุรกรรมจะเลือกจาก dropdown ได้เลย
+              สร้าง preset ไว้ล่วงหน้า เวลาบันทึกธุรกรรมจะเลือกจาก dropdown แล้วเติมข้อมูลให้ทั้งหมด
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" className="gap-1" onClick={addPreset}>
             <Plus className="h-3 w-3" />
-            เพิ่มรายการ
+            เพิ่ม Preset
           </Button>
         </div>
 
         {formData.descriptionPresets.length === 0 ? (
           <div className="text-center py-6 text-sm text-muted-foreground border border-dashed rounded-lg">
-            ยังไม่มีรายการบันทึก กด &ldquo;เพิ่มรายการ&rdquo; เพื่อสร้าง
+            ยังไม่มี preset กด &ldquo;เพิ่ม Preset&rdquo; เพื่อสร้าง
           </div>
         ) : (
           <div className="space-y-3">
             {formData.descriptionPresets.map((preset, index) => (
-              <div key={index} className="border rounded-lg p-3 space-y-3 relative">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => removePreset(index)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-                <div className="grid grid-cols-2 gap-3 pr-8">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">ชื่อย่อ</Label>
-                    <Input
-                      value={preset.label}
-                      onChange={(e) => updatePreset(index, "label", e.target.value)}
-                      placeholder="เช่น ค่าบริการรายเดือน"
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">บัญชี (ถ้าต่างจากค่าเริ่มต้น)</Label>
-                    {companyCode ? (
-                      <AccountSelector
-                        value={preset.accountId || null}
-                        onValueChange={(val) => updatePreset(index, "accountId", val || "")}
-                        companyCode={companyCode}
-                        placeholder="ใช้บัญชีเริ่มต้น"
-                        filterClass={filterClass}
-                      />
-                    ) : (
-                      <Input disabled placeholder="—" className="h-9 text-sm" />
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">หมวดหมู่</Label>
-                    {companyCode ? (
-                      <CategorySelector
-                        value={preset.categoryId || null}
-                        onValueChange={(val) => updatePreset(index, "categoryId", val || "")}
-                        companyCode={companyCode}
-                        type={categoryType}
-                        placeholder="ไม่ระบุหมวดหมู่"
-                      />
-                    ) : (
-                      <Input disabled placeholder="—" className="h-9 text-sm" />
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">คำอธิบายเต็ม</Label>
-                    <Input
-                      value={preset.description}
-                      onChange={(e) => updatePreset(index, "description", e.target.value)}
-                      placeholder="เช่น ค่าบริการที่ปรึกษาประจำเดือน ม.ค. 2569"
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
+              <PresetCard
+                key={index}
+                preset={preset}
+                index={index}
+                companyCode={companyCode}
+                filterClass={filterClass}
+                categoryType={categoryType}
+                onUpdate={updatePreset}
+                onRemove={removePreset}
+              />
             ))}
           </div>
         )}
       </div>
     </>
+  );
+}
+
+function PresetCard({
+  preset,
+  index,
+  companyCode,
+  filterClass,
+  categoryType,
+  onUpdate,
+  onRemove,
+}: {
+  preset: TransactionPreset;
+  index: number;
+  companyCode?: string;
+  filterClass?: string;
+  categoryType: "EXPENSE" | "INCOME";
+  onUpdate: (index: number, field: keyof TransactionPreset, value: string | boolean) => void;
+  onRemove: (index: number) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  const summaryParts: string[] = [];
+  if (preset.description) summaryParts.push(preset.description);
+  if (preset.vatRate) summaryParts.push(`VAT ${preset.vatRate}%`);
+  if (preset.whtEnabled) summaryParts.push(`WHT ${preset.whtRate || "?"}%`);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="border rounded-lg overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+              <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+            </Button>
+          </CollapsibleTrigger>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {preset.label || <span className="text-muted-foreground italic">Preset #{index + 1}</span>}
+            </p>
+            {!open && summaryParts.length > 0 && (
+              <p className="text-xs text-muted-foreground truncate">{summaryParts.join(" · ")}</p>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={() => onRemove(index)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <CollapsibleContent>
+          <div className="p-3 space-y-3 border-t">
+            {/* Row 1: Label + Description */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">ชื่อ Preset</Label>
+                <Input
+                  value={preset.label}
+                  onChange={(e) => onUpdate(index, "label", e.target.value)}
+                  placeholder="เช่น ค่าบริการรายเดือน"
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">คำอธิบาย</Label>
+                <Input
+                  value={preset.description}
+                  onChange={(e) => onUpdate(index, "description", e.target.value)}
+                  placeholder="คำอธิบายรายการ"
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Account + Category */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">หมวดบัญชี</Label>
+                {companyCode ? (
+                  <AccountSelector
+                    value={preset.accountId || null}
+                    onValueChange={(val) => onUpdate(index, "accountId", val || "")}
+                    companyCode={companyCode}
+                    placeholder="ไม่ระบุ"
+                    filterClass={filterClass}
+                  />
+                ) : (
+                  <Input disabled placeholder="—" className="h-9 text-sm" />
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">หมวดหมู่</Label>
+                {companyCode ? (
+                  <CategorySelector
+                    value={preset.categoryId || null}
+                    onValueChange={(val) => onUpdate(index, "categoryId", val || "")}
+                    companyCode={companyCode}
+                    type={categoryType}
+                    placeholder="ไม่ระบุ"
+                  />
+                ) : (
+                  <Input disabled placeholder="—" className="h-9 text-sm" />
+                )}
+              </div>
+            </div>
+
+            {/* Row 3: VAT + WHT */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">VAT</Label>
+                <Select
+                  value={preset.vatRate || "__NONE__"}
+                  onValueChange={(v) => onUpdate(index, "vatRate", v === "__NONE__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="ใช้ค่าเริ่มต้น" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__NONE__">ใช้ค่าเริ่มต้น</SelectItem>
+                    <SelectItem value="0">0%</SelectItem>
+                    <SelectItem value="7">7%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">ประเภทเอกสาร</Label>
+                <Select
+                  value={preset.documentType || "__NONE__"}
+                  onValueChange={(v) => onUpdate(index, "documentType", v === "__NONE__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="ไม่ระบุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
+                    <SelectItem value="TAX_INVOICE">ใบกำกับภาษี</SelectItem>
+                    <SelectItem value="CASH_RECEIPT">บิลเงินสด</SelectItem>
+                    <SelectItem value="NO_DOCUMENT">ไม่มีเอกสาร</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* WHT toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={preset.whtEnabled}
+                  onCheckedChange={(checked) => {
+                    onUpdate(index, "whtEnabled", checked);
+                    if (checked && !preset.whtType) {
+                      onUpdate(index, "whtType", "SERVICE");
+                      onUpdate(index, "whtRate", "3");
+                    }
+                  }}
+                />
+                <Label className="text-xs cursor-pointer">หัก ณ ที่จ่าย</Label>
+              </div>
+              {preset.whtEnabled && (
+                <div className="grid grid-cols-2 gap-3 pl-10">
+                  <Select
+                    value={preset.whtType || "SERVICE"}
+                    onValueChange={(v) => {
+                      onUpdate(index, "whtType", v);
+                      onUpdate(index, "whtRate", WHT_RATE_BY_TYPE[v]?.toString() || preset.whtRate);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WHT_TYPE_OPTIONS.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    value={preset.whtRate}
+                    onChange={(e) => onUpdate(index, "whtRate", e.target.value)}
+                    placeholder="3"
+                    className="h-9 text-sm"
+                    min="0" max="100" step="0.01"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Row 4: Delivery + Tax Invoice */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">วิธีส่งเอกสาร</Label>
+                <Select
+                  value={preset.deliveryMethod || "__NONE__"}
+                  onValueChange={(v) => onUpdate(index, "deliveryMethod", v === "__NONE__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="ไม่ระบุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
+                    {DELIVERY_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">ช่องทางขอใบกำกับ</Label>
+                <Select
+                  value={preset.taxInvoiceRequestMethod || "__NONE__"}
+                  onValueChange={(v) => onUpdate(index, "taxInvoiceRequestMethod", v === "__NONE__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="ไม่ระบุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
+                    {TAX_INVOICE_REQUEST_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Conditional email fields */}
+            {preset.deliveryMethod === "EMAIL" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">อีเมลส่งเอกสาร</Label>
+                <Input
+                  value={preset.deliveryEmail}
+                  onChange={(e) => onUpdate(index, "deliveryEmail", e.target.value)}
+                  placeholder="email@example.com"
+                  className="h-9 text-sm"
+                />
+              </div>
+            )}
+            {preset.taxInvoiceRequestMethod === "EMAIL" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">อีเมลขอใบกำกับ</Label>
+                <Input
+                  value={preset.taxInvoiceRequestEmail}
+                  onChange={(e) => onUpdate(index, "taxInvoiceRequestEmail", e.target.value)}
+                  placeholder="email@example.com"
+                  className="h-9 text-sm"
+                />
+              </div>
+            )}
+
+            {/* Row 5: Notes */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">หมายเหตุ</Label>
+              <Textarea
+                value={preset.notes}
+                onChange={(e) => onUpdate(index, "notes", e.target.value)}
+                placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
+                className="min-h-[36px] text-sm resize-none"
+                rows={1}
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }
