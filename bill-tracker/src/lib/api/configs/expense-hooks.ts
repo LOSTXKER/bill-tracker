@@ -7,19 +7,7 @@ import { learnFromTransaction } from "../vendor-mapping";
 export async function handleExpenseAfterCreate(item: Expense, body: TransactionRequestBody, context: TransactionHookContext) {
   if (item.contactId && !item.isSettlementTransfer) {
     try {
-      await prisma.contact.findUnique({
-        where: { id: item.contactId },
-        select: { defaultsLastUpdatedAt: true },
-      });
-
-      const contactUpdate: Record<string, unknown> = {
-        defaultVatRate: item.vatRate,
-        defaultWhtEnabled: item.isWht,
-        defaultWhtRate: item.whtRate,
-        defaultWhtType: item.whtType,
-        descriptionTemplate: item.description,
-        defaultsLastUpdatedAt: new Date(),
-      };
+      const contactUpdate: Record<string, unknown> = {};
 
       if (body.updateContactDelivery && item.whtDeliveryMethod) {
         contactUpdate.preferredDeliveryMethod = item.whtDeliveryMethod;
@@ -33,12 +21,14 @@ export async function handleExpenseAfterCreate(item: Expense, body: TransactionR
         contactUpdate.taxInvoiceRequestNotes = item.taxInvoiceRequestNotes || null;
       }
 
-      await prisma.contact.update({
-        where: { id: item.contactId },
-        data: contactUpdate as Prisma.ContactUncheckedUpdateInput,
-      });
+      if (Object.keys(contactUpdate).length > 0) {
+        await prisma.contact.update({
+          where: { id: item.contactId },
+          data: contactUpdate as Prisma.ContactUncheckedUpdateInput,
+        });
+      }
     } catch (error) {
-      console.error("Failed to update contact defaults:", error);
+      console.error("Failed to update contact delivery preferences:", error);
     }
   }
 

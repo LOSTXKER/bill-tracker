@@ -20,15 +20,7 @@ export interface TransactionPreset {
 export type DescriptionPreset = TransactionPreset;
 
 export interface ContactDefaults {
-  defaultVatRate: number | null;
-  defaultWhtEnabled: boolean | null;
-  defaultWhtRate: number | null;
-  defaultWhtType: string | null;
   presets: TransactionPreset[];
-  defaultAccountId: string | null;
-  defaultAccountCode: string | null;
-  defaultAccountName: string | null;
-  defaultsLastUpdatedAt: string | null;
   preferredDeliveryMethod: string | null;
   deliveryEmail: string | null;
   deliveryNotes: string | null;
@@ -41,16 +33,7 @@ export interface ContactWithDefaults {
   id: string;
   name: string;
   taxId: string | null;
-  defaultVatRate: number | null;
-  defaultWhtEnabled: boolean | null;
-  defaultWhtRate: number | null;
-  defaultWhtType: string | null;
-  descriptionTemplate: string | null;
   descriptionPresets: TransactionPreset[] | unknown;
-  defaultAccountId: string | null;
-  defaultAccountCode: string | null;
-  defaultAccountName: string | null;
-  defaultsLastUpdatedAt: string | null;
   preferredDeliveryMethod: string | null;
   deliveryEmail: string | null;
   deliveryNotes: string | null;
@@ -114,15 +97,7 @@ export function useContactDefaults(
   const presets = contact ? parsePresets(contact.descriptionPresets) : [];
 
   const defaults: ContactDefaults | null = contact && hasDefaults ? {
-    defaultVatRate: contact.defaultVatRate,
-    defaultWhtEnabled: contact.defaultWhtEnabled,
-    defaultWhtRate: contact.defaultWhtRate,
-    defaultWhtType: contact.defaultWhtType,
     presets,
-    defaultAccountId: contact.defaultAccountId,
-    defaultAccountCode: contact.defaultAccountCode,
-    defaultAccountName: contact.defaultAccountName,
-    defaultsLastUpdatedAt: contact.defaultsLastUpdatedAt,
     preferredDeliveryMethod: contact.preferredDeliveryMethod,
     deliveryEmail: contact.deliveryEmail,
     deliveryNotes: contact.deliveryNotes,

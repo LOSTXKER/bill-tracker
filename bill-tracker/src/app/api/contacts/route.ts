@@ -88,19 +88,9 @@ export const POST = withCompanyAccess(
         creditLimit: body.creditLimit,
         paymentTerms: body.paymentTerms,
         notes: body.notes || null,
-        // Contact defaults for transactions
-        defaultVatRate: body.defaultVatRate ?? null,
-        defaultWhtEnabled: body.defaultWhtEnabled ?? null,
-        defaultWhtRate: body.defaultWhtRate ?? null,
-        defaultWhtType: body.defaultWhtType || null,
-        descriptionTemplate: body.descriptionTemplate || null,
+        // Transaction presets
         descriptionPresets: Array.isArray(body.descriptionPresets) ? body.descriptionPresets : [],
-        defaultAccountId: body.defaultAccountId || null,
-        defaultsLastUpdatedAt: body.defaultVatRate !== undefined || 
-                               body.defaultWhtEnabled !== undefined ||
-                               body.descriptionTemplate !== undefined ||
-                               body.defaultAccountId !== undefined ||
-                               (Array.isArray(body.descriptionPresets) && body.descriptionPresets.length > 0)
+        defaultsLastUpdatedAt: (Array.isArray(body.descriptionPresets) && body.descriptionPresets.length > 0)
           ? new Date()
           : null,
         // Delivery preferences
@@ -148,15 +138,7 @@ export const PATCH = withCompanyAccess(
       return apiResponse.error(new Error("Contact not found"));
     }
 
-    // Check if defaults are being updated
-    const isUpdatingDefaults = 
-      data.defaultVatRate !== undefined ||
-      data.defaultWhtEnabled !== undefined ||
-      data.defaultWhtRate !== undefined ||
-      data.defaultWhtType !== undefined ||
-      data.descriptionTemplate !== undefined ||
-      data.descriptionPresets !== undefined ||
-      data.defaultAccountId !== undefined;
+    const isUpdatingDefaults = data.descriptionPresets !== undefined;
 
     const contact = await prisma.contact.update({
       where: { id },
@@ -186,14 +168,8 @@ export const PATCH = withCompanyAccess(
         creditLimit: data.creditLimit ?? existing.creditLimit,
         paymentTerms: data.paymentTerms ?? existing.paymentTerms,
         notes: data.notes ?? existing.notes,
-        // Contact defaults for transactions
-        defaultVatRate: data.defaultVatRate !== undefined ? data.defaultVatRate : existing.defaultVatRate,
-        defaultWhtEnabled: data.defaultWhtEnabled !== undefined ? data.defaultWhtEnabled : existing.defaultWhtEnabled,
-        defaultWhtRate: data.defaultWhtRate !== undefined ? data.defaultWhtRate : existing.defaultWhtRate,
-        defaultWhtType: data.defaultWhtType !== undefined ? data.defaultWhtType : existing.defaultWhtType,
-        descriptionTemplate: data.descriptionTemplate !== undefined ? data.descriptionTemplate : existing.descriptionTemplate,
+        // Transaction presets
         descriptionPresets: data.descriptionPresets !== undefined ? data.descriptionPresets : undefined,
-        defaultAccountId: data.defaultAccountId !== undefined ? data.defaultAccountId : existing.defaultAccountId,
         defaultsLastUpdatedAt: isUpdatingDefaults ? new Date() : existing.defaultsLastUpdatedAt,
         // Delivery preferences
         preferredDeliveryMethod: data.preferredDeliveryMethod !== undefined ? (data.preferredDeliveryMethod?.toUpperCase() || null) : existing.preferredDeliveryMethod,

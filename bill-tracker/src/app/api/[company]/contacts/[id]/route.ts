@@ -31,15 +31,7 @@ async function handleGet(
       contactCategory: true,
       entityType: true,
       source: true,
-      defaultVatRate: true,
-      defaultWhtEnabled: true,
-      defaultWhtRate: true,
-      defaultWhtType: true,
-      descriptionTemplate: true,
       descriptionPresets: true,
-      defaultAccountId: true,
-      DefaultAccount: { select: { id: true, code: true, name: true } },
-      defaultsLastUpdatedAt: true,
       preferredDeliveryMethod: true,
       deliveryEmail: true,
       deliveryNotes: true,
@@ -54,19 +46,12 @@ async function handleGet(
   }
 
   const hasDefaults =
-    contact.defaultVatRate !== null ||
-    contact.defaultWhtEnabled !== null ||
-    contact.defaultAccountId !== null ||
     (Array.isArray(contact.descriptionPresets) && (contact.descriptionPresets as unknown[]).length > 0) ||
     contact.preferredDeliveryMethod !== null ||
     contact.taxInvoiceRequestMethod !== null;
 
   return apiResponse.success({
-    contact: {
-      ...contact,
-      defaultAccountCode: contact.DefaultAccount?.code ?? null,
-      defaultAccountName: contact.DefaultAccount?.name ?? null,
-    },
+    contact,
     hasDefaults,
   });
 }
@@ -94,13 +79,7 @@ async function handlePatch(
   const contact = await prisma.contact.update({
     where: { id: context.params.id },
     data: {
-      defaultVatRate: body.defaultVatRate !== undefined ? body.defaultVatRate : existing.defaultVatRate,
-      defaultWhtEnabled: body.defaultWhtEnabled !== undefined ? body.defaultWhtEnabled : existing.defaultWhtEnabled,
-      defaultWhtRate: body.defaultWhtRate !== undefined ? body.defaultWhtRate : existing.defaultWhtRate,
-      defaultWhtType: body.defaultWhtType !== undefined ? body.defaultWhtType : existing.defaultWhtType,
-      descriptionTemplate: body.descriptionTemplate !== undefined ? body.descriptionTemplate : existing.descriptionTemplate,
       descriptionPresets: body.descriptionPresets !== undefined ? body.descriptionPresets : undefined,
-      defaultAccountId: body.defaultAccountId !== undefined ? body.defaultAccountId : existing.defaultAccountId,
       defaultsLastUpdatedAt: new Date(),
     },
   });

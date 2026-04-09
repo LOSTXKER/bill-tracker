@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Lightbulb, Plus, Trash2, ChevronDown, Layers } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Layers } from "lucide-react";
 import { WHT_TYPE_OPTIONS, WHT_RATE_BY_TYPE } from "@/lib/constants/transaction";
 import { AccountSelector } from "@/components/forms/shared/account-selector";
 import { CategorySelector } from "@/components/forms/shared/CategorySelector";
@@ -111,115 +111,6 @@ export function ContactFinanceSection({ formData, setFormData, companyCode }: Co
               className="h-10"
             />
           </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Transaction Defaults */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="h-4 w-4 text-amber-500" />
-          <h3 className="font-medium text-sm">ค่าเริ่มต้นสำหรับธุรกรรม</h3>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          ค่าเหล่านี้จะถูกเติมอัตโนมัติเมื่อเลือกผู้ติดต่อนี้ในฟอร์มรายจ่าย/รายรับ
-        </p>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="contact-defaultVatRate">อัตรา VAT เริ่มต้น</Label>
-            <Select
-              value={formData.defaultVatRate || "__NONE__"}
-              onValueChange={(value) => setFormData({ ...formData, defaultVatRate: value === "__NONE__" ? "" : value })}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="ไม่ระบุ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
-                <SelectItem value="0">0% (ไม่มี VAT)</SelectItem>
-                <SelectItem value="7">7%</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>บัญชีเริ่มต้น</Label>
-            {companyCode ? (
-              <AccountSelector
-                value={formData.defaultAccountId || null}
-                onValueChange={(val) => setFormData({ ...formData, defaultAccountId: val || "" })}
-                companyCode={companyCode}
-                placeholder="เลือกบัญชีเริ่มต้น..."
-                filterClass={filterClass}
-              />
-            ) : (
-              <Input disabled placeholder="บันทึกผู้ติดต่อก่อนจึงเลือกบัญชีได้" className="h-10" />
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="contact-defaultWhtEnabled"
-              checked={formData.defaultWhtEnabled}
-              onCheckedChange={(checked) => {
-                setFormData({
-                  ...formData,
-                  defaultWhtEnabled: checked,
-                  defaultWhtType: checked && !formData.defaultWhtType ? "SERVICE" : formData.defaultWhtType,
-                  defaultWhtRate: checked && !formData.defaultWhtRate ? "3" : formData.defaultWhtRate,
-                });
-              }}
-            />
-            <Label htmlFor="contact-defaultWhtEnabled" className="cursor-pointer">
-              หัก ณ ที่จ่ายเป็นค่าเริ่มต้น
-            </Label>
-          </div>
-
-          {formData.defaultWhtEnabled && (
-            <div className="grid grid-cols-2 gap-4 pl-10">
-              <div className="space-y-2">
-                <Label htmlFor="contact-defaultWhtType">ประเภท WHT</Label>
-                <Select
-                  value={formData.defaultWhtType}
-                  onValueChange={(value) => {
-                    setFormData({
-                      ...formData,
-                      defaultWhtType: value,
-                      defaultWhtRate: WHT_RATE_BY_TYPE[value]?.toString() || formData.defaultWhtRate,
-                    });
-                  }}
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="เลือกประเภท" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WHT_TYPE_OPTIONS.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact-defaultWhtRate">อัตรา WHT (%)</Label>
-                <Input
-                  id="contact-defaultWhtRate"
-                  type="number"
-                  value={formData.defaultWhtRate}
-                  onChange={(e) => setFormData({ ...formData, defaultWhtRate: e.target.value })}
-                  placeholder="3"
-                  className="h-10"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -385,10 +276,10 @@ function PresetCard({
                   onValueChange={(v) => onUpdate(index, "vatRate", v === "__NONE__" ? "" : v)}
                 >
                   <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="ใช้ค่าเริ่มต้น" />
+                    <SelectValue placeholder="ไม่ระบุ" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__NONE__">ใช้ค่าเริ่มต้น</SelectItem>
+                    <SelectItem value="__NONE__">ไม่ระบุ</SelectItem>
                     <SelectItem value="0">0%</SelectItem>
                     <SelectItem value="7">7%</SelectItem>
                   </SelectContent>

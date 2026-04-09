@@ -197,15 +197,17 @@ model Contact {
   contactPerson   String?
   source          DataSource      @default(MANUAL)
 
-  // ค่าเริ่มต้นสำหรับธุรกรรม (Contact Defaults)
-  defaultVatRate        Int? // อัตรา VAT เริ่มต้น (0, 7, etc.)
-  defaultWhtEnabled     Boolean? // เปิด/ปิด หัก ณ ที่จ่าย
-  defaultWhtRate        Decimal?  @db.Decimal(5, 2) // อัตราหัก ณ ที่จ่าย
-  defaultWhtType        String? // ประเภท WHT (SERVICE, RENT, etc.)
-  descriptionTemplate   String? // template คำอธิบาย (legacy, ใช้ descriptionPresets แทน)
-  descriptionPresets    Json     @default("[]") // [{label, description, accountId?}]
-  defaultAccountId      String? // บัญชีเริ่มต้น
-  defaultsLastUpdatedAt DateTime? // วันที่อัปเดตค่าเริ่มต้นล่าสุด
+  // @deprecated -- migrated to descriptionPresets (TransactionPreset JSON)
+  defaultVatRate        Int?
+  defaultWhtEnabled     Boolean?
+  defaultWhtRate        Decimal?  @db.Decimal(5, 2)
+  defaultWhtType        String?
+  descriptionTemplate   String?
+  defaultAccountId      String?
+
+  // Transaction presets (replaces contact defaults above)
+  descriptionPresets    Json     @default("[]") // TransactionPreset[]
+  defaultsLastUpdatedAt DateTime?
 
   // วิธีส่งเอกสาร (Document Delivery Preferences)
   preferredDeliveryMethod String?

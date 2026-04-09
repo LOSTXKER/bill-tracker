@@ -40,13 +40,7 @@ export interface ContactFormData {
   creditLimit: string;
   paymentTerms: string;
   notes: string;
-  defaultVatRate: string;
-  defaultWhtEnabled: boolean;
-  defaultWhtRate: string;
-  defaultWhtType: string;
-  descriptionTemplate: string;
   descriptionPresets: DescriptionPreset[];
-  defaultAccountId: string;
   preferredDeliveryMethod: string;
   deliveryEmail: string;
   deliveryNotes: string;
@@ -83,13 +77,7 @@ export interface Contact {
   postalCode?: string | null;
   country?: string | null;
   contactPerson?: string | null;
-  defaultVatRate?: number | null;
-  defaultWhtEnabled?: boolean | null;
-  defaultWhtRate?: number | null;
-  defaultWhtType?: string | null;
-  descriptionTemplate?: string | null;
   descriptionPresets?: DescriptionPreset[] | null;
-  defaultAccountId?: string | null;
   preferredDeliveryMethod?: string | null;
   deliveryEmail?: string | null;
   deliveryNotes?: string | null;
@@ -130,13 +118,7 @@ export const defaultFormData: ContactFormData = {
   creditLimit: "",
   paymentTerms: "",
   notes: "",
-  defaultVatRate: "",
-  defaultWhtEnabled: false,
-  defaultWhtRate: "",
-  defaultWhtType: "",
-  descriptionTemplate: "",
   descriptionPresets: [],
-  defaultAccountId: "",
   preferredDeliveryMethod: "",
   deliveryEmail: "",
   deliveryNotes: "",
@@ -205,13 +187,7 @@ export function contactToFormData(contact: Contact): ContactFormData {
     creditLimit: contact.creditLimit?.toString() || "",
     paymentTerms: contact.paymentTerms?.toString() || "",
     notes: contact.notes || "",
-    defaultVatRate: contact.defaultVatRate?.toString() || "",
-    defaultWhtEnabled: contact.defaultWhtEnabled || false,
-    defaultWhtRate: contact.defaultWhtRate?.toString() || "",
-    defaultWhtType: contact.defaultWhtType || "",
-    descriptionTemplate: contact.descriptionTemplate || "",
     descriptionPresets: presets,
-    defaultAccountId: contact.defaultAccountId || "",
     preferredDeliveryMethod: contact.preferredDeliveryMethod || "",
     deliveryEmail: contact.deliveryEmail || "",
     deliveryNotes: contact.deliveryNotes || "",
