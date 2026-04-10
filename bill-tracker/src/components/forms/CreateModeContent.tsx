@@ -577,6 +577,20 @@ function PresetDropdown({
 // Save Preset Dialog (internal)
 // ---------------------------------------------------------------------------
 
+const DOC_TYPE_LABELS: Record<string, string> = {
+  TAX_INVOICE: "ใบกำกับภาษี",
+  CASH_RECEIPT: "บิลเงินสด",
+  NO_DOCUMENT: "ไม่มีเอกสาร",
+};
+
+const WHT_TYPE_LABELS: Record<string, string> = {
+  SERVICE_3: "ค่าบริการ",
+  PROFESSIONAL_5: "ค่าวิชาชีพ",
+  TRANSPORT_1: "ค่าขนส่ง",
+  RENT_5: "ค่าเช่า",
+  ADVERTISING_2: "ค่าโฆษณา",
+};
+
 function SavePresetDialog({
   open,
   onOpenChange,
@@ -605,14 +619,46 @@ function SavePresetDialog({
   const [overwriteIndex, setOverwriteIndex] = useState<number | null>(null);
   const [label, setLabel] = useState("");
   const [saving, setSaving] = useState(false);
+  const [accountName, setAccountName] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setSaveMode("new");
       setOverwriteIndex(null);
       setLabel("");
+
+      if (selectedAccount) {
+        fetch(`/api/${companyCode.toLowerCase()}/accounts`)
+          .then(r => r.json())
+          .then(json => {
+            const accounts = json.data?.accounts || json.accounts || [];
+            const found = accounts.find((a: { id: string; code: string; name: string }) => a.id === selectedAccount);
+            setAccountName(found ? `${found.code} - ${found.name}` : null);
+          })
+          .catch(() => setAccountName(null));
+      } else {
+        setAccountName(null);
+      }
+
+      if (selectedCategory) {
+        const catType = config.type === "expense" ? "EXPENSE" : "INCOME";
+        fetch(`/api/${companyCode}/categories?type=${catType}`)
+          .then(r => r.json())
+          .then(json => {
+            const groups = json.data?.categories || [];
+            for (const g of groups) {
+              const found = (g.children || []).find((c: { id: string }) => c.id === selectedCategory);
+              if (found) { setCategoryName(found.name); return; }
+            }
+            setCategoryName(null);
+          })
+          .catch(() => setCategoryName(null));
+      } else {
+        setCategoryName(null);
+      }
     }
-  }, [open]);
+  }, [open, selectedAccount, selectedCategory, companyCode, config.type]);
 
   const buildPresetFromForm = (): TransactionPreset => {
     const desc = config.fields.descriptionField
@@ -700,9 +746,12 @@ function SavePresetDialog({
           <DialogTitle>บันทึกเป็น Preset</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <p className="text-xs text-muted-foreground">
-            ข้อมูลทั้งหมดในฟอร์มปัจจุบัน (VAT, WHT, บัญชี, หมวดหมู่, คำอธิบาย, ฯลฯ) จะถูกบันทึกลงใน preset
-          </p>
+          <PresetPreviewSummary
+            config={config}
+            watch={watch}
+            accountName={accountName}
+            categoryName={categoryName}
+          />
 
           {hasExisting && (
             <div className="flex gap-2">
@@ -772,5 +821,62 @@ function SavePresetDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Preset Preview Summary (internal)
+// ---------------------------------------------------------------------------
+
+function PresetPreviewSummary({
+  config,
+  watch,
+  accountName,
+  categoryName,
+}: {
+  config: UnifiedTransactionConfig;
+  watch: UseFormWatch<Record<string, unknown>>;
+  accountName: string | null;
+  categoryName: string | null;
+}) {
+  const desc = config.fields.descriptionField
+    ? String(watch(config.fields.descriptionField.name) || "")
+    : "";
+  const vatRate = watch("vatRate") != null ? Number(watch("vatRate")) : null;
+  const whtEnabled = !!watch("isWht");
+  const whtRate = watch("whtRate") != null ? Number(watch("whtRate")) : null;
+  const whtType = (watch("whtType") as string) || null;
+  const docType = (watch("documentType") as string) || null;
+  const notes = (watch("notes") as string) || null;
+
+  const rows: { label: string; value: string | null }[] = [];
+
+  if (desc) rows.push({ label: "คำอธิบาย", value: desc });
+  if (docType && config.type === "expense") rows.push({ label: "ประเภทเอกสาร", value: DOC_TYPE_LABELS[docType] || docType });
+  rows.push({ label: "VAT", value: vatRate ? `${vatRate}%` : "ไม่มี" });
+
+  if (whtEnabled && whtRate) {
+    const typeLabel = whtType ? WHT_TYPE_LABELS[whtType] || whtType : null;
+    rows.push({ label: "หัก ณ ที่จ่าย", value: `${whtRate}%${typeLabel ? ` (${typeLabel})` : ""}` });
+  } else {
+    rows.push({ label: "หัก ณ ที่จ่าย", value: "ไม่หัก" });
+  }
+
+  if (accountName) rows.push({ label: "บัญชี", value: accountName });
+  if (categoryName) rows.push({ label: "หมวดหมู่", value: categoryName });
+  if (notes) rows.push({ label: "หมายเหตุ", value: notes });
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-0">
+      <p className="text-xs font-medium text-muted-foreground mb-2">ข้อมูลที่จะบันทึก</p>
+      <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+        {rows.map((row) => (
+          <div key={row.label} className="contents">
+            <span className="text-muted-foreground whitespace-nowrap">{row.label}</span>
+            <span className="text-foreground truncate">{row.value || "-"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
