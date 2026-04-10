@@ -6,7 +6,7 @@ import {
   UseFormWatch,
   UseFormSetValue,
 } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -426,7 +426,23 @@ export function CreateModeContent({
               </div>
             )}
 
-            {/* Section 5: หมายเหตุ */}
+            {/* Section 5: ตั้งค่าเอกสาร */}
+            <div className="space-y-4">
+              <div className="border-t border-border pt-5 flex items-center gap-2">
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">ตั้งค่าเอกสาร</span>
+              </div>
+              <DocumentSettingsBlock
+                mode="edit"
+                configType={config.type}
+                documentType={watchDocumentType}
+                isWht={watchIsWht || false}
+                referenceUrls={referenceUrls}
+                onReferenceUrlsChange={onReferenceUrlsChange}
+              />
+            </div>
+
+            {/* Section 6: หมายเหตุ */}
             <div className="space-y-3">
               <div className="border-t border-border pt-5 flex items-center gap-2">
                 <MessageSquareText className="h-4 w-4 text-muted-foreground" />
@@ -443,7 +459,7 @@ export function CreateModeContent({
           </CardContent>
         </Card>
 
-        {/* Right Column: Uploads + Document Settings + Sticky Summary */}
+        {/* Right Column: Uploads + Sticky Summary */}
         <div className="lg:col-span-2 order-first lg:order-none space-y-3">
           <InputMethodSection
             key={filesInitialized ? "with-prefill" : "fresh"}
@@ -454,25 +470,6 @@ export function CreateModeContent({
             showWhtCert={watchIsWht}
             initialFiles={filesInitialized ? categorizedFiles : undefined}
           />
-
-          <Card className="shadow-sm border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Settings2 className="h-4 w-4 text-muted-foreground" />
-                ตั้งค่าเอกสาร
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-5 pb-5 pt-0 space-y-4">
-              <DocumentSettingsBlock
-                mode="edit"
-                configType={config.type}
-                documentType={watchDocumentType}
-                isWht={watchIsWht || false}
-                referenceUrls={referenceUrls}
-                onReferenceUrlsChange={onReferenceUrlsChange}
-              />
-            </CardContent>
-          </Card>
 
           {/* Mobile-only CalculationSummary */}
           <div className="lg:hidden">
