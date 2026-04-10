@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { APP_LOCALE, APP_TIMEZONE } from "@/lib/queries/date-utils";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Collapsible,
@@ -38,6 +37,7 @@ interface TransactionSidePanelProps {
   onFileDelete: (type: "slip" | "invoice" | "wht" | "other", url: string) => Promise<void>;
   auditRefreshKey: number;
   currentUserId?: string;
+  onRefreshAll: () => void;
 }
 
 export function TransactionSidePanel({
@@ -49,8 +49,8 @@ export function TransactionSidePanel({
   onFileDelete,
   auditRefreshKey,
   currentUserId,
+  onRefreshAll,
 }: TransactionSidePanelProps) {
-  const router = useRouter();
   const [historyTab, setHistoryTab] = useState<HistoryTab>("document");
   const [commentsOpen, setCommentsOpen] = useState(true);
 
@@ -68,7 +68,7 @@ export function TransactionSidePanel({
       const data = await res.json();
       throw new Error(data.error || "เกิดข้อผิดพลาด");
     }
-    router.refresh();
+    onRefreshAll();
   };
 
   return (

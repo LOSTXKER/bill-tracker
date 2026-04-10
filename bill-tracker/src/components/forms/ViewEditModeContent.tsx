@@ -59,6 +59,7 @@ export interface ViewEditModeContentProps {
   handleDeleteFileWrapper: (type: "slip" | "invoice" | "wht" | "other", urlToDelete: string) => Promise<void>;
   auditRefreshKey: number;
   currentUserId?: string;
+  onRefreshAll: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,7 @@ export function ViewEditModeContent({
   handleDeleteFileWrapper,
   auditRefreshKey,
   currentUserId,
+  onRefreshAll,
 }: ViewEditModeContentProps) {
   const fieldsConfig = buildFieldsConfig(config);
 
@@ -231,6 +233,7 @@ export function ViewEditModeContent({
           onFileDelete={handleDeleteFileWrapper}
           auditRefreshKey={auditRefreshKey}
           currentUserId={currentUserId}
+          onRefreshAll={onRefreshAll}
         />
       </div>
     </div>

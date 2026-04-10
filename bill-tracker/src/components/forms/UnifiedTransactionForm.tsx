@@ -1087,6 +1087,7 @@ export function UnifiedTransactionForm({
             handleDeleteFileWrapper={handleDeleteFileWrapper}
             auditRefreshKey={auditRefreshKey}
             currentUserId={currentUserId}
+            onRefreshAll={refreshAll}
           />
         )}
       </form>
