@@ -19,7 +19,10 @@ import {
 import { CurrencyConversionNote } from "./shared/CurrencyConversionNote";
 import { TransactionAmountCard } from "./shared/TransactionAmountCard";
 import { PayerSection, type PayerInfo } from "./shared/PayerSection";
+import { PresetControls } from "./shared/PresetControls";
 import { TransactionSidePanel } from "./TransactionSidePanel";
+import type { ContactSummary } from "@/types";
+import type { ContactDefaults } from "@/hooks/use-contact-defaults";
 import type {
   AccountSuggestion,
   CurrencyConversionValue,
@@ -60,6 +63,9 @@ export interface ViewEditModeContentProps {
   auditRefreshKey: number;
   currentUserId?: string;
   onRefreshAll: () => void;
+  selectedContact: ContactSummary | null;
+  contactDefaults: ContactDefaults | null;
+  mutateContactDefaults: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +101,9 @@ export function ViewEditModeContent({
   auditRefreshKey,
   currentUserId,
   onRefreshAll,
+  selectedContact,
+  contactDefaults,
+  mutateContactDefaults,
 }: ViewEditModeContentProps) {
   const fieldsConfig = buildFieldsConfig(config);
 
@@ -128,6 +137,19 @@ export function ViewEditModeContent({
                   alternatives: suggestion.alternatives,
                 });
               } : undefined}
+              renderAfterInfoSection={
+                mode === "edit" && selectedContact ? (
+                  <PresetControls
+                    companyCode={companyCode}
+                    selectedContact={selectedContact}
+                    contactDefaults={contactDefaults}
+                    mutateContactDefaults={mutateContactDefaults}
+                    config={config}
+                    watch={watch}
+                    setValue={setValue}
+                  />
+                ) : undefined
+              }
             />
 
             {/* Section 3: จำนวนเงินและภาษี */}

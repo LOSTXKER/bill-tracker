@@ -231,52 +231,62 @@ export function TransactionFieldsSection({
     </div>
   );
 
-  const accountAndCompanyFields = (() => {
-    const showInternalCompany = config.type === "expense" && onInternalCompanyChange && accessibleCompanies.length > 1;
-    return (
-      <div className={showInternalCompany ? "grid sm:grid-cols-2 gap-4" : ""}>
-        <div className="space-y-1.5">
-          <Label className="text-sm text-muted-foreground">
-            บัญชี (ไม่บังคับ)
-          </Label>
-          <AccountSelector
-            value={selectedAccount}
-            onValueChange={onAccountChange}
-            companyCode={companyCode}
-            placeholder="เลือกบัญชี"
-            suggestedAccountId={suggestedAccountId}
-            alternatives={suggestedAccountAlternatives}
-            filterClass={config.type === "expense" ? "EXPENSE" : config.type === "income" ? "REVENUE" : undefined}
-          />
-        </div>
-        {showInternalCompany && (
-          <div className="space-y-1.5">
-            <Label className="text-sm text-muted-foreground">
-              บริษัทภายใน (เป็นค่าใช้จ่ายจริงของ)
-            </Label>
-            <Select
-              value={internalCompanyId || "__none__"}
-              onValueChange={(value) => onInternalCompanyChange(value === "__none__" ? null : value)}
-            >
-              <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
-                <SelectValue placeholder="ไม่ระบุ (ใช้บริษัทที่บันทึก)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground">ไม่ระบุ (ใช้บริษัทที่บันทึก)</span>
-                </SelectItem>
-                {accessibleCompanies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name} ({company.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+  const showInternalCompany =
+    config.type === "expense" && onInternalCompanyChange && accessibleCompanies.length > 1;
+
+  const internalCompanyField = showInternalCompany ? (
+    <div className="space-y-1.5">
+      <Label className="text-sm text-muted-foreground">
+        จ่ายแทนให้ (บริษัทเจ้าของค่าใช้จ่ายจริง)
+      </Label>
+      <Select
+        value={internalCompanyId || "__none__"}
+        onValueChange={(value) =>
+          onInternalCompanyChange(value === "__none__" ? null : value)
+        }
+      >
+        <SelectTrigger className="h-11 bg-muted/30 border-border focus:bg-background">
+          <SelectValue placeholder="ไม่ระบุ (จ่ายเอง)" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">
+            <span className="text-muted-foreground">ไม่ระบุ (จ่ายเอง)</span>
+          </SelectItem>
+          {accessibleCompanies.map((company) => (
+            <SelectItem key={company.id} value={company.id}>
+              {company.name} ({company.code})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  ) : null;
+
+  const accountAndCompanyFields = (
+    <div className={showInternalCompany ? "grid sm:grid-cols-2 gap-4" : ""}>
+      <div className="space-y-1.5">
+        <Label className="text-sm text-muted-foreground">
+          บัญชี (ไม่บังคับ)
+        </Label>
+        <AccountSelector
+          value={selectedAccount}
+          onValueChange={onAccountChange}
+          companyCode={companyCode}
+          placeholder="เลือกบัญชี"
+          suggestedAccountId={suggestedAccountId}
+          alternatives={suggestedAccountAlternatives}
+          filterClass={
+            config.type === "expense"
+              ? "EXPENSE"
+              : config.type === "income"
+                ? "REVENUE"
+                : undefined
+          }
+        />
       </div>
-    );
-  })();
+      {internalCompanyField}
+    </div>
+  );
 
   const descriptionField = config.descriptionField && (
     <div className="space-y-2">
@@ -391,6 +401,8 @@ export function TransactionFieldsSection({
               />
             </div>
           </div>
+
+          {internalCompanyField}
 
           {additionalAndStatusFields}
         </div>

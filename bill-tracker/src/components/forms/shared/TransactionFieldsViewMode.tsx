@@ -178,7 +178,7 @@ export function TransactionFieldsViewMode({
 
   const internalCompanyField = config.type === "expense" && internalCompanyId ? (
     <div>
-      <p className="text-sm text-muted-foreground mb-1">บริษัทภายใน (เป็นค่าใช้จ่ายจริงของ)</p>
+      <p className="text-sm text-muted-foreground mb-1">จ่ายแทนให้ (บริษัทเจ้าของค่าใช้จ่ายจริง)</p>
       <p className="text-base font-semibold text-foreground">
         {accessibleCompanies.find((c) => c.id === internalCompanyId)?.name || (
           <span className="text-muted-foreground font-normal">-</span>

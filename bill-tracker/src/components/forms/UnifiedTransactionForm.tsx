@@ -1088,6 +1088,9 @@ export function UnifiedTransactionForm({
             auditRefreshKey={auditRefreshKey}
             currentUserId={currentUserId}
             onRefreshAll={refreshAll}
+            selectedContact={contactState.selectedContact}
+            contactDefaults={contactDefaults}
+            mutateContactDefaults={mutateContactDefaults}
           />
         )}
       </form>
