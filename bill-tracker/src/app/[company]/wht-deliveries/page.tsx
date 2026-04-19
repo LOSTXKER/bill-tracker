@@ -765,15 +765,23 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
                 }
               >
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed min-w-[720px]">
+                    <colgroup>
+                      <col className="w-12" />
+                      <col className="w-32" />
+                      <col />
+                      <col className="w-20" />
+                      <col className="w-36" />
+                      <col className="w-28" />
+                    </colgroup>
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
-                        <th className="w-10 p-3"></th>
+                        <th className="p-3"></th>
                         <th className="text-left p-3 font-medium">วันที่</th>
                         <th className="text-left p-3 font-medium">รายละเอียด</th>
                         <th className="text-right p-3 font-medium">WHT %</th>
                         <th className="text-right p-3 font-medium">ยอด WHT</th>
-                        <th className="text-right p-3 font-medium w-32">
+                        <th className="text-right p-3 font-medium">
                           การกระทำ
                         </th>
                       </tr>
@@ -803,10 +811,11 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
                             <td className="p-3 whitespace-nowrap text-muted-foreground">
                               {formatThaiDate(new Date(expense.billDate))}
                             </td>
-                            <td className="p-3">
+                            <td className="p-3 truncate">
                               <button
                                 type="button"
-                                className="text-left hover:underline text-foreground"
+                                className="text-left hover:underline text-foreground truncate max-w-full"
+                                title={expense.description || "-"}
                                 onClick={() =>
                                   router.push(
                                     `/${companyCode}/expenses/${expense.id}`
@@ -1071,10 +1080,17 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                 }
               >
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed min-w-[640px]">
+                    <colgroup>
+                      <col className="w-12" />
+                      <col className="w-32" />
+                      <col />
+                      <col className="w-20" />
+                      <col className="w-36" />
+                    </colgroup>
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
-                        <th className="w-10 p-3"></th>
+                        <th className="p-3"></th>
                         <th className="text-left p-3 font-medium">วันที่</th>
                         <th className="text-left p-3 font-medium">รายละเอียด</th>
                         <th className="text-right p-3 font-medium">WHT %</th>
@@ -1111,10 +1127,11 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                             <td className="p-3 whitespace-nowrap text-muted-foreground">
                               {formatThaiDate(new Date(expense.billDate))}
                             </td>
-                            <td className="p-3">
+                            <td className="p-3 truncate">
                               <button
                                 type="button"
-                                className="text-left hover:underline"
+                                className="text-left hover:underline truncate max-w-full"
+                                title={expense.description || "-"}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   router.push(
@@ -1125,13 +1142,14 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                                 {expense.description || "-"}
                               </button>
                               {expenseDeliveryInfo && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                                  <expenseDeliveryInfo.Icon className="h-3 w-3" />
-                                  <span>{expenseDeliveryInfo.label}</span>
-                                  {expense.whtDeliveryMethod === "EMAIL" &&
-                                    expense.whtDeliveryEmail && (
-                                      <span>({expense.whtDeliveryEmail})</span>
-                                    )}
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 truncate">
+                                  <expenseDeliveryInfo.Icon className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">
+                                    {expenseDeliveryInfo.label}
+                                    {expense.whtDeliveryMethod === "EMAIL" &&
+                                      expense.whtDeliveryEmail &&
+                                      ` (${expense.whtDeliveryEmail})`}
+                                  </span>
                                 </div>
                               )}
                             </td>
@@ -1370,7 +1388,15 @@ function IncomingWaitTab({ companyCode }: { companyCode: string }) {
                 }
               >
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed min-w-[760px]">
+                    <colgroup>
+                      <col className="w-32" />
+                      <col />
+                      <col className="w-20" />
+                      <col className="w-36" />
+                      <col className="w-20" />
+                      <col className="w-56" />
+                    </colgroup>
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
                         <th className="text-left p-3 font-medium">วันที่รับ</th>
@@ -1378,7 +1404,7 @@ function IncomingWaitTab({ companyCode }: { companyCode: string }) {
                         <th className="text-right p-3 font-medium">WHT %</th>
                         <th className="text-right p-3 font-medium">ยอด WHT</th>
                         <th className="text-center p-3 font-medium">เตือน</th>
-                        <th className="text-right p-3 font-medium w-56">
+                        <th className="text-right p-3 font-medium">
                           การกระทำ
                         </th>
                       </tr>
@@ -1399,10 +1425,11 @@ function IncomingWaitTab({ companyCode }: { companyCode: string }) {
                             <td className="p-3 whitespace-nowrap text-muted-foreground">
                               {formatThaiDate(new Date(income.receiveDate))}
                             </td>
-                            <td className="p-3">
+                            <td className="p-3 truncate">
                               <button
                                 type="button"
-                                className="text-left hover:underline"
+                                className="text-left hover:underline truncate max-w-full"
+                                title={income.source || income.invoiceNumber || "-"}
                                 onClick={() =>
                                   router.push(
                                     `/${companyCode}/incomes/${income.id}`
