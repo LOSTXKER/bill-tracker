@@ -43,6 +43,9 @@ import {
   X,
   Mail,
   Phone,
+  Undo2,
+  History,
+  Mailbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
@@ -53,9 +56,18 @@ import { PermissionGuard } from "@/components/guards/permission-guard";
 // Types
 // =============================================================================
 
-type Stage = "pending-issue" | "pending-send" | "incoming-wait";
+type Stage =
+  | "pending-issue"
+  | "pending-send"
+  | "incoming-wait"
+  | "recently-done";
 
-const VALID_STAGES: Stage[] = ["pending-issue", "pending-send", "incoming-wait"];
+const VALID_STAGES: Stage[] = [
+  "pending-issue",
+  "pending-send",
+  "incoming-wait",
+  "recently-done",
+];
 
 interface ExpenseItem {
   id: string;
@@ -139,6 +151,30 @@ type IncomeStageResponse = {
   };
 };
 
+type RecentItemKind = "expense-issued" | "expense-sent" | "income-received";
+
+interface RecentItem {
+  kind: RecentItemKind;
+  id: string;
+  date: string;
+  eventDate: string;
+  contactId: string | null;
+  contactName: string;
+  description: string | null;
+  whtAmount: number;
+  whtRate: number | null;
+  deliveryMethod?: string | null;
+}
+
+type RecentlyDoneResponse = {
+  data?: {
+    stage: "recently-done";
+    items?: RecentItem[];
+    totalPending?: number;
+    days?: number;
+  };
+};
+
 // =============================================================================
 // Helpers / hooks
 // =============================================================================
@@ -171,6 +207,13 @@ const STAGE_META: Record<
     description:
       "รายรับที่ลูกค้าหัก ณ ที่จ่ายไว้ แต่ยังไม่ได้ส่งใบ 50 ทวิ มาให้",
     accent: "blue",
+  },
+  "recently-done": {
+    label: "เสร็จแล้ว (ล่าสุด)",
+    shortLabel: "เสร็จแล้ว",
+    description:
+      "รายการที่เพิ่งทำสำเร็จในช่วง 30 วันล่าสุด — สามารถย้อนกลับได้หากกดผิด",
+    accent: "slate",
   },
 };
 
@@ -225,6 +268,50 @@ function avatarClass(seed: string): string {
   return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
 }
 
+/**
+ * รัน /document-workflow แบบ parallel หลายรายการพร้อมกัน
+ * คืน { ok, failed } เพื่อให้ caller แสดง toast
+ */
+async function runWorkflowBulk(
+  companyCode: string,
+  items: {
+    transactionType: "expense" | "income";
+    transactionId: string;
+    action: string;
+  }[]
+): Promise<{ ok: number; failed: number }> {
+  let ok = 0;
+  let failed = 0;
+  await Promise.all(
+    items.map(async (it) => {
+      try {
+        const res = await fetch(`/api/${companyCode}/document-workflow`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(it),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json?.error || "fail");
+        ok++;
+      } catch {
+        failed++;
+      }
+    })
+  );
+  return { ok, failed };
+}
+
+/**
+ * รีเฟรช cache ของทุก stage หลังจากทำ action ใดๆ
+ * (action หนึ่งอาจย้าย item ข้าม stage ได้)
+ */
+function refreshAllStages(companyCode: string) {
+  globalMutate(wht(companyCode, "pending-issue"));
+  globalMutate(wht(companyCode, "pending-send"));
+  globalMutate(wht(companyCode, "incoming-wait"));
+  globalMutate(wht(companyCode, "recently-done"));
+}
+
 // =============================================================================
 // Page
 // =============================================================================
@@ -261,12 +348,18 @@ export default function WhtDeliveriesPage() {
     fetcher,
     { revalidateOnFocus: false, dedupingInterval: 30_000 }
   );
+  const { data: countDone } = useSWR<RecentlyDoneResponse>(
+    companyCode ? wht(companyCode, "recently-done") : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
 
   const refreshAll = () => {
     if (!companyCode) return;
     globalMutate(wht(companyCode, "pending-issue"));
     globalMutate(wht(companyCode, "pending-send"));
     globalMutate(wht(companyCode, "incoming-wait"));
+    globalMutate(wht(companyCode, "recently-done"));
     toast.success("กำลังรีเฟรช...");
   };
 
@@ -286,7 +379,7 @@ export default function WhtDeliveriesPage() {
         />
 
         <Tabs value={stage} onValueChange={handleStageChange} className="gap-4">
-          <TabsList className="h-auto p-1 bg-muted/50 w-full md:w-fit">
+          <TabsList className="h-auto p-1 bg-muted/50 w-full md:w-fit flex-wrap">
             <StageTab
               stage="pending-issue"
               icon={FilePlus}
@@ -305,6 +398,12 @@ export default function WhtDeliveriesPage() {
               total={countIncoming?.data?.totalPending}
               active={stage === "incoming-wait"}
             />
+            <StageTab
+              stage="recently-done"
+              icon={History}
+              total={countDone?.data?.totalPending}
+              active={stage === "recently-done"}
+            />
           </TabsList>
 
           <TabsContent value="pending-issue" className="mt-0">
@@ -315,6 +414,9 @@ export default function WhtDeliveriesPage() {
           </TabsContent>
           <TabsContent value="incoming-wait" className="mt-0">
             <IncomingWaitTab companyCode={companyCode} />
+          </TabsContent>
+          <TabsContent value="recently-done" className="mt-0">
+            <RecentlyDoneTab companyCode={companyCode} />
           </TabsContent>
         </Tabs>
       </div>
@@ -343,17 +445,25 @@ function StageTab({
     emerald:
       "data-[state=active]:text-emerald-700 dark:data-[state=active]:text-emerald-300",
     blue: "data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-300",
+    slate:
+      "data-[state=active]:text-slate-700 dark:data-[state=active]:text-slate-300",
   };
   const badgeClass = (() => {
     if (total === undefined) return "bg-muted text-muted-foreground";
     if (total === 0) return "bg-muted text-muted-foreground";
-    return active
-      ? meta.accent === "amber"
-        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-        : meta.accent === "emerald"
-        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-        : "bg-blue-500/15 text-blue-700 dark:text-blue-300"
-      : "bg-foreground/10 text-foreground";
+    if (!active) return "bg-foreground/10 text-foreground";
+    switch (meta.accent) {
+      case "amber":
+        return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+      case "emerald":
+        return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+      case "blue":
+        return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
+      case "slate":
+        return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+      default:
+        return "bg-foreground/10 text-foreground";
+    }
   })();
 
   return (
@@ -634,27 +744,13 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
     if (ids.length === 0) return;
     setBusyIds(new Set(ids));
     const toastId = toast.loading(`กำลังออกหนังสือ ${ids.length} รายการ...`);
-    let ok = 0;
-    let failed = 0;
-    await Promise.all(
-      ids.map(async (id) => {
-        try {
-          const res = await fetch(`/api/${companyCode}/document-workflow`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              transactionType: "expense",
-              transactionId: id,
-              action: "issue_wht",
-            }),
-          });
-          const json = await res.json();
-          if (!res.ok || !json.success) throw new Error(json?.error || "fail");
-          ok++;
-        } catch {
-          failed++;
-        }
-      })
+    const { ok, failed } = await runWorkflowBulk(
+      companyCode,
+      ids.map((id) => ({
+        transactionType: "expense",
+        transactionId: id,
+        action: "issue_wht",
+      }))
     );
     setBusyIds(new Set());
     setSelected(new Set());
@@ -664,7 +760,7 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
       toast.error(`สำเร็จ ${ok} / ล้มเหลว ${failed}`, { id: toastId });
     }
     mutate();
-    globalMutate(wht(companyCode, "pending-send"));
+    refreshAllStages(companyCode);
   };
 
   const toggleAllInGroup = (g: ExpenseContactGroup) => {
@@ -910,7 +1006,35 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
   const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [undoBusy, setUndoBusy] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useExpandOnFirstLoad(groups);
+
+  const undoIssueMany = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setUndoBusy(new Set(ids));
+    const toastId = toast.loading(
+      `กำลังย้อนการออก 50 ทวิ ${ids.length} รายการ...`
+    );
+    const { ok, failed } = await runWorkflowBulk(
+      companyCode,
+      ids.map((id) => ({
+        transactionType: "expense",
+        transactionId: id,
+        action: "undo_issue_wht",
+      }))
+    );
+    setUndoBusy(new Set());
+    setSelected(new Set());
+    if (failed === 0) {
+      toast.success(`ย้อนสำเร็จ ${ok} รายการ → กลับไปอยู่ "รอออก"`, {
+        id: toastId,
+      });
+    } else {
+      toast.error(`สำเร็จ ${ok} / ล้มเหลว ${failed}`, { id: toastId });
+    }
+    mutate();
+    refreshAllStages(companyCode);
+  };
 
   const filteredGroups = useMemo(() => {
     if (!search.trim()) return groups;
@@ -962,6 +1086,7 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
         setSelectedDeliveryMethod("");
         setNotes("");
         mutate();
+        refreshAllStages(companyCode);
       } else {
         throw new Error(data.error || "เกิดข้อผิดพลาด");
       }
@@ -1080,13 +1205,14 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                 }
               >
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm table-fixed min-w-[640px]">
+                  <table className="w-full text-sm table-fixed min-w-[760px]">
                     <colgroup>
                       <col className="w-12" />
                       <col className="w-32" />
                       <col />
                       <col className="w-20" />
                       <col className="w-36" />
+                      <col className="w-24" />
                     </colgroup>
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
@@ -1095,11 +1221,13 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                         <th className="text-left p-3 font-medium">รายละเอียด</th>
                         <th className="text-right p-3 font-medium">WHT %</th>
                         <th className="text-right p-3 font-medium">ยอด WHT</th>
+                        <th className="text-right p-3 font-medium">การกระทำ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {group.expenses.map((expense) => {
                         const checked = selected.has(expense.id);
+                        const isUndoing = undoBusy.has(expense.id);
                         const expenseDeliveryInfo = expense.whtDeliveryMethod
                           ? getDeliveryMethod(expense.whtDeliveryMethod)
                           : null;
@@ -1159,6 +1287,19 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                             <td className="p-3 text-right font-medium tabular-nums">
                               {formatCurrency(expense.whtAmount)}
                             </td>
+                            <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                              <LoadingButton
+                                size="sm"
+                                variant="ghost"
+                                loading={isUndoing}
+                                onClick={() => undoIssueMany([expense.id])}
+                                title="ย้อนการออก 50 ทวิ — กลับไปอยู่ 'รอออก'"
+                                className="h-8 text-muted-foreground hover:text-amber-600"
+                              >
+                                <Undo2 className="h-3.5 w-3.5 mr-1" />
+                                ย้อน
+                              </LoadingButton>
+                            </td>
                           </tr>
                         );
                       })}
@@ -1177,10 +1318,21 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
             size="sm"
             onClick={() => setShowMarkSentDialog(true)}
             className="h-8 bg-emerald-600 hover:bg-emerald-700"
+            disabled={undoBusy.size > 0}
           >
             <Send className="h-4 w-4 mr-2" />
             บันทึกส่งแล้ว
           </Button>
+          <LoadingButton
+            size="sm"
+            variant="outline"
+            loading={undoBusy.size > 0}
+            onClick={() => undoIssueMany(Array.from(selected))}
+            className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+          >
+            <Undo2 className="h-4 w-4 mr-2" />
+            ย้อน (กลับ &quot;รอออก&quot;)
+          </LoadingButton>
         </StickyActionBar>
       )}
 
@@ -1322,6 +1474,7 @@ function IncomingWaitTab({ companyCode }: { companyCode: string }) {
           : "ส่ง reminder แล้ว"
       );
       mutate();
+      refreshAllStages(companyCode);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -1497,5 +1650,327 @@ function IncomingWaitTab({ companyCode }: { companyCode: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// Tab: เสร็จแล้ว (recently-done) — แสดงรายการที่เพิ่งทำสำเร็จ พร้อม undo
+// =============================================================================
+
+const RECENT_KIND_META: Record<
+  RecentItemKind,
+  {
+    label: string;
+    detail: string;
+    icon: React.ComponentType<{ className?: string }>;
+    accent: string;
+    undoAction: string;
+    undoLabel: string;
+    transactionType: "expense" | "income";
+    detailHref: (companyCode: string, id: string) => string;
+  }
+> = {
+  "expense-issued": {
+    label: "ออก 50 ทวิ แล้ว",
+    detail: "รายจ่าย",
+    icon: FilePlus,
+    accent: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    undoAction: "undo_issue_wht",
+    undoLabel: "ย้อนการออก",
+    transactionType: "expense",
+    detailHref: (c, id) => `/${c}/expenses/${id}`,
+  },
+  "expense-sent": {
+    label: "ส่งให้ vendor แล้ว",
+    detail: "รายจ่าย",
+    icon: Send,
+    accent: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    undoAction: "undo_send_wht",
+    undoLabel: "ย้อนการส่ง",
+    transactionType: "expense",
+    detailHref: (c, id) => `/${c}/expenses/${id}`,
+  },
+  "income-received": {
+    label: "รับใบจากลูกค้าแล้ว",
+    detail: "รายรับ",
+    icon: Mailbox,
+    accent: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    undoAction: "undo_receive_wht",
+    undoLabel: "ย้อนการรับ",
+    transactionType: "income",
+    detailHref: (c, id) => `/${c}/incomes/${id}`,
+  },
+};
+
+function RecentlyDoneTab({ companyCode }: { companyCode: string }) {
+  const router = useRouter();
+  const { data, isLoading, mutate } = useSWR<RecentlyDoneResponse>(
+    wht(companyCode, "recently-done"),
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
+
+  const items = useMemo(() => data?.data?.items || [], [data]);
+  const days = data?.data?.days || 30;
+
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<RecentItemKind | "all">("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    let list = items;
+    if (kindFilter !== "all") list = list.filter((i) => i.kind === kindFilter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (i) =>
+          i.contactName.toLowerCase().includes(q) ||
+          (i.description || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [items, search, kindFilter]);
+
+  const handleUndo = async (item: RecentItem) => {
+    const meta = RECENT_KIND_META[item.kind];
+    setBusyId(item.id + ":" + item.kind);
+    const toastId = toast.loading(`กำลัง${meta.undoLabel}...`);
+    try {
+      const res = await fetch(`/api/${companyCode}/document-workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionType: meta.transactionType,
+          transactionId: item.id,
+          action: meta.undoAction,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json?.error || "ย้อนไม่สำเร็จ");
+      }
+      toast.success(`${meta.undoLabel}สำเร็จ`, { id: toastId });
+      mutate();
+      refreshAllStages(companyCode);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "เกิดข้อผิดพลาด", {
+        id: toastId,
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (isLoading) return <ListSkeleton />;
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        message="ยังไม่มีรายการที่เสร็จในช่วงนี้"
+        subMessage={`ไม่พบรายการ WHT ที่ทำสำเร็จในช่วง ${days} วันที่ผ่านมา`}
+      />
+    );
+  }
+
+  const kindCounts: Record<RecentItemKind, number> = {
+    "expense-issued": 0,
+    "expense-sent": 0,
+    "income-received": 0,
+  };
+  items.forEach((i) => kindCounts[i.kind]++);
+
+  const totalWht = items.reduce((s, i) => s + i.whtAmount, 0);
+
+  return (
+    <div className="space-y-4">
+      <StageHeader
+        description={STAGE_META["recently-done"].description}
+        metrics={[
+          { label: `${days} วันล่าสุด`, value: items.length },
+          {
+            label: "ยอด WHT",
+            value: formatCurrency(totalWht),
+            tone: "text-slate-600 dark:text-slate-400",
+          },
+        ]}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "ค้นหาผู้ติดต่อ หรือรายการ...",
+        }}
+        rightSlot={
+          <div className="flex items-center gap-1 flex-wrap">
+            <KindFilterChip
+              label="ทั้งหมด"
+              count={items.length}
+              active={kindFilter === "all"}
+              onClick={() => setKindFilter("all")}
+            />
+            {(Object.keys(RECENT_KIND_META) as RecentItemKind[]).map((k) => {
+              const meta = RECENT_KIND_META[k];
+              return (
+                <KindFilterChip
+                  key={k}
+                  label={meta.label}
+                  count={kindCounts[k]}
+                  icon={meta.icon}
+                  accent={meta.accent}
+                  active={kindFilter === k}
+                  onClick={() => setKindFilter(k)}
+                />
+              );
+            })}
+          </div>
+        }
+      />
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          message="ไม่พบรายการที่ค้นหา"
+          subMessage="ลองเปลี่ยนคำค้นหาหรือฟิลเตอร์"
+        />
+      ) : (
+        <Card className="border-border/60 overflow-hidden p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-fixed min-w-[860px]">
+              <colgroup>
+                <col className="w-44" />
+                <col className="w-44" />
+                <col />
+                <col className="w-36" />
+                <col className="w-28" />
+              </colgroup>
+              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="text-left p-3 font-medium">เมื่อ</th>
+                  <th className="text-left p-3 font-medium">ผู้ติดต่อ</th>
+                  <th className="text-left p-3 font-medium">รายละเอียด</th>
+                  <th className="text-right p-3 font-medium">ยอด WHT</th>
+                  <th className="text-right p-3 font-medium">การกระทำ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => {
+                  const meta = RECENT_KIND_META[item.kind];
+                  const Icon = meta.icon;
+                  const busyKey = item.id + ":" + item.kind;
+                  const isBusy = busyId === busyKey;
+                  return (
+                    <tr
+                      key={busyKey}
+                      className="border-t border-border/40 hover:bg-muted/40 transition-colors"
+                    >
+                      <td className="p-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                              meta.accent
+                            )}
+                          >
+                            <Icon className="h-3 w-3" />
+                            {meta.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {formatThaiDate(new Date(item.eventDate))}
+                        </div>
+                      </td>
+                      <td className="p-3 truncate">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <VendorAvatar name={item.contactName} size="sm" />
+                          <span className="truncate" title={item.contactName}>
+                            {item.contactName}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-3 truncate">
+                        <button
+                          type="button"
+                          className="text-left hover:underline truncate max-w-full"
+                          title={item.description || "-"}
+                          onClick={() =>
+                            router.push(meta.detailHref(companyCode, item.id))
+                          }
+                        >
+                          {item.description || "-"}
+                        </button>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {meta.detail}
+                          {item.whtRate ? ` · ${item.whtRate}%` : ""}
+                          {item.deliveryMethod
+                            ? ` · ${
+                                getDeliveryMethod(item.deliveryMethod)?.label ||
+                                item.deliveryMethod
+                              }`
+                            : ""}
+                        </div>
+                      </td>
+                      <td className="p-3 text-right font-medium tabular-nums">
+                        {formatCurrency(item.whtAmount)}
+                      </td>
+                      <td className="p-3 text-right">
+                        <LoadingButton
+                          size="sm"
+                          variant="outline"
+                          loading={isBusy}
+                          onClick={() => handleUndo(item)}
+                          title={meta.undoLabel}
+                          className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                        >
+                          <Undo2 className="h-3.5 w-3.5 mr-1" />
+                          ย้อน
+                        </LoadingButton>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function KindFilterChip({
+  label,
+  count,
+  icon: Icon,
+  accent,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  icon?: React.ComponentType<{ className?: string }>;
+  accent?: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+        active
+          ? accent
+            ? cn(accent, "border-transparent")
+            : "bg-foreground text-background border-transparent"
+          : "border-border bg-background text-muted-foreground hover:bg-muted"
+      )}
+    >
+      {Icon && <Icon className="h-3.5 w-3.5" />}
+      <span>{label}</span>
+      <span
+        className={cn(
+          "ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded-full text-[10px] font-semibold",
+          active ? "bg-background/30" : "bg-muted"
+        )}
+      >
+        {count}
+      </span>
+    </button>
   );
 }

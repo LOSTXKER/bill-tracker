@@ -1,9 +1,10 @@
 /**
  * WHT Deliveries API
- * จัดการรายการที่เกี่ยวข้องกับใบหัก ณ ที่จ่าย 3 stage:
+ * จัดการรายการที่เกี่ยวข้องกับใบหัก ณ ที่จ่าย 4 stage:
  *   stage=pending-issue   → expense ที่ isWht แต่ยังไม่ได้ออกใบ 50 ทวิ (hasWhtCert=false)
  *   stage=pending-send    → expense ที่ออกใบ 50 ทวิแล้วแต่ยังไม่ส่งให้ vendor (default)
  *   stage=incoming-wait   → income ที่ลูกค้าหัก ณ ที่จ่ายไว้แต่ยังไม่ส่งใบ 50 ทวิ มาให้
+ *   stage=recently-done   → expense/income ที่เพิ่งทำสำเร็จในช่วง 30 วันล่าสุด (รองรับ undo)
  */
 
 import { prisma } from "@/lib/db";
@@ -13,10 +14,15 @@ import { DocumentEventType } from "@prisma/client";
 import { getDeliveryMethod } from "@/lib/constants/delivery-methods";
 import { reimbursementFilter, buildIncomeBaseWhere } from "@/lib/queries/expense-filters";
 
-type Stage = "pending-issue" | "pending-send" | "incoming-wait";
+type Stage = "pending-issue" | "pending-send" | "incoming-wait" | "recently-done";
 
 function parseStage(value: string | null): Stage {
-  if (value === "pending-issue" || value === "incoming-wait") return value;
+  if (
+    value === "pending-issue" ||
+    value === "incoming-wait" ||
+    value === "recently-done"
+  )
+    return value;
   return "pending-send";
 }
 
@@ -29,9 +35,17 @@ export const GET = withCompanyAccessFromParams(
     const { searchParams } = new URL(req.url);
     const stage = parseStage(searchParams.get("stage"));
     const groupBy = searchParams.get("groupBy") || "contact";
+    const days = Math.min(
+      Math.max(parseInt(searchParams.get("days") || "30", 10) || 30, 1),
+      365
+    );
 
     if (stage === "incoming-wait") {
       return getIncomingWaitData(company.id, groupBy);
+    }
+
+    if (stage === "recently-done") {
+      return getRecentlyDoneData(company.id, days);
     }
 
     return getExpenseStageData(company.id, stage, groupBy);
@@ -242,6 +256,176 @@ async function getIncomingWaitData(companyId: string, groupBy: string) {
     kind: "income",
     incomes,
     totalPending: incomes.length,
+  });
+}
+
+// =============================================================================
+// stage=recently-done: รายการที่เพิ่งทำสำเร็จในช่วง N วันล่าสุด
+// รองรับ undo ผ่าน /document-workflow
+// =============================================================================
+
+async function getRecentlyDoneData(companyId: string, days: number) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const [issuedExpenses, sentExpenses, receivedIncomes] = await Promise.all([
+    // Expense ที่เพิ่งออกใบ 50 ทวิ (แต่ยังไม่ส่ง) — รองรับ undo_issue_wht
+    prisma.expense.findMany({
+      where: {
+        ...reimbursementFilter,
+        companyId,
+        deletedAt: null,
+        isWht: true,
+        hasWhtCert: true,
+        whtCertSentAt: null,
+        whtCertIssuedAt: { gte: since },
+      },
+      select: {
+        id: true,
+        billDate: true,
+        description: true,
+        whtAmount: true,
+        whtRate: true,
+        whtCertIssuedAt: true,
+        Contact: { select: { id: true, name: true } },
+      },
+      orderBy: { whtCertIssuedAt: "desc" },
+      take: 100,
+    }),
+    // Expense ที่เพิ่งถูก mark ส่งให้ vendor — รองรับ undo_send_wht
+    prisma.expense.findMany({
+      where: {
+        ...reimbursementFilter,
+        companyId,
+        deletedAt: null,
+        isWht: true,
+        hasWhtCert: true,
+        whtCertSentAt: { gte: since },
+      },
+      select: {
+        id: true,
+        billDate: true,
+        description: true,
+        whtAmount: true,
+        whtRate: true,
+        whtCertSentAt: true,
+        whtDeliveryMethod: true,
+        Contact: {
+          select: { id: true, name: true, preferredDeliveryMethod: true },
+        },
+      },
+      orderBy: { whtCertSentAt: "desc" },
+      take: 100,
+    }),
+    // Income ที่เพิ่งบันทึกว่าได้รับใบ 50 ทวิ — รองรับ undo_receive_wht
+    prisma.income.findMany({
+      where: {
+        ...buildIncomeBaseWhere(companyId),
+        isWhtDeducted: true,
+        hasWhtCert: true,
+        whtCertReceivedAt: { gte: since },
+      },
+      select: {
+        id: true,
+        receiveDate: true,
+        source: true,
+        invoiceNumber: true,
+        whtAmount: true,
+        whtRate: true,
+        whtCertReceivedAt: true,
+        Contact: { select: { id: true, name: true } },
+      },
+      orderBy: { whtCertReceivedAt: "desc" },
+      take: 100,
+    }),
+  ]);
+
+  type RecentItem =
+    | {
+        kind: "expense-issued";
+        id: string;
+        date: Date;
+        eventDate: Date;
+        contactId: string | null;
+        contactName: string;
+        description: string | null;
+        whtAmount: number;
+        whtRate: number | null;
+        deliveryMethod?: string | null;
+      }
+    | {
+        kind: "expense-sent";
+        id: string;
+        date: Date;
+        eventDate: Date;
+        contactId: string | null;
+        contactName: string;
+        description: string | null;
+        whtAmount: number;
+        whtRate: number | null;
+        deliveryMethod?: string | null;
+      }
+    | {
+        kind: "income-received";
+        id: string;
+        date: Date;
+        eventDate: Date;
+        contactId: string | null;
+        contactName: string;
+        description: string | null;
+        whtAmount: number;
+        whtRate: number | null;
+      };
+
+  const items: RecentItem[] = [
+    ...issuedExpenses.map(
+      (e): RecentItem => ({
+        kind: "expense-issued",
+        id: e.id,
+        date: e.billDate,
+        eventDate: e.whtCertIssuedAt!,
+        contactId: e.Contact?.id ?? null,
+        contactName: e.Contact?.name ?? "ไม่ระบุผู้ติดต่อ",
+        description: e.description,
+        whtAmount: Number(e.whtAmount) || 0,
+        whtRate: e.whtRate ? Number(e.whtRate) : null,
+      })
+    ),
+    ...sentExpenses.map(
+      (e): RecentItem => ({
+        kind: "expense-sent",
+        id: e.id,
+        date: e.billDate,
+        eventDate: e.whtCertSentAt!,
+        contactId: e.Contact?.id ?? null,
+        contactName: e.Contact?.name ?? "ไม่ระบุผู้ติดต่อ",
+        description: e.description,
+        whtAmount: Number(e.whtAmount) || 0,
+        whtRate: e.whtRate ? Number(e.whtRate) : null,
+        deliveryMethod:
+          e.whtDeliveryMethod || e.Contact?.preferredDeliveryMethod || null,
+      })
+    ),
+    ...receivedIncomes.map(
+      (i): RecentItem => ({
+        kind: "income-received",
+        id: i.id,
+        date: i.receiveDate,
+        eventDate: i.whtCertReceivedAt!,
+        contactId: i.Contact?.id ?? null,
+        contactName: i.Contact?.name ?? "ไม่ระบุลูกค้า",
+        description: i.source || i.invoiceNumber,
+        whtAmount: Number(i.whtAmount) || 0,
+        whtRate: i.whtRate ? Number(i.whtRate) : null,
+      })
+    ),
+  ].sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime());
+
+  return apiResponse.success({
+    stage: "recently-done" as const,
+    items,
+    totalPending: items.length,
+    days,
   });
 }
 
