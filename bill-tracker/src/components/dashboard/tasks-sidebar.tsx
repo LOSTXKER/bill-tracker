@@ -91,7 +91,7 @@ export async function TasksSidebar({ companyCode }: { companyCode: string }) {
       icon: <Receipt className="h-4 w-4" />,
       label: "รอใบ 50 ทวิ จากลูกค้า",
       count: waitingWht,
-      href: `/${companyCode}/incomes?whtPending=1`,
+      href: `/${companyCode}/wht-deliveries?stage=incoming-wait`,
       colorClass: "text-amber-600 dark:text-amber-400",
     },
     {
@@ -105,7 +105,7 @@ export async function TasksSidebar({ companyCode }: { companyCode: string }) {
       icon: <Receipt className="h-4 w-4" />,
       label: "รอออกใบ 50 ทวิ",
       count: whtPendingIssue,
-      href: `/${companyCode}/expenses?whtPendingIssue=1`,
+      href: `/${companyCode}/wht-deliveries?stage=pending-issue`,
       colorClass: "text-purple-600 dark:text-purple-400",
     },
     {
