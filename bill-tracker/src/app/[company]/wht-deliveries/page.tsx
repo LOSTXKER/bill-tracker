@@ -70,17 +70,21 @@ import { PermissionGuard } from "@/components/guards/permission-guard";
 // =============================================================================
 
 type Stage =
+  | "all"
   | "pending-issue"
   | "pending-send"
   | "incoming-wait"
   | "recently-done";
 
 const VALID_STAGES: Stage[] = [
+  "all",
   "pending-issue",
   "pending-send",
   "incoming-wait",
   "recently-done",
 ];
+
+type ActiveSubStage = "pending-issue" | "pending-send" | "incoming-wait";
 
 interface ExpenseItem {
   id: string;
@@ -196,13 +200,20 @@ type RecentlyDoneResponse = {
 
 function parseStage(value: string | null): Stage {
   if (value && (VALID_STAGES as string[]).includes(value)) return value as Stage;
-  return "pending-issue";
+  return "all";
 }
 
 const STAGE_META: Record<
   Stage,
   { label: string; shortLabel: string; description: string; accent: string }
 > = {
+  all: {
+    label: "ทั้งหมด",
+    shortLabel: "ทั้งหมด",
+    description:
+      "งาน WHT ที่ยังค้างทั้งหมด จัดกลุ่มตามผู้ติดต่อ — เห็นทุก stage ของ vendor/ลูกค้าในที่เดียว",
+    accent: "violet",
+  },
   "pending-issue": {
     label: "รอออก 50 ทวิ",
     shortLabel: "รอออก",
@@ -589,6 +600,16 @@ export default function WhtDeliveriesPage() {
         <Tabs value={stage} onValueChange={handleStageChange} className="gap-4">
           <TabsList className="h-auto p-1 bg-muted/50 w-full md:w-fit flex-wrap">
             <StageTab
+              stage="all"
+              icon={FileText}
+              total={
+                (countIssue?.data?.totalPending ?? 0) +
+                (countSend?.data?.totalPending ?? 0) +
+                (countIncoming?.data?.totalPending ?? 0)
+              }
+              active={stage === "all"}
+            />
+            <StageTab
               stage="pending-issue"
               icon={FilePlus}
               total={countIssue?.data?.totalPending}
@@ -614,6 +635,9 @@ export default function WhtDeliveriesPage() {
             />
           </TabsList>
 
+          <TabsContent value="all" className="mt-0">
+            <AllTab companyCode={companyCode} />
+          </TabsContent>
           <TabsContent value="pending-issue" className="mt-0">
             <PendingIssueTab companyCode={companyCode} />
           </TabsContent>
@@ -655,6 +679,8 @@ function StageTab({
     blue: "data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-300",
     slate:
       "data-[state=active]:text-slate-700 dark:data-[state=active]:text-slate-300",
+    violet:
+      "data-[state=active]:text-violet-700 dark:data-[state=active]:text-violet-300",
   };
   const badgeClass = (() => {
     if (total === undefined) return "bg-muted text-muted-foreground";
@@ -669,6 +695,8 @@ function StageTab({
         return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
       case "slate":
         return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+      case "violet":
+        return "bg-violet-500/15 text-violet-700 dark:text-violet-300";
       default:
         return "bg-foreground/10 text-foreground";
     }
@@ -2168,6 +2196,740 @@ function RecentlyDoneTab({ companyCode }: { companyCode: string }) {
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Tab: ทั้งหมด (all) — รวมทุก stage ที่ยังค้าง จัดกลุ่มตามผู้ติดต่อ
+// =============================================================================
+
+type ActiveItemKind = ActiveSubStage; // pending-issue | pending-send | incoming-wait
+
+interface UnifiedItem {
+  kind: ActiveItemKind;
+  id: string;
+  date: string; // billDate / receiveDate
+  description: string | null;
+  whtAmount: number;
+  whtRate: number | null;
+  // expense-only
+  whtDeliveryMethod?: string | null;
+  whtDeliveryEmail?: string | null;
+  // income-only
+  whtCertRemindCount?: number | null;
+  invoiceNumber?: string | null;
+}
+
+interface UnifiedContactGroup {
+  contactId: string;
+  contactName: string;
+  contact: {
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+  items: UnifiedItem[];
+  countByKind: Record<ActiveItemKind, number>;
+  totalWhtAmount: number;
+}
+
+const ACTIVE_KIND_META: Record<
+  ActiveItemKind,
+  {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    chipClass: string;
+    badgeAccent: string;
+  }
+> = {
+  "pending-issue": {
+    label: "รอออก",
+    icon: FilePlus,
+    chipClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    badgeAccent: "amber",
+  },
+  "pending-send": {
+    label: "รอส่ง",
+    icon: Send,
+    chipClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    badgeAccent: "emerald",
+  },
+  "incoming-wait": {
+    label: "รอจากลูกค้า",
+    icon: BellRing,
+    chipClass: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    badgeAccent: "blue",
+  },
+};
+
+function AllTab({ companyCode }: { companyCode: string }) {
+  const router = useRouter();
+
+  const { data: issueData, isLoading: loadingIssue, mutate: mutateIssue } =
+    useSWR<ExpenseStageResponse>(wht(companyCode, "pending-issue"), fetcher, {
+      revalidateOnFocus: false,
+      dedupingInterval: 30_000,
+    });
+  const { data: sendData, isLoading: loadingSend, mutate: mutateSend } =
+    useSWR<ExpenseStageResponse>(wht(companyCode, "pending-send"), fetcher, {
+      revalidateOnFocus: false,
+      dedupingInterval: 30_000,
+    });
+  const { data: incomingData, isLoading: loadingIncoming, mutate: mutateIncoming } =
+    useSWR<IncomeStageResponse>(wht(companyCode, "incoming-wait"), fetcher, {
+      revalidateOnFocus: false,
+      dedupingInterval: 30_000,
+    });
+
+  const isLoading = loadingIssue || loadingSend || loadingIncoming;
+
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<ActiveItemKind | "all">("all");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showMarkSentDialog, setShowMarkSentDialog] = useState(false);
+  const [selectedDeliveryMethod, setSelectedDeliveryMethod] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const issueGroups = useMemo(() => issueData?.data?.groups || [], [issueData]);
+  const sendGroups = useMemo(() => sendData?.data?.groups || [], [sendData]);
+  const incomingGroups = useMemo(
+    () => incomingData?.data?.groups || [],
+    [incomingData]
+  );
+
+  // รวม 3 stage เข้าด้วยกัน group by contact
+  const grouped: UnifiedContactGroup[] = useMemo(() => {
+    const map = new Map<string, UnifiedContactGroup>();
+
+    const ensure = (
+      contactId: string,
+      contactName: string,
+      contact: UnifiedContactGroup["contact"]
+    ) => {
+      const key = contactId || "no-contact";
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          contactId: key,
+          contactName,
+          contact,
+          items: [],
+          countByKind: { "pending-issue": 0, "pending-send": 0, "incoming-wait": 0 },
+          totalWhtAmount: 0,
+        };
+        map.set(key, g);
+      }
+      return g;
+    };
+
+    issueGroups.forEach((cg) => {
+      const g = ensure(
+        cg.contactId,
+        cg.contactName,
+        cg.contact
+          ? { email: cg.contact.email, phone: cg.contact.phone }
+          : null
+      );
+      cg.expenses.forEach((e) => {
+        g.items.push({
+          kind: "pending-issue",
+          id: e.id,
+          date: e.billDate,
+          description: e.description,
+          whtAmount: Number(e.whtAmount) || 0,
+          whtRate: e.whtRate ? Number(e.whtRate) : null,
+        });
+        g.countByKind["pending-issue"]++;
+        g.totalWhtAmount += Number(e.whtAmount) || 0;
+      });
+    });
+
+    sendGroups.forEach((cg) => {
+      const g = ensure(
+        cg.contactId,
+        cg.contactName,
+        cg.contact
+          ? { email: cg.contact.email, phone: cg.contact.phone }
+          : null
+      );
+      cg.expenses.forEach((e) => {
+        g.items.push({
+          kind: "pending-send",
+          id: e.id,
+          date: e.billDate,
+          description: e.description,
+          whtAmount: Number(e.whtAmount) || 0,
+          whtRate: e.whtRate ? Number(e.whtRate) : null,
+          whtDeliveryMethod:
+            e.whtDeliveryMethod || cg.deliveryMethod || null,
+          whtDeliveryEmail:
+            e.whtDeliveryEmail || cg.deliveryEmail || null,
+        });
+        g.countByKind["pending-send"]++;
+        g.totalWhtAmount += Number(e.whtAmount) || 0;
+      });
+    });
+
+    incomingGroups.forEach((cg) => {
+      const g = ensure(cg.contactId, cg.contactName, cg.contact);
+      cg.incomes.forEach((i) => {
+        g.items.push({
+          kind: "incoming-wait",
+          id: i.id,
+          date: i.receiveDate,
+          description: i.source || i.invoiceNumber,
+          whtAmount: Number(i.whtAmount) || 0,
+          whtRate: i.whtRate ? Number(i.whtRate) : null,
+          whtCertRemindCount: i.whtCertRemindCount,
+          invoiceNumber: i.invoiceNumber,
+        });
+        g.countByKind["incoming-wait"]++;
+        g.totalWhtAmount += Number(i.whtAmount) || 0;
+      });
+    });
+
+    // Sort items per group: pending-issue → pending-send → incoming-wait, then by date desc
+    const kindOrder: Record<ActiveItemKind, number> = {
+      "pending-issue": 0,
+      "pending-send": 1,
+      "incoming-wait": 2,
+    };
+    map.forEach((g) => {
+      g.items.sort((a, b) => {
+        const k = kindOrder[a.kind] - kindOrder[b.kind];
+        if (k !== 0) return k;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.contactName.localeCompare(b.contactName, "th")
+    );
+  }, [issueGroups, sendGroups, incomingGroups]);
+
+  const totalCounts = useMemo(() => {
+    const counts: Record<ActiveItemKind, number> = {
+      "pending-issue": 0,
+      "pending-send": 0,
+      "incoming-wait": 0,
+    };
+    grouped.forEach((g) => {
+      counts["pending-issue"] += g.countByKind["pending-issue"];
+      counts["pending-send"] += g.countByKind["pending-send"];
+      counts["incoming-wait"] += g.countByKind["incoming-wait"];
+    });
+    return counts;
+  }, [grouped]);
+
+  const totalActive =
+    totalCounts["pending-issue"] +
+    totalCounts["pending-send"] +
+    totalCounts["incoming-wait"];
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return grouped
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((it) => {
+          if (kindFilter !== "all" && it.kind !== kindFilter) return false;
+          if (q) {
+            return (
+              g.contactName.toLowerCase().includes(q) ||
+              (it.description || "").toLowerCase().includes(q)
+            );
+          }
+          return true;
+        }),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [grouped, search, kindFilter]);
+
+  const [expandedGroups, setExpandedGroups] = useExpandOnFirstLoad(filtered);
+
+  // ==== Actions ====
+
+  const refreshAll = () => {
+    mutateIssue();
+    mutateSend();
+    mutateIncoming();
+    refreshAllStages(companyCode);
+  };
+
+  const runSingle = async (
+    transactionType: "expense" | "income",
+    transactionId: string,
+    action: string,
+    label: string,
+    rowKey: string
+  ) => {
+    setBusyKey(rowKey);
+    const toastId = toast.loading(`กำลัง${label}...`);
+    try {
+      const res = await fetch(`/api/${companyCode}/document-workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionType, transactionId, action }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json?.error || "fail");
+      toast.success(`${label}สำเร็จ`, { id: toastId });
+      refreshAll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "เกิดข้อผิดพลาด", {
+        id: toastId,
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleMarkSent = async () => {
+    if (selected.size === 0 || !selectedDeliveryMethod) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/${companyCode}/wht-deliveries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseIds: Array.from(selected),
+          deliveryMethod: selectedDeliveryMethod,
+          notes,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.data.message || "อัปเดตสถานะสำเร็จ");
+        setShowMarkSentDialog(false);
+        setSelected(new Set());
+        setSelectedDeliveryMethod("");
+        setNotes("");
+        refreshAll();
+      } else {
+        throw new Error(data.error || "เกิดข้อผิดพลาด");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ==== Render ====
+
+  if (isLoading && grouped.length === 0) return <ListSkeleton />;
+  if (!isLoading && totalActive === 0) {
+    return (
+      <EmptyState
+        message="ไม่มีงาน WHT ค้าง"
+        subMessage="ทุกใบ 50 ทวิ จัดการเสร็จเรียบร้อยแล้ว"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <StageHeader
+        description={STAGE_META["all"].description}
+        metrics={[
+          { label: "ค้างทั้งหมด", value: totalActive },
+          { label: "ผู้ติดต่อ", value: grouped.length },
+          {
+            label: "ยอด WHT รวม",
+            value: formatCurrency(
+              grouped.reduce((s, g) => s + g.totalWhtAmount, 0)
+            ),
+            tone: "text-violet-600 dark:text-violet-400",
+          },
+        ]}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "ค้นหาผู้ติดต่อ หรือรายการ...",
+        }}
+        rightSlot={
+          <div className="flex items-center gap-1 flex-wrap">
+            <KindFilterChip
+              label="ทั้งหมด"
+              count={totalActive}
+              active={kindFilter === "all"}
+              onClick={() => setKindFilter("all")}
+            />
+            {(Object.keys(ACTIVE_KIND_META) as ActiveItemKind[]).map((k) => {
+              const meta = ACTIVE_KIND_META[k];
+              return (
+                <KindFilterChip
+                  key={k}
+                  label={meta.label}
+                  count={totalCounts[k]}
+                  icon={meta.icon}
+                  accent={meta.chipClass}
+                  active={kindFilter === k}
+                  onClick={() => setKindFilter(k)}
+                />
+              );
+            })}
+          </div>
+        }
+      />
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          message="ไม่พบรายการที่ตรงกับเงื่อนไข"
+          subMessage="ลองเปลี่ยนคำค้นหาหรือฟิลเตอร์"
+        />
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((group) => {
+            const isExpanded = expandedGroups.has(group.contactId);
+            return (
+              <VendorCardShell
+                key={group.contactId}
+                vendorName={group.contactName}
+                contactInfo={
+                  group.contact
+                    ? { email: group.contact.email, phone: group.contact.phone }
+                    : undefined
+                }
+                countLabel={`${group.items.length} รายการ`}
+                totalWht={group.totalWhtAmount}
+                isExpanded={isExpanded}
+                onToggle={() =>
+                  setExpandedGroups((prev) => toggleSet(prev, group.contactId))
+                }
+                rightExtra={
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {(Object.keys(ACTIVE_KIND_META) as ActiveItemKind[]).map(
+                      (k) => {
+                        const c = group.countByKind[k];
+                        if (c === 0) return null;
+                        const meta = ACTIVE_KIND_META[k];
+                        const Icon = meta.icon;
+                        return (
+                          <span
+                            key={k}
+                            className={cn(
+                              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                              meta.chipClass
+                            )}
+                          >
+                            <Icon className="h-2.5 w-2.5" />
+                            {meta.label} {c}
+                          </span>
+                        );
+                      }
+                    )}
+                  </div>
+                }
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm table-fixed min-w-[820px]">
+                    <colgroup>
+                      <col className="w-32" />
+                      <col className="w-32" />
+                      <col />
+                      <col className="w-20" />
+                      <col className="w-32" />
+                      <col className="w-40" />
+                    </colgroup>
+                    <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="text-left p-3 font-medium">สถานะ</th>
+                        <th className="text-left p-3 font-medium">วันที่</th>
+                        <th className="text-left p-3 font-medium">รายละเอียด</th>
+                        <th className="text-right p-3 font-medium">WHT %</th>
+                        <th className="text-right p-3 font-medium">ยอด WHT</th>
+                        <th className="text-right p-3 font-medium">การกระทำ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.items.map((it) => {
+                        const meta = ACTIVE_KIND_META[it.kind];
+                        const Icon = meta.icon;
+                        const rowKey = `${it.kind}:${it.id}`;
+                        const isBusy = busyKey === rowKey;
+                        const isSelected =
+                          it.kind === "pending-send" && selected.has(it.id);
+                        const detailHref =
+                          it.kind === "incoming-wait"
+                            ? `/${companyCode}/incomes/${it.id}`
+                            : `/${companyCode}/expenses/${it.id}`;
+                        return (
+                          <tr
+                            key={rowKey}
+                            className={cn(
+                              "border-t border-border/40 hover:bg-muted/40 transition-colors",
+                              isSelected && "bg-primary/5"
+                            )}
+                          >
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                {it.kind === "pending-send" && (
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() =>
+                                      setSelected((prev) =>
+                                        toggleSet(prev, it.id)
+                                      )
+                                    }
+                                  />
+                                )}
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                                    meta.chipClass
+                                  )}
+                                >
+                                  <Icon className="h-3 w-3" />
+                                  {meta.label}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 whitespace-nowrap text-muted-foreground">
+                              {formatThaiDate(new Date(it.date))}
+                            </td>
+                            <td className="p-3 truncate">
+                              <button
+                                type="button"
+                                className="text-left hover:underline truncate max-w-full"
+                                title={it.description || "-"}
+                                onClick={() => router.push(detailHref)}
+                              >
+                                {it.description || "-"}
+                              </button>
+                              {it.kind === "pending-send" && it.whtDeliveryMethod && (() => {
+                                const di = getDeliveryMethod(it.whtDeliveryMethod);
+                                if (!di) return null;
+                                const DIcon = di.Icon;
+                                return (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 truncate">
+                                    <DIcon className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">
+                                      {di.label}
+                                      {it.whtDeliveryMethod === "EMAIL" &&
+                                        it.whtDeliveryEmail &&
+                                        ` (${it.whtDeliveryEmail})`}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
+                              {it.kind === "incoming-wait" &&
+                                (it.whtCertRemindCount ?? 0) > 0 && (
+                                  <div className="text-xs text-muted-foreground mt-0.5">
+                                    เตือนแล้ว {it.whtCertRemindCount}x
+                                  </div>
+                                )}
+                            </td>
+                            <td className="p-3 text-right text-muted-foreground tabular-nums">
+                              {it.whtRate ?? "-"}
+                              {it.whtRate ? "%" : ""}
+                            </td>
+                            <td className="p-3 text-right font-medium tabular-nums">
+                              {formatCurrency(it.whtAmount)}
+                            </td>
+                            <td className="p-3 text-right">
+                              {it.kind === "pending-issue" && (
+                                <LoadingButton
+                                  size="sm"
+                                  variant="outline"
+                                  loading={isBusy}
+                                  onClick={() =>
+                                    runSingle(
+                                      "expense",
+                                      it.id,
+                                      "issue_wht",
+                                      "ออก 50 ทวิ",
+                                      rowKey
+                                    )
+                                  }
+                                  className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                >
+                                  <FilePlus className="h-3.5 w-3.5 mr-1" />
+                                  ออก
+                                </LoadingButton>
+                              )}
+                              {it.kind === "pending-send" && (
+                                <div className="flex gap-1 justify-end">
+                                  <LoadingButton
+                                    size="sm"
+                                    variant="ghost"
+                                    loading={isBusy}
+                                    onClick={() =>
+                                      runSingle(
+                                        "expense",
+                                        it.id,
+                                        "undo_issue_wht",
+                                        "ย้อนการออก",
+                                        rowKey
+                                      )
+                                    }
+                                    title="ย้อนการออก 50 ทวิ"
+                                    className="h-8 text-muted-foreground hover:text-amber-600"
+                                  >
+                                    <Undo2 className="h-3.5 w-3.5" />
+                                  </LoadingButton>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelected(new Set([it.id]));
+                                      setShowMarkSentDialog(true);
+                                    }}
+                                    className="h-8 bg-emerald-600 hover:bg-emerald-700"
+                                  >
+                                    <Send className="h-3.5 w-3.5 mr-1" />
+                                    ส่ง
+                                  </Button>
+                                </div>
+                              )}
+                              {it.kind === "incoming-wait" && (
+                                <div className="flex gap-1 justify-end">
+                                  <LoadingButton
+                                    size="sm"
+                                    variant="outline"
+                                    loading={
+                                      busyKey ===
+                                      `${it.kind}:${it.id}:remind`
+                                    }
+                                    onClick={() =>
+                                      runSingle(
+                                        "income",
+                                        it.id,
+                                        "remind_wht",
+                                        "ส่ง reminder",
+                                        `${it.kind}:${it.id}:remind`
+                                      )
+                                    }
+                                    className="h-8"
+                                  >
+                                    <BellRing className="h-3.5 w-3.5 mr-1" />
+                                    เตือน
+                                  </LoadingButton>
+                                  <LoadingButton
+                                    size="sm"
+                                    loading={
+                                      busyKey ===
+                                      `${it.kind}:${it.id}:receive`
+                                    }
+                                    onClick={() =>
+                                      runSingle(
+                                        "income",
+                                        it.id,
+                                        "receive_wht",
+                                        "บันทึกรับใบ 50 ทวิ",
+                                        `${it.kind}:${it.id}:receive`
+                                      )
+                                    }
+                                    className="h-8 bg-emerald-600 hover:bg-emerald-700"
+                                  >
+                                    <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                                    รับ
+                                  </LoadingButton>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </VendorCardShell>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Sticky bar - bulk mark sent (เฉพาะที่เลือกใน pending-send) */}
+      {selected.size > 0 && (
+        <StickyActionBar
+          count={selected.size}
+          onClear={() => setSelected(new Set())}
+        >
+          <Button
+            size="sm"
+            onClick={() => setShowMarkSentDialog(true)}
+            className="h-8 bg-emerald-600 hover:bg-emerald-700"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            บันทึกส่งแล้ว
+          </Button>
+        </StickyActionBar>
+      )}
+
+      {/* Mark sent dialog (shared with pending-send) */}
+      <Dialog open={showMarkSentDialog} onOpenChange={setShowMarkSentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              บันทึกการส่งใบ 50 ทวิ
+            </DialogTitle>
+            <DialogDescription>
+              เลือก {selected.size} รายการ
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>วิธีส่ง</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {DELIVERY_METHODS.map((method) => {
+                  const Icon = method.Icon;
+                  const isActive = selectedDeliveryMethod === method.value;
+                  return (
+                    <button
+                      key={method.value}
+                      type="button"
+                      onClick={() => setSelectedDeliveryMethod(method.value)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors text-left",
+                        isActive
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:bg-muted/50"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{method.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="all-notes">หมายเหตุ (ถ้ามี)</Label>
+              <Textarea
+                id="all-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="เพิ่มหมายเหตุ..."
+                className="mt-2"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowMarkSentDialog(false)}
+              disabled={isSubmitting}
+            >
+              ยกเลิก
+            </Button>
+            <LoadingButton
+              onClick={handleMarkSent}
+              loading={isSubmitting}
+              disabled={!selectedDeliveryMethod}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              ยืนยันส่งแล้ว
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
