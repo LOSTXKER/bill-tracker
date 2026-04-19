@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/swr-config";
 import { useParams, useRouter } from "next/navigation";
@@ -63,6 +63,11 @@ interface ContactGroup {
   deliveryMethod: string | null;
   deliveryEmail: string | null;
   deliveryNotes: string | null;
+  /**
+   * true เมื่อ expense ในกลุ่มนี้มีวิธีส่งไม่เหมือนกัน
+   * (override ระดับ expense ต่างจาก preference ของ contact)
+   */
+  mixedDeliveryMethods?: boolean;
   expenses: ExpenseItem[];
   totalAmount: number;
   totalWhtAmount: number;
@@ -78,6 +83,8 @@ export default function WhtDeliveriesPage() {
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set());
+  // ใช้ flag กัน auto-expand ซ้ำหลังจาก user collapse เอง
+  const hasAutoExpandedRef = useRef(false);
 
   // Mark sent dialog
   const [showMarkSentDialog, setShowMarkSentDialog] = useState(false);
@@ -96,12 +103,17 @@ export default function WhtDeliveriesPage() {
   const groups: ContactGroup[] = swrData?.data?.groups || [];
   const totalPending: number = swrData?.data?.totalPending || 0;
 
-  // Auto-expand all groups when data first loads
+  // Auto-expand all groups เฉพาะครั้งแรกที่ data โหลดเสร็จ (จะไม่กลับมา expand เองหลัง user collapse)
+  // ใช้ ref เป็น guard เพื่อป้องกันรันซ้ำหลัง refetch หรือ rerender
+  const groupsLength = groups.length;
   useEffect(() => {
-    if (groups.length > 0 && expandedGroups.size === 0) {
-      setExpandedGroups(new Set(groups.map((g) => g.contactId)));
-    }
-  }, [groups.length]);
+    if (hasAutoExpandedRef.current || groupsLength === 0) return;
+    setExpandedGroups(new Set(groups.map((g) => g.contactId)));
+    hasAutoExpandedRef.current = true;
+    // ตั้งใจ omit `groups` เพื่อกัน effect รัน effect ใหม่ทุก render
+    // groupsLength เป็น stable id ของ "data โหลดมาแล้วหรือยัง"
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupsLength]);
 
   const toggleGroup = (contactId: string) => {
     const newExpanded = new Set(expandedGroups);
@@ -275,9 +287,13 @@ export default function WhtDeliveriesPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Checkbox
-                          checked={allSelected}
-                          // @ts-ignore - indeterminate is valid
-                          indeterminate={someSelected && !allSelected}
+                          checked={
+                            allSelected
+                              ? true
+                              : someSelected
+                              ? "indeterminate"
+                              : false
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleAllInGroup(group);
@@ -293,8 +309,13 @@ export default function WhtDeliveriesPage() {
                             {group.contactName}
                             <Badge variant="secondary">{group.count} รายการ</Badge>
                           </CardTitle>
-                          <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3">
-                            {deliveryInfo ? (() => {
+                          <div className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+                            {group.mixedDeliveryMethods ? (
+                              <span className="flex items-center gap-1 text-amber-600">
+                                <Send className="h-4 w-4" />
+                                หลายวิธี (ดูในแต่ละรายการ)
+                              </span>
+                            ) : deliveryInfo ? (() => {
                               const Icon = deliveryInfo.Icon;
                               return (
                                 <span className="flex items-center gap-1">
@@ -308,7 +329,7 @@ export default function WhtDeliveriesPage() {
                             })() : (
                               <span className="text-amber-600">ยังไม่ระบุวิธีส่ง</span>
                             )}
-                            {group.deliveryNotes && (
+                            {group.deliveryNotes && !group.mixedDeliveryMethods && (
                               <span className="text-xs">• {group.deliveryNotes}</span>
                             )}
                           </div>

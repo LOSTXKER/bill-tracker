@@ -172,9 +172,17 @@ async function IncomesData({ companyCode, searchParams }: IncomesDataProps) {
   const creator = searchParams.creator as string | undefined;
   const dateFrom = searchParams.dateFrom as string | undefined;
   const dateTo = searchParams.dateTo as string | undefined;
+  // Quick-filter: รอใบ 50 ทวิ จากลูกค้า (income ที่หัก ณ ที่จ่ายแล้วแต่ลูกค้ายังไม่ส่งใบ 50 ทวิให้)
+  const whtPending = searchParams.whtPending === "1" || searchParams.whtPending === "true";
 
   // Build where clause
   const whereClause: Prisma.IncomeWhereInput = { ...buildIncomeBaseWhere(companyId) };
+
+  if (whtPending) {
+    whereClause.workflowStatus = "ACTIVE";
+    whereClause.isWhtDeducted = true;
+    whereClause.hasWhtCert = false;
+  }
 
   if (search) {
     whereClause.AND = [

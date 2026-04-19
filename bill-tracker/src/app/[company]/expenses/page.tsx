@@ -187,6 +187,9 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
   const dateTo = searchParams.dateTo as string | undefined;
   // Ownership filter: null (all), "self" (paid by us), "payOnBehalf" (paid by another company)
   const ownership = searchParams.ownership as string | undefined;
+  // Quick-filter: รอออกใบ 50 ทวิ ให้ vendor (expense ที่หัก ณ ที่จ่าย แต่ยังไม่ได้ออกใบ 50 ทวิ)
+  const whtPendingIssue =
+    searchParams.whtPendingIssue === "1" || searchParams.whtPendingIssue === "true";
 
   // Build where clause using shared filter builders
   let whereClause: Prisma.ExpenseWhereInput;
@@ -196,6 +199,12 @@ async function ExpensesData({ companyCode, searchParams }: ExpensesDataProps) {
     whereClause = buildExpensePayOnBehalfWhere(companyId);
   } else {
     whereClause = buildExpenseBaseWhere(companyId);
+  }
+
+  if (whtPendingIssue) {
+    whereClause.workflowStatus = "ACTIVE";
+    whereClause.isWht = true;
+    whereClause.hasWhtCert = false;
   }
 
   if (search) {
