@@ -187,7 +187,7 @@ export function DashboardShell({ children, company, user, isOwner, permissions }
           badgeKey: "pendingTaxInvoices",
         },
         {
-          name: "รอส่ง 50 ทวิ",
+          name: "จัดการใบ 50 ทวิ",
           href: `/${companyCode}/wht-deliveries`,
           icon: Send,
           permission: "expenses:read",

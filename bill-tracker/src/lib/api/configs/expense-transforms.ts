@@ -158,6 +158,16 @@ export function transformExpenseUpdateData(body: TransactionRequestBody, existin
   if (data.whtCertUrls !== undefined) {
     updateData.whtCertUrls = data.whtCertUrls;
     updateData.hasWhtCert = data.whtCertUrls.length > 0;
+    // Auto-set whtCertIssuedAt ครั้งแรกที่อัพโหลดไฟล์ WHT cert
+    // (มาตรฐานเดียวกับ income ที่ set whtCertReceivedAt อัตโนมัติ)
+    if (data.whtCertUrls.length > 0 && !existingData?.whtCertIssuedAt) {
+      updateData.whtCertIssuedAt = new Date();
+    }
+    // ถ้าลบไฟล์ทั้งหมด ก็เคลียร์ทุก WHT cert timestamp ด้วย
+    if (data.whtCertUrls.length === 0) {
+      updateData.whtCertIssuedAt = null;
+      updateData.whtCertSentAt = null;
+    }
   }
   if (data.referenceUrls !== undefined) {
     updateData.referenceUrls = data.referenceUrls;

@@ -46,7 +46,20 @@ import {
   Undo2,
   History,
   Mailbox,
+  Upload,
+  Paperclip,
+  ExternalLink,
+  Image as ImageIcon,
+  FileText as FileTextIcon,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { uploadFileDirect } from "@/lib/storage/client-upload";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatThaiDate } from "@/lib/utils/tax-calculator";
 import { DELIVERY_METHODS, getDeliveryMethod } from "@/lib/constants/delivery-methods";
@@ -77,6 +90,8 @@ interface ExpenseItem {
   whtAmount: number;
   whtRate: number;
   whtCertUrls: string[];
+  whtCertIssuedAt?: string | null;
+  createdBy?: string | null;
   whtDeliveryMethod?: string | null;
   whtDeliveryEmail?: string | null;
   whtDeliveryNotes?: string | null;
@@ -312,6 +327,199 @@ function refreshAllStages(companyCode: string) {
   globalMutate(wht(companyCode, "recently-done"));
 }
 
+/** ตรวจว่า item เพิ่งเกิดขึ้นภายใน N ชม. ที่ผ่านมา */
+function isFresh(timestamp: string | null | undefined, hours = 24): boolean {
+  if (!timestamp) return false;
+  const diffMs = Date.now() - new Date(timestamp).getTime();
+  return diffMs >= 0 && diffMs < hours * 60 * 60 * 1000;
+}
+
+/** ดึงชื่อไฟล์จาก Supabase URL */
+function fileNameFromUrl(url: string): string {
+  const last = url.split("/").pop() || "file";
+  const decoded = decodeURIComponent(last);
+  // Remove timestamp prefix (e.g. "1234567890_filename.pdf" → "filename.pdf")
+  const m = decoded.match(/^\d{10,}_(.+)$/);
+  if (!m) return decoded;
+  // Try base64 decode of the base name (we encode in client-upload)
+  const dotIdx = m[1].lastIndexOf(".");
+  const base = dotIdx > 0 ? m[1].slice(0, dotIdx) : m[1];
+  const ext = dotIdx > 0 ? m[1].slice(dotIdx) : "";
+  try {
+    const b64 = base.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const decodedBase = decodeURIComponent(escape(atob(padded)));
+    return decodedBase + ext;
+  } catch {
+    return m[1];
+  }
+}
+
+function isImage(url: string): boolean {
+  return /\.(jpe?g|png|webp|gif)$/i.test(url.split("?")[0]);
+}
+
+// ======================
+// Sub-components
+// ======================
+
+function FreshBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+      <Sparkles className="h-2.5 w-2.5" />
+      ใหม่
+    </span>
+  );
+}
+
+/** Popover แสดงรายการไฟล์ + ดาวน์โหลด/preview */
+function FilesPopover({
+  urls,
+  triggerLabel,
+}: {
+  urls: string[];
+  triggerLabel?: string;
+}) {
+  if (urls.length === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Paperclip className="h-3 w-3" />
+        ไม่มีไฟล์
+      </span>
+    );
+  }
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-muted hover:bg-muted/70 text-foreground"
+        >
+          <Paperclip className="h-3 w-3" />
+          {triggerLabel ?? `${urls.length} ไฟล์`}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-80 p-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-xs font-medium text-muted-foreground px-2 py-1">
+          ไฟล์ใบ 50 ทวิ ({urls.length})
+        </div>
+        <div className="space-y-1 max-h-72 overflow-y-auto">
+          {urls.map((url, i) => {
+            const name = fileNameFromUrl(url);
+            const Icon = isImage(url) ? ImageIcon : FileTextIcon;
+            return (
+              <a
+                key={url + i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-muted text-sm group"
+              >
+                <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate" title={name}>
+                  {name}
+                </span>
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100" />
+              </a>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * ปุ่มอัพโหลดไฟล์ WHT cert ตรงๆ จาก row (ไม่ต้องเข้าหน้ารายละเอียด)
+ * อัพโหลดสำเร็จแล้ว PUT ไปที่ /api/expenses/[id] เพื่ออัพเดต whtCertUrls
+ * → side effect ใน expense-transforms จะ set hasWhtCert=true และ whtCertIssuedAt อัตโนมัติ
+ */
+function InlineUploadButton({
+  companyCode,
+  expenseId,
+  currentUrls,
+  onUploaded,
+  variant = "default",
+}: {
+  companyCode: string;
+  expenseId: string;
+  currentUrls: string[];
+  onUploaded: () => void;
+  variant?: "default" | "ghost";
+}) {
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setBusy(true);
+    try {
+      const folder = `${companyCode.toUpperCase()}/expenses/${expenseId}/wht-certs`;
+      const result = await uploadFileDirect(file, folder, file.name);
+      const res = await fetch(`/api/expenses/${expenseId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          whtCertUrls: [...currentUrls, result.url],
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.error || "อัพโหลดไม่สำเร็จ");
+      }
+      toast.success("อัพโหลดสำเร็จ — บันทึกออก 50 ทวิ ให้อัตโนมัติ");
+      onUploaded();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+      />
+      <Button
+        type="button"
+        size="sm"
+        variant={variant === "ghost" ? "ghost" : "outline"}
+        disabled={busy}
+        onClick={(e) => {
+          e.stopPropagation();
+          inputRef.current?.click();
+        }}
+        className={cn(
+          "h-8 text-xs",
+          variant === "default" &&
+            "text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+        )}
+        title="อัพโหลดไฟล์ใบ 50 ทวิ — จะบันทึกออกอัตโนมัติ"
+      >
+        {busy ? (
+          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+        ) : (
+          <Upload className="h-3.5 w-3.5 mr-1" />
+        )}
+        อัพโหลด
+      </Button>
+    </>
+  );
+}
+
 // =============================================================================
 // Page
 // =============================================================================
@@ -368,8 +576,8 @@ export default function WhtDeliveriesPage() {
       <div className="space-y-6 pb-24">
         <PageHeader
           icon={FileText}
-          title="ใบหัก ณ ที่จ่าย"
-          description="ติดตามสถานะการออก / ส่ง / รับใบ 50 ทวิ ทุกประเภทในที่เดียว"
+          title="จัดการใบ 50 ทวิ"
+          description="ออก / ส่ง / รับ / ตรวจสอบเอกสารใบหัก ณ ที่จ่าย ทุกประเภทในที่เดียว — อัพโหลดไฟล์ตรงนี้ได้เลย ระบบจะบันทึกออกอัตโนมัติ"
           actions={
             <Button variant="outline" size="sm" onClick={refreshAll}>
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -861,14 +1069,15 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
                 }
               >
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm table-fixed min-w-[720px]">
+                  <table className="w-full text-sm table-fixed min-w-[820px]">
                     <colgroup>
                       <col className="w-12" />
                       <col className="w-32" />
                       <col />
                       <col className="w-20" />
                       <col className="w-36" />
-                      <col className="w-28" />
+                      <col className="w-24" />
+                      <col className="w-44" />
                     </colgroup>
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
@@ -877,6 +1086,7 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
                         <th className="text-left p-3 font-medium">รายละเอียด</th>
                         <th className="text-right p-3 font-medium">WHT %</th>
                         <th className="text-right p-3 font-medium">ยอด WHT</th>
+                        <th className="text-center p-3 font-medium">ไฟล์</th>
                         <th className="text-right p-3 font-medium">
                           การกระทำ
                         </th>
@@ -886,6 +1096,7 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
                       {group.expenses.map((expense) => {
                         const checked = selected.has(expense.id);
                         const busy = busyIds.has(expense.id);
+                        const fileCount = expense.whtCertUrls?.length || 0;
                         return (
                           <tr
                             key={expense.id}
@@ -927,24 +1138,43 @@ function PendingIssueTab({ companyCode }: { companyCode: string }) {
                             <td className="p-3 text-right font-medium tabular-nums">
                               {formatCurrency(expense.whtAmount)}
                             </td>
+                            <td className="p-3 text-center">
+                              <FilesPopover urls={expense.whtCertUrls || []} />
+                            </td>
                             <td className="p-3 text-right">
-                              <LoadingButton
-                                size="sm"
-                                variant="outline"
-                                loading={busy}
-                                onClick={() => issueMany([expense.id])}
-                                className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-                              >
-                                <FilePlus className="h-3.5 w-3.5 mr-1" />
-                                ออก
-                              </LoadingButton>
+                              <div className="flex justify-end gap-1.5">
+                                <InlineUploadButton
+                                  companyCode={companyCode}
+                                  expenseId={expense.id}
+                                  currentUrls={expense.whtCertUrls || []}
+                                  onUploaded={() => {
+                                    mutate();
+                                    refreshAllStages(companyCode);
+                                  }}
+                                />
+                                <LoadingButton
+                                  size="sm"
+                                  variant="outline"
+                                  loading={busy}
+                                  onClick={() => issueMany([expense.id])}
+                                  className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                  title={
+                                    fileCount === 0
+                                      ? "บันทึกออกใบ (ไม่มีไฟล์แนบ)"
+                                      : "บันทึกออก 50 ทวิ"
+                                  }
+                                >
+                                  <FilePlus className="h-3.5 w-3.5 mr-1" />
+                                  ออก
+                                </LoadingButton>
+                              </div>
                             </td>
                           </tr>
                         );
                       })}
                       {/* Vendor-level bulk action */}
                       <tr className="border-t border-border/40 bg-muted/30">
-                        <td colSpan={6} className="p-2 text-right">
+                        <td colSpan={7} className="p-2 text-right">
                           <LoadingButton
                             size="sm"
                             variant="ghost"
@@ -1205,13 +1435,14 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                 }
               >
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm table-fixed min-w-[760px]">
+                  <table className="w-full text-sm table-fixed min-w-[820px]">
                     <colgroup>
                       <col className="w-12" />
                       <col className="w-32" />
                       <col />
                       <col className="w-20" />
                       <col className="w-36" />
+                      <col className="w-24" />
                       <col className="w-24" />
                     </colgroup>
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
@@ -1221,6 +1452,7 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                         <th className="text-left p-3 font-medium">รายละเอียด</th>
                         <th className="text-right p-3 font-medium">WHT %</th>
                         <th className="text-right p-3 font-medium">ยอด WHT</th>
+                        <th className="text-center p-3 font-medium">ไฟล์</th>
                         <th className="text-right p-3 font-medium">การกระทำ</th>
                       </tr>
                     </thead>
@@ -1228,6 +1460,7 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                       {group.expenses.map((expense) => {
                         const checked = selected.has(expense.id);
                         const isUndoing = undoBusy.has(expense.id);
+                        const fresh = isFresh(expense.whtCertIssuedAt);
                         const expenseDeliveryInfo = expense.whtDeliveryMethod
                           ? getDeliveryMethod(expense.whtDeliveryMethod)
                           : null;
@@ -1256,19 +1489,22 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                               {formatThaiDate(new Date(expense.billDate))}
                             </td>
                             <td className="p-3 truncate">
-                              <button
-                                type="button"
-                                className="text-left hover:underline truncate max-w-full"
-                                title={expense.description || "-"}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(
-                                    `/${companyCode}/expenses/${expense.id}`
-                                  );
-                                }}
-                              >
-                                {expense.description || "-"}
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="text-left hover:underline truncate max-w-full"
+                                  title={expense.description || "-"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(
+                                      `/${companyCode}/expenses/${expense.id}`
+                                    );
+                                  }}
+                                >
+                                  {expense.description || "-"}
+                                </button>
+                                {fresh && <FreshBadge />}
+                              </div>
                               {expenseDeliveryInfo && (
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 truncate">
                                   <expenseDeliveryInfo.Icon className="h-3 w-3 shrink-0" />
@@ -1286,6 +1522,9 @@ function PendingSendTab({ companyCode }: { companyCode: string }) {
                             </td>
                             <td className="p-3 text-right font-medium tabular-nums">
                               {formatCurrency(expense.whtAmount)}
+                            </td>
+                            <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <FilesPopover urls={expense.whtCertUrls || []} />
                             </td>
                             <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
                               <LoadingButton

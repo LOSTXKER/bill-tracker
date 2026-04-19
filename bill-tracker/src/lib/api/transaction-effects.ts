@@ -1,6 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { logCreate, logUpdate, logStatusChange, logDelete, logWhtChange } from "@/lib/audit/logger";
-import { notifyTransactionChange } from "@/lib/notifications/in-app";
+import { notifyTransactionChange, createNotification } from "@/lib/notifications/in-app";
 import { createDocumentEvent } from "./transaction-document-events";
 import { createLogger } from "@/lib/utils/logger";
 import type { TransactionRouteConfig, TransactionRequestBody, TransactionRecord } from "./transaction-types";
@@ -152,6 +152,30 @@ export async function runUpdateSideEffects<TModel>(params: {
         metadata: { fileType: field, addedUrls },
         createdBy: session.user.id,
       }).catch((e) => log.error("Failed to create file upload event", e));
+
+      // แจ้งเตือนผู้สร้างรายการเมื่อมีคนอื่นอัพโหลดเอกสารสำคัญ
+      // (โดยเฉพาะใบ 50 ทวิ ที่บัญชีมักจะเป็นคนอัพ — เจ้าของรายการต้องรู้)
+      const creatorId = (existingItem as { createdBy?: string }).createdBy;
+      if (creatorId && creatorId !== session.user.id) {
+        createNotification({
+          companyId: item.companyId,
+          type: "FILE_UPLOADED",
+          entityType: config.modelName === "expense" ? "Expense" : "Income",
+          entityId: item.id,
+          title: `${label}ใหม่ (${addedUrls.length} ไฟล์)`,
+          message: `${session.user.name || "ผู้ใช้"} อัปโหลด${label}ให้กับ "${
+            item.description || "รายการ"
+          }"`,
+          actorId: session.user.id,
+          actorName: session.user.name || "ผู้ใช้",
+          targetUserIds: [creatorId],
+          metadata: {
+            fileType: field,
+            addedCount: addedUrls.length,
+            transactionType: config.modelName,
+          },
+        }).catch((e) => log.error("Failed to send file-upload notification", e));
+      }
     }
 
     if (removedUrls.length > 0) {
