@@ -472,50 +472,55 @@ function VendorCardShell({
   leadingSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // หมายเหตุ: ไม่ใช้ <button> ครอบทั้งหัวการ์ดเพราะ leadingSlot จะมี
+  // Radix Checkbox (ซึ่งเป็น <button> เอง) → button-in-button hydration error
   return (
     <Card className="border-border/60 overflow-hidden p-0 gap-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left px-4 py-3 hover:bg-muted/40 transition-colors flex items-center gap-3"
-      >
-        {leadingSlot}
-        <VendorAvatar name={vendorName} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            )}
-            <span className="font-medium truncate">{vendorName}</span>
-            <Badge variant="secondary" className="text-xs">
-              {countLabel}
-            </Badge>
-          </div>
-          {(contactInfo?.email || contactInfo?.phone || rightExtra) && (
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground pl-6">
-              {contactInfo?.email && (
-                <span className="flex items-center gap-1">
-                  <Mail className="h-3 w-3" />
-                  {contactInfo.email}
-                </span>
+      <div className="px-4 py-3 hover:bg-muted/40 transition-colors flex items-center gap-3">
+        {leadingSlot && <div className="shrink-0">{leadingSlot}</div>}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+          className="flex-1 flex items-center gap-3 text-left min-w-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-md"
+        >
+          <VendorAvatar name={vendorName} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
-              {contactInfo?.phone && (
-                <span className="flex items-center gap-1">
-                  <Phone className="h-3 w-3" />
-                  {contactInfo.phone}
-                </span>
-              )}
-              {rightExtra}
+              <span className="font-medium truncate">{vendorName}</span>
+              <Badge variant="secondary" className="text-xs">
+                {countLabel}
+              </Badge>
             </div>
-          )}
-        </div>
-        <div className="text-right shrink-0">
-          <div className="font-semibold tabular-nums">{formatCurrency(totalWht)}</div>
-          <div className="text-[11px] text-muted-foreground">ยอด WHT</div>
-        </div>
-      </button>
+            {(contactInfo?.email || contactInfo?.phone || rightExtra) && (
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground pl-6">
+                {contactInfo?.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    {contactInfo.email}
+                  </span>
+                )}
+                {contactInfo?.phone && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    {contactInfo.phone}
+                  </span>
+                )}
+                {rightExtra}
+              </div>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <div className="font-semibold tabular-nums">{formatCurrency(totalWht)}</div>
+            <div className="text-[11px] text-muted-foreground">ยอด WHT</div>
+          </div>
+        </button>
+      </div>
       {isExpanded && (
         <div className="border-t border-border/60 bg-muted/20">{children}</div>
       )}
