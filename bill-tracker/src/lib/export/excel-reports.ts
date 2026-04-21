@@ -44,6 +44,7 @@ export async function exportMonthlyReport(
 
   const expenseSheet = workbook.addWorksheet("รายจ่าย");
   expenseSheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "ผู้ขาย", key: "vendor", width: 25 },
     { header: "รายละเอียด", key: "description", width: 30 },
@@ -57,6 +58,7 @@ export async function exportMonthlyReport(
 
   expenses.forEach((expense) => {
     expenseSheet.addRow({
+      documentCode: expense.documentCode || "-",
       date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       vendor: expense.vendorName || "-",
       description: expense.description || "-",
@@ -71,6 +73,7 @@ export async function exportMonthlyReport(
 
   const incomeSheet = workbook.addWorksheet("รายรับ");
   incomeSheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "ลูกค้า", key: "customer", width: 25 },
     { header: "รายละเอียด", key: "source", width: 30 },
@@ -82,6 +85,7 @@ export async function exportMonthlyReport(
 
   incomes.forEach((income) => {
     incomeSheet.addRow({
+      documentCode: income.documentCode || "-",
       date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       customer: income.customerName || "-",
       source: income.source || "-",
@@ -142,6 +146,7 @@ export async function exportVATReport(
 
   const inputSheet = workbook.addWorksheet("ภาษีซื้อ");
   inputSheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "เลขที่ใบกำกับ", key: "invoiceNo", width: 15 },
     { header: "ผู้ขาย", key: "vendor", width: 25 },
@@ -153,6 +158,7 @@ export async function exportVATReport(
 
   expenses.forEach((expense) => {
     inputSheet.addRow({
+      documentCode: expense.documentCode || "-",
       date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: expense.invoiceNumber || "-",
       vendor: expense.vendorName || "-",
@@ -165,6 +171,7 @@ export async function exportVATReport(
 
   const outputSheet = workbook.addWorksheet("ภาษีขาย");
   outputSheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "เลขที่ใบกำกับ", key: "invoiceNo", width: 15 },
     { header: "ลูกค้า", key: "customer", width: 25 },
@@ -175,6 +182,7 @@ export async function exportVATReport(
 
   incomes.forEach((income) => {
     outputSheet.addRow({
+      documentCode: income.documentCode || "-",
       date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: income.invoiceNumber || "-",
       customer: income.customerName || "-",
@@ -234,6 +242,7 @@ export async function exportWHTReport(
 
   const paidSheet = workbook.addWorksheet("หักจากผู้ขาย");
   paidSheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "ผู้ขาย", key: "vendor", width: 25 },
     { header: "เลขประจำตัวผู้เสียภาษี", key: "taxId", width: 18 },
@@ -246,6 +255,7 @@ export async function exportWHTReport(
     .filter((e) => e.isWht)
     .forEach((expense) => {
       paidSheet.addRow({
+        documentCode: expense.documentCode || "-",
         date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
         vendor: expense.vendorName || "-",
         taxId: expense.vendorTaxId || "-",
@@ -257,6 +267,7 @@ export async function exportWHTReport(
 
   const receivedSheet = workbook.addWorksheet("โดนหักจากลูกค้า");
   receivedSheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "ลูกค้า", key: "customer", width: 25 },
     { header: "ยอด", key: "amount", width: 15 },
@@ -269,6 +280,7 @@ export async function exportWHTReport(
     .filter((i) => i.isWhtDeducted)
     .forEach((income) => {
       receivedSheet.addRow({
+        documentCode: income.documentCode || "-",
         date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
         customer: income.customerName || "-",
         amount: Number(income.amount),

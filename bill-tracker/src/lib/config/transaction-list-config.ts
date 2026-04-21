@@ -27,6 +27,7 @@ const EXPENSE_LIST_CONFIG: TransactionListConfigDef = {
   dateField: "billDate",
   statusInfo: EXPENSE_WORKFLOW_INFO,
   tableHeaders: [
+    { key: "documentCode", label: "เลขที่เอกสาร" },
     { key: "createdAt", label: "สร้างเมื่อ", sortable: true },
     { key: "billDate", label: "วันที่บิล", sortable: true },
     { key: "status", label: "สถานะ", align: "center" as const },
@@ -51,6 +52,7 @@ const INCOME_LIST_CONFIG: TransactionListConfigDef = {
   dateField: "receiveDate",
   statusInfo: INCOME_WORKFLOW_INFO,
   tableHeaders: [
+    { key: "documentCode", label: "เลขที่เอกสาร" },
     { key: "createdAt", label: "สร้างเมื่อ", sortable: true },
     { key: "receiveDate", label: "วันที่รับ", sortable: true },
     { key: "status", label: "สถานะ", align: "center" as const },

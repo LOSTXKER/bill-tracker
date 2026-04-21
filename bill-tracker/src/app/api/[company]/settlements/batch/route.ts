@@ -3,6 +3,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/audit/logger";
 import { randomUUID } from "crypto";
+import { generateDocumentCode } from "@/lib/utils/document-code";
 
 interface RouteParams {
   params: Promise<{ company: string }>;
@@ -118,10 +119,17 @@ export const POST = withCompanyAccessFromParams(
 
       // Create one expense + payment per employee (if requested)
       for (const entry of expenseIdsForEmployees) {
+        const documentCode = await generateDocumentCode(
+          tx,
+          company.id,
+          "expense",
+          settledAt,
+        );
         await tx.expense.create({
           data: {
             id: entry.expenseId,
             companyId: company.id,
+            documentCode,
             amount: entry.amount,
             vatRate: 0,
             vatAmount: 0,

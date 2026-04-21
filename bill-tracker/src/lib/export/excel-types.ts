@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 export interface ExpenseData {
+  documentCode?: string | null;
   billDate: Date;
   vendorName?: string | null;
   vendorTaxId?: string | null;
@@ -19,6 +20,7 @@ export interface ExpenseData {
 }
 
 export interface IncomeData {
+  documentCode?: string | null;
   receiveDate: Date;
   customerName?: string | null;
   customerTaxId?: string | null;

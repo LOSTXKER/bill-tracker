@@ -18,6 +18,7 @@ export async function exportExpensesToExcel(
   const worksheet = workbook.addWorksheet("รายจ่าย");
 
   worksheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "เลขที่ใบกำกับ", key: "invoiceNo", width: 15 },
     { header: "ผู้ขาย", key: "vendor", width: 25 },
@@ -38,6 +39,7 @@ export async function exportExpensesToExcel(
 
   expenses.forEach((expense) => {
     worksheet.addRow({
+      documentCode: expense.documentCode || "-",
       date: expense.billDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: expense.invoiceNumber || "-",
       vendor: expense.vendorName || "-",
@@ -59,6 +61,7 @@ export async function exportExpensesToExcel(
 
   const lastRow = worksheet.lastRow?.number || 1;
   const totalRow = worksheet.addRow({
+    documentCode: "",
     date: "",
     invoiceNo: "",
     vendor: "",
@@ -66,12 +69,12 @@ export async function exportExpensesToExcel(
     description: "",
     category: "รวมทั้งหมด",
     payer: "",
-    amount: { formula: `SUM(H2:H${lastRow})` },
+    amount: { formula: `SUM(I2:I${lastRow})` },
     vatRate: "",
-    vat: { formula: `SUM(J2:J${lastRow})` },
+    vat: { formula: `SUM(K2:K${lastRow})` },
     whtRate: "",
-    wht: { formula: `SUM(L2:L${lastRow})` },
-    netPaid: { formula: `SUM(M2:M${lastRow})` },
+    wht: { formula: `SUM(M2:M${lastRow})` },
+    netPaid: { formula: `SUM(N2:N${lastRow})` },
     status: "",
   });
   totalRow.font = { bold: true };
@@ -94,6 +97,7 @@ export async function exportIncomesToExcel(
   const worksheet = workbook.addWorksheet("รายรับ");
 
   worksheet.columns = [
+    { header: "เลขที่เอกสาร", key: "documentCode", width: 18 },
     { header: "วันที่", key: "date", width: 12 },
     { header: "เลขที่ใบกำกับ", key: "invoiceNo", width: 15 },
     { header: "ลูกค้า", key: "customer", width: 25 },
@@ -112,6 +116,7 @@ export async function exportIncomesToExcel(
 
   incomes.forEach((income) => {
     worksheet.addRow({
+      documentCode: income.documentCode || "-",
       date: income.receiveDate.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIMEZONE }),
       invoiceNo: income.invoiceNumber || "-",
       customer: income.customerName || "-",
@@ -131,17 +136,18 @@ export async function exportIncomesToExcel(
 
   const lastRow = worksheet.lastRow?.number || 1;
   const totalRow = worksheet.addRow({
+    documentCode: "",
     date: "",
     invoiceNo: "",
     customer: "",
     taxId: "",
     source: "รวมทั้งหมด",
-    amount: { formula: `SUM(F2:F${lastRow})` },
+    amount: { formula: `SUM(G2:G${lastRow})` },
     vatRate: "",
-    vat: { formula: `SUM(H2:H${lastRow})` },
+    vat: { formula: `SUM(I2:I${lastRow})` },
     whtRate: "",
-    wht: { formula: `SUM(J2:J${lastRow})` },
-    netReceived: { formula: `SUM(K2:K${lastRow})` },
+    wht: { formula: `SUM(K2:K${lastRow})` },
+    netReceived: { formula: `SUM(L2:L${lastRow})` },
     status: "",
   });
   totalRow.font = { bold: true };

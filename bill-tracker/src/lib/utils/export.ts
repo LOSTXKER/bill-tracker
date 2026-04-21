@@ -6,13 +6,14 @@ export function exportToCSV(data: any[], filename: string, type: "expense" | "in
   // Define headers based on type
   const headers =
     type === "expense"
-      ? ["วันที่", "ผู้ขาย", "รายละเอียด", "บัญชี", "จำนวนเงิน", "สถานะ", "ผู้สร้าง"]
-      : ["วันที่", "ลูกค้า", "แหล่งที่มา", "จำนวนเงิน", "WHT", "สถานะ", "ผู้สร้าง"];
+      ? ["เลขที่เอกสาร", "วันที่", "ผู้ขาย", "รายละเอียด", "บัญชี", "จำนวนเงิน", "สถานะ", "ผู้สร้าง"]
+      : ["เลขที่เอกสาร", "วันที่", "ลูกค้า", "แหล่งที่มา", "จำนวนเงิน", "WHT", "สถานะ", "ผู้สร้าง"];
 
   // Map data to CSV rows
   const rows = data.map((item) => {
     if (type === "expense") {
       return [
+        item.documentCode || "-",
         formatThaiDate(new Date(item.billDate)),
         item.contact?.name || "-",
         item.description || "-",
@@ -23,6 +24,7 @@ export function exportToCSV(data: any[], filename: string, type: "expense" | "in
       ];
     } else {
       return [
+        item.documentCode || "-",
         formatThaiDate(new Date(item.receiveDate)),
         item.contact?.name || "-",
         item.source || "-",

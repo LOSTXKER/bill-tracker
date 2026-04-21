@@ -145,6 +145,10 @@ export function useTransactionSubmission({
       validationErrors.push("กรุณาระบุจำนวนเงิน");
     }
 
+    if (!selectedCategory) {
+      validationErrors.push("กรุณาเลือกหมวดหมู่");
+    }
+
     if (config.type === "expense") {
       validationErrors.push(...validateExpenseFields(data.documentType, taxInvoiceRequestMethod, data.isWht, whtDeliveryMethod, hasDocument));
     }
@@ -261,13 +265,17 @@ export function useTransactionSubmission({
       const formData = watch();
       const whtEnabled = formData[config.fields.whtField.name] as boolean;
 
+      const saveErrors: string[] = [];
+      if (!selectedCategory) {
+        saveErrors.push("กรุณาเลือกหมวดหมู่");
+      }
       if (config.type === "expense") {
-        const saveErrors = validateExpenseFields(formData.documentType, taxInvoiceRequestMethod, whtEnabled, whtDeliveryMethod, hasDocument);
-        if (saveErrors.length > 0) {
-          toast.error(saveErrors.join(", "));
-          setSaving(false);
-          return;
-        }
+        saveErrors.push(...validateExpenseFields(formData.documentType, taxInvoiceRequestMethod, whtEnabled, whtDeliveryMethod, hasDocument));
+      }
+      if (saveErrors.length > 0) {
+        toast.error(saveErrors.join(", "));
+        setSaving(false);
+        return;
       }
       const calc = config.calculateTotals(
         Number(formData.amount) || 0,

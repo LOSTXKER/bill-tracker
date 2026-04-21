@@ -63,6 +63,7 @@ export const GET = withCompanyAccess(
 
     // Transform data to match export format
     const expenseData = expenses.map((e) => ({
+      documentCode: e.documentCode,
       billDate: e.billDate,
       vendorName: e.contact?.name || null,
       vendorTaxId: e.contact?.taxId || null,
@@ -87,6 +88,7 @@ export const GET = withCompanyAccess(
     }));
 
     const incomeData = incomes.map((i) => ({
+      documentCode: i.documentCode,
       receiveDate: i.receiveDate,
       customerName: i.contact?.name || null,
       customerTaxId: i.contact?.taxId || null,

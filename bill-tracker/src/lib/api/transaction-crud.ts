@@ -6,6 +6,7 @@ import { ApiErrors } from "./errors";
 import { hasPermission } from "@/lib/permissions/checker";
 import { getBaseIncludes, getInternalCompanyInclude } from "./transaction-includes";
 import { runCreateSideEffects, runUpdateSideEffects, runDeleteSideEffects } from "./transaction-effects";
+import { withDocumentCode } from "@/lib/utils/document-code";
 import type { TransactionRouteConfig, RouteParamsContext } from "./transaction-types";
 
 export function createCreateHandler<TModel>(config: TransactionRouteConfig<TModel, unknown, unknown>) {
@@ -14,18 +15,30 @@ export function createCreateHandler<TModel>(config: TransactionRouteConfig<TMode
       const body = await request.json();
       const createData = config.transformCreateData(body) as Record<string, unknown>;
 
-      const item = await config.prismaModel.create({
-        data: {
-          ...createData,
-          companyId: company.id,
-          createdBy: session.user.id,
-        },
-        include: {
-          Contact: true,
-          Account: true,
-          ...getInternalCompanyInclude(config.modelName),
-        },
-      });
+      const docDateRaw =
+        createData.billDate ?? createData.receiveDate ?? new Date();
+      const docDate =
+        docDateRaw instanceof Date ? docDateRaw : new Date(docDateRaw as string);
+
+      const item = await withDocumentCode(
+        config.modelName,
+        company.id,
+        docDate,
+        (documentCode) =>
+          config.prismaModel.create({
+            data: {
+              ...createData,
+              documentCode,
+              companyId: company.id,
+              createdBy: session.user.id,
+            },
+            include: {
+              Contact: true,
+              Account: true,
+              ...getInternalCompanyInclude(config.modelName),
+            },
+          }),
+      );
 
       if (config.afterCreate) {
         await config.afterCreate(item as TModel, body, { session, company });

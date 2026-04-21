@@ -28,6 +28,10 @@ export function deduplicatePayers<T extends { paidByType: string; paidByUserId?:
 export function transformExpenseCreateData(body: TransactionRequestBody) {
   const { vatAmount: _clientVat, whtAmount: _clientWht, netPaid: _clientNet, ...data } = body;
 
+  if (!data.categoryId) {
+    throw ApiErrors.badRequest("กรุณาเลือกหมวดหมู่");
+  }
+
   const isWht = data.isWht || false;
   const hasTaxInvoice = (data.taxInvoiceUrls?.length || 0) > 0;
   const workflowStatus = "DRAFT";

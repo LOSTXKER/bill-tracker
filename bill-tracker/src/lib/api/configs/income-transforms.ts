@@ -3,9 +3,14 @@ import type { Income } from "@prisma/client";
 import { validateIncomeWhtChange } from "@/lib/validations/wht-validator";
 import { calculateTransactionTotals } from "@/lib/utils/tax-calculator";
 import type { TransactionRequestBody } from "../transaction-types";
+import { ApiErrors } from "../errors";
 
 export function transformIncomeCreateData(body: TransactionRequestBody) {
   const { vatAmount: _clientVat, whtAmount: _clientWht, netReceived: _clientNet, ...data } = body;
+
+  if (!data.categoryId) {
+    throw ApiErrors.badRequest("กรุณาเลือกหมวดหมู่");
+  }
 
   const isWhtDeducted = data.isWhtDeducted || false;
   const hasInvoice = (data.myBillCopyUrls?.length || 0) > 0;

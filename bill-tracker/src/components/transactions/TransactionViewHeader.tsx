@@ -32,6 +32,7 @@ export interface TransactionViewHeaderProps {
   // Transaction data
   transaction: {
     id: string;
+    documentCode?: string | null;
     workflowStatus?: string;
     approvalStatus?: string | null;
     documentType?: string;
@@ -136,6 +137,15 @@ export function TransactionViewHeader({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+              {transaction.documentCode && (
+                <Badge
+                  variant="outline"
+                  className="font-mono text-[11px] tracking-wide bg-muted/50"
+                  title="เลขที่เอกสาร"
+                >
+                  {transaction.documentCode}
+                </Badge>
+              )}
               {/* Show single badge: ApprovalBadge for PENDING/REJECTED, otherwise StatusBadge */}
               {showApprovalBadge ? (
                 <ApprovalBadge status={approvalStatus!} size="sm" />

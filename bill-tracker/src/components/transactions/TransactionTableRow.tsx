@@ -40,6 +40,7 @@ export interface TransactionRowConfig {
 
 export interface TransactionData {
   id: string;
+  documentCode?: string | null;
   billDate?: Date | string;
   receiveDate?: Date | string;
   description?: string | null;
@@ -253,6 +254,11 @@ function TransactionTableRowInner({
           />
         </TableCell>
       )}
+
+      {/* Document Code (เลขที่เอกสาร) */}
+      <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+        {transaction.documentCode || "-"}
+      </TableCell>
 
       {/* Created At */}
       {config.showCreatedAt && (

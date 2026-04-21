@@ -4,6 +4,7 @@ import { withCompanyAccessFromParams } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { ApiErrors } from "@/lib/api/errors";
 import { toThaiStartOfDay, toThaiEndOfDay } from "@/lib/queries/date-utils";
+import { generateDocumentCode } from "@/lib/utils/document-code";
 import type { Prisma, PaidByType } from "@prisma/client";
 
 /**
@@ -153,10 +154,17 @@ export const POST = withCompanyAccessFromParams(
     const parsedDate = billDate ? new Date(billDate) : new Date();
 
     const expense = await prisma.$transaction(async (tx) => {
+      const documentCode = await generateDocumentCode(
+        tx,
+        company.id,
+        "expense",
+        parsedDate,
+      );
       const created = await tx.expense.create({
         data: {
           id: expenseId,
           companyId: company.id,
+          documentCode,
           amount: parsedAmount,
           vatRate: 0,
           vatAmount: 0,
