@@ -5,19 +5,55 @@ import { apiResponse } from "@/lib/api/response";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit/logger";
 
 /**
- * Map Prisma unique-constraint target names to friendly Thai messages for
- * the contacts endpoints. Returns `null` when the target isn't user-visible.
+ * Normalize "nullable string" inputs from the client: trim whitespace and turn
+ * empty strings into `null`. Important for fields that participate in a UNIQUE
+ * constraint because Postgres allows many NULLs but rejects duplicate `""`.
  */
-function friendlyContactUniqueError(target: unknown): string | null {
+function nullifyBlank(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * Given a Prisma P2002 error on Contact, try to fetch the existing row that
+ * collided and build a user-friendly Thai message that names the culprit.
+ */
+async function buildContactConflictMessage(
+  err: Prisma.PrismaClientKnownRequestError,
+  companyId: string,
+  payload: { peakCode?: string | null },
+): Promise<string> {
+  const target = err.meta?.target;
   const fields = Array.isArray(target)
     ? target.map(String)
     : typeof target === "string"
       ? [target]
       : [];
-  if (fields.some((f) => f.toLowerCase().includes("peakcode"))) {
-    return "รหัส Peak นี้ถูกใช้กับ Contact อื่นในบริษัทนี้แล้ว";
+  const hitsPeakCode = fields.some((f) =>
+    f.toLowerCase().includes("peakcode"),
+  );
+
+  if (hitsPeakCode && payload.peakCode) {
+    const conflict = await prisma.contact.findFirst({
+      where: { companyId, peakCode: payload.peakCode },
+      select: { id: true, name: true, peakCode: true },
+    });
+    if (conflict) {
+      return `รหัส Peak "${conflict.peakCode}" ถูกใช้กับ "${conflict.name}" อยู่แล้ว`;
+    }
+    return `รหัส Peak "${payload.peakCode}" ถูกใช้กับ Contact อื่นในบริษัทนี้แล้ว`;
   }
-  return null;
+
+  if (hitsPeakCode) {
+    // Empty/blank peakCode that slipped through as "" — tell the user how to
+    // fix it so we don't leak a mysterious "row with '' peakCode" error.
+    return "กรุณาระบุรหัส Peak หรือเว้นว่างไว้ (ห้ามส่งค่าว่างๆ ซ้ำกัน)";
+  }
+
+  return "ข้อมูลนี้ซ้ำกับรายการที่มีอยู่แล้ว";
 }
 
 /**
@@ -39,6 +75,7 @@ export const GET = withCompanyAccess(
           { taxId: { contains: search } },
           { phone: { contains: search } },
           { email: { contains: search, mode: "insensitive" as const } },
+          { peakCode: { contains: search, mode: "insensitive" as const } },
         ],
       }),
     };
@@ -76,12 +113,14 @@ export const POST = withCompanyAccess(
   async (request, { company, session }) => {
     const body = await request.json();
 
+    const peakCode = nullifyBlank(body.peakCode) ?? null;
+
     try {
       const contact = await prisma.contact.create({
         data: {
           id: crypto.randomUUID(),
           companyId: company.id,
-          peakCode: body.peakCode || null,
+          peakCode,
           contactCategory: body.contactCategory || "VENDOR",
           entityType: body.entityType || "COMPANY",
           businessType: body.businessType || null,
@@ -132,9 +171,9 @@ export const POST = withCompanyAccess(
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        const message =
-          friendlyContactUniqueError(err.meta?.target) ??
-          "ข้อมูลนี้ซ้ำกับรายการที่มีอยู่แล้ว";
+        const message = await buildContactConflictMessage(err, company.id, {
+          peakCode,
+        });
         return apiResponse.conflict(message, "DUPLICATE_CONTACT");
       }
       throw err;
@@ -170,11 +209,19 @@ export const PATCH = withCompanyAccess(
 
     const isUpdatingDefaults = data.descriptionPresets !== undefined;
 
+    // Normalize peakCode so "" from a cleared input becomes NULL; otherwise
+    // Postgres enforces UNIQUE on the literal empty string and refuses a 2nd
+    // contact with an empty peakCode.
+    const nextPeakCode =
+      data.peakCode !== undefined
+        ? (nullifyBlank(data.peakCode) ?? null)
+        : existing.peakCode;
+
     try {
       const contact = await prisma.contact.update({
         where: { id },
         data: {
-          peakCode: data.peakCode ?? existing.peakCode,
+          peakCode: nextPeakCode,
           contactCategory: data.contactCategory ?? existing.contactCategory,
           entityType: data.entityType ?? existing.entityType,
           businessType: data.businessType ?? existing.businessType,
@@ -222,9 +269,9 @@ export const PATCH = withCompanyAccess(
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        const message =
-          friendlyContactUniqueError(err.meta?.target) ??
-          "ข้อมูลนี้ซ้ำกับรายการที่มีอยู่แล้ว";
+        const message = await buildContactConflictMessage(err, company.id, {
+          peakCode: nextPeakCode,
+        });
         return apiResponse.conflict(message, "DUPLICATE_CONTACT");
       }
       throw err;
