@@ -1,7 +1,24 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { apiResponse } from "@/lib/api/response";
 import { logCreate, logUpdate, logDelete } from "@/lib/audit/logger";
+
+/**
+ * Map Prisma unique-constraint target names to friendly Thai messages for
+ * the contacts endpoints. Returns `null` when the target isn't user-visible.
+ */
+function friendlyContactUniqueError(target: unknown): string | null {
+  const fields = Array.isArray(target)
+    ? target.map(String)
+    : typeof target === "string"
+      ? [target]
+      : [];
+  if (fields.some((f) => f.toLowerCase().includes("peakcode"))) {
+    return "รหัส Peak นี้ถูกใช้กับ Contact อื่นในบริษัทนี้แล้ว";
+  }
+  return null;
+}
 
 /**
  * GET /api/contacts?company=ABC&search=...
@@ -59,56 +76,69 @@ export const POST = withCompanyAccess(
   async (request, { company, session }) => {
     const body = await request.json();
 
-    const contact = await prisma.contact.create({
-      data: {
-        id: crypto.randomUUID(),
-        companyId: company.id,
-        peakCode: body.peakCode || null,
-        contactCategory: body.contactCategory || "VENDOR",
-        entityType: body.entityType || "COMPANY",
-        businessType: body.businessType || null,
-        nationality: body.nationality || "ไทย",
-        prefix: body.prefix || null,
-        firstName: body.firstName || null,
-        lastName: body.lastName || null,
-        name: body.name,
-        taxId: body.taxId || null,
-        branchCode: body.branchCode || "00000",
-        address: body.address || null,
-        subDistrict: body.subDistrict || null,
-        district: body.district || null,
-        province: body.province || null,
-        postalCode: body.postalCode || null,
-        country: body.country || "Thailand",
-        contactPerson: body.contactPerson || null,
-        phone: body.phone || null,
-        email: body.email || null,
-        bankAccount: body.bankAccount || null,
-        bankName: body.bankName || null,
-        creditLimit: body.creditLimit,
-        paymentTerms: body.paymentTerms,
-        notes: body.notes || null,
-        // Transaction presets
-        descriptionPresets: Array.isArray(body.descriptionPresets) ? body.descriptionPresets : [],
-        defaultsLastUpdatedAt: (Array.isArray(body.descriptionPresets) && body.descriptionPresets.length > 0)
-          ? new Date()
-          : null,
-        // Delivery preferences
-        preferredDeliveryMethod: body.preferredDeliveryMethod?.toUpperCase() || null,
-        deliveryEmail: body.deliveryEmail || null,
-        deliveryNotes: body.deliveryNotes || null,
-        // Tax Invoice Request preferences
-        taxInvoiceRequestMethod: body.taxInvoiceRequestMethod?.toUpperCase() || null,
-        taxInvoiceRequestEmail: body.taxInvoiceRequestEmail || null,
-        taxInvoiceRequestNotes: body.taxInvoiceRequestNotes || null,
-        updatedAt: new Date(),
-      },
-    });
+    try {
+      const contact = await prisma.contact.create({
+        data: {
+          id: crypto.randomUUID(),
+          companyId: company.id,
+          peakCode: body.peakCode || null,
+          contactCategory: body.contactCategory || "VENDOR",
+          entityType: body.entityType || "COMPANY",
+          businessType: body.businessType || null,
+          nationality: body.nationality || "ไทย",
+          prefix: body.prefix || null,
+          firstName: body.firstName || null,
+          lastName: body.lastName || null,
+          name: body.name,
+          taxId: body.taxId || null,
+          branchCode: body.branchCode || "00000",
+          address: body.address || null,
+          subDistrict: body.subDistrict || null,
+          district: body.district || null,
+          province: body.province || null,
+          postalCode: body.postalCode || null,
+          country: body.country || "Thailand",
+          contactPerson: body.contactPerson || null,
+          phone: body.phone || null,
+          email: body.email || null,
+          bankAccount: body.bankAccount || null,
+          bankName: body.bankName || null,
+          creditLimit: body.creditLimit,
+          paymentTerms: body.paymentTerms,
+          notes: body.notes || null,
+          // Transaction presets
+          descriptionPresets: Array.isArray(body.descriptionPresets) ? body.descriptionPresets : [],
+          defaultsLastUpdatedAt: (Array.isArray(body.descriptionPresets) && body.descriptionPresets.length > 0)
+            ? new Date()
+            : null,
+          // Delivery preferences
+          preferredDeliveryMethod: body.preferredDeliveryMethod?.toUpperCase() || null,
+          deliveryEmail: body.deliveryEmail || null,
+          deliveryNotes: body.deliveryNotes || null,
+          // Tax Invoice Request preferences
+          taxInvoiceRequestMethod: body.taxInvoiceRequestMethod?.toUpperCase() || null,
+          taxInvoiceRequestEmail: body.taxInvoiceRequestEmail || null,
+          taxInvoiceRequestNotes: body.taxInvoiceRequestNotes || null,
+          updatedAt: new Date(),
+        },
+      });
 
-    // Create audit log
-    await logCreate("Contact", contact, session.user.id, company.id);
+      // Create audit log
+      await logCreate("Contact", contact, session.user.id, company.id);
 
-    return apiResponse.created({ contact });
+      return apiResponse.created({ contact });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const message =
+          friendlyContactUniqueError(err.meta?.target) ??
+          "ข้อมูลนี้ซ้ำกับรายการที่มีอยู่แล้ว";
+        return apiResponse.conflict(message, "DUPLICATE_CONTACT");
+      }
+      throw err;
+    }
   },
   {
     permission: "contacts:create",
@@ -140,52 +170,65 @@ export const PATCH = withCompanyAccess(
 
     const isUpdatingDefaults = data.descriptionPresets !== undefined;
 
-    const contact = await prisma.contact.update({
-      where: { id },
-      data: {
-        peakCode: data.peakCode ?? existing.peakCode,
-        contactCategory: data.contactCategory ?? existing.contactCategory,
-        entityType: data.entityType ?? existing.entityType,
-        businessType: data.businessType ?? existing.businessType,
-        nationality: data.nationality ?? existing.nationality,
-        prefix: data.prefix ?? existing.prefix,
-        firstName: data.firstName ?? existing.firstName,
-        lastName: data.lastName ?? existing.lastName,
-        name: data.name ?? existing.name,
-        taxId: data.taxId ?? existing.taxId,
-        branchCode: data.branchCode ?? existing.branchCode,
-        address: data.address ?? existing.address,
-        subDistrict: data.subDistrict ?? existing.subDistrict,
-        district: data.district ?? existing.district,
-        province: data.province ?? existing.province,
-        postalCode: data.postalCode ?? existing.postalCode,
-        country: data.country ?? existing.country,
-        contactPerson: data.contactPerson ?? existing.contactPerson,
-        phone: data.phone ?? existing.phone,
-        email: data.email ?? existing.email,
-        bankAccount: data.bankAccount ?? existing.bankAccount,
-        bankName: data.bankName ?? existing.bankName,
-        creditLimit: data.creditLimit ?? existing.creditLimit,
-        paymentTerms: data.paymentTerms ?? existing.paymentTerms,
-        notes: data.notes ?? existing.notes,
-        // Transaction presets
-        descriptionPresets: data.descriptionPresets !== undefined ? data.descriptionPresets : undefined,
-        defaultsLastUpdatedAt: isUpdatingDefaults ? new Date() : existing.defaultsLastUpdatedAt,
-        // Delivery preferences
-        preferredDeliveryMethod: data.preferredDeliveryMethod !== undefined ? (data.preferredDeliveryMethod?.toUpperCase() || null) : existing.preferredDeliveryMethod,
-        deliveryEmail: data.deliveryEmail !== undefined ? data.deliveryEmail : existing.deliveryEmail,
-        deliveryNotes: data.deliveryNotes !== undefined ? data.deliveryNotes : existing.deliveryNotes,
-        // Tax Invoice Request preferences
-        taxInvoiceRequestMethod: data.taxInvoiceRequestMethod !== undefined ? (data.taxInvoiceRequestMethod?.toUpperCase() || null) : existing.taxInvoiceRequestMethod,
-        taxInvoiceRequestEmail: data.taxInvoiceRequestEmail !== undefined ? data.taxInvoiceRequestEmail : existing.taxInvoiceRequestEmail,
-        taxInvoiceRequestNotes: data.taxInvoiceRequestNotes !== undefined ? data.taxInvoiceRequestNotes : existing.taxInvoiceRequestNotes,
-      },
-    });
+    try {
+      const contact = await prisma.contact.update({
+        where: { id },
+        data: {
+          peakCode: data.peakCode ?? existing.peakCode,
+          contactCategory: data.contactCategory ?? existing.contactCategory,
+          entityType: data.entityType ?? existing.entityType,
+          businessType: data.businessType ?? existing.businessType,
+          nationality: data.nationality ?? existing.nationality,
+          prefix: data.prefix ?? existing.prefix,
+          firstName: data.firstName ?? existing.firstName,
+          lastName: data.lastName ?? existing.lastName,
+          name: data.name ?? existing.name,
+          taxId: data.taxId ?? existing.taxId,
+          branchCode: data.branchCode ?? existing.branchCode,
+          address: data.address ?? existing.address,
+          subDistrict: data.subDistrict ?? existing.subDistrict,
+          district: data.district ?? existing.district,
+          province: data.province ?? existing.province,
+          postalCode: data.postalCode ?? existing.postalCode,
+          country: data.country ?? existing.country,
+          contactPerson: data.contactPerson ?? existing.contactPerson,
+          phone: data.phone ?? existing.phone,
+          email: data.email ?? existing.email,
+          bankAccount: data.bankAccount ?? existing.bankAccount,
+          bankName: data.bankName ?? existing.bankName,
+          creditLimit: data.creditLimit ?? existing.creditLimit,
+          paymentTerms: data.paymentTerms ?? existing.paymentTerms,
+          notes: data.notes ?? existing.notes,
+          // Transaction presets
+          descriptionPresets: data.descriptionPresets !== undefined ? data.descriptionPresets : undefined,
+          defaultsLastUpdatedAt: isUpdatingDefaults ? new Date() : existing.defaultsLastUpdatedAt,
+          // Delivery preferences
+          preferredDeliveryMethod: data.preferredDeliveryMethod !== undefined ? (data.preferredDeliveryMethod?.toUpperCase() || null) : existing.preferredDeliveryMethod,
+          deliveryEmail: data.deliveryEmail !== undefined ? data.deliveryEmail : existing.deliveryEmail,
+          deliveryNotes: data.deliveryNotes !== undefined ? data.deliveryNotes : existing.deliveryNotes,
+          // Tax Invoice Request preferences
+          taxInvoiceRequestMethod: data.taxInvoiceRequestMethod !== undefined ? (data.taxInvoiceRequestMethod?.toUpperCase() || null) : existing.taxInvoiceRequestMethod,
+          taxInvoiceRequestEmail: data.taxInvoiceRequestEmail !== undefined ? data.taxInvoiceRequestEmail : existing.taxInvoiceRequestEmail,
+          taxInvoiceRequestNotes: data.taxInvoiceRequestNotes !== undefined ? data.taxInvoiceRequestNotes : existing.taxInvoiceRequestNotes,
+        },
+      });
 
-    // Create audit log
-    await logUpdate("Contact", contact.id, existing, contact, session.user.id, company.id);
+      // Create audit log
+      await logUpdate("Contact", contact.id, existing, contact, session.user.id, company.id);
 
-    return apiResponse.success({ contact });
+      return apiResponse.success({ contact });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const message =
+          friendlyContactUniqueError(err.meta?.target) ??
+          "ข้อมูลนี้ซ้ำกับรายการที่มีอยู่แล้ว";
+        return apiResponse.conflict(message, "DUPLICATE_CONTACT");
+      }
+      throw err;
+    }
   },
   { permission: "contacts:update" }
 );

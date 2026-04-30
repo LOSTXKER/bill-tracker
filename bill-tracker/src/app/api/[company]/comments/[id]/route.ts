@@ -17,17 +17,17 @@ const getCompanyFromPath = (req: Request) => {
   return pathParts[2];
 };
 
-interface RouteContext {
-  params: Promise<{ company: string; id: string }>;
-}
+// Helper to extract comment id from URL path
+// /api/[company]/comments/[id] -> last segment is the id
+const getCommentIdFromPath = (req: Request) => {
+  const url = new URL(req.url);
+  const parts = url.pathname.split("/");
+  return parts[parts.length - 1];
+};
 
 // PATCH: Update a comment (content or resolve status)
-async function handlePatch(request: Request, { session, company }: { session: { user: { id: string } }; company: { id: string } }, routeContext?: RouteContext) {
-  if (!routeContext) {
-    return apiResponse.badRequest("Missing route context");
-  }
-  
-  const { id } = await routeContext.params;
+async function handlePatch(request: Request, { session, company }: { session: { user: { id: string } }; company: { id: string } }) {
+  const id = getCommentIdFromPath(request);
   const body = await request.json();
   const { content, isResolved } = body;
 
@@ -74,6 +74,9 @@ async function handlePatch(request: Request, { session, company }: { session: { 
     }
   }
 
+  // Schema has no @updatedAt auto-handling, so we bump it manually
+  updateData.updatedAt = new Date();
+
   const updatedRaw = await prisma.comment.update({
     where: { id },
     data: updateData,
@@ -89,12 +92,8 @@ async function handlePatch(request: Request, { session, company }: { session: { 
 }
 
 // DELETE: Soft delete a comment
-async function handleDelete(request: Request, { session, company }: { session: { user: { id: string } }; company: { id: string } }, routeContext?: RouteContext) {
-  if (!routeContext) {
-    return apiResponse.badRequest("Missing route context");
-  }
-  
-  const { id } = await routeContext.params;
+async function handleDelete(request: Request, { session, company }: { session: { user: { id: string } }; company: { id: string } }) {
+  const id = getCommentIdFromPath(request);
 
   // Find the comment
   const comment = await prisma.comment.findUnique({
@@ -129,7 +128,7 @@ async function handleDelete(request: Request, { session, company }: { session: {
 
   await prisma.comment.update({
     where: { id },
-    data: { deletedAt: new Date() },
+    data: { deletedAt: new Date(), updatedAt: new Date() },
   });
 
   return apiResponse.success({ message: "Comment deleted" });

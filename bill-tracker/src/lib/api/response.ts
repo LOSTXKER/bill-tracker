@@ -132,4 +132,14 @@ export const apiResponse = {
       { status: 400 }
     );
   },
+
+  /**
+   * Return a 409 Conflict response (e.g. unique constraint violation)
+   */
+  conflict(message = "Conflict", code = "CONFLICT"): NextResponse {
+    return NextResponse.json(
+      { success: false, error: message, code },
+      { status: 409 }
+    );
+  },
 };

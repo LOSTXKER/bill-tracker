@@ -4,6 +4,8 @@
  * POST /api/[company]/comments - Create a comment
  */
 
+import { randomUUID } from "crypto";
+import type { Prisma } from "@prisma/client";
 import { apiResponse } from "@/lib/api/response";
 import { withCompanyAccess } from "@/lib/api/with-company-access";
 import { prisma } from "@/lib/db";
@@ -131,11 +133,15 @@ async function handlePost(request: Request, { session, company }: { session: { u
     return apiResponse.badRequest("Invalid entityType");
   }
 
-  // Build data based on entity type
-  const data: Record<string, unknown> = {
+  // NOTE: Prisma schema for Comment has no @default on `id` and no @updatedAt,
+  // so both fields MUST be set explicitly or `.create()` throws
+  // "Argument `id` is missing." in production.
+  const data: Prisma.CommentUncheckedCreateInput = {
+    id: randomUUID(),
     content: content.trim(),
     authorId: session.user.id,
     mentionedUserIds: mentionedUserIds || [],
+    updatedAt: new Date(),
   };
 
   if (parentId) {
@@ -153,7 +159,7 @@ async function handlePost(request: Request, { session, company }: { session: { u
   }
 
   const commentRaw = await prisma.comment.create({
-    data: data as any,
+    data,
     include: {
       User: {
         select: { id: true, name: true, email: true, avatarUrl: true },
