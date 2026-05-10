@@ -20,6 +20,7 @@ export interface ContactFormData {
   entityType: string;
   businessType: string;
   nationality: string;
+  isForeign: boolean;
   prefix: string;
   firstName: string;
   lastName: string;
@@ -67,6 +68,7 @@ export interface Contact {
   entityType?: string | null;
   businessType?: string | null;
   nationality?: string | null;
+  isForeign?: boolean | null;
   prefix?: string | null;
   firstName?: string | null;
   lastName?: string | null;
@@ -98,6 +100,7 @@ export const defaultFormData: ContactFormData = {
   entityType: "COMPANY",
   businessType: "",
   nationality: "ไทย",
+  isForeign: false,
   prefix: "",
   firstName: "",
   lastName: "",
@@ -167,6 +170,7 @@ export function contactToFormData(contact: Contact): ContactFormData {
     entityType: contact.entityType || "COMPANY",
     businessType: contact.businessType || "",
     nationality: contact.nationality || "ไทย",
+    isForeign: contact.isForeign ?? false,
     prefix: contact.prefix || "",
     firstName: contact.firstName || "",
     lastName: contact.lastName || "",

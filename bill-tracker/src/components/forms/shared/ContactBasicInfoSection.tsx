@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Globe2 } from "lucide-react";
 import type { ContactFormSectionProps } from "./contact-form-types";
 
 export function ContactBasicInfoSection({ formData, setFormData }: ContactFormSectionProps) {
@@ -137,6 +139,29 @@ export function ContactBasicInfoSection({ formData, setFormData }: ContactFormSe
               className="h-10"
               maxLength={5}
             />
+          </div>
+        </div>
+
+        {/* Foreign vendor / customer flag */}
+        <div className="flex items-start gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+          <Switch
+            id="contact-isForeign"
+            checked={!!formData.isForeign}
+            onCheckedChange={(checked) =>
+              setFormData({ ...formData, isForeign: checked })
+            }
+          />
+          <div className="space-y-0.5 flex-1">
+            <Label
+              htmlFor="contact-isForeign"
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Globe2 className="h-4 w-4 text-blue-600" />
+              ค่าใช้จ่าย/รายรับต่างประเทศ
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              เปิดเมื่อผู้ติดต่อนี้เป็นคู่ค้าต่างประเทศ (เช่น ใช้สำหรับ ภ.พ.36 หรือสกุลเงินต่างประเทศ)
+            </p>
           </div>
         </div>
       </div>

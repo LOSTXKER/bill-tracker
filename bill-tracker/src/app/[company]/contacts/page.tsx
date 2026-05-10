@@ -34,6 +34,7 @@ import {
   UserCheck,
   Truck,
   HelpCircle,
+  Globe2,
 } from "lucide-react";
 import {
   Select,
@@ -94,6 +95,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedForeign, setSelectedForeign] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("peakCode");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
@@ -146,7 +148,11 @@ export default function ContactsPage({ params }: ContactsPageProps) {
     const matchesSource = !selectedSource ||
       (selectedSource === "PEAK" ? contact.source === "PEAK" : contact.source !== "PEAK");
 
-    return matchesSearch && matchesCategory && matchesSource;
+    // Foreign filter
+    const matchesForeign = !selectedForeign ||
+      (selectedForeign === "FOREIGN" ? !!contact.isForeign : !contact.isForeign);
+
+    return matchesSearch && matchesCategory && matchesSource && matchesForeign;
   });
 
   // Sort contacts
@@ -251,8 +257,19 @@ export default function ContactsPage({ params }: ContactsPageProps) {
           <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
             <Building2 className="h-4 w-4 text-primary" />
           </div>
-          <div>
-            <p className="font-medium">{contact.name}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-medium">{contact.name}</p>
+              {contact.isForeign && (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-blue-300 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900"
+                >
+                  <Globe2 className="h-3 w-3" />
+                  ต่างประเทศ
+                </Badge>
+              )}
+            </div>
             {contact.address && (
               <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                 {contact.address}
@@ -495,8 +512,31 @@ export default function ContactsPage({ params }: ContactsPageProps) {
               </SelectContent>
             </Select>
 
+            {/* Foreign Filter */}
+            <Select
+              value={selectedForeign || "all"}
+              onValueChange={(value) => setSelectedForeign(value === "all" ? null : value)}
+            >
+              <SelectTrigger className="w-[160px] h-8">
+                <SelectValue placeholder="ในประเทศ/ต่างประเทศ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกประเทศ</SelectItem>
+                <SelectItem value="FOREIGN">
+                  <span className="flex items-center gap-1">
+                    <Globe2 className="h-3 w-3" /> ต่างประเทศ
+                  </span>
+                </SelectItem>
+                <SelectItem value="DOMESTIC">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" /> ในประเทศ
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Clear Filters */}
-            {(selectedCategory || selectedSource) && (
+            {(selectedCategory || selectedSource || selectedForeign) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -504,6 +544,7 @@ export default function ContactsPage({ params }: ContactsPageProps) {
                 onClick={() => {
                   setSelectedCategory(null);
                   setSelectedSource(null);
+                  setSelectedForeign(null);
                 }}
               >
                 <X className="h-4 w-4 mr-1" />
@@ -527,10 +568,10 @@ export default function ContactsPage({ params }: ContactsPageProps) {
         onSort={handleSort}
         emptyState={{
           icon: Users,
-          title: search || selectedCategory || selectedSource 
-            ? "ไม่พบผู้ติดต่อที่ตรงกับเงื่อนไข" 
+          title: search || selectedCategory || selectedSource || selectedForeign
+            ? "ไม่พบผู้ติดต่อที่ตรงกับเงื่อนไข"
             : "ยังไม่มีผู้ติดต่อ",
-          action: !search && !selectedCategory && !selectedSource ? (
+          action: !search && !selectedCategory && !selectedSource && !selectedForeign ? (
             <Button variant="outline" onClick={() => handleOpenDialog()}>
               <Plus className="h-4 w-4 mr-2" />
               เพิ่มผู้ติดต่อแรก

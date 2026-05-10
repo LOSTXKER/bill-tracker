@@ -196,6 +196,8 @@ model Contact {
   country         String?         @default("Thailand")
   contactPerson   String?
   source          DataSource      @default(MANUAL)
+  // ค่าใช้จ่าย/รายรับต่างประเทศ – ใช้แยก vendor ต่างประเทศ (เช่น สำหรับ ภ.พ.36)
+  isForeign       Boolean         @default(false)
 
   // @deprecated -- migrated to descriptionPresets (TransactionPreset JSON)
   defaultVatRate        Int?

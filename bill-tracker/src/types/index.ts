@@ -174,6 +174,7 @@ export interface ContactSummary {
   peakCode?: string | null;
   source?: "PEAK" | "MANUAL" | "AI";
   contactCategory?: string | null;
+  isForeign?: boolean | null;
   // Delivery preferences
   preferredDeliveryMethod?: string | null;
   deliveryEmail?: string | null;
