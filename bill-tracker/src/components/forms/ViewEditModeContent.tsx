@@ -125,7 +125,7 @@ export function ViewEditModeContent({
               renderAdditionalFields={() =>
                 config.renderAdditionalFields?.({ register, watch, setValue, mode })
               }
-              isWht={config.type === "expense" ? transaction?.isWht : transaction?.isWhtDeducted}
+              isWht={watchIsWht}
               layout="sectioned"
               onAiSuggestAccount={mode === "edit" ? (suggestion) => {
                 setAccountSuggestion({
